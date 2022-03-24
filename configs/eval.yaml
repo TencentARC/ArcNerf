@@ -1,0 +1,35 @@
+# eval script
+
+name: eval
+
+model_pt: None
+
+dir:
+    data_dir: None
+    eval_dir: None
+
+gpu_ids: -1                   # -1 for cpu, 0/1/2 for gpu. Do not use multiple gpu
+
+worker: 1
+
+dist:
+    rank: 0
+    local_rank: 0
+    world_size: 1
+
+progress:
+    max_samples_eval: 10      # Max num of sample to write into image in eval
+
+dataset:
+    eval:
+        type: DummyConv
+        eval_batch_size: 1
+
+metric:
+    M1:
+    M2:
+
+model:
+    type: ConvModel
+    in_channel: 3
+    out_channel: 1
