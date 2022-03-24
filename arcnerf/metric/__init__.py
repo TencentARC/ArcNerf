@@ -27,7 +27,8 @@ def build_metric(cfgs, logger):
         metric_funcs.append(METRIC_REGISTRY.get(metric)(getattr(cfgs.metric, metric)))
         metric_names.append(metric)
     metric_factory = AllMetric(metric_funcs, metric_names)
-    logger.add_log('Metric types : {}'.format(metric_names))
+    if logger is not None:
+        logger.add_log('Metric types : {}'.format(metric_names))
 
     return metric_factory
 

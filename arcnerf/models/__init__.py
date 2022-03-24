@@ -24,7 +24,8 @@ def build_model(cfgs, logger):
     """
     cfgs = deepcopy(cfgs)
     model = MODEL_REGISTRY.get(cfgs.model.type)(cfgs)
-    logger.add_log('Model type : {}'.format(cfgs.model.type))
-    logger.add_log('Model Configs: {}'.format(obj_to_dict(cfgs.model)))
+    if logger is not None:
+        logger.add_log('Model type : {}'.format(cfgs.model.type))
+        logger.add_log('Model Configs: {}'.format(obj_to_dict(cfgs.model)))
 
     return model

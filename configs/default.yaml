@@ -10,7 +10,7 @@ debug:
 
 dir:
     expr_dir: None
-    data_dir: None
+    data_dir: None                  # It is the main dataset address containing all dataset
 
 gpu_ids: -1                         # -1 is cpu, otherwise use list of gpus
 

@@ -30,7 +30,8 @@ def get_dataset(cfgs, data_dir, logger, mode='train', transfroms=None):
     cfgs = deepcopy(cfgs)
     cfgs_mode = get_mode_cfgs(cfgs, mode)
     model = DATASET_REGISTRY.get(getattr(cfgs_mode, 'type'))(cfgs_mode, data_dir, mode, transfroms)
-    logger.add_log('Dataset type : {} - mode: {}'.format(getattr(cfgs_mode, 'type'), mode))
-    logger.add_log('Dataset Configs: {}'.format(obj_to_dict(cfgs_mode)))
+    if logger is not None:
+        logger.add_log('Dataset type : {} - mode: {}'.format(getattr(cfgs_mode, 'type'), mode))
+        logger.add_log('Dataset Configs: {}'.format(obj_to_dict(cfgs_mode)))
 
     return model

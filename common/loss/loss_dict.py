@@ -12,6 +12,20 @@ class LossDictCounter(object):
         self.count = 0
         self.avg_summary = None
 
+    def get_summary(self):
+        """Get summary"""
+        return self.summary
+
+    def get_count(self):
+        """Get total num of sample"""
+        return self.count
+
+    def reset(self):
+        """Reset all to init mode"""
+        self.summary = None
+        self.count = 0
+        self.avg_summary = None
+
     def __call__(self, loss, batch_size):
         """Write loss to summary."""
         if self.summary is None:

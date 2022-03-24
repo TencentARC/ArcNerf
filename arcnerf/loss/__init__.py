@@ -29,8 +29,9 @@ def build_loss(cfgs, logger):
         loss_names.append(loss)
         loss_weights.append(getattr(cfgs.loss, loss).weight)
     loss_factory = AllLoss(loss_funcs, loss_names, loss_weights)
-    logger.add_log('Loss types : {}'.format(loss_names))
-    logger.add_log('Loss Weights: {}'.format(loss_weights))
+    if logger is not None:
+        logger.add_log('Loss types : {}'.format(loss_names))
+        logger.add_log('Loss Weights: {}'.format(loss_weights))
 
     return loss_factory
 
