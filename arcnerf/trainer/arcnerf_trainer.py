@@ -37,7 +37,7 @@ class ArcNerfTrainer(BasicTrainer):
             'pin_memory': True,
             'drop_last': True
         }
-        data['train'], data['train_sampler'], train_info = self.set_dataset('train', tkwargs)
+        data['train'], data['train_sampler'] = self.set_dataset('train', tkwargs)
 
         # val
         if not hasattr(self.cfgs.dataset, 'val') or self.cfgs.dataset.val is None:
@@ -59,13 +59,13 @@ class ArcNerfTrainer(BasicTrainer):
                 'pin_memory': True,
                 'drop_last': False
             }
-            data['eval'], _, _ = self.set_dataset('eval', tkwargs_eval)
+            data['eval'], _ = self.set_dataset('eval', tkwargs_eval)
 
         return data
 
     def set_dataset(self, mode, tkwargs):
         """Get loader, sampler and aug_info"""
-        transforms, info = get_transforms(getattr(self.cfgs.dataset, mode))
+        transforms, _ = get_transforms(getattr(self.cfgs.dataset, mode))
         dataset = get_dataset(
             self.cfgs.dataset, self.cfgs.dir.data_dir, logger=self.logger, mode=mode, transfroms=transforms
         )
@@ -77,7 +77,7 @@ class ArcNerfTrainer(BasicTrainer):
             )
         loader = torch.utils.data.DataLoader(dataset, sampler=sampler, shuffle=(sampler is None), **tkwargs)
 
-        return loader, sampler, info
+        return loader, sampler
 
     def set_loss_factory(self):
         """Set loss factory which will be use to calculate all the loss"""

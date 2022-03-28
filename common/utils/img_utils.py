@@ -4,10 +4,14 @@ import cv2
 import numpy as np
 
 
-def read_img(path, dtype=np.float32, norm_by_255=False, bgr2rgb=True):
+def read_img(path, dtype=np.float32, norm_by_255=False, bgr2rgb=True, gray=False):
     """Read img in RGB Order. Generally do no norm the image by 255"""
     try:
         img = cv2.imread(path)
+        if gray:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            bgr2rgb = False
+
         if bgr2rgb:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
@@ -25,6 +29,24 @@ def read_img(path, dtype=np.float32, norm_by_255=False, bgr2rgb=True):
             raise RuntimeError(
                 'Image at {} found error, read as image {}, dtype {}, shape {}'.format(path, img, img.dtype, img.shape)
             )
+
+    return img
+
+
+def img_scale(img, scale, interpolation=None):
+    """Scale a image using cv2.resize(). scale > 1 is scale_up
+    By default scale_up uses INTER_LINEAR, scale_down uses INTER_AREA. You can specify by youself.
+    """
+    if scale == 1:
+        return img
+
+    new_h, new_w = int(img.shape[0] * scale), int(img.shape[1] * scale)
+    if scale > 1:
+        interpolation = cv2.INTER_LINEAR if interpolation is None else interpolation
+    elif scale < 1:
+        interpolation = cv2.INTER_AREA if interpolation is None else interpolation
+
+    img = cv2.resize(img, (new_w, new_h), interpolation=interpolation)
 
     return img
 

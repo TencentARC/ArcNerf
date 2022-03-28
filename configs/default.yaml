@@ -10,7 +10,7 @@ debug:
 
 dir:
     expr_dir: None
-    data_dir: None                  # It is the main dataset address containing all dataset
+    data_dir: '/Users/leoyluo/Desktop/Immerse/data'       # It is the main dataset address containing all dataset
 
 gpu_ids: -1                         # -1 is cpu, otherwise use list of gpus
 
@@ -64,12 +64,20 @@ progress:
 
 dataset:
     train:
-        type: DummyConv
+        type: DTU
+        scan_id: 65
+        img_scale: 1.0              # scale image and intrinsic, < 1 means scale_down
+        scale_radius: 3.0           # norm the camera within a sphere with such radius
+        precache: False              # precache all the rays at once
         augmentation:
-            jitter: 0.5
+            N_rays: 1024
 
     val:
-        type: DummyConv
+        type: DTU
+        scan_id: 65
+        img_scale: 0.5
+        scale_radius: 3.0
+        precache: False
 
     eval:
         type: DummyConv
