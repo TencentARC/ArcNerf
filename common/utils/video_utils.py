@@ -12,11 +12,14 @@ import numpy as np
 def read_video(path, bgr2rgb=False, downsample=1, max_count=None):
     """
     Read a video to image list
-    :param path: The path of video file.
-    :param bgr2rgb: Whether to change the frame from bgr to rgb order
-    :param downsample: downsample ratio. default is 1
-    :param max_count: max number of frames to be extracted. None will extract all.
-    :return: a list of image.
+
+    Args:
+        path: The path of video file.
+        bgr2rgb: Whether to change the frame from bgr to rgb order
+        downsample: downsample ratio. default is 1
+        max_count: max number of frames to be extracted. None will extract all.
+    Returns:
+         a list of image.
     """
     assert osp.exists(path), 'No video file at {}'.format(path)
 
@@ -46,10 +49,12 @@ def read_video(path, bgr2rgb=False, downsample=1, max_count=None):
 def write_video(img_list, path, rgb2bgr=False, fps=30):
     """
     Write a video from image list
-    :param img_list: A list of img in np array. Should be in bgr order, if in rgb need to set rgb2bgr=True
-    :param path: The path to write the video. .MP4 is tested now.
-    :param rgb2bgr: Whether to change img from rgb order to bgr.
-    :param fps: video fps to be saved.
+
+    Args:
+        img_list: A list of img in np array. Should be in bgr order, if in rgb need to set rgb2bgr=True
+        path: The path to write the video. .MP4 is tested now.
+        rgb2bgr: Whether to change img from rgb order to bgr.
+        fps: video fps to be saved.
     """
     assert len(img_list) > 0, 'No image to be recorded down'
 
@@ -66,13 +71,15 @@ def write_video(img_list, path, rgb2bgr=False, fps=30):
 
 def extract_video(path, dst_folder, max_name_len=6, ext='.png', video_downsample=1, image_downsample=1, max_count=None):
     """Extract frames of a video to final folder. Frame will to write to xxxxx.jpg.
-    :param path: video path
-    :param dst_folder: folder to write
-    :param max_name_len: max len of name.
-    :param video_downsample: video downsample factor
-    :param image_downsample: if >1, will resize image_h and image_w by factor
-    :param max_count: max number of frames to be extracted. None will extract all
-    :param ext: .png or .jpg
+
+    Args:
+        path: video path
+        dst_folder: folder to write
+        max_name_len: max len of name.
+        video_downsample: video downsample factor
+        image_downsample: if >1, will resize image_h and image_w by factor
+        max_count: max number of frames to be extracted. None will extract all
+        ext: .png or .jpg
     """
     assert osp.exists(path), 'No video file at {}'.format(path)
 
@@ -122,11 +129,15 @@ def extract_video_ffmpeg(path, dst_folder, max_name_len=6, ext='.png', max_count
 def get_video_metadata(path):
     """
     Get the metadata of a video.
-    :param path: video path
-    :return length:  number of frames
-            width:   frame width
-            height:  frame height
-            fps:     video fps
+
+    Args:
+        path: video path
+
+    Returns：
+        - length: number of frames
+        - width: frame width
+        - height: frame height
+        - fps: video fps
     """
     assert osp.exists(path), 'No video file at {}'.format(path)
 
@@ -144,10 +155,12 @@ def ffmpeg_video_read(video_path, fps=None):
       This function supports setting fps for video reading. It is critical
       as AIST++ Dataset are constructed under exact 60 fps, while some of
       the AIST dance videos are not percisely 60 fps.
-      Args:
+
+    Args:
         video_path: A video file.
         fps: Use specific fps for video reading. (optional)
-      Returns:
+
+    Returns:
         A `np.array` with the shape of [seq_len, height, width, 3]
     """
     assert os.path.exists(video_path), f'{video_path} does not exist!'
@@ -170,7 +183,8 @@ def ffmpeg_video_read(video_path, fps=None):
 
 def ffmpeg_video_write(data, video_path, fps=25):
     """Video writer based on FFMPEG. Borrow from https://github.com/google/aistplusplus_api.
-      Args:
+
+    Args:
         data: A `np.array` with the shape of [seq_len, height, width, 3]
         video_path: A video file.
         fps: Use specific fps for video writing. (optional)

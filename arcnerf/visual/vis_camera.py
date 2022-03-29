@@ -73,9 +73,6 @@ def draw_cameras(ax, cam_width, cam_height, f_scale, extrinsics):
     color = (1.0, 0.0, 0.0)  # red
 
     for idx in range(extrinsics.shape[0]):
-        # R, _ = cv2.Rodrigues(extrinsics[idx, :3, :3])
-        # cMo = np.eye(4, 4)
-        # cMo[0:3, 0:3] = R
         cMo = extrinsics[idx]
         for i in range(len(X_moving)):
             X = np.zeros(X_moving[i].shape)
@@ -90,7 +87,10 @@ def draw_cameras(ax, cam_width, cam_height, f_scale, extrinsics):
 
 def draw_camera_extrinsic(extrinsics, save_path=None):
     """draw cameras on image
-    :params: extrinsics: w2c pose stack in in shape(N, 4, 4)
+
+    Args:
+        extrinsics: w2c pose stack in in shape(N, 4, 4)
+        save_path: path to save the fig. None will only show fig
     """
     # set vis params, adjust by camera loc
     max_cam_pose_norm = np.linalg.norm(extrinsics[:, :3, 3], axis=-1).max()

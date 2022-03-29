@@ -5,8 +5,8 @@ import os.path as osp
 
 import numpy as np
 
-from arcnerf.datasets.base_3d_dataset import Base3dDataset
-from arcnerf.datasets import DATASET_REGISTRY
+from .base_3d_dataset import Base3dDataset
+from ..datasets import DATASET_REGISTRY
 from arcnerf.render.camera import load_K_Rt_from_P, PerspectiveCamera
 from common.utils.img_utils import read_img
 
@@ -74,8 +74,10 @@ class DTU(Base3dDataset):
         """Get cameras with pose and intrinsic from cam_file.npz. Detail information is here
         https://github.com/autonomousvision/differentiable_volumetric_rendering/blob/master/FAQ.md
 
-        In DTU, camera mat is [2/w, 0; -1, 0, 2/h, -1; 0, 0, 1], which transfer point in (w,h) to (-1, 1).
-        Scale_mat and world_mats transfer the image into correct image_plane
+        In DTU, camera mat is [2/w, 0, -1,
+                               0, 2/h, -1;
+                               0, 0, 1], which transfer point in range (w,h) to (-1, 1).
+        Scale_mat and world_mats transfer the image into correct image_plane within range (w, h)
         """
         cam_dict = np.load(cam_file)
         scale_mats = [cam_dict['scale_mat_%d' % idx].astype(np.float32) for idx in range(self.n_imgs)]
