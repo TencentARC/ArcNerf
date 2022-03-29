@@ -16,9 +16,9 @@ def invert_pose(poses):
         poses: (N, 4, 4)
     """
     if isinstance(poses, torch.FloatTensor):
-        return torch.inverse(poses)
+        return torch.inverse(poses.clone())
     elif isinstance(poses, np.ndarray):
-        return np.linalg.inv(poses)
+        return np.linalg.inv(poses.copy())
 
 
 def center_poses(poses):

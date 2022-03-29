@@ -2,6 +2,8 @@
 
 import torch
 
+from .transformation import rotate_points
+
 
 def pixel_to_cam(pixels, z, intrinsic):
     """Pixel to cam space xyz
@@ -41,7 +43,7 @@ def cam_to_world(points, c2w):
     Returns:
         xyz_world: torch.tensor(B, N, 3), pixel lift to world coord position
     """
-    xyz_world = torch.einsum('bki, bji->bjk', c2w[:, :3, :3], points)
+    xyz_world = rotate_points(points, c2w)
 
     return xyz_world
 
@@ -73,7 +75,7 @@ def world_to_cam(points, w2c):
     Returns:
          xyz_cam: torch.tensor(B, N, 3), xyz in world coord
     """
-    xyz_cam = torch.einsum('bki, bji->bjk', w2c[:, :3, :3], points)
+    xyz_cam = rotate_points(points, w2c)
 
     return xyz_cam
 
@@ -106,8 +108,10 @@ def world_to_pixel(points, intrinsic, w2c, distort=None):
         pixels: index in x(horizontal)/y(vertical), torch.tensor (B, N, 2)
     """
     xyz_cam = world_to_cam(points, w2c)
+
     if distort:
         xyz_cam = apply_distortion(xyz_cam, distort[0], distort[1])
+
     pixels = cam_to_pixel(xyz_cam, intrinsic)
 
     return pixels

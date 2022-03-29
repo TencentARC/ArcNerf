@@ -6,8 +6,9 @@ import unittest
 import numpy as np
 import torch
 
+from arcnerf.geometry.poses import invert_pose
 from arcnerf.geometry.projection import pixel_to_cam
-from arcnerf.geometry.transformation import normalize
+from arcnerf.geometry.transformation import normalize, rotate_points
 from tests.tests_arcnerf.tests_geometry import TestGeomDict
 
 
@@ -23,6 +24,15 @@ class TestDict(TestGeomDict):
         vec_np = vec.numpy()
         norm_vec_np = normalize(vec_np)
         self.assertTrue(np.allclose(np.ones(shape=norm_vec_np.shape[:2]), np.linalg.norm(norm_vec_np, axis=-1)))
+
+    def tests_rotate_points(self):
+        points = torch.rand(size=(self.batch_size, 1000, 3))
+        rot = torch.eye(4)
+        rot[:3, :4] = torch.rand(size=(3, 4))
+        rot = torch.repeat_interleave(rot.unsqueeze(0), self.batch_size, dim=0)
+        inv_rot = invert_pose(rot)
+        points_test = rotate_points(rotate_points(points, rot), inv_rot)
+        self.assertTrue(torch.allclose(points, points_test, atol=1e-3))
 
     @staticmethod
     def get_max_abs_error(a, b):

@@ -24,15 +24,16 @@ class TestDict(TestGeomDict):
         xyz_world_direct = pixel_to_world(self.pixels, self.depth, self.intrinsic, self.c2w)
         self.assertTrue(torch.allclose(xyz_world, xyz_world_direct))
 
-        # Seems like w2c invert increase error at max 1e-3 level
+        # Seems like w2c invert increase error at above 1e-3 level
         xyz_cam_from_world = world_to_cam(xyz_world, self.get_w2c())
-        self.assertTrue(torch.allclose(xyz_cam, xyz_cam_from_world, atol=1e-3))
+        self.assertTrue(torch.allclose(xyz_cam, xyz_cam_from_world, atol=1e-5))
+        # accumulated error at pixel level is above 1e-2
         pixel_from_cam = cam_to_pixel(xyz_cam, self.intrinsic)
         self.assertTrue(torch.allclose(self.pixels, pixel_from_cam, atol=1e-3))
         pixel_from_world = world_to_pixel(xyz_world, self.intrinsic, self.get_w2c())
         self.assertTrue(
-            torch.allclose(self.pixels, pixel_from_world, atol=1e-1),
-            'max_error {:.2f}'.format(self.get_max_abs_error(self.pixels, pixel_from_world))
+            torch.allclose(self.pixels, pixel_from_world, atol=1e-2),
+            'max_error {:.5f}'.format(self.get_max_abs_error(self.pixels, pixel_from_world))
         )
 
     @staticmethod

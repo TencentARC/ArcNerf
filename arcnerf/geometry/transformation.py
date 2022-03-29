@@ -25,6 +25,26 @@ def normalize(vec):
     return vec
 
 
+def rotate_points(points, rot):
+    """Rotate points by a rot
+
+    Args:
+        points: points, torch.tensor(B, N, 3)
+        rot: rot matrix, torch.tensor(B, 4, 4)
+
+    Returns:
+        rotated points in (B, N, 3)
+    """
+    # convert points to home
+    homo_coord = torch.ones(list(points.shape)[:-1] + [1], dtype=points.dtype, device=points.device)
+    points_h = torch.cat([points, homo_coord], dim=-1)
+
+    proj_points = torch.einsum('bki,bji->bjk', rot, points_h)  # (B, N, 4)
+    proj_points = torch.div(proj_points[..., :3], proj_points[..., 3].unsqueeze(-1))
+
+    return proj_points[..., :3]
+
+
 def rotate_matrix(rot, source):
     """Rotate a matrix by a rot
 

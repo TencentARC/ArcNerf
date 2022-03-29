@@ -21,13 +21,18 @@ save related visual results into results folder.
 
 ### tests_geometry
 Test geometry function.
+#### tests_poses
+Test the poses creation and modification functions.
 #### tests_projection
-Test projection functions. Make pixels and transform to points, project them
+Test projection functions. Make pixels and transform them to points, then project points
 back to pixels. Check the difference.
 #### tests_transformation
-Test function in transform
+Test function in transform, like normalization, rotation
 
 ### tests_render
+#### tests_camera
+Test camera creation, get_rays and project rays into pixel.
+Also check when we rescale camera and image, whether rays get projected correctly.
 
 ### tests_visual
 Tests for visualization functions

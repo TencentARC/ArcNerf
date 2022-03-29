@@ -18,23 +18,22 @@ class PerspectiveCamera(object):
             Intrinsic: (3, 3) numpy array
             cw2: (4, 4) numpy array
             H, W: height/width
-            dtype: torch tensor type. used for output
+            dtype: torch tensor type. controls for outputs like intrinsic/pose/ray_bundle.
+                    By default is torch.float32
         """
         self.dtype = dtype
-        self.intrinsic = intrinsic
-        self.c2w = c2w
+        self.intrinsic = intrinsic.copy()
+        self.c2w = c2w.copy()
         self.W = W if W is not None else int(c2w[0, 2] / 2.0)
         self.H = H if H is not None else int(c2w[1, 2] / 2.0)
 
     def rescale(self, scale):
         """Scale intrinsic and hw. scale < 1.0 means scale_down"""
-        # TODO: Skewness is a ratio, not scale, will it be use in ray_sampler?
-        # TODO: How scale it affects the points
         self.intrinsic[0, 0] *= scale
         self.intrinsic[1, 1] *= scale
         self.intrinsic[0, 2] *= scale
         self.intrinsic[1, 2] *= scale
-        # self.intrinsic[0, 1] *= scale # check whether skewness needs to be scaled
+        self.intrinsic[0, 1] *= scale
         self.H = int(self.H * scale)
         self.W = int(self.W * scale)
 
@@ -44,6 +43,10 @@ class PerspectiveCamera(object):
 
         return pose_norm
 
+    def get_wh(self):
+        """Get camera width and height"""
+        return self.W, self.H
+
     def rescale_pose(self, scale):
         """scale the pose."""
         self.c2w[:3, 3] *= scale
@@ -51,17 +54,17 @@ class PerspectiveCamera(object):
     def get_intrinsic(self, torch_tensor=True):
         """Get intrinsic. return numpy array by default"""
         if torch_tensor:
-            return torch.FloatTensor(self.intrinsic, dtype=self.dtype)
+            return torch.tensor(self.intrinsic, dtype=self.dtype)
         else:
             return self.intrinsic
 
     def get_pose(self, torch_tensor=True, w2c=False):
-        """Get pose, retrun numpy array by default. Support w2c transformation"""
+        """Get pose, return numpy array by default. Support w2c transformation"""
         pose = self.c2w.copy()
         if w2c:
-            pose = invert_pose(self.c2w)
+            pose = invert_pose(pose)
         if torch_tensor:
-            pose = torch.FloatTensor(pose, dtype=self.dtype)
+            pose = torch.tensor(pose, dtype=self.dtype)
 
         return pose
 
@@ -72,14 +75,18 @@ class PerspectiveCamera(object):
     def proj_world_to_pixel(self, points):
         """Project points onto image plane.
 
-        :param points: torch.Tensor(N, 3)
-        :return: pixels: torch.Tensor(N, 2)
+        Args:
+            points: pts in world coord, torch.Tensor(N, 3)
+
+        Returns:
+            pixels: pixel loc, torch.Tensor(N, 2)
         """
         pixel = world_to_pixel(
             points.unsqueeze(0),
             self.get_intrinsic().unsqueeze(0),
-            self.get_pose(w2c=True).unsqueeze()
+            self.get_pose(w2c=True).unsqueeze(0)
         )
+
         return pixel[0]
 
 
@@ -123,7 +130,7 @@ def get_rays(H, W, intrinsic, c2w, index=None):
         torch.linspace(0, W - 1, W, dtype=dtype), torch.linspace(0, H - 1, H, dtype=dtype)
     )  # i, j: (W, H)
 
-    pixels = torch.stack([i, j]).reshape(-1, 2).unsqueeze(0)  # (1, WH, 2)
+    pixels = torch.stack([i, j], dim=-1).reshape(-1, 2).unsqueeze(0)  # (1, WH, 2)
     z = torch.ones(size=(1, pixels.shape[1]), dtype=dtype).to(device)  # (1, WH)
     xyz_world = pixel_to_world(pixels, z, intrinsic.unsqueeze(0), c2w.unsqueeze(0))  # (1, WH, 3)
 

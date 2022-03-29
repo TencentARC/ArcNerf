@@ -14,16 +14,21 @@ class TestGeomDict(unittest.TestCase):
     def setUp(self):
         self.cfgs = setup_test_config()
         self.H, self.W = 480, 640
+        self.focal = 1000.0
+        self.skewness = 10.0
         self.batch_size = 2
         self.intrinsic, self.c2w = self.setup_params()
         self.pixels, self.depth = self.set_pixels()
 
     def setup_params(self):
         intrinsic = torch.eye(3, dtype=torch.float32)
+        intrinsic[0, 0] = self.focal
+        intrinsic[1, 1] = self.focal
+        intrinsic[0, 1] = self.skewness
         intrinsic[0, 2] = self.W / 2.0
         intrinsic[1, 2] = self.H / 2.0
         c2w = torch.eye(4, dtype=torch.float32)
-        c2w[:3, :3] = torch.rand(size=(3, 3))
+        c2w[:3, :4] = torch.rand(size=(3, 4))
         intrinsic = torch.repeat_interleave(intrinsic[None, ...], self.batch_size, dim=0)
         c2w = torch.repeat_interleave(c2w[None, ...], self.batch_size, dim=0)
 
