@@ -8,7 +8,7 @@ import unittest
 import numpy as np
 import torch
 
-from arcnerf.geometry.poses import invert_poses, look_at, get_sphere_line, get_spiral_line
+from arcnerf.geometry.poses import generate_cam_pose_on_sphere, invert_poses, look_at
 from arcnerf.geometry.transformation import normalize
 from arcnerf.visual.plot_3d import draw_3d_components
 from tests.tests_arcnerf.tests_geometry import TestGeomDict
@@ -21,6 +21,8 @@ class TestDict(TestGeomDict):
 
     def setUp(self):
         super().setUp()
+        self.radius = 4
+        self.n_cam = 25
 
     def tests_invert_pose(self):
         c2w_new = invert_poses(invert_poses(self.c2w))
@@ -42,36 +44,46 @@ class TestDict(TestGeomDict):
             view_mat[None],
             points=point[None, :],
             rays=(cam_loc[None, :], rays_d[None, :]),
-            sphere_radius=4,
+            sphere_radius=self.radius,
             title='look at camera from (1,2,3) to (0,0,0)',
             save_path=file_path
         )
 
-    def tests_sphere_line(self):
-        file_path = osp.join(RESULT_DIR, 'sphere_line.png')
-        sphere_lines = []
-        origin = (5, 5, 0)
-        for v in [-0.5, 0, 0.5, 0.8]:
-            sphere_lines.append(get_sphere_line(4, v=v, origin=origin))
-        draw_3d_components(
-            sphere_radius=4,
-            sphere_origin=origin,
-            lines=sphere_lines,
-            title='sphere_line_ori(5,5,0)',
-            save_path=file_path
-        )
+    def tests_generate_cam_pose_on_sphere(self):
+        u_start = 0  # (0, 1)
+        v_ratio = 0.5  # (-1, 1)
+        # custom case
+        # look_at_point = np.array([1.0, 1.0, 0.0])  # (3, )
+        # origin = (5, 5, 0)
+        # these are centered on origin
+        look_at_point = np.array([0.0, 0.0, 0.0])  # (3, )
+        origin = (0, 0, 0)
 
-    def tests_spiral_line(self):
-        file_path = osp.join(RESULT_DIR, 'spiral_lines.png')
-        origin = (5, 5, 0)
-        spiral_lines = [get_spiral_line(4, u_start=0.25, v_range=(0.75, -0.25), origin=origin)]
-        draw_3d_components(
-            sphere_radius=4,
-            sphere_origin=origin,
-            lines=spiral_lines,
-            title='spiral_lines_ustart_0.25_vrange(0.75, -0.25)_origin(5,5,0)',
-            save_path=file_path
-        )
+        modes = ['random', 'regular', 'circle', 'spiral']
+        for mode in modes:
+            file_path = osp.join(RESULT_DIR, 'cam_path_mode_{}.png'.format(mode))
+            c2w = generate_cam_pose_on_sphere(
+                mode,
+                self.radius,
+                self.n_cam,
+                u_start=u_start,
+                v_ratio=v_ratio,
+                origin=origin,
+                look_at_point=look_at_point
+            )
+            cam_loc = c2w[:, :3, 3]  # (n, 3)
+            rays_d = normalize(look_at_point[None, :] - cam_loc)  # (n, 3)
+            track = [cam_loc] if mode != 'random' else []
+            draw_3d_components(
+                c2w,
+                points=look_at_point[None, :],
+                rays=(cam_loc, rays_d),
+                sphere_radius=self.radius,
+                sphere_origin=origin,
+                lines=track,
+                title='Cam pos on sphere. Mode: {}'.format(mode),
+                save_path=file_path
+            )
 
     @staticmethod
     def get_max_abs_error(a, b):

@@ -4,13 +4,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from .camera_model import create_camera_model
-from arcnerf.geometry.poses import get_sphere_surface
+from arcnerf.geometry.sphere import get_sphere_surface
 from common.visual.draw_cv2 import get_colors
 
 
 def transform_plt_space(pts, xyz_axis=0):
     """Transform any point in world space to plt space
-    This will change y/z axis
+    This will change y/z axis. y-direction is up.
+    TODO: In fact y is down, so this could be flip up-down, need to check.
 
     Args:
         pts: np.array in (n_pts, 3) or (3, n_pts)
@@ -77,7 +78,7 @@ def draw_points(ax, points, point_colors, point_size, min_values, max_values):
     # set color, by default is green
     N_p = points.shape[0]
     if point_colors is None:
-        point_colors = get_colors('dark', to_int=False, to_np=True)
+        point_colors = get_colors('green', to_int=False, to_np=True)
     if point_colors.shape == (3, ):
         point_colors = np.repeat(point_colors[None, :], N_p, axis=0)
     assert point_colors.shape == (N_p, 3), 'Invalid point colors shape...(N_p, 3) or (3,)'
