@@ -11,6 +11,7 @@ from arcnerf.datasets import get_dataset
 from arcnerf.datasets.transform.augmentation import get_transforms
 from arcnerf.geometry.transformation import normalize
 from arcnerf.visual.plot_3d import draw_3d_components
+from common.visual import get_colors_from_cm
 from tests import setup_test_config
 
 MODE = 'train'
@@ -44,9 +45,12 @@ class TestDict(unittest.TestCase):
         ori_point = np.array([0.0, 0.0, 0.0], dtype=cam_loc.dtype)[None, :]  # (1, 3)
         rays_d = normalize(ori_point - cam_loc)
 
+        cam_colors = get_colors_from_cm(cam_loc.shape[0], to_np=True)
+
         cam_path = '{}/{}_vis_camera.png'.format(RESULT_DIR, self.dataset_type)
         draw_3d_components(
             c2w,
+            cam_colors=cam_colors,
             points=ori_point,
             rays=(cam_loc, rays_d),
             title='{} Cam position'.format(self.dataset_type),

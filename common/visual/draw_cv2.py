@@ -3,23 +3,7 @@
 import cv2
 import numpy as np
 
-colors = {
-    'blue': [0, 0, 1.0],
-    'green': [0, 1.0, 0],
-    'neutral': [.9, .9, .8],
-    'red': [1.0, 0, 0],
-    'yellow': [.7, .75, .5],
-    'dark': [.3, .3, .3],
-}
-
-
-def get_colors(color='dark', opa=None):
-    """Get the color in list with opa if required"""
-    col = colors[color].copy()
-    col = [int(c * 255) for c in col]
-    if opa is not None:
-        col.append(opa)
-    return col
+from ..visual import get_colors
 
 
 def check_pixel_in_img(p, img_shape, col_row_order=False):
