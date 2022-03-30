@@ -9,8 +9,13 @@ colors = {
     'neutral': [.9, .9, .8],
     'grey': [1.0, 1.0, 1.0],
     'red': [1.0, 0, 0],
-    'yellow': [.7, .75, .5],
+    'yellow': [1, 1, 0],
     'dark': [.3, .3, .3],
+    'black': [0, 0, 0],
+    'purple': [0.5, 0, 0.5],
+    'maroon': [0.5, 0, 0],
+    'olive': [0.5, 0.5, 0],
+    'navy': [0, 0, 0.5]
 }
 
 
@@ -32,7 +37,7 @@ def get_colors(color='dark', to_int=True, opa=None, to_np=False):
     if opa is not None:
         col.append(opa)
     if to_np:
-        col = np.array(col, dtype=np.int if to_int else np.float)
+        col = np.array(col, dtype=np.int if to_int else np.float64)
 
     return col
 
