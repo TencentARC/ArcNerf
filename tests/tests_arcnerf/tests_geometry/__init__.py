@@ -5,7 +5,7 @@ import unittest
 
 import torch
 
-from arcnerf.geometry.poses import invert_pose
+from arcnerf.geometry.poses import invert_poses
 from tests import setup_test_config
 
 
@@ -46,6 +46,6 @@ class TestGeomDict(unittest.TestCase):
         return pixels, depth
 
     def get_w2c(self):
-        w2c = invert_pose(self.c2w)
+        w2c = invert_poses(self.c2w)
 
         return w2c

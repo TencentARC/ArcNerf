@@ -18,9 +18,9 @@ def normalize(vec):
         vec: (B, N, 3)
     """
     if isinstance(vec, torch.FloatTensor):
-        vec = vec / torch.norm(vec, dim=-1).unsqueeze(-1)
+        vec = vec / (torch.norm(vec, dim=-1).unsqueeze(-1) + 1e-8)
     elif isinstance(vec, np.ndarray):
-        vec = vec / np.linalg.norm(vec, axis=-1)[..., None]
+        vec = vec / (np.linalg.norm(vec, axis=-1)[..., None] + 1e-8)
 
     return vec
 
@@ -40,7 +40,7 @@ def rotate_points(points, rot):
     points_h = torch.cat([points, homo_coord], dim=-1)
 
     proj_points = torch.einsum('bki,bji->bjk', rot, points_h)  # (B, N, 4)
-    proj_points = torch.div(proj_points[..., :3], proj_points[..., 3].unsqueeze(-1))
+    proj_points = torch.div(proj_points[..., :3], proj_points[..., 3].unsqueeze(-1) + 1e-8)
 
     return proj_points[..., :3]
 

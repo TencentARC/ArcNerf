@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import torch
 
-from arcnerf.geometry.poses import invert_pose
+from arcnerf.geometry.poses import invert_poses
 from arcnerf.geometry.projection import pixel_to_world, world_to_pixel
 from arcnerf.geometry.transformation import normalize
 
@@ -62,7 +62,7 @@ class PerspectiveCamera(object):
         """Get pose, return numpy array by default. Support w2c transformation"""
         pose = self.c2w.copy()
         if w2c:
-            pose = invert_pose(pose)
+            pose = invert_poses(pose)
         if torch_tensor:
             pose = torch.tensor(pose, dtype=self.dtype)
 

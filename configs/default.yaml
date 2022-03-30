@@ -68,7 +68,7 @@ dataset:
         scan_id: 65
         img_scale: 1.0              # scale image and intrinsic, < 1 means scale_down
         scale_radius: 3.0           # norm the camera within a sphere with such radius
-        precache: False              # precache all the rays at once
+        precache: True              # precache all the rays at once
         augmentation:
             N_rays: 1024
 

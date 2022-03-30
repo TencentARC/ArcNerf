@@ -91,7 +91,7 @@ def cam_to_pixel(points, intrinsic):
         pixels: index in x(horizontal)/y(vertical), torch.tensor (B, N, 2)
     """
     pixels = torch.einsum('bki,bji->bjk', intrinsic, points)
-    pixels = torch.div(pixels[:, :, :2], pixels[:, :, 2].unsqueeze(dim=-1))
+    pixels = torch.div(pixels[:, :, :2], pixels[:, :, 2].unsqueeze(dim=-1) + 1e-8)
 
     return pixels[:, :, :2]
 

@@ -6,7 +6,7 @@ import torch
 from .transformation import normalize
 
 
-def invert_pose(poses):
+def invert_poses(poses):
     """ Change poses between c2w and w2c. Support numpy and torch
 
     Args:
@@ -82,3 +82,44 @@ def average_poses(poses):
     pose_avg = np.stack([x, y, z, center], 1)
 
     return pose_avg
+
+
+def view_matrix(forward, up, cam_loc):
+    """Get view matrix(c2w matrix) given forward/up dir and cam_loc.
+
+    Args:
+        forward: direction of view. np(3, )
+        up: up direction. np(3, )
+        cam_loc: view location. np(3, )
+
+    Returns:
+        view_mat: c2w matrix. np(4, 4)
+
+    """
+    rot_z = normalize(forward)
+    rot_x = normalize(np.cross(up, rot_z))
+    rot_y = normalize(np.cross(rot_z, rot_x))
+    view_mat = np.stack((rot_x, rot_y, rot_z, cam_loc), axis=-1)
+    hom_vec = np.array([[0., 0., 0., 1.]])
+    if len(view_mat.shape) > 2:
+        hom_vec = np.tile(hom_vec, [view_mat.shape[0], 1, 1])
+    view_mat = np.concatenate((view_mat, hom_vec), axis=-2)
+
+    return view_mat
+
+
+def look_at(cam_loc, point, up):
+    """Get view matrix(c2w matrix) given cam_loc, look_at_point, and up dir
+    origin is at cam_loc always.
+
+    Args:
+        cam_loc: view location. np(3, )
+        point: look at destination. np(3, )
+        up: up direction. np(3, )
+
+    Returns:
+        view_mat: c2w matrix. np(4, 4)
+    """
+    forward = normalize(point - cam_loc)  # cam_loc -> point
+
+    return view_matrix(forward, up, cam_loc)
