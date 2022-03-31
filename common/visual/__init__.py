@@ -24,7 +24,7 @@ def get_colors(color='dark', to_int=True, opa=None, to_np=False):
 
     Args:
         color: color name
-        to_int: If true, change range from (0, 1) to (0, 255)
+        to_int: If true, change range from (0, 1)-float64 to (0, 255)-int8
         opa: opacity value in (0, 1)
         to_np: if True, get numpy array
 
@@ -37,7 +37,7 @@ def get_colors(color='dark', to_int=True, opa=None, to_np=False):
     if opa is not None:
         col.append(opa)
     if to_np:
-        col = np.array(col, dtype=np.int if to_int else np.float64)
+        col = np.array(col, dtype=np.int8 if to_int else np.float64)
 
     return col
 

@@ -60,7 +60,7 @@ def draw_cameras(ax, c2w, cam_colors, min_values, max_values):
     for idx in range(c2w.shape[0]):  # each camera
         mat = c2w[idx]
         for i in range(len(camera_model)):  # each polygon. (4, n_pts)
-            X = np.zeros(camera_model[i].shape)
+            X = np.zeros(camera_model[i].shape, dtype=mat.dtype)
             # to world coord
             for j in range(X.shape[1]):  # each point in polygon, (4, )
                 X[:4, j] = mat @ camera_model[i][:4, j]
@@ -138,10 +138,10 @@ def draw_sphere(ax, radius, origin, min_values, max_values, color='grey', alpha=
 
 def draw_lines(ax, lines, line_colors, min_values, max_values):
     """Draw lines. Each line in list is a np.array with shape (N_pt_in_line, 3)"""
-    # set color, by default is black
+    # set color, by default is dark
     N_line = len(lines)
     if line_colors is None:
-        line_colors = get_colors('black', to_int=False, to_np=True)
+        line_colors = get_colors('dark', to_int=False, to_np=True)
     if line_colors.shape == (3, ):
         line_colors = np.repeat(line_colors[None, :], N_line, axis=0)
     assert line_colors.shape == (N_line, 3), 'Invalid line colors shape...(N_line, 3) or (3,)'
@@ -192,7 +192,7 @@ def draw_3d_components(
         save_path: path to save the fig. None will only show fig
     """
     fig = plt.figure()
-    ax = fig.gca(projection='3d')
+    ax = fig.add_subplot(projection='3d')
     ax.set_aspect('auto')
 
     # axis range

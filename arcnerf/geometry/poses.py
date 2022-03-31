@@ -22,26 +22,32 @@ def invert_poses(poses):
         return np.linalg.inv(poses.copy())
 
 
-def center_poses(poses):
+def center_poses(poses, center_loc=None):
     """
-    Centralize the pose, which changes the world coordinate center.
-    The central of the poses is now the origin of world
+    Centralize the pose, which changes the world coordinate center. Good for cams that are not centered at (0,0,0)
+    If you now where camera's are looking at (like central of point_cloud), you can set center_loc and
+        all camera will look to this new place, rotation not change.
+    Else all camera will look at avg_pose instead (rotatation applied
+    The avg_poses/center_loc is now the origin of world. This will change the orientation of cameras. Be careful to use.
 
     Args:
-        poses: (N_images, 3, 4)
+        poses: (N_images, 4, 4)
+        center_loc: (3, ), if None, need to calculate the avg by cameras
+                    else, every camera looks to it after adjustment
 
     Returns:
-        poses_centered: (N_images, 3, 4) the centered poses
+        poses_centered: (N_images, 4, 4) the centered poses
     """
-
-    pose_avg = average_poses(poses)  # (3, 4)
-    pose_avg_homo = np.eye(4)
-    pose_avg_homo[:3] = pose_avg
-
-    bottom = np.tile(np.array([0, 0, 0, 1]), (len(poses), 1, 1))  # (N_images, 1, 4)
-    poses_homo = np.concatenate([poses, bottom], 1)  # (N_images, 4, 4)
-    poses_centered = np.linalg.inv(pose_avg_homo) @ poses_homo  # (N_images, 4, 4)
-    poses_centered = poses_centered[:, :3, :]  # (N_images, 3, 4)
+    if center_loc is None:
+        up = normalize(poses[:, :3, 1].mean(0))
+        pose_avg = average_poses(poses)
+        poses_centered = poses.copy()
+        poses_centered[:, :3, 3] -= pose_avg[:3, 3]
+        for idx in range(poses.shape[0]):
+            poses_centered[idx, :3, :3] = look_at(poses[idx, :3, 3], pose_avg[:3, 3], up)[:3, :3]
+    else:
+        poses_centered = poses.copy()
+        poses_centered[:, :3, 3] -= center_loc
 
     return poses_centered
 
@@ -60,19 +66,20 @@ def average_poses(poses):
     not necessarily orthogonal to z axis. We need to pass from x to y.
 
     Args:
-        poses: (N_images, 3, 4), should be c2w poses, but not w2c
+        poses: (N_images, 4, 4), c2w poses
 
     Returns:
-        pose_avg: (3, 4) the average pose
+        pose_avg: (4, 4) the average pose c2w
     """
+    poses_3x4 = poses[:, :3, :].copy()
     # 1. Compute the center
-    center = poses[..., 3].mean(0)
+    center = poses_3x4[..., 3].mean(0)
 
     # 2. Compute the z axis
-    z = normalize(poses[..., 2].mean(0))
+    z = normalize(poses_3x4[..., 2].mean(0))
 
     # 3. Compute axis y' (no need to normalize as it's not the final output)
-    y_ = poses[..., 1].mean(0)
+    y_ = poses_3x4[..., 1].mean(0)
 
     # 4. Compute the x axis
     x = normalize(np.cross(y_, z))
@@ -81,6 +88,8 @@ def average_poses(poses):
     y = np.cross(z, x)
 
     pose_avg = np.stack([x, y, z, center], 1)
+    homo = np.ones(shape=(1, 4), dtype=pose_avg.dtype)
+    pose_avg = np.concatenate([pose_avg, homo], axis=0)
 
     return pose_avg
 
@@ -134,6 +143,7 @@ def generate_cam_pose_on_sphere(
     v_ratio=0,
     v_range=(1, 0),
     n_rot=3,
+    upper=None,
     close=False,
     origin=(0, 0, 0),
     look_at_point=np.array([0, 0, 0])
@@ -153,6 +163,7 @@ def generate_cam_pose_on_sphere(
         v_range: a tuple of v (v_start, v_end), start and end v ratio of spiral line
                     vertical lift angle, in (-1, 0). 0 is largest circle level, pos is on above.
         n_rot: num of full rotation, by default 3
+        upper: Control camera postion for get_regular_sphere_line
         close: if true, first one will be the same as last(for circle and regular)
         origin: origin of sphere, tuple of 3
         look_at_point: the point camera looked at, np(3,)
@@ -169,7 +180,7 @@ def generate_cam_pose_on_sphere(
         v = np.random.rand(n_cam) * np.pi
         xyz = uv_to_sphere_point(u, v, radius, origin)  # (n_cam, 3)
     if mode == 'regular':
-        xyz = get_regular_sphere_line(radius, u_start, origin, n_rot, n_pts=n_cam, close=close)
+        xyz = get_regular_sphere_line(radius, u_start, origin, n_rot, n_pts=n_cam, upper=upper, close=close)
     elif mode == 'circle':
         xyz = get_sphere_line(radius, u_start, v_ratio, origin, n_pts=n_cam, close=close)
     elif mode == 'spiral':

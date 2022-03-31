@@ -103,7 +103,7 @@ def load_K_Rt_from_P(proj_mat):
     intrinsics = np.eye(4)
     intrinsics[:3, :3] = K
 
-    pose = np.eye(4, dtype=np.float32)
+    pose = np.eye(4, dtype=proj_mat.dtype)
     pose[:3, :3] = R.transpose()
     pose[:3, 3] = (t[:3] / t[3])[:, 0]
 

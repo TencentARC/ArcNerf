@@ -18,10 +18,10 @@ def uv_to_sphere_point(u, v, radius, origin=(0, 0, 0)):
         xyz: np.array(n_pt, 3), xyz position
     """
     if isinstance(v, float) or isinstance(v, int):
-        v = np.repeat(np.array([v]), u.shape[0], axis=0)
+        v = np.repeat(np.array([v], dtype=u.dtype), u.shape[0], axis=0)
     assert u.shape == v.shape, 'Unmatched shape for u{} and v{}'.format(u.shape, v.shape)
     x = radius * (np.cos(u) * np.sin(v)) + origin[0]
-    y = radius * (np.ones(np.size(u)) * np.cos(v)) + origin[1]
+    y = radius * (np.ones(np.size(u), dtype=u.dtype) * np.cos(v)) + origin[1]
     z = radius * (np.sin(u) * np.sin(v)) + origin[2]
     xyz = np.concatenate([x[:, None], y[:, None], z[:, None]], axis=-1)
 
@@ -42,13 +42,15 @@ def get_sphere_surface(radius, origin=(0, 0, 0), n_pts=100):
     u = np.linspace(0, 2 * np.pi, n_pts)  # horizontal
     v = np.linspace(0, np.pi, n_pts)  # vertical
     x = radius * np.outer(np.cos(u), np.sin(v)) + origin[0]
-    y = radius * np.outer(np.ones(np.size(u)), np.cos(v)) + origin[1]
+    y = radius * np.outer(np.ones(np.size(u), dtype=u.dtype), np.cos(v)) + origin[1]
     z = radius * np.outer(np.sin(u), np.sin(v)) + origin[2]
 
     return x, y, z
 
 
-def get_regular_sphere_line(radius, u_start=0, origin=(0, 0, 0), n_rot=3, n_pts=100, close=True, concat=True):
+def get_regular_sphere_line(
+    radius, u_start=0, origin=(0, 0, 0), n_rot=3, n_pts=100, upper=None, close=True, concat=True
+):
     """Get several sphere surface line(circle) with regular vertical distance. from top to down.
      The circle is face up-down, rotate in counter-clockwise, y is up-down axis
 
@@ -58,6 +60,9 @@ def get_regular_sphere_line(radius, u_start=0, origin=(0, 0, 0), n_rot=3, n_pts=
         origin: origin of sphere, tuple of 3
         n_rot: num of circle needed
         n_pts: num of point on line, by default 100.
+        upper: if None, in both sphere
+               if True, in upper sphere,
+               if False, in lower sphere.
         close: if true, first one will be the same as last
         concat: if concat, return (n_pts, 3) array. else return a list of each level, by default is True
 
@@ -75,7 +80,13 @@ def get_regular_sphere_line(radius, u_start=0, origin=(0, 0, 0), n_rot=3, n_pts=
     u *= (2 * np.pi)
     u = np.concatenate([u] * n_rot)[:n_pts]
 
-    v_levels = np.linspace(1, -1, n_rot + 2)[1:-1]  # (n_rot,)
+    if upper is None:
+        v_levels = np.linspace(1, -1, n_rot + 2)[1:-1]  # (n_rot,)
+    elif upper is True:
+        v_levels = np.linspace(1, 0, n_rot + 1)[1:]  # (n_rot,)
+    elif upper is False:
+        v_levels = np.linspace(-1, 0, n_rot + 1)[1:]  # (n_rot,)
+
     v_levels = (1 - v_levels) * np.pi / 2.0
     lines = []
     count = 0
@@ -160,3 +171,6 @@ def get_v_from_pos():
 
 def sphere_line_from_pos():
     pass
+
+
+# calculate sphere circle with them, test u/v calculation
