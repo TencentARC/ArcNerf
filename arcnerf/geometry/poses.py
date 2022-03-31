@@ -5,6 +5,7 @@ import torch
 
 from .sphere import uv_to_sphere_point, get_sphere_line, get_spiral_line, get_regular_sphere_line
 from .transformation import normalize
+from .triangle import circumcircle_from_triangle
 
 
 def invert_poses(poses):
@@ -193,3 +194,27 @@ def generate_cam_pose_on_sphere(
     cam_poses = np.concatenate(cam_poses, axis=0)
 
     return cam_poses
+
+
+def generate_can_pose_from_tri_circumcircle(verts, n_cam, up=np.array([0, 1, 0]), close=True):
+    """Get cam pose on a circle that is the circumcircle of triangle
+
+    Args:
+        verts: np(3, 3), triangle verts, second dim is xyz
+        close: if true, first one will be the same as last
+
+    Returns:
+        c2w: np(n_cam, 4, 4) matrix of cam position, in order
+        origin: np(3,), origin of the circle in 3d space
+        radius: radius of circle
+    """
+    origin, radius, normal, circle = circumcircle_from_triangle(verts, n_cam, close)
+
+    cam_poses = []
+    for idx in range(circle.shape[0]):
+        cam_loc = circle[idx]
+        c2w = look_at(cam_loc, origin, up=normal)[None, :]
+        cam_poses.append(c2w)
+    cam_poses = np.concatenate(cam_poses, axis=0)
+
+    return cam_poses, origin, radius

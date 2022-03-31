@@ -5,11 +5,13 @@ import os
 import os.path as osp
 import unittest
 
-from arcnerf.geometry.sphere import get_regular_sphere_line, get_sphere_line, get_spiral_line
+import numpy as np
+
+from arcnerf.geometry.sphere import get_regular_sphere_line, get_sphere_line, get_spiral_line, get_uv_from_pos
 from arcnerf.visual.plot_3d import draw_3d_components
 from tests.tests_arcnerf.tests_geometry import TestGeomDict
 
-RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results'))
+RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results', 'sphere'))
 os.makedirs(RESULT_DIR, exist_ok=True)
 
 
@@ -54,6 +56,21 @@ class TestDict(TestGeomDict):
             sphere_origin=origin,
             lines=spiral_lines,
             title='spiral_lines_ustart_0.25_vrange(0.75, -0.25)_origin(5,5,0)',
+            save_path=file_path
+        )
+
+    def tests_get_uv_from_pos(self):
+        file_path = osp.join(RESULT_DIR, 'get_uv_line.png')
+        origin = (5, 5, 0)
+        pos = np.array([6, 7, 2])
+        u_start, v_ratio, radius = get_uv_from_pos(pos, origin)
+        line = [get_sphere_line(radius, u_start, v_ratio, origin, n_pts=10, close=False)]
+        draw_3d_components(
+            points=np.concatenate([np.array(origin)[None, :], pos[None, :]]),
+            sphere_radius=radius,
+            sphere_origin=origin,
+            lines=line,
+            title='get_uv_from_pos(6,7,2)_from_origin(5,5,0)',
             save_path=file_path
         )
 

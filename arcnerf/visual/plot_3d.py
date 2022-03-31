@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
 
 from .camera_model import create_camera_model
@@ -155,6 +156,28 @@ def draw_lines(ax, lines, line_colors, min_values, max_values):
     return min_values, max_values
 
 
+def draw_meshes(ax, meshes, mesh_colors, min_values, max_values):
+    """Draw meshes. Each mesh in list is a np.array with shape (N_tri, 3, 3)"""
+    # set color, by default is red
+    N_m = len(meshes)
+    if mesh_colors is None:
+        mesh_colors = get_colors('red', to_int=False, to_np=True)
+    if mesh_colors.shape == (3, ):
+        mesh_colors = np.repeat(mesh_colors[None, :], N_m, axis=0)
+    assert mesh_colors.shape == (N_m, 3), 'Invalid mesh colors shape...(N_m, 3) or (3,)'
+
+    for idx, mesh in enumerate(meshes):
+        N_tri = mesh.shape[0]
+        mesh_plt = transform_plt_space(mesh.reshape(-1, 3), xyz_axis=1).reshape(N_tri, 3, -1)  # (N_tri, 3, 3)
+        ax.add_collection3d(
+            Poly3DCollection([mesh_plt[i] for i in range(N_tri)], facecolors=mesh_colors[idx], linewidths=1)
+        )
+        min_values = np.minimum(min_values, mesh_plt.reshape(-1, 3).min(0))
+        max_values = np.maximum(max_values, mesh_plt.reshape(-1, 3).max(0))
+
+    return min_values, max_values
+
+
 def draw_3d_components(
     c2w=None,
     cam_colors=None,
@@ -165,6 +188,8 @@ def draw_3d_components(
     line_colors=None,
     rays=None,
     ray_colors=None,
+    meshes=None,
+    mesh_colors=None,
     sphere_radius=None,
     sphere_origin=(0, 0, 0),
     title='',
@@ -173,21 +198,23 @@ def draw_3d_components(
     """draw 3d component, including cameras, points, rays, etc
     For any pts in world space, you need to transform_plt_space to switch yz axis
     You can specified color for different cam/ray/point.
-    TODO: Draw meshes
+    TODO: Draw voxel grids
 
     Args:
         c2w: c2w pose stack in in shape(N_cam, 4, 4). None means not visual
-        cam_colors: color in (N_cam, 3) or (3,), applied for each cam
+        cam_colors: color in (N_cam, 3) or (3,), applied for each or all cam
         points: point in (N_p, 3) shape in world coord
         point_size: size of point, by default set up 20
-        point_colors: color in (N_p, 3) or (3,), applied for each point
+        point_colors: color in (N_p, 3) or (3,), applied for each or all point
         lines: line in list of (N_pts_in_line, 3), len is N_line
-        line_colors: color in (N_line, 3) or (3,), applied for each line
+        line_colors: color in (N_line, 3) or (3,), applied for each or all line
         rays: a tuple (rays_o, rays_d), each in (N_r, 3), in world coord
-                rays_d is with actual len, if you want longer arrow, you need to extent rays_d
-        ray_colors: color in (N_r, 3) or (3,), applied for each ray
+                rays_d is with actual len, if you want longer arrow, you need to extend rays_d
+        ray_colors: color in (N_r, 3) or (3,), applied for each or all ray
+        meshes: list of mesh of (N_tri, 3, 3), len is N_m
+        mesh_colors: color in (N_m, 3) or (3,), applied for each or all mesh
         sphere_radius: if not None, draw a sphere with such radius
-        sphere_origin: the origin of sphere, by default is 0
+        sphere_origin: the origin of sphere, by default is (0, 0, 0)
         title: a string of figure title
         save_path: path to save the fig. None will only show fig
     """
@@ -216,6 +243,9 @@ def draw_3d_components(
 
     if lines is not None:
         min_values, max_values = draw_lines(ax, lines, line_colors, min_values, max_values)
+
+    if meshes is not None:
+        min_values, max_values = draw_meshes(ax, meshes, mesh_colors, min_values, max_values)
 
     # set axis limit
     axis_scale_factor = 0.25  # extent scale by such factor

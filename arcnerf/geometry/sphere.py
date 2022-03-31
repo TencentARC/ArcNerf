@@ -4,6 +4,8 @@ import math
 
 import numpy as np
 
+from .transformation import normalize
+
 
 def uv_to_sphere_point(u, v, radius, origin=(0, 0, 0)):
     """Get sphere point from uv
@@ -26,6 +28,62 @@ def uv_to_sphere_point(u, v, radius, origin=(0, 0, 0)):
     xyz = np.concatenate([x[:, None], y[:, None], z[:, None]], axis=-1)
 
     return xyz
+
+
+def get_uv_from_pos(pos, origin=(0.0, 0.0, 0.0)):
+    """Get the u, v in scaled range, and radius from pos
+
+    Args:
+        pos: np(3, ) position of point in xyz
+        origin: the origin of sphere
+
+    Returns:
+        u: (0, 1) representing (0, 2pi) xz-direction
+        v: (-1, 1) representation (0, pi) y-direction
+        radius: radius of sphere
+    """
+    radius = np.linalg.norm(pos - np.array(origin, dtype=pos.dtype))
+    v = np.arccos((pos[1] - origin[1]) / radius)  # in (0, pi)
+    u = np.arctan((pos[2] - origin[2]) / (pos[0] - origin[0]))
+    if u < 0:
+        u += (2 * np.pi)  # in (0, 2pi)
+    u = u / (2 * np.pi)  # in (0, 1)
+    v = 1 - (v * 2.0 / np.pi)  # in (-1, 1)
+
+    return u, v, radius
+
+
+def get_circle(origin, radius, normal, n_pts=100, close=True):
+    """Get circle representation in 3D
+
+    Args:
+        origin: np(3,), origin of the circle
+        normal: np(3,), norm of the triangle
+        radius: radius of circle
+        n_pts: num of sampled points
+        close: if true, first one will be the same as last
+    Returns:
+        line: np.array(n_pts, 3)
+    """
+    if close:
+        u = np.linspace(0, 2 * np.pi, n_pts)
+    else:
+        u = np.linspace(0, 2 * np.pi, n_pts + 1)[:n_pts]
+
+    a = np.cross(normal, np.array([1.0, 0.0, 0.0]))
+    if not np.any(a):  # zeros
+        a = np.cross(normal, np.array([0.0, 1.0, 0.0]))
+    b = np.cross(normal, a)
+    a = normalize(a)
+    b = normalize(b)
+
+    x = radius * (a[0] * np.cos(u) + b[0] * np.sin(u)) + origin[0]
+    y = radius * (a[1] * np.cos(u) + b[1] * np.sin(u)) + origin[1]
+    z = radius * (a[2] * np.cos(u) + b[2] * np.sin(u)) + origin[2]
+
+    line = np.concatenate([x[:, None], y[:, None], z[:, None]], axis=-1)
+
+    return line
 
 
 def get_sphere_surface(radius, origin=(0, 0, 0), n_pts=100):
@@ -119,9 +177,9 @@ def get_sphere_line(radius, u_start=0, v_ratio=0, origin=(0, 0, 0), n_pts=100, c
     assert 0 <= u_start <= 1, 'Invalid u_start, (0, 1) only'
     assert -1 <= v_ratio <= 1, 'Invalid v ratio, (-1, 1) only'
     if close:
-        u = np.linspace(0, 1, n_pts) + 1
+        u = np.linspace(0, 1, n_pts) + u_start
     else:
-        u = np.linspace(0, 1, n_pts + 1)[:n_pts] + 1
+        u = np.linspace(0, 1, n_pts + 1)[:n_pts] + u_start
     u[u > 1.0] -= 1.0
     u *= (2 * np.pi)
     v = (1 - v_ratio) * np.pi / 2.0
@@ -159,18 +217,3 @@ def get_spiral_line(radius, u_start=0, v_range=(1, 0), origin=(0, 0, 0), n_rot=3
     line = uv_to_sphere_point(u, v, radius, origin)
 
     return line
-
-
-def get_u_start_from_pos():
-    pass
-
-
-def get_v_from_pos():
-    pass
-
-
-def sphere_line_from_pos():
-    pass
-
-
-# calculate sphere circle with them, test u/v calculation

@@ -1,12 +1,17 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import os
+import os.path as osp
 import unittest
 
 import torch
 
 from arcnerf.geometry.poses import invert_poses
 from tests import setup_test_config
+
+RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results'))
+os.makedirs(RESULT_DIR, exist_ok=True)
 
 
 class TestGeomDict(unittest.TestCase):

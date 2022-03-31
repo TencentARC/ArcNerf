@@ -11,6 +11,7 @@ import torch
 from arcnerf.geometry.poses import (
     average_poses,
     center_poses,
+    generate_can_pose_from_tri_circumcircle,
     generate_cam_pose_on_sphere,
     look_at,
     invert_poses,
@@ -20,7 +21,7 @@ from arcnerf.visual.plot_3d import draw_3d_components
 from common.visual import get_colors
 from tests.tests_arcnerf.tests_geometry import TestGeomDict
 
-RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results'))
+RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results', 'poses'))
 os.makedirs(RESULT_DIR, exist_ok=True)
 
 
@@ -224,6 +225,44 @@ class TestDict(TestGeomDict):
             sphere_radius=self.radius,
             sphere_origin=origin,
             title='Random {} cam on sphere, get avg pose and recenter by real_avg_pose'.format(n_cam),
+            save_path=file_path
+        )
+
+    def test_pose_from_tri_circumcircle(self):
+        n_cam = 3
+        look_at_point = np.array([5.0, 5.0, 0.0])  # (3, )
+        c2w = generate_cam_pose_on_sphere(
+            'random', self.radius, 3, origin=look_at_point, look_at_point=look_at_point
+        )  # (3, 4, 4)
+        c2w_circle, origin, radius = generate_can_pose_from_tri_circumcircle(c2w[:, :3, 3], n_cam, close=False)
+        c2w_all = np.concatenate([c2w, c2w_circle], axis=0)  # (3+n, 4, 4)
+        cam_colors = np.concatenate([
+            np.repeat(get_colors(color='blue', to_int=False, to_np=True)[None, :], 3, axis=0),
+            np.repeat(get_colors(color='black', to_int=False, to_np=True)[None, :], n_cam, axis=0),
+        ])  # (3+n, 3)
+        cam_loc = c2w_all[:, :3, 3]  # (3+n, 3)
+        rays_d = normalize(look_at_point[None, :] - cam_loc)  # (3+n, 3)
+        rays_d = np.concatenate([
+            normalize(look_at_point[None, :] - cam_loc[:3]),
+            normalize(origin[None, :] - cam_loc[3:]),
+        ])  # (3+n, 3)
+        rays_colors = np.concatenate([
+            np.repeat(get_colors(color='red', to_int=False, to_np=True)[None, :], 3, axis=0),
+            np.repeat(get_colors(color='yellow', to_int=False, to_np=True)[None, :], n_cam, axis=0),
+        ])  # (3+n, 3)
+        points_all = np.concatenate([look_at_point[None, :], c2w[:, :3, 3]], axis=0)  # (1+3, 3)
+
+        file_path = osp.join(RESULT_DIR, 'pose_from_circumcircle.png')
+        draw_3d_components(
+            c2w_all,
+            cam_colors=cam_colors,
+            lines=[c2w_circle[:, :3, 3]],
+            points=points_all,
+            rays=(cam_loc, rays_d),
+            ray_colors=rays_colors,
+            sphere_radius=radius,
+            sphere_origin=origin,
+            title='{} cam on circumcircle given 3 random cam'.format(n_cam),
             save_path=file_path
         )
 
