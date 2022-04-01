@@ -9,11 +9,14 @@ import numpy as np
 
 from arcnerf.datasets import get_dataset
 from arcnerf.datasets.transform.augmentation import get_transforms
+from arcnerf.geometry import np_wrapper
 from arcnerf.geometry.poses import average_poses, generate_cam_pose_on_sphere
+from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.sphere import get_uv_from_pos
 from arcnerf.geometry.transformation import normalize
+from arcnerf.render.camera import equal_sample, get_rays
 from arcnerf.visual.plot_3d import draw_3d_components
-from common.visual import get_colors
+from common.visual import get_combine_colors
 from tests import setup_test_config
 
 MODE = 'train'
@@ -27,8 +30,9 @@ class TestDict(unittest.TestCase):
         self.cfgs = setup_test_config()
         self.dataset_type = getattr(self.cfgs.dataset, MODE).type
         self.dataset = self.setup_dataset()
-        self.c2w = self.get_cameras()  # (n, 4, 4)
+        self.c2w, self.intrinsic, self.H, self.W = self.get_cameras()
         self.n_cam = self.c2w.shape[0]
+        self.radius = np.linalg.norm(self.c2w[:, :3, 3], axis=-1).max(0)
 
         self.spec_result_dir = osp.abspath(osp.join(RESULT_DIR, self.dataset_type))
         os.makedirs(self.spec_result_dir, exist_ok=True)
@@ -44,8 +48,10 @@ class TestDict(unittest.TestCase):
         for sample in self.dataset:
             c2w.append(sample['c2w'][None, ...])
         c2w = np.concatenate(c2w, axis=0)  # (n, 4, 4)
+        intrinsic = self.dataset[0]['intrinsic']
+        H, W = self.dataset[0]['H'], self.dataset[0]['W']
 
-        return c2w
+        return c2w, intrinsic, H, W
 
     def tests_get_dataset(self):
         self.assertIsInstance(self.dataset[0], dict)
@@ -55,22 +61,17 @@ class TestDict(unittest.TestCase):
         # combine avg pose with different color
         avg_pose = average_poses(self.c2w)[None, :]  # (1, 4, 4)
         c2w = np.concatenate([self.c2w, avg_pose], axis=0)  # (n+1, 4, 4)
-        cam_colors = np.concatenate([
-            np.repeat(get_colors(color='red', to_int=False, to_np=True)[None, :], self.n_cam, axis=0),
-            get_colors('maroon', to_int=False, to_np=True)[None, :]
-        ])  # (n+1, 3)
+        cam_colors = get_combine_colors(['red', 'maroon'], [self.n_cam, 1])  # (n+1, 3)
         cam_loc = np.concatenate([self.c2w[:, :3, 3], avg_pose[:, :3, 3]])  # (n+1, 3)
         rays_d = normalize(np.array(origin)[None, :] - cam_loc)  # (n+1, 3)
-        rays_colors = np.concatenate([
-            np.repeat(get_colors(color='blue', to_int=False, to_np=True)[None, :], self.n_cam, axis=0),
-            get_colors('navy', to_int=False, to_np=True)[None, :]
-        ])  # (n+1, 3)
+        rays_colors = get_combine_colors(['blue', 'navy'], [self.n_cam, 1])  # (n+1, 3)
         # mean sphere radius
         radius = np.linalg.norm(avg_pose[0, :3, 3])
 
         file_path = osp.join(self.spec_result_dir, '{}_vis_camera.png'.format(self.dataset_type))
         draw_3d_components(
             c2w,
+            intrinsic=self.intrinsic,
             cam_colors=cam_colors,
             points=np.array(origin)[None, :],
             rays=(cam_loc, rays_d),
@@ -105,18 +106,13 @@ class TestDict(unittest.TestCase):
                 close=False  # just for test, should be true for actual visual
             )
             c2w = np.concatenate([c2w_test, avg_pose], axis=0)  # (n+1, 4, 4)
-            cam_colors = np.concatenate([
-                np.repeat(get_colors(color='red', to_int=False, to_np=True)[None, :], n_test_cam, axis=0),
-                get_colors('maroon', to_int=False, to_np=True)[None, :]
-            ])  # (n+1, 3)
+            cam_colors = get_combine_colors(['red', 'maroon'], [n_test_cam, 1])  # (n+1, 3)
             cam_loc = np.concatenate([c2w_test[:, :3, 3], avg_pose[:, :3, 3]])  # (n+1, 3)
             rays_d = normalize(np.array(origin)[None, :] - cam_loc)  # (n+1, 3)
-            rays_colors = np.concatenate([
-                np.repeat(get_colors(color='blue', to_int=False, to_np=True)[None, :], n_test_cam, axis=0),
-                get_colors('navy', to_int=False, to_np=True)[None, :]
-            ])  # (n+1, 3)
+            rays_colors = get_combine_colors(['blue', 'navy'], [n_test_cam, 1])  # (n+1, 3)
             draw_3d_components(
                 c2w,
+                intrinsic=self.intrinsic,
                 cam_colors=cam_colors,
                 points=np.array(origin)[None, :],
                 rays=(cam_loc, rays_d),
@@ -127,6 +123,61 @@ class TestDict(unittest.TestCase):
                 title='Cam pos on sphere. Mode: {}'.format(mode),
                 save_path=file_path
             )
+
+    def tests_ray_points(self):
+        n_rays_w, n_rays_h = 4, 3
+        n_rays = n_rays_w * n_rays_h
+        index = equal_sample(n_rays_w, n_rays_h, self.W, self.H)
+
+        n_pts = 5
+        z_min, z_max = 2, 4
+        zvals = np.linspace(z_min, z_max, n_pts)  # (n_pts, )
+        zvals = np.repeat(zvals[None, :], n_rays, axis=0)  # (n_rays, n_pts)
+
+        points = []
+        rays = []
+        for idx in range(self.n_cam):
+            ray_bundle = np_wrapper(get_rays, self.W, self.H, self.intrinsic, self.c2w[idx], index)[:2]  # (n_rays, 3)
+            pts = np_wrapper(get_ray_points_by_zvals, ray_bundle[0], ray_bundle[1], zvals)  # (n_rays, n_pts, 3)
+            rays.append(ray_bundle)
+            points.append(pts.reshape(-1, 3))  # (n_rays*n_pts, 3)
+        points = np.concatenate(points, axis=0)
+        rays_all = (np.concatenate([r[0] for r in rays], axis=0), np.concatenate([r[1] for r in rays], axis=0))
+        self.assertEqual(points.shape, (self.n_cam * n_rays * n_pts, 3))
+        self.assertEqual(rays_all[0].shape, (self.n_cam * n_rays, 3))
+        self.assertEqual(rays_all[1].shape, (self.n_cam * n_rays, 3))
+
+        ray_colors = get_combine_colors(['sky_blue'], [self.n_cam * n_rays])
+        points_with_cam = np.concatenate([np.array([0, 0, 0])[None, :], self.c2w[:, :3, 3]], axis=0)
+        point_colors_with_cam = get_combine_colors(['green', 'red'], [1, self.c2w.shape[0]])
+
+        file_path = osp.join(self.spec_result_dir, 'rays_from_all_cams.png')
+        draw_3d_components(
+            points=points_with_cam,
+            point_size=5,
+            point_colors=point_colors_with_cam,
+            rays=(rays_all[0], z_max * rays_all[1]),
+            ray_colors=ray_colors,
+            ray_linewidth=0.5,
+            sphere_radius=self.radius,
+            sphere_origin=(0, 0, 0),
+            title='Each cam sampled {} rays'.format(n_rays),
+            save_path=file_path
+        )
+
+        points_all = np.concatenate([np.array([0, 0, 0])[None, :], points], axis=0)
+        point_colors = get_combine_colors(['green', 'red'], [1, points.shape[0]])
+
+        file_path = osp.join(self.spec_result_dir, 'points_from_all_cams.png')
+        draw_3d_components(
+            points=points_all,
+            point_colors=point_colors,
+            point_size=1,
+            sphere_radius=self.radius,
+            sphere_origin=(0, 0, 0),
+            title='Each ray sampled {} pointsm, z_range({}-{})'.format(n_pts, z_min, z_max),
+            save_path=file_path
+        )
 
 
 if __name__ == '__main__':

@@ -8,9 +8,12 @@ import unittest
 import numpy as np
 import torch
 
+from arcnerf.geometry import np_wrapper
 from arcnerf.geometry.poses import look_at
-from arcnerf.render.camera import PerspectiveCamera
+from arcnerf.geometry.ray import get_ray_points_by_zvals
+from arcnerf.render.camera import PerspectiveCamera, equal_sample
 from arcnerf.visual.plot_3d import draw_3d_components
+from common.visual import get_combine_colors
 from tests import setup_test_config
 
 RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results', 'camera'))
@@ -25,7 +28,7 @@ class TestDict(unittest.TestCase):
         self.focal = 1000.0
         self.skewness = 10.0
         self.origin = (0, 0, 0)
-        self.cam_loc = np.array([1, 1, 1])
+        self.cam_loc = np.array([1, 1, -1])
         self.radius = np.linalg.norm(self.cam_loc - np.array(self.origin))
         self.intrinsic, self.c2w = self.setup_params()
         self.camera = self.setup_camera()
@@ -103,7 +106,7 @@ class TestDict(unittest.TestCase):
             self.assertEqual(ray_bundle[1].shape, (N_rays, 3))
             self.assertEqual(len(ray_bundle[2]), N_rays)
         for N_rays in [1, 10, 100, 1000, 10000]:
-            index = np.random.choice(range(0, self.W * self.H), N_rays, replace=False)  # N_rays in (HW)
+            index = np.random.choice(range(0, self.W * self.H - 1), N_rays, replace=False)  # N_rays in (HW)
             ind_x, ind_y = index // self.W, index % self.H
             index = np.concatenate([ind_x[:, None], ind_y[:, None]], axis=-1)
             self.assertEqual(index.shape, (N_rays, 2))
@@ -112,7 +115,7 @@ class TestDict(unittest.TestCase):
             self.assertEqual(ray_bundle[1].shape, (N_rays, 3))
             self.assertEqual(len(ray_bundle[2]), N_rays)
 
-    def test_n_rays_visual(self):
+    def tests_n_rays_visual(self):
         ray_bundle = self.camera.get_rays(N_rays=10, to_np=True)
         z_factor = 3
         file_path = osp.join(RESULT_DIR, 'sample_10_rays.png')
@@ -126,7 +129,7 @@ class TestDict(unittest.TestCase):
             save_path=file_path
         )
 
-    def test_index_rays_visual(self):
+    def tests_index_rays_visual(self):
         index = np.array([[0, 0]])
         ray_bundle = self.camera.get_rays(index=index, to_np=True)
         file_path = osp.join(RESULT_DIR, 'sample_(0,0)_rays.png')
@@ -147,6 +150,37 @@ class TestDict(unittest.TestCase):
             points=np.array(self.origin)[None, :],
             rays=(ray_bundle[0], ray_bundle[1]),
             title='Cam ray at (W-1,H-1)',
+            save_path=file_path
+        )
+
+    def tests_ray_points(self):
+        n_rays_w, n_rays_h = 8, 6
+        n_rays = n_rays_w * n_rays_h
+        index = equal_sample(n_rays_w, n_rays_h, self.W, self.H)
+        ray_bundle = self.camera.get_rays(index=index, to_np=True)
+
+        # get points by different depths
+        n_pts = 5
+        z_max = 3
+        zvals = np.linspace(0, z_max, n_pts + 2)[1:-1]  # (n_pts, )
+        zvals = np.repeat(zvals[None, :], n_rays, axis=0)  # (n_rays, n_pts)
+        points = np_wrapper(get_ray_points_by_zvals, ray_bundle[0], ray_bundle[1], zvals)  # (n_rays, n_pts, 3)
+        points = points.reshape(-1, 3)
+        self.assertEqual(points.shape[0], n_rays * n_pts)
+        points_all = np.concatenate([np.array(self.origin)[None, :], points], axis=0)
+        point_colors = get_combine_colors(['green', 'red'], [1, points.shape[0]])
+        ray_colors = get_combine_colors(['sky_blue'], [n_rays])
+
+        file_path = osp.join(RESULT_DIR, 'rays_sample_points.png')
+        draw_3d_components(
+            self.c2w[None, :],
+            intrinsic=self.intrinsic,
+            points=points_all,
+            point_colors=point_colors,
+            rays=(ray_bundle[0], z_max * ray_bundle[1]),
+            ray_colors=ray_colors,
+            ray_linewidth=0.5,
+            title='Each ray sample {} points'.format(n_pts),
             save_path=file_path
         )
 

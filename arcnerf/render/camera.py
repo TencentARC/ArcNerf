@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import torch
 
+from arcnerf.geometry import torch_to_np
 from arcnerf.geometry.poses import invert_poses
 from arcnerf.geometry.projection import pixel_to_world, world_to_pixel
 from arcnerf.geometry.transformation import normalize
@@ -34,8 +35,8 @@ class PerspectiveCamera(object):
         self.intrinsic[0, 2] *= scale
         self.intrinsic[1, 2] *= scale
         self.intrinsic[0, 1] *= scale
-        self.H = int(self.H * scale)
         self.W = int(self.W * scale)
+        self.H = int(self.H * scale)
 
     def get_cam_pose_norm(self):
         """Get the camera distance from origin in world coord"""
@@ -70,7 +71,7 @@ class PerspectiveCamera(object):
 
     def get_rays(self, index=None, N_rays=-1, to_np=False):
         """Get camera rays by intrinsic and c2w, in world coord"""
-        return get_rays(self.H, self.W, self.get_intrinsic(), self.get_pose(), index=index, N_rays=N_rays, to_np=to_np)
+        return get_rays(self.W, self.H, self.get_intrinsic(), self.get_pose(), index=index, N_rays=N_rays, to_np=to_np)
 
     def proj_world_to_pixel(self, points):
         """Project points onto image plane.
@@ -110,17 +111,17 @@ def load_K_Rt_from_P(proj_mat):
     return intrinsics, pose
 
 
-def get_rays(H, W, intrinsic, c2w, index=None, N_rays=-1, to_np=False):
+def get_rays(W, H, intrinsic, c2w, index=None, N_rays=-1, to_np=False):
     """Get rays in world coord from camera.
     No batch processing allow. Rays are produced by setting z=1 and get location.
     You can select index by a tuple, a list of tuple or a list of index
 
     Args:
-        H: img_height
         W: img_width
+        H: img_height
         intrinsic: torch.tensor(3, 3) intrinsic matrix
         c2w: torch.tensor(4, 4) cam pose. cam_to_world transform
-        index: sample ray by (i, j) index from (W, H), np.array(N_ind, 2) for (i, j) index
+        index: sample ray by (i, j) index from (W, H), np.array/torch.tensor(N_ind, 2) for (i, j) index
                 first index is X and second is Y, any index should be in range (0, W-1) and (0, H-1)
         N_rays: random sample ray by such num if it > 0
         to_np: if to np, return np array instead of torch.tensor
@@ -141,7 +142,10 @@ def get_rays(H, W, intrinsic, c2w, index=None, N_rays=-1, to_np=False):
     # index unroll
     if index is not None:
         assert len(index.shape) == 2 and index.shape[-1] == 2, 'invalid shape, should be (N_rays, 2)'
-        index = torch.tensor(index, dtype=torch.long).to(device)
+        if isinstance(index, np.ndarray):
+            index = torch.tensor(index, dtype=torch.long).to(device)
+        else:
+            index = index.type(torch.long).to(device)
         index = index[:, 0] * H + index[:, 1]  # (N_rays, ) unroll from (i, j)
     # sample by N_rays
     if N_rays > 0:
@@ -150,7 +154,7 @@ def get_rays(H, W, intrinsic, c2w, index=None, N_rays=-1, to_np=False):
     # sampled by index
     if index is not None:
         pixels = pixels[:, index, :]
-        index = index.detach().cpu().numpy().tolist()
+        index = torch_to_np(index).tolist()
 
     z = torch.ones(size=(1, pixels.shape[1]), dtype=dtype).to(device)  # (1, WH/N_rays)
     xyz_world = pixel_to_world(pixels, z, intrinsic.unsqueeze(0), c2w.unsqueeze(0))  # (1, WH/N_rays, 3)
@@ -161,7 +165,26 @@ def get_rays(H, W, intrinsic, c2w, index=None, N_rays=-1, to_np=False):
     rays_o = torch.repeat_interleave(cam_loc, rays_d.shape[0], dim=0)  # (WH/N_rays, 3)
 
     if to_np:
-        rays_o = rays_o.detach().cpu().numpy()
-        rays_d = rays_d.detach().cpu().numpy()
+        rays_o = torch_to_np(rays_o)
+        rays_d = torch_to_np(rays_d)
 
     return rays_o, rays_d, index
+
+
+def equal_sample(n_rays_w, n_rays_h, W, H):
+    """Eqaul sample i,j index on img with (W, H)
+
+    Args:
+        n_rays_w: num of samples on each row (x direction)
+        n_rays_h: num of samples on each col (y direction)
+        W: image width
+        H: image height
+
+    Returns:
+        index: np.array(n_rays_w*n_rays_h, 2) equally sampled grid
+    """
+
+    i, j = np.meshgrid(np.linspace(0, W - 1, n_rays_w), np.linspace(0, H - 1, n_rays_h))
+    index = np.stack([i, j], axis=-1).reshape(-1, 2)
+
+    return index

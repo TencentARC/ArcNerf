@@ -53,7 +53,6 @@ class Base3dDataset(BaseDataset):
 
             for camera in self.cameras:
                 camera.rescale_pose(scale=self.cfgs.scale_radius / max_cam_norm_t / 1.1)
-        # TODO: Ray visual by loc, volume sampler visual(with camera)
 
     def precache_ray(self):
         """Precache all the rays for all images first"""

@@ -90,7 +90,7 @@ def draw_points(ax, points, point_colors, point_size, min_values, max_values):
     return min_values, max_values
 
 
-def draw_rays(ax, rays, ray_colors, min_values, max_values):
+def draw_rays(ax, rays, ray_colors, ray_linewidth, min_values, max_values):
     """Draw rays"""
     # set color, by default is blue
     N_r = rays[0].shape[0]
@@ -113,7 +113,8 @@ def draw_rays(ax, rays, ray_colors, min_values, max_values):
         rays_d_plt[:, 0],
         rays_d_plt[:, 1],
         rays_d_plt[:, 2],
-        color=ray_colors
+        color=ray_colors,
+        linewidths=ray_linewidth,
     )
     min_values = np.minimum(np.minimum(min_values, rays_o_plt.min(0)), rays_e_plt.min(0))
     max_values = np.maximum(np.maximum(max_values, rays_o_plt.max(0)), rays_e_plt.max(0))
@@ -187,6 +188,7 @@ def draw_3d_components(
     line_colors=None,
     rays=None,
     ray_colors=None,
+    ray_linewidth=2,
     meshes=None,
     mesh_colors=None,
     sphere_radius=None,
@@ -211,6 +213,7 @@ def draw_3d_components(
         rays: a tuple (rays_o, rays_d), each in (N_r, 3), in world coord
                 rays_d is with actual len, if you want longer arrow, you need to extend rays_d
         ray_colors: color in (N_r, 3) or (3,), applied for each or all ray
+        ray_linewidth: width of ray line, by default is 1
         meshes: list of mesh of (N_tri, 3, 3), len is N_m
         mesh_colors: color in (N_m, 3) or (3,), applied for each or all mesh
         sphere_radius: if not None, draw a sphere with such radius
@@ -236,7 +239,7 @@ def draw_3d_components(
         min_values, max_values = draw_points(ax, points, point_colors, point_size, min_values, max_values)
 
     if rays is not None:
-        min_values, max_values = draw_rays(ax, rays, ray_colors, min_values, max_values)
+        min_values, max_values = draw_rays(ax, rays, ray_colors, ray_linewidth, min_values, max_values)
 
     if sphere_radius is not None:
         min_values, max_values = draw_sphere(ax, sphere_radius, sphere_origin, min_values, max_values)

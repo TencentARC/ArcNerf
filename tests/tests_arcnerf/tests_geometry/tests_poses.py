@@ -18,7 +18,7 @@ from arcnerf.geometry.poses import (
 )
 from arcnerf.geometry.transformation import normalize
 from arcnerf.visual.plot_3d import draw_3d_components
-from common.visual import get_colors
+from common.visual import get_combine_colors
 from tests.tests_arcnerf.tests_geometry import TestGeomDict
 
 RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results', 'poses'))
@@ -108,21 +108,15 @@ class TestDict(TestGeomDict):
             origin=look_at_point,
             look_at_point=look_at_point
         )
-        cam_colors = np.repeat(get_colors(color='red', to_int=False, to_np=True)[None, :], n_cam, axis=0)  # (n, 3)
         cam_loc = c2w[:, :3, 3]  # (n, 3)
         rays_d = normalize(look_at_point[None, :] - cam_loc)  # (n, 3)
-        rays_colors = np.repeat(get_colors(color='blue', to_int=False, to_np=True)[None, :], n_cam, axis=0)  # (n, 3)
 
         # append avg poses
         avg_pose = average_poses(c2w)[None, :]  # (1, 4, 4)
 
         # center poses by real avg_pose, new centered poses is not one sphere center at (0,0,0)
         center_pose = center_poses(c2w)  # (n, 4, 4)
-        cam_colors_all = np.concatenate([
-            cam_colors,
-            get_colors('maroon', to_int=False, to_np=True)[None, :],
-            np.repeat(get_colors('black', to_int=False, to_np=True)[None, :], n_cam, axis=0)
-        ])  # (n+1+n, 3)
+        cam_colors_all = get_combine_colors(['red', 'maroon', 'black'], [n_cam, 1, n_cam])  # (n+1+n, 3)
         c2w_all = np.concatenate([c2w, avg_pose, center_pose], axis=0)  # (n+1+n, 4, 4)
         cam_loc_all = np.concatenate([cam_loc, avg_pose[:, :3, 3], center_pose[:, :3, 3]], axis=0)  # (n+1+n, 3)
         rays_d_all = np.concatenate([
@@ -130,11 +124,7 @@ class TestDict(TestGeomDict):
             normalize(look_at_point[None, :] - avg_pose[:, :3, 3]),
             normalize(np.array(list(origin))[None, :] - center_pose[:, :3, 3])
         ])  # (n+1+n, 3)
-        rays_colors_all = np.concatenate([
-            rays_colors,
-            get_colors('navy', to_int=False, to_np=True)[None, :],
-            np.repeat(get_colors('yellow', to_int=False, to_np=True)[None, :], n_cam, axis=0)
-        ])  # (n+1+n, 3)
+        rays_colors_all = get_combine_colors(['blue', 'navy', 'yellow'], [n_cam, 1, n_cam])  # (n+1+n, 3)
         points_all = np.concatenate([look_at_point[None, :], np.array(list(origin))[None, :]], axis=0)
 
         file_path = osp.join(RESULT_DIR, 'recenter_regular_poses.png')
@@ -158,10 +148,9 @@ class TestDict(TestGeomDict):
         c2w = generate_cam_pose_on_sphere(
             'random', self.radius, n_cam, origin=look_at_point, look_at_point=look_at_point
         )  # (n, 4, 4)
-        cam_colors = np.repeat(get_colors(color='red', to_int=False, to_np=True)[None, :], n_cam, axis=0)  # (n, 3)
+
         cam_loc = c2w[:, :3, 3]  # (n, 3)
         rays_d = normalize(look_at_point[None, :] - cam_loc)  # (n, 3)
-        rays_colors = np.repeat(get_colors(color='blue', to_int=False, to_np=True)[None, :], n_cam, axis=0)  # (n, 3)
 
         # append avg poses
         avg_pose = average_poses(c2w)[None, :]  # (1, 4, 4)
@@ -169,16 +158,8 @@ class TestDict(TestGeomDict):
         avg_pose_center[:, :3, 3] = look_at_point
 
         # combined color
-        cam_colors_all = np.concatenate([
-            cam_colors,
-            get_colors('maroon', to_int=False, to_np=True)[None, :],
-            np.repeat(get_colors('black', to_int=False, to_np=True)[None, :], n_cam, axis=0)
-        ])  # (n+1+n, 3)
-        rays_colors_all = np.concatenate([
-            rays_colors,
-            get_colors('navy', to_int=False, to_np=True)[None, :],
-            np.repeat(get_colors('yellow', to_int=False, to_np=True)[None, :], n_cam, axis=0)
-        ])  # (n+1+n, 3)
+        cam_colors_all = get_combine_colors(['red', 'maroon', 'black'], [n_cam, 1, n_cam])  # (n+1+n, 3)
+        rays_colors_all = get_combine_colors(['blue', 'navy', 'yellow'], [n_cam, 1, n_cam])  # (n+1+n, 3)
 
         # center poses, new center is the look at point, all center_pose is on sphere centered at 0
         center_pose = center_poses(c2w, look_at_point)  # (n, 4, 4)
@@ -229,26 +210,20 @@ class TestDict(TestGeomDict):
         )
 
     def test_pose_from_tri_circumcircle(self):
-        n_cam = 3
+        n_cam = 5
         look_at_point = np.array([5.0, 5.0, 0.0])  # (3, )
         c2w = generate_cam_pose_on_sphere(
             'random', self.radius, 3, origin=look_at_point, look_at_point=look_at_point
         )  # (3, 4, 4)
         c2w_circle, origin, radius = generate_can_pose_from_tri_circumcircle(c2w[:, :3, 3], n_cam, close=False)
         c2w_all = np.concatenate([c2w, c2w_circle], axis=0)  # (3+n, 4, 4)
-        cam_colors = np.concatenate([
-            np.repeat(get_colors(color='blue', to_int=False, to_np=True)[None, :], 3, axis=0),
-            np.repeat(get_colors(color='black', to_int=False, to_np=True)[None, :], n_cam, axis=0),
-        ])  # (3+n, 3)
+        cam_colors = get_combine_colors(['blue', 'black'], [3, n_cam])  # (3+n, 3)
         cam_loc = c2w_all[:, :3, 3]  # (3+n, 3)
         rays_d = np.concatenate([
             normalize(look_at_point[None, :] - cam_loc[:3]),
             normalize(origin[None, :] - cam_loc[3:]),
         ])  # (3+n, 3)
-        rays_colors = np.concatenate([
-            np.repeat(get_colors(color='red', to_int=False, to_np=True)[None, :], 3, axis=0),
-            np.repeat(get_colors(color='yellow', to_int=False, to_np=True)[None, :], n_cam, axis=0),
-        ])  # (3+n, 3)
+        rays_colors = get_combine_colors(['red', 'yellow'], [3, n_cam])  # (3+n, 3)
         points_all = np.concatenate([look_at_point[None, :], c2w[:, :3, 3]], axis=0)  # (1+3, 3)
 
         file_path = osp.join(RESULT_DIR, 'pose_from_circumcircle.png')

@@ -26,7 +26,8 @@ each line prints `N_pt_in_line-1` line seg
 
 ## Rays
 - rays: a tuple `(rays_o, rays_d)`, each in `(N_r, 3)`, in world coord. `rays_d` is with actual len, if you want longer arrow, you need to extend `rays_d`
-ray_colors: color in `(N_r, 3)` or `(3,)`, applied for each or all rays
+- ray_colors: color in `(N_r, 3)` or `(3,)`, applied for each or all rays
+- ray_linewidth: width of ray line, by default is 1
 
 ## Sphere
 - sphere_radius: draw a sphere with such `radius` if not None

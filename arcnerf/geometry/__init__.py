@@ -28,3 +28,8 @@ def np_wrapper(func, *args):
         return result.numpy()
     else:
         return result
+
+
+def torch_to_np(tensor):
+    """Torch tensor to numpy array"""
+    return tensor.detach().cpu().numpy()

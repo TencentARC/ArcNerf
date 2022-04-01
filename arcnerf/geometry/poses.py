@@ -196,8 +196,9 @@ def generate_cam_pose_on_sphere(
     return cam_poses
 
 
-def generate_can_pose_from_tri_circumcircle(verts, n_cam, up=np.array([0, 1, 0]), close=True):
+def generate_can_pose_from_tri_circumcircle(verts, n_cam, close=True):
     """Get cam pose on a circle that is the circumcircle of triangle
+    Use normal of circle (y+) as the up direction for cameras.
 
     Args:
         verts: np(3, 3), triangle verts, second dim is xyz
