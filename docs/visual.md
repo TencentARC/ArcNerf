@@ -8,6 +8,7 @@ Then change to plt space
 ## Camera
 - c2w pose in `(N_cam, 4, 4)`. Local camera models will be created and transformed into world space
 - cam_colors in `(N_cam, 3)` or `(3,)` can be used to color each or all cams
+- intrinsic in `(3, 3)` is used to adjust local cam model for actual ray direction.
 
 ## Points
 - point in `(N_p, 3)` in world space

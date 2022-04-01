@@ -68,9 +68,9 @@ class PerspectiveCamera(object):
 
         return pose
 
-    def get_rays(self, index=None):
+    def get_rays(self, index=None, N_rays=-1, to_np=False):
         """Get camera rays by intrinsic and c2w, in world coord"""
-        return get_rays(self.H, self.W, self.get_intrinsic(), self.get_pose(), index=index)
+        return get_rays(self.H, self.W, self.get_intrinsic(), self.get_pose(), index=index, N_rays=N_rays, to_np=to_np)
 
     def proj_world_to_pixel(self, points):
         """Project points onto image plane.
@@ -110,33 +110,58 @@ def load_K_Rt_from_P(proj_mat):
     return intrinsics, pose
 
 
-def get_rays(H, W, intrinsic, c2w, index=None):
-    """Get rays in world coord. No batch processing allow. Rays are produced by setting z=1 and get location.
+def get_rays(H, W, intrinsic, c2w, index=None, N_rays=-1, to_np=False):
+    """Get rays in world coord from camera.
+    No batch processing allow. Rays are produced by setting z=1 and get location.
     You can select index by a tuple, a list of tuple or a list of index
 
     Args:
         H: img_height
         W: img_width
-        intrinsic: (3, 3) intrinsic matrix
-        c2w: (4, 4) cam pose. cam_to_world transform
+        intrinsic: torch.tensor(3, 3) intrinsic matrix
+        c2w: torch.tensor(4, 4) cam pose. cam_to_world transform
+        index: sample ray by (i, j) index from (W, H), np.array(N_ind, 2) for (i, j) index
+                first index is X and second is Y, any index should be in range (0, W-1) and (0, H-1)
+        N_rays: random sample ray by such num if it > 0
+        to_np: if to np, return np array instead of torch.tensor
 
     Returns:
         a ray_bundle with rays_o and rays_d. Each is in dim (N_ray, 3).
-            If no sampler is used, return (WH, 3) num of rays
+             If no sampler is used, return (WH, 3) num of rays
+        ind_unroll: sample index in list of (N_ind, ) for index in (WH, ) range
     """
+    assert (index is None) or N_rays <= 0, 'You are not allowed to sampled both by index and N_ray'
     device = intrinsic.device
     dtype = intrinsic.dtype
     i, j = torch.meshgrid(
         torch.linspace(0, W - 1, W, dtype=dtype), torch.linspace(0, H - 1, H, dtype=dtype)
     )  # i, j: (W, H)
-
     pixels = torch.stack([i, j], dim=-1).reshape(-1, 2).unsqueeze(0)  # (1, WH, 2)
-    z = torch.ones(size=(1, pixels.shape[1]), dtype=dtype).to(device)  # (1, WH)
-    xyz_world = pixel_to_world(pixels, z, intrinsic.unsqueeze(0), c2w.unsqueeze(0))  # (1, WH, 3)
+
+    # index unroll
+    if index is not None:
+        assert len(index.shape) == 2 and index.shape[-1] == 2, 'invalid shape, should be (N_rays, 2)'
+        index = torch.tensor(index, dtype=torch.long).to(device)
+        index = index[:, 0] * H + index[:, 1]  # (N_rays, ) unroll from (i, j)
+    # sample by N_rays
+    if N_rays > 0:
+        index = np.random.choice(range(0, W * H), N_rays, replace=False)  # (N_rays, )
+        index = torch.tensor(index, dtype=torch.long).to(device)
+    # sampled by index
+    if index is not None:
+        pixels = pixels[:, index, :]
+        index = index.detach().cpu().numpy().tolist()
+
+    z = torch.ones(size=(1, pixels.shape[1]), dtype=dtype).to(device)  # (1, WH/N_rays)
+    xyz_world = pixel_to_world(pixels, z, intrinsic.unsqueeze(0), c2w.unsqueeze(0))  # (1, WH/N_rays, 3)
 
     cam_loc = c2w[:3, 3].unsqueeze(0)  # (1, 3)
-    rays_d = xyz_world - cam_loc.unsqueeze(0)  # (1, WH, 3)
-    rays_d = normalize(rays_d)[0]  # (WH, 3)
-    rays_o = torch.repeat_interleave(cam_loc, rays_d.shape[0], dim=0)  # (WH, 3)
+    rays_d = xyz_world - cam_loc.unsqueeze(0)  # (1, WH/N_rays, 3)
+    rays_d = normalize(rays_d)[0]  # (WH/N_rays, 3)
+    rays_o = torch.repeat_interleave(cam_loc, rays_d.shape[0], dim=0)  # (WH/N_rays, 3)
 
-    return rays_o, rays_d
+    if to_np:
+        rays_o = rays_o.detach().cpu().numpy()
+        rays_d = rays_d.detach().cpu().numpy()
+
+    return rays_o, rays_d, index

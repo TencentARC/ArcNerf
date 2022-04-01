@@ -241,7 +241,6 @@ class TestDict(TestGeomDict):
             np.repeat(get_colors(color='black', to_int=False, to_np=True)[None, :], n_cam, axis=0),
         ])  # (3+n, 3)
         cam_loc = c2w_all[:, :3, 3]  # (3+n, 3)
-        rays_d = normalize(look_at_point[None, :] - cam_loc)  # (3+n, 3)
         rays_d = np.concatenate([
             normalize(look_at_point[None, :] - cam_loc[:3]),
             normalize(origin[None, :] - cam_loc[3:]),

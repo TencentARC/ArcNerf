@@ -4,6 +4,32 @@
 import numpy as np
 
 
+def get_cam_whf(intrinsic, max_norm=1):
+    """Get he camera model w/2, h/2 and f_scale from intrinsic
+
+    Args:
+        intrinsic: np(3,3) intrinsic matrix
+        max_norm: factor fo adjustment, by default is 1
+
+    Returns:
+        width: local image plane width by half
+        height: local image plane height by half
+        f_scale: camera model frustum length
+    """
+    if intrinsic is not None:
+        assert intrinsic.shape == (3, 3), 'Invalid intrinsic shape, should be (3, 3)'
+
+    width = 0.032 if intrinsic is None else intrinsic[0, 2] / 1e4
+    height = 0.024 if intrinsic is None else intrinsic[1, 2] / 1e4
+    f_scale = 0.08 if intrinsic is None else intrinsic[0, 0] / 1e4
+
+    width *= max_norm
+    height *= max_norm
+    f_scale *= max_norm
+
+    return width, height, f_scale
+
+
 def create_camera_model(width, height, f_scale):
     """Return camera model in local coord. Cam is allow centered at (0,0,0)
 

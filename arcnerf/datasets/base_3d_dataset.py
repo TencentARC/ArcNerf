@@ -81,20 +81,17 @@ class Base3dDataset(BaseDataset):
             ray_bundle = self.cameras[idx].get_rays()  # We don't sample rays here, although you can do that
 
         inputs = {
-            'img': img,  # (hw, 3), in rgb order
-            'mask': mask,  # (hw,)
+            'img': img,  # (hw, 3), in rgb order / (n_rays, 3) if sample rays
+            'mask': mask,  # (hw,) / (n_rays, 3) if sample rays
             'c2w': c2w,  # (4, 4)
             'intrinsic': intrinsic,  # (3, 3)
-            'rays_o': ray_bundle[0],  # (hw, 3)
-            'rays_d': ray_bundle[1],  # (hw, 3)
+            'rays_o': ray_bundle[0],  # (hw, 3) / (n_rays, 3) if sample rays
+            'rays_d': ray_bundle[1],  # (hw, 3) / (n_rays, 3) if sample rays
             'H': self.H,
             'W': self.W
         }
 
         if self.transforms is not None:
             inputs = self.transforms(inputs)
-
-        # for k, v in inputs.items():
-        #     print(k, v.shape)
 
         return inputs

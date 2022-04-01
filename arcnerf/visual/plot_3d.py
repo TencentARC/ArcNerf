@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
 
-from .camera_model import create_camera_model
+from .camera_model import create_camera_model, get_cam_whf
 from arcnerf.geometry.sphere import get_sphere_surface
 from common.visual.draw_cv2 import get_colors
 
@@ -39,7 +39,7 @@ def transform_plt_space(pts, xyz_axis=0):
     return pts_rot
 
 
-def draw_cameras(ax, c2w, cam_colors, min_values, max_values):
+def draw_cameras(ax, c2w, cam_colors, intrinsic, min_values, max_values):
     """Draw cameras"""
     # set color, by default is red
     N_cam = c2w.shape[0]
@@ -51,9 +51,7 @@ def draw_cameras(ax, c2w, cam_colors, min_values, max_values):
 
     # set vis params, adjust by camera loc
     max_cam_pose_norm = np.linalg.norm(c2w[:, :3, 3], axis=-1).max()
-    cam_width = 0.032 * max_cam_pose_norm
-    cam_height = 0.024 * max_cam_pose_norm
-    f_scale = 0.08 * max_cam_pose_norm
+    cam_width, cam_height, f_scale = get_cam_whf(intrinsic, max_cam_pose_norm)
 
     # single camera_model in local coord. Each is a xxx
     camera_model = create_camera_model(cam_width, cam_height, f_scale)
@@ -181,6 +179,7 @@ def draw_meshes(ax, meshes, mesh_colors, min_values, max_values):
 def draw_3d_components(
     c2w=None,
     cam_colors=None,
+    intrinsic=None,
     points=None,
     point_size=20,
     point_colors=None,
@@ -203,6 +202,7 @@ def draw_3d_components(
     Args:
         c2w: c2w pose stack in in shape(N_cam, 4, 4). None means not visual
         cam_colors: color in (N_cam, 3) or (3,), applied for each or all cam
+        intrinsic: intrinsic in (3, 3), adjust local cam model if not None
         points: point in (N_p, 3) shape in world coord
         point_size: size of point, by default set up 20
         point_colors: color in (N_p, 3) or (3,), applied for each or all point
@@ -230,7 +230,7 @@ def draw_3d_components(
 
     # draw components
     if c2w is not None:
-        min_values, max_values = draw_cameras(ax, c2w, cam_colors, min_values, max_values)
+        min_values, max_values = draw_cameras(ax, c2w, cam_colors, intrinsic, min_values, max_values)
 
     if points is not None:
         min_values, max_values = draw_points(ax, points, point_colors, point_size, min_values, max_values)
