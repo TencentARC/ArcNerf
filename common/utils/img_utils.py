@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import os
+
 import cv2
 import numpy as np
 
@@ -87,3 +89,31 @@ def img_to_uint8(img, transpose=None, std=None, mean=None, norm_by_255=True, rgb
 def is_img_ext(file):
     """Check whether a filename is an image file by checking extension."""
     return file.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp'))
+
+
+def get_n_img_in_dir(folder):
+    """Get the num of image in directory"""
+    return len([f for f in os.listdir(folder) if is_img_ext(f)])
+
+
+def heic_to_png(heic_path):
+    """Change a heic(ios format) to png file.
+    Save .png image to the same directory with different extension.
+    """
+    from wand.image import Image
+    img = Image(filename=heic_path)
+    img.format = 'png'
+    img.save(filename=heic_path.replace('.HEIC', '.png'))
+    img.close()
+
+
+def get_image_metadata(img_path):
+    """Get image w,h,channel"""
+    img = cv2.imread(img_path)
+    if len(img.shape) == 2:
+        h, w = img.shape[:2]
+        channel = 0
+    else:
+        h, w, channel = img.shape
+
+    return w, h, channel

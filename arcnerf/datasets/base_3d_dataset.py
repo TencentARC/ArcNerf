@@ -3,7 +3,7 @@
 import torch
 
 from common.datasets.base_dataset import BaseDataset
-from common.utils.img_utils import img_scale
+from common.utils.img_utils import img_scale, read_img
 
 
 class Base3dDataset(BaseDataset):
@@ -15,6 +15,7 @@ class Base3dDataset(BaseDataset):
         self.images = []
         self.n_imgs = 0
         self.masks = []
+        self.cam_file = None
         self.cameras = []
         self.H, self.W = 0, 0
         self.precache = False
@@ -34,6 +35,21 @@ class Base3dDataset(BaseDataset):
                 for camera in self.cameras:
                     camera.rescale(scale)
 
+    @staticmethod
+    def read_image_mask(img_list, mask_list):
+        """Read image and mask from list. can be emtpy list if not file needed"""
+        images = [read_img(path, norm_by_255=True) for path in img_list]
+        masks = [read_img(path, norm_by_255=True, gray=True) for path in mask_list]
+
+        for i in range(len(masks)):
+            masks[i][masks[i] > 0.5] = 1.0
+
+        return images, masks
+
+    def read_cameras(self):
+        """Return a list of render.camera with c2w and intrinsic"""
+        raise NotImplementedError('Please implement the detail function in child class....')
+
     def get_poses(self, torch_tensor=True, w2c=False):
         """Get the a list of poses of all cameras"""
         extrinsic = []
@@ -45,14 +61,19 @@ class Base3dDataset(BaseDataset):
     def norm_cam_pose(self):
         """Normalize camera pose by scale_radius, place camera near a sphere surface"""
         assert len(self.cameras) > 0, 'Not camera in dataset, do not use this func'
-        if self.cfgs.scale_radius > 0:
+        if hasattr(self.cfgs, 'scale_radius') and self.cfgs.scale_radius > 0:
             cam_norm_t = []
             for camera in self.cameras:
                 cam_norm_t.append(camera.get_cam_pose_norm())
             max_cam_norm_t = max(cam_norm_t)
+            print('before norm ', max_cam_norm_t)
 
             for camera in self.cameras:
                 camera.rescale_pose(scale=self.cfgs.scale_radius / max_cam_norm_t / 1.1)
+            cam_norm_t = []
+            for camera in self.cameras:
+                cam_norm_t.append(camera.get_cam_pose_norm())
+            print('after norm ', max_cam_norm_t)
 
     def precache_ray(self):
         """Precache all the rays for all images first"""

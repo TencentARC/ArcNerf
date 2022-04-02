@@ -33,6 +33,14 @@ each line prints `N_pt_in_line-1` line seg
 - sphere_radius: draw a sphere with such `radius` if not None
 - sphere_origin: the origin of sphere, by default is `(0, 0, 0)`
 
+## Voxel
+- TBD
+
 ## Other:
 - title: title of the fig
 - save_path: if `None`, will show the fig, otherwise save it
+
+
+# TODO:
+- Write a python notebook showing how to use
+- open3d version for pc, mesh visual with rays if necessary

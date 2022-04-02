@@ -106,16 +106,17 @@ def draw_rays(ax, rays, ray_colors, ray_linewidth, min_values, max_values):
     rays_o_plt = transform_plt_space(rays_o, xyz_axis=1)
     rays_d_plt = transform_plt_space(rays_d, xyz_axis=1)
     rays_e_plt = transform_plt_space(rays_e, xyz_axis=1)
-    ax.quiver(
-        rays_o_plt[:, 0],
-        rays_o_plt[:, 1],
-        rays_o_plt[:, 2],
-        rays_d_plt[:, 0],
-        rays_d_plt[:, 1],
-        rays_d_plt[:, 2],
-        color=ray_colors,
-        linewidths=ray_linewidth,
-    )
+    for idx in range(rays_o_plt.shape[0]):
+        ax.quiver(
+            rays_o_plt[idx, 0],
+            rays_o_plt[idx, 1],
+            rays_o_plt[idx, 2],
+            rays_d_plt[idx, 0],
+            rays_d_plt[idx, 1],
+            rays_d_plt[idx, 2],
+            color=ray_colors[idx],
+            linewidths=ray_linewidth,
+        )
     min_values = np.minimum(np.minimum(min_values, rays_o_plt.min(0)), rays_e_plt.min(0))
     max_values = np.maximum(np.maximum(max_values, rays_o_plt.max(0)), rays_e_plt.max(0))
 

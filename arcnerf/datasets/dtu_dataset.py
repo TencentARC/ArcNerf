@@ -8,7 +8,6 @@ import numpy as np
 from .base_3d_dataset import Base3dDataset
 from ..datasets import DATASET_REGISTRY
 from arcnerf.render.camera import load_K_Rt_from_P, PerspectiveCamera
-from common.utils.img_utils import read_img
 
 
 @DATASET_REGISTRY.register()
@@ -29,9 +28,9 @@ class DTU(Base3dDataset):
         self.H, self.W = self.images[0].shape[:2]
 
         # get cameras
-        cam_file = osp.join(self.data_spec_dir, 'cameras.npz')
-        assert osp.exists(cam_file), 'Camera file {} not exist...'.format(cam_file)
-        self.cameras = self.read_cameras(cam_file)
+        self.cam_file = osp.join(self.data_spec_dir, 'cameras.npz')
+        assert osp.exists(self.cam_file), 'Camera file {} not exist...'.format(self.cam_file)
+        self.cameras = self.read_cameras()
 
         # norm camera_pose
         self.norm_cam_pose()
@@ -58,19 +57,7 @@ class DTU(Base3dDataset):
 
         return img_list, mask_list, n_imgs
 
-    @staticmethod
-    def read_image_mask(img_list, mask_list):
-        """Read image and mask from list"""
-
-        images = [read_img(path, norm_by_255=True) for path in img_list]
-        masks = [read_img(path, norm_by_255=True, gray=True) for path in mask_list]
-
-        for i in range(len(masks)):
-            masks[i][masks[i] > 0.5] = 1.0
-
-        return images, masks
-
-    def read_cameras(self, cam_file):
+    def read_cameras(self):
         """Get cameras with pose and intrinsic from cam_file.npz. Detail information is here
         https://github.com/autonomousvision/differentiable_volumetric_rendering/blob/master/FAQ.md
 
@@ -79,7 +66,7 @@ class DTU(Base3dDataset):
                                0, 0, 1], which transfer point in range (w,h) to (-1, 1).
         Scale_mat and world_mats transfer the image into correct image_plane within range (w, h)
         """
-        cam_dict = np.load(cam_file)
+        cam_dict = np.load(self.cam_file)
         scale_mats = [cam_dict['scale_mat_%d' % idx].astype(np.float32) for idx in range(self.n_imgs)]
         world_mats = [cam_dict['world_mat_%d' % idx].astype(np.float32) for idx in range(self.n_imgs)]
 

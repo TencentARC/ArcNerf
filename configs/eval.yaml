@@ -8,6 +8,10 @@ dir:
     data_dir: None
     eval_dir: None
 
+data:
+    video_downsample: 15
+    image_downsample: 4
+
 gpu_ids: -1                   # -1 for cpu, 0/1/2 for gpu. Do not use multiple gpu
 
 worker: 1
@@ -25,11 +29,11 @@ dataset:
         type: DummyConv
         eval_batch_size: 1
 
-metric:
-    M1:
-    M2:
-
 model:
     type: ConvModel
     in_channel: 3
     out_channel: 1
+
+metric:
+    M1:
+    M2:

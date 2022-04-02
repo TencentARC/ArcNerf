@@ -1,6 +1,8 @@
+ffmpeg-python
 loguru
 matplotlib
 numpy
+opencv-python
 pyyaml
 tensorboard
 torch
