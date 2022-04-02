@@ -1,22 +1,26 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import cv2
 import os
 import os.path as osp
 import unittest
 
 import numpy as np
+import torch
 
 from arcnerf.datasets import get_dataset
 from arcnerf.datasets.transform.augmentation import get_transforms
-from arcnerf.geometry import np_wrapper
+from arcnerf.geometry import np_wrapper, torch_to_np
 from arcnerf.geometry.poses import average_poses, generate_cam_pose_on_sphere
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.sphere import get_uv_from_pos
 from arcnerf.geometry.transformation import normalize
-from arcnerf.render.camera import equal_sample, get_rays
+from arcnerf.render.camera import equal_sample, get_rays, PerspectiveCamera
 from arcnerf.visual.plot_3d import draw_3d_components
+from common.utils.video_utils import write_video
 from common.visual import get_combine_colors
+from common.visual.draw_cv2 import draw_vert_on_img
 from tests import setup_test_config
 
 MODE = 'train'
@@ -31,7 +35,9 @@ class TestDict(unittest.TestCase):
         cls.cfgs = setup_test_config()
         cls.dataset_type = getattr(cls.cfgs.dataset, MODE).type
         cls.dataset = cls.setup_dataset()
-        cls.c2w, cls.intrinsic, cls.H, cls.W = cls.get_cameras()
+        cls.images = cls.load_images()
+        cls.H, cls.W = int(cls.dataset[0]['H']), int(cls.dataset[0]['W'])
+        cls.c2w, cls.intrinsic, cls.cameras = cls.get_cameras()
         cls.n_cam = cls.c2w.shape[0]
         cls.radius = np.linalg.norm(cls.c2w[:, :3, 3], axis=-1).max(0)
 
@@ -42,19 +48,27 @@ class TestDict(unittest.TestCase):
     def setup_dataset(cls):
         transforms, _ = get_transforms(getattr(cls.cfgs.dataset, MODE))
         dataset = get_dataset(cls.cfgs.dataset, cls.cfgs.dir.data_dir, None, MODE, transforms)
-        print('setup')
+
         return dataset
 
     @classmethod
+    def load_images(cls):
+        img_list, _ = cls.dataset.get_image_list()
+        imgs = [cv2.imread(path) for path in img_list]
+
+        return imgs
+
+    @classmethod
     def get_cameras(cls):
+        intrinsic = cls.dataset[0]['intrinsic']
         c2w = []
+        cameras = []
         for sample in cls.dataset:
             c2w.append(sample['c2w'][None, ...])
+            cameras.append(PerspectiveCamera(torch_to_np(intrinsic), torch_to_np(sample['c2w']), cls.W, cls.H))
         c2w = np.concatenate(c2w, axis=0)  # (n, 4, 4)
-        intrinsic = cls.dataset[0]['intrinsic']
-        H, W = cls.dataset[0]['H'], cls.dataset[0]['W']
 
-        return c2w, intrinsic, H, W
+        return c2w, intrinsic, cameras
 
     def tests_get_dataset(self):
         self.assertIsInstance(self.dataset[0], dict)
@@ -179,6 +193,30 @@ class TestDict(unittest.TestCase):
             title='Each ray sampled {} pointsm, z_range({}-{})'.format(n_pts, z_min, z_max),
             save_path=file_path
         )
+
+    def tests_pc_reproject(self):
+        pc = self.dataset[0]['pc']
+        if pc is None:
+            return
+        if self.dataset[0]['img'].shape[0] != (self.H * self.W):  # Sample
+            return
+
+        pts = pc['pts']  # (n_pts, 3)
+        pts_vis = pc['vis'] if 'vis' in pc else None
+        if pts_vis is not None:
+            self.assertEqual(pts_vis.shape[0], self.n_cam)  # (n_cam, n_pts)
+
+        proj_imgs = []
+        for idx in range(self.n_cam):
+            pts_pixels = self.cameras[idx].proj_world_to_pixel(torch.FloatTensor(pts))
+            pts_pixels = torch_to_np(pts_pixels)
+            pts_vis_cam = pts_vis[idx, :]
+            pts_pixels = pts_pixels if pts_vis is None else pts_pixels[pts_vis_cam == 1, :]
+
+            proj_imgs.append(draw_vert_on_img(self.images[idx], pts_pixels, color='green'))
+
+        video_path = osp.join(self.spec_result_dir, 'reproj_pc.mp4')
+        write_video(proj_imgs, video_path, fps=5)
 
 
 if __name__ == '__main__':

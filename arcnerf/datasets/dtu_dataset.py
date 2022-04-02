@@ -17,14 +17,16 @@ class DTU(Base3dDataset):
     """
 
     def __init__(self, cfgs, data_dir, mode, transforms):
-        super(Base3dDataset, self).__init__(cfgs, data_dir, mode, transforms)
+        super(DTU, self).__init__(cfgs, data_dir, mode, transforms)
 
         # real DTU dataset with scan_id
         self.data_spec_dir = osp.join(self.data_dir, 'DTU', 'scan{}'.format(self.cfgs.scan_id))
 
         # get image and mask
-        img_list, mask_list, self.n_imgs = self.get_image_mask_list()
-        self.images, self.masks = self.read_image_mask(img_list, mask_list)
+        img_list, self.n_imgs = self.get_image_list()
+        mask_list = self.get_mask_list()
+        self.images = self.read_image_list(img_list)
+        self.masks = self.read_mask_list(mask_list)
         self.H, self.W = self.images[0].shape[:2]
 
         # get cameras
@@ -45,17 +47,22 @@ class DTU(Base3dDataset):
         if self.precache:
             self.precache_ray()
 
-    def get_image_mask_list(self):
-        """Get image and mask list"""
+    def get_image_list(self):
+        """Get image list"""
         img_dir = osp.join(self.data_spec_dir, 'image')
-        mask_dir = osp.join(self.data_spec_dir, 'mask')
         img_list = sorted(glob.glob(img_dir + '/*.png'))
-        mask_list = sorted(glob.glob(mask_dir + '/*.png'))
 
         n_imgs = len(img_list)
         assert n_imgs > 0, 'No image exists in {}'.format(img_dir)
 
-        return img_list, mask_list, n_imgs
+        return img_list, n_imgs
+
+    def get_mask_list(self):
+        """Get mask list"""
+        mask_dir = osp.join(self.data_spec_dir, 'mask')
+        mask_list = sorted(glob.glob(mask_dir + '/*.png'))
+
+        return mask_list
 
     def read_cameras(self):
         """Get cameras with pose and intrinsic from cam_file.npz. Detail information is here
@@ -75,6 +82,6 @@ class DTU(Base3dDataset):
             proj_mat = world_mat @ scale_mat
             proj_mat = proj_mat[:3, :4]
             intrinsic, pose = load_K_Rt_from_P(proj_mat)  # (4,4), (4,4)
-            cameras.append(PerspectiveCamera(intrinsic=intrinsic[:3, :3], c2w=pose, H=self.H, W=self.W))
+            cameras.append(PerspectiveCamera(intrinsic=intrinsic[:3, :3], c2w=pose, W=self.W, H=self.H))
 
         return cameras

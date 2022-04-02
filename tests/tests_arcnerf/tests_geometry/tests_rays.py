@@ -55,7 +55,7 @@ class TestDict(unittest.TestCase):
 
     @classmethod
     def setup_camera(cls):
-        return PerspectiveCamera(cls.intrinsic, cls.c2w, cls.H, cls.W)
+        return PerspectiveCamera(cls.intrinsic, cls.c2w, cls.W, cls.H)
 
     @classmethod
     def get_rays(cls):

@@ -13,7 +13,7 @@ from arcnerf.geometry.transformation import normalize
 class PerspectiveCamera(object):
     """A camera with intrinsic and c2w pose"""
 
-    def __init__(self, intrinsic, c2w, H=None, W=None, dtype=torch.float32):
+    def __init__(self, intrinsic, c2w, W=None, H=None, dtype=torch.float32):
         """
         Args:
             Intrinsic: (3, 3) numpy array

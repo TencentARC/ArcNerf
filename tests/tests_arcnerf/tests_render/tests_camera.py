@@ -50,7 +50,7 @@ class TestDict(unittest.TestCase):
 
     @classmethod
     def setup_camera(cls):
-        return PerspectiveCamera(cls.intrinsic, cls.c2w, cls.H, cls.W)
+        return PerspectiveCamera(cls.intrinsic, cls.c2w, cls.W, cls.H)
 
     @staticmethod
     def create_pixel_grid(W, H):
@@ -60,10 +60,10 @@ class TestDict(unittest.TestCase):
         return pixels
 
     def tests_dtype(self):
-        self.camera = PerspectiveCamera(self.intrinsic, self.c2w, self.H, self.W, dtype=torch.float64)
+        self.camera = PerspectiveCamera(self.intrinsic, self.c2w, self.W, self.H, dtype=torch.float64)
         ray_bundle = self.camera.get_rays()
         self.assertEqual(ray_bundle[0].dtype, torch.float64)
-        self.camera = PerspectiveCamera(self.intrinsic, self.c2w, self.H, self.W, dtype=torch.float32)
+        self.camera = PerspectiveCamera(self.intrinsic, self.c2w, self.W, self.H, dtype=torch.float32)
         ray_bundle = self.camera.get_rays()
         self.assertEqual(ray_bundle[0].dtype, torch.float32)
 

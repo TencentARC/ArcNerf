@@ -14,15 +14,18 @@ class Base3dDataset(BaseDataset):
         super(Base3dDataset, self).__init__(cfgs, data_dir, mode, transforms)
         self.images = []
         self.n_imgs = 0
-        self.masks = []
         self.cam_file = None
         self.cameras = []
         self.H, self.W = 0, 0
         self.precache = False
         self.ray_bundles = None
+        # below are optional
+        self.masks = []
+        self.point_cloud = None
+        print(self.masks)
 
     def rescale_img_and_pose(self):
-        """Rescale image/mask and pose if needed"""
+        """Rescale image/mask and pose if needed. It affects intrinsic only. """
         if hasattr(self.cfgs, 'img_scale') and self.cfgs.img_scale is not None:
             scale = self.cfgs.img_scale
             if scale != 1:
@@ -36,15 +39,21 @@ class Base3dDataset(BaseDataset):
                     camera.rescale(scale)
 
     @staticmethod
-    def read_image_mask(img_list, mask_list):
-        """Read image and mask from list. can be emtpy list if not file needed"""
+    def read_image_list(img_list):
+        """Read image from list."""
         images = [read_img(path, norm_by_255=True) for path in img_list]
+
+        return images
+
+    @staticmethod
+    def read_mask_list(mask_list):
+        """Read mask from list. can be emtpy list if not file needed"""
         masks = [read_img(path, norm_by_255=True, gray=True) for path in mask_list]
 
         for i in range(len(masks)):
             masks[i][masks[i] > 0.5] = 1.0
 
-        return images, masks
+        return masks
 
     def read_cameras(self):
         """Return a list of render.camera with c2w and intrinsic"""
@@ -59,21 +68,16 @@ class Base3dDataset(BaseDataset):
         return extrinsic
 
     def norm_cam_pose(self):
-        """Normalize camera pose by scale_radius, place camera near a sphere surface"""
+        """Normalize camera pose by scale_radius, place camera near a sphere surface. It affects extrinsic"""
         assert len(self.cameras) > 0, 'Not camera in dataset, do not use this func'
         if hasattr(self.cfgs, 'scale_radius') and self.cfgs.scale_radius > 0:
             cam_norm_t = []
             for camera in self.cameras:
                 cam_norm_t.append(camera.get_cam_pose_norm())
             max_cam_norm_t = max(cam_norm_t)
-            print('before norm ', max_cam_norm_t)
 
             for camera in self.cameras:
                 camera.rescale_pose(scale=self.cfgs.scale_radius / max_cam_norm_t / 1.1)
-            cam_norm_t = []
-            for camera in self.cameras:
-                cam_norm_t.append(camera.get_cam_pose_norm())
-            print('after norm ', max_cam_norm_t)
 
     def precache_ray(self):
         """Precache all the rays for all images first"""
@@ -81,6 +85,17 @@ class Base3dDataset(BaseDataset):
             self.ray_bundles = []
             for i in range(self.n_imgs):
                 self.ray_bundles.append(self.cameras[i].get_rays())
+
+    def get_sparse_point_cloud(self):
+        """Get sparse point cloud. You should write it in child class if needed
+
+        Returns:
+            point_cloud: a dict. only 'pts' is required, 'color', 'vis' is optional
+                - pts: (n_pts, 3), xyz points
+                - color: (n_pts, 3), rgb color.
+                - vis: (n_cam, n_pts), visibility in each cam.
+        """
+        return None
 
     def __len__(self):
         """Len of dataset"""
@@ -108,7 +123,8 @@ class Base3dDataset(BaseDataset):
             'rays_o': ray_bundle[0],  # (hw, 3) / (n_rays, 3) if sample rays
             'rays_d': ray_bundle[1],  # (hw, 3) / (n_rays, 3) if sample rays
             'H': self.H,
-            'W': self.W
+            'W': self.W,
+            'pc': self.point_cloud,  # a dict contains['pts', 'color', 'vis']. Same for all cam
         }
 
         if self.transforms is not None:

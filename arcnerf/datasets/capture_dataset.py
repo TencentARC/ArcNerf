@@ -16,14 +16,14 @@ class Capture(Base3dDataset):
     """A dataset class for self-capture images with colmap pose estimation"""
 
     def __init__(self, cfgs, data_dir, mode, transforms):
-        super(Base3dDataset, self).__init__(cfgs, data_dir, mode, transforms)
+        super(Capture, self).__init__(cfgs, data_dir, mode, transforms)
 
         # real capture dataset with scene_name
         self.data_spec_dir = osp.join(self.data_dir, 'Capture', self.cfgs.scene_name)
 
         # get image
         img_list, self.n_imgs = self.get_image_list()
-        self.images, self.masks = self.read_image_mask(img_list, [])
+        self.images = self.read_image_list(img_list)
         self.H, self.W = self.images[0].shape[:2]
 
         # get cameras
@@ -31,6 +31,9 @@ class Capture(Base3dDataset):
         assert osp.exists(self.cam_file), 'Camera file {} not exist...Please run colmap first...'.format(self.cam_file)
         self.poses = np.load(self.cam_file, allow_pickle=True).item()
         self.cameras = self.read_cameras()
+
+        # get pointcloud
+        self.point_cloud = self.get_sparse_point_cloud()
 
         # norm camera_pose
         self.norm_cam_pose()
@@ -69,7 +72,7 @@ class Capture(Base3dDataset):
 
         cameras = []
         for idx in range(self.n_imgs):  # read only first n_imgs
-            cameras.append(PerspectiveCamera(intrinsic=intrinsic, c2w=c2w[idx], H=self.H, W=self.W))
+            cameras.append(PerspectiveCamera(intrinsic=intrinsic, c2w=c2w[idx], W=self.W, H=self.H))
 
         return cameras
 
@@ -90,3 +93,6 @@ class Capture(Base3dDataset):
 
     def get_sparse_point_cloud(self):
         """Get sparse point cloud as the point cloud"""
+        pc = {'pts': self.poses['pts'], 'color': self.poses['rgb'], 'vis': self.poses['vis'][:self.n_imgs]}
+
+        return pc
