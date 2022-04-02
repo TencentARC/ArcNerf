@@ -1,0 +1,107 @@
+# default config.
+
+name: colmap
+
+resume: None
+
+debug:
+    debug_mode: False               # support debug like checking grad.
+    print_all_grad: False           # print all grad for all param in model. Only in debug mode
+
+dir:
+    expr_dir: None
+    data_dir: '/Users/leoyluo/Desktop/Immerse/data'       # It is the main dataset address containing all dataset
+
+data:
+    video_path: '/Users/leoyluo/Desktop/Immerse/data/Capture/qq_tiger.MOV'
+    scene_name: qq_tiger
+    video_downsample: 15            # fps downsample ratio, default 15 (fps=30, each second 2 image)
+    image_downsample: 4             # image rescale downsample ratio, default 4 (each length 1/4)
+    colmap:
+        match_type: 'sequential_matcher'        # ['sequential_matcher', 'exhaustive_matcher']
+        dense_reconstruct: False                # run for dense reconstruction with point cloud and mesh
+
+gpu_ids: -1                         # -1 is cpu, otherwise use list of gpus
+
+dist:
+    local_rank: 0
+    rank: 0
+    world_size: 1
+    distributed_backend: nccl       # nccl/mpi
+    random_seed: None               # None will not require reproducibility, run benchmark to be faster
+    slurm: False                    # use slurm for management
+
+batch_size: 1
+worker: 1
+
+optim:
+    lr: 1e-5
+    optim_type: adam                # [adam, sgd, lbfgs, rmsprop]
+    weight_decay: 0.0
+    maxiters: 5
+    lr_scheduler:
+        type: MultiStepLR           # [MultiStepLR, ExponentialLR, PolyLR, CosineAnnealingLR]
+        lr_gamma: 0.1               # for ExponentialLR, MultiStepLR, PolyLR
+        lr_steps: [50, 80]          # for MultiStepLR, PolyLR
+        tmax: 20                    # for CosineAnnealingLR
+
+    clip_gradients: 0.0             # grad clipping set for init
+    clip_warmup: -1                 # warmup epoches. -1 mean not change after warmup
+    clip_gradients_warmup: 0.0      # grad cliping after warmup period. Can be smaller incase explode
+
+progress:
+    start_epoch: -1                 # -1: resume; 0: finetune. Only for resume mode
+    epoch: 100                      # Num of epoch for training
+    save_time: 1800                 # save model after this time(in second). By default 30min
+
+    iter_loss: 10                   # Num of iteration to display loss
+    save_progress: True             # Whether to save progress during training
+    epoch_save_progress: 1          # Num of epoch for saving progress
+    iter_save_progress: 100         # Num of iteration for saving progress
+
+    epoch_val: 1                    # Num of epoch for validation. -1 means not validation
+    save_progress_val: True         # Whether to save progress during validation
+    max_samples_val: 5              # Max num of sample to write into image in valid
+
+    epoch_save_checkpoint: 10       # Num of epoch save checkpoint
+    local_progress: False           # When local progress, will write to local files. Otherwise to tensorboard only
+
+    init_eval: False                # Whether to eval the model at first epoch
+    epoch_eval: 10                  # Num of epoch eval model on test set. -1 means no evaluation
+    max_samples_eval: 10            # Max num of sample to write into image in eval
+
+dataset:
+    train:
+        type: DTU
+        scan_id: 65
+        img_scale: 1.0              # scale image and intrinsic, < 1 means scale_down
+        scale_radius: 3.0           # norm the camera within a sphere with such radius
+        precache: True              # precache all the rays at once
+        augmentation:
+            N_rays: 1024
+
+    val:
+        type: DTU
+        scan_id: 65
+        img_scale: 0.5
+        scale_radius: 3.0
+        precache: False
+
+    eval:
+        type: DummyConv
+        eval_batch_size: 1
+
+model:
+    type: ConvModel
+    in_channel: 3
+    out_channel: 1
+
+loss:
+    L2Loss:
+        weight: 1.0
+    RegLoss:
+        weight: 2.0
+
+metric:
+    M1:
+    M2:

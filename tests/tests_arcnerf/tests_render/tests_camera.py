@@ -22,32 +22,35 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 
 class TestDict(unittest.TestCase):
 
-    def setUp(self):
-        self.cfgs = setup_test_config()
-        self.H, self.W = 480, 640
-        self.focal = 1000.0
-        self.skewness = 10.0
-        self.origin = (0, 0, 0)
-        self.cam_loc = np.array([1, 1, -1])
-        self.radius = np.linalg.norm(self.cam_loc - np.array(self.origin))
-        self.intrinsic, self.c2w = self.setup_params()
-        self.camera = self.setup_camera()
+    @classmethod
+    def setUpClass(cls):
+        cls.cfgs = setup_test_config()
+        cls.H, cls.W = 480, 640
+        cls.focal = 1000.0
+        cls.skewness = 10.0
+        cls.origin = (0, 0, 0)
+        cls.cam_loc = np.array([1, 1, -1])
+        cls.radius = np.linalg.norm(cls.cam_loc - np.array(cls.origin))
+        cls.intrinsic, cls.c2w = cls.setup_params()
+        cls.camera = cls.setup_camera()
 
-    def setup_params(self):
+    @classmethod
+    def setup_params(cls):
         # intrinsic
         intrinsic = np.eye(3, dtype=np.float32)
-        intrinsic[0, 0] = self.focal
-        intrinsic[1, 1] = self.focal
-        intrinsic[0, 1] = self.skewness
-        intrinsic[0, 2] = self.W / 2.0
-        intrinsic[1, 2] = self.H / 2.0
+        intrinsic[0, 0] = cls.focal
+        intrinsic[1, 1] = cls.focal
+        intrinsic[0, 1] = cls.skewness
+        intrinsic[0, 2] = cls.W / 2.0
+        intrinsic[1, 2] = cls.H / 2.0
         # extrinsic
-        c2w = look_at(self.cam_loc, np.array(self.origin))
+        c2w = look_at(cls.cam_loc, np.array(cls.origin))
 
         return intrinsic, c2w
 
-    def setup_camera(self):
-        return PerspectiveCamera(self.intrinsic, self.c2w, self.H, self.W)
+    @classmethod
+    def setup_camera(cls):
+        return PerspectiveCamera(cls.intrinsic, cls.c2w, cls.H, cls.W)
 
     @staticmethod
     def create_pixel_grid(W, H):
@@ -117,12 +120,19 @@ class TestDict(unittest.TestCase):
 
     def tests_n_rays_visual(self):
         ray_bundle = self.camera.get_rays(N_rays=10, to_np=True)
+        up = self.c2w[:3, 1][None, :]
+
         z_factor = 3
+        rays_origin = np.concatenate([self.c2w[:3, 3][None, :], ray_bundle[0]], axis=0)
+        rays_dir = np.concatenate([up, ray_bundle[1] * z_factor], axis=0)
+        ray_colors = get_combine_colors(['maroon', 'blue'], [1, ray_bundle[0].shape[0]])
+
         file_path = osp.join(RESULT_DIR, 'sample_10_rays.png')
         draw_3d_components(
             self.c2w[None, :],
             points=np.array(self.origin)[None, :],
-            rays=(ray_bundle[0], ray_bundle[1] * z_factor),
+            rays=(rays_origin, rays_dir),
+            ray_colors=ray_colors,
             sphere_radius=self.radius,
             sphere_origin=self.origin,
             title='Cam with 10 rays(z factor {})'.format(z_factor),
