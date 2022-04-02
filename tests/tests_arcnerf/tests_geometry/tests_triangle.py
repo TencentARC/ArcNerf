@@ -17,8 +17,9 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 
 class TestDict(TestGeomDict):
 
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def setUpClass(cls):
+        super(TestDict, cls).setUpClass()
 
     def tests_tri_mesh(self):
         file_path = osp.join(RESULT_DIR, 'tri_mesh.png')

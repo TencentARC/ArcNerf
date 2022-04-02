@@ -27,10 +27,11 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 
 class TestDict(TestGeomDict):
 
-    def setUp(self):
-        super().setUp()
-        self.radius = 4
-        self.n_cam = 25
+    @classmethod
+    def setUpClass(cls):
+        super(TestDict, cls).setUpClass()
+        cls.radius = 4
+        cls.n_cam = 25
 
     def tests_invert_pose(self):
         c2w_new = invert_poses(invert_poses(self.c2w))

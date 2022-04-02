@@ -17,9 +17,10 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 
 class TestDict(TestGeomDict):
 
-    def setUp(self):
-        super().setUp()
-        self.radius = 4
+    @classmethod
+    def setUpClass(cls):
+        super(TestDict, cls).setUpClass()
+        cls.radius = 4
 
     def tests_sphere_line(self):
         file_path = osp.join(RESULT_DIR, 'sphere_line.png')

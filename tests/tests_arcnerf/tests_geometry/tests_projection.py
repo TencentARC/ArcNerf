@@ -13,8 +13,9 @@ from tests.tests_arcnerf.tests_geometry import TestGeomDict
 
 class TestDict(TestGeomDict):
 
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def setUpClass(cls):
+        super(TestDict, cls).setUpClass()
 
     def tests_points_transform(self):
         xyz_cam = pixel_to_cam(self.pixels, self.depth, self.intrinsic)

@@ -26,30 +26,33 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 
 class TestDict(unittest.TestCase):
 
-    def setUp(self):
-        self.cfgs = setup_test_config()
-        self.dataset_type = getattr(self.cfgs.dataset, MODE).type
-        self.dataset = self.setup_dataset()
-        self.c2w, self.intrinsic, self.H, self.W = self.get_cameras()
-        self.n_cam = self.c2w.shape[0]
-        self.radius = np.linalg.norm(self.c2w[:, :3, 3], axis=-1).max(0)
+    @classmethod
+    def setUpClass(cls):
+        cls.cfgs = setup_test_config()
+        cls.dataset_type = getattr(cls.cfgs.dataset, MODE).type
+        cls.dataset = cls.setup_dataset()
+        cls.c2w, cls.intrinsic, cls.H, cls.W = cls.get_cameras()
+        cls.n_cam = cls.c2w.shape[0]
+        cls.radius = np.linalg.norm(cls.c2w[:, :3, 3], axis=-1).max(0)
 
-        self.spec_result_dir = osp.abspath(osp.join(RESULT_DIR, self.dataset_type))
-        os.makedirs(self.spec_result_dir, exist_ok=True)
+        cls.spec_result_dir = osp.abspath(osp.join(RESULT_DIR, cls.dataset_type))
+        os.makedirs(cls.spec_result_dir, exist_ok=True)
 
-    def setup_dataset(self):
-        transforms, _ = get_transforms(getattr(self.cfgs.dataset, MODE))
-        dataset = get_dataset(self.cfgs.dataset, self.cfgs.dir.data_dir, None, MODE, transforms)
-
+    @classmethod
+    def setup_dataset(cls):
+        transforms, _ = get_transforms(getattr(cls.cfgs.dataset, MODE))
+        dataset = get_dataset(cls.cfgs.dataset, cls.cfgs.dir.data_dir, None, MODE, transforms)
+        print('setup')
         return dataset
 
-    def get_cameras(self):
+    @classmethod
+    def get_cameras(cls):
         c2w = []
-        for sample in self.dataset:
+        for sample in cls.dataset:
             c2w.append(sample['c2w'][None, ...])
         c2w = np.concatenate(c2w, axis=0)  # (n, 4, 4)
-        intrinsic = self.dataset[0]['intrinsic']
-        H, W = self.dataset[0]['H'], self.dataset[0]['W']
+        intrinsic = cls.dataset[0]['intrinsic']
+        H, W = cls.dataset[0]['H'], cls.dataset[0]['W']
 
         return c2w, intrinsic, H, W
 
@@ -65,8 +68,6 @@ class TestDict(unittest.TestCase):
         cam_loc = np.concatenate([self.c2w[:, :3, 3], avg_pose[:, :3, 3]])  # (n+1, 3)
         rays_d = normalize(np.array(origin)[None, :] - cam_loc)  # (n+1, 3)
         rays_colors = get_combine_colors(['blue', 'navy'], [self.n_cam, 1])  # (n+1, 3)
-        # mean sphere radius
-        radius = np.linalg.norm(avg_pose[0, :3, 3])
 
         file_path = osp.join(self.spec_result_dir, '{}_vis_camera.png'.format(self.dataset_type))
         draw_3d_components(
@@ -76,7 +77,7 @@ class TestDict(unittest.TestCase):
             points=np.array(origin)[None, :],
             rays=(cam_loc, rays_d),
             ray_colors=rays_colors,
-            sphere_radius=radius,
+            sphere_radius=self.radius,
             sphere_origin=origin,
             title='{} Cam position'.format(self.dataset_type),
             save_path=file_path,
@@ -87,7 +88,7 @@ class TestDict(unittest.TestCase):
         origin = (0, 0, 0)
         avg_pose = average_poses(self.c2w)[None, :]  # (1, 4, 4)
 
-        u_start, v_ratio, radius = get_uv_from_pos(avg_pose[0, :3, 3], origin)
+        u_start, v_ratio, _ = get_uv_from_pos(avg_pose[0, :3, 3], origin)
         _, v_min, _ = get_uv_from_pos(self.c2w[np.argmin(self.c2w[:, 1, 3]), :3, 3], origin)
         _, v_max, _ = get_uv_from_pos(self.c2w[np.argmax(self.c2w[:, 1, 3]), :3, 3], origin)
 
@@ -96,7 +97,7 @@ class TestDict(unittest.TestCase):
             file_path = osp.join(self.spec_result_dir, 'test_cam_mode_{}.png'.format(mode))
             c2w_test = generate_cam_pose_on_sphere(
                 mode,
-                radius,
+                self.radius,
                 n_test_cam,
                 u_start=u_start,
                 v_ratio=v_ratio,
@@ -117,7 +118,7 @@ class TestDict(unittest.TestCase):
                 points=np.array(origin)[None, :],
                 rays=(cam_loc, rays_d),
                 ray_colors=rays_colors,
-                sphere_radius=radius,
+                sphere_radius=self.radius,
                 sphere_origin=origin,
                 lines=[cam_loc[:n_test_cam]],
                 title='Cam pos on sphere. Mode: {}'.format(mode),
