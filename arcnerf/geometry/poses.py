@@ -97,6 +97,7 @@ def average_poses(poses):
 
 def view_matrix(forward, cam_loc, up=np.array([0.0, 1.0, 0.0])):
     """Get view matrix(c2w matrix) given forward/up dir and cam_loc.
+    TODO: The up direction is y+, but (0,0) ray is down-ward. It is consistent with c2w from dataset but strange
 
     Args:
         forward: direction of view. np(3, )

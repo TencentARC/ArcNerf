@@ -93,7 +93,11 @@ class Capture(Base3dPCDataset):
         return intrinsic
 
     def get_sparse_point_cloud(self):
-        """Get sparse point cloud as the point cloud"""
-        pc = {'pts': self.poses['pts'], 'color': self.poses['rgb'], 'vis': self.poses['vis'][:self.n_imgs]}
+        """Get sparse point cloud as the point cloud. color should be normed in (0,1)"""
+        pc = {
+            'pts': self.poses['pts'],
+            'color': self.poses['rgb'].astype(np.float64) / 255.0,
+            'vis': self.poses['vis'][:self.n_imgs]
+        }
 
         return pc

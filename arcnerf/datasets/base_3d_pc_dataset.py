@@ -20,7 +20,7 @@ class Base3dPCDataset(Base3dDataset):
         Returns:
             point_cloud: a dict. only 'pts' is required, 'color', 'vis' is optional
                 - pts: (n_pts, 3), xyz points
-                - color: (n_pts, 3), rgb color.
+                - color: (n_pts, 3), rgb color. (0~1) float point
                 - vis: (n_cam, n_pts), visibility in each cam.
         """
         raise NotImplementedError('You must have your point_cloud init function in child class...')

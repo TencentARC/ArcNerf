@@ -49,9 +49,6 @@ class Base3dDataset(BaseDataset):
         """Read mask from list. can be emtpy list if not file needed"""
         masks = [read_img(path, norm_by_255=True, gray=True) for path in mask_list]
 
-        for i in range(len(masks)):
-            masks[i][masks[i] > 0.5] = 1.0
-
         return masks
 
     def read_cameras(self):

@@ -15,6 +15,14 @@ Will not touch intrinsic. If point cloud exists, rescale them by same factor to 
 Done before camera `scale_radius`.
 ## Augmentation:
 - N_rays: Sample `N_rays` instead of using all, good for training.
+## rgb and mask
+- All color are in `rgb` order and normed by `255` into `0~1` range.
+- All masks should be binary masks with `{0,1}` values.
+## point cloud
+- pts: `(n_pts, 3)` in world coordinate, `xyz` order
+- color: `(n_pts, 3)`, `rgb` order, should be normed into `0~1` range.
+- vis: `(n_cam, n_pts)`, visibility of each point in each cam. `{0,1}` values.
+- pts is required, color/vis is optional.
 
 ## Capture
 This class provides dataset from your capture data.

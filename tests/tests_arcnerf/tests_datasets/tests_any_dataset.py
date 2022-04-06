@@ -226,7 +226,7 @@ class TestDict(unittest.TestCase):
             return
 
         pts = pc['pts']  # (n_pts, 3)
-        pts_color = pc['color'].astype(np.float64) / 255.0 if 'color' in pc else None
+        pts_color = pc['color'] if 'color' in pc else None
 
         if pts_color is not None:
             self.assertEqual(pts_color.shape, pts.shape)  # (n_pts, 3)

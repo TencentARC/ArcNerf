@@ -33,6 +33,8 @@ where u in (0, 2pi), v in (0, pi)
 - z = sin(u) * sin(v)
 
 # ray
+Functions for ray point.
+- get_ray_point_by_zvals: get the real point on ray using rays_o/rays_d/zvals.
 
 # triangle
 Functions for triangle calculation.
