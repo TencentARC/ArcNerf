@@ -190,7 +190,7 @@ class TestDict(unittest.TestCase):
             point_size=1,
             sphere_radius=self.radius,
             sphere_origin=(0, 0, 0),
-            title='Each ray sampled {} pointsm, z_range({}-{})'.format(n_pts, z_min, z_max),
+            title='Each ray sampled {} points, z_range({}-{})'.format(n_pts, z_min, z_max),
             save_path=file_path
         )
 
