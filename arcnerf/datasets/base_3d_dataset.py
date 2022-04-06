@@ -22,7 +22,6 @@ class Base3dDataset(BaseDataset):
         # below are optional
         self.masks = []
         self.point_cloud = None
-        print(self.masks)
 
     def rescale_img_and_pose(self):
         """Rescale image/mask and pose if needed. It affects intrinsic only. """
@@ -77,7 +76,7 @@ class Base3dDataset(BaseDataset):
             max_cam_norm_t = max(cam_norm_t)
 
             for camera in self.cameras:
-                camera.rescale_pose(scale=self.cfgs.scale_radius / max_cam_norm_t / 1.1)
+                camera.rescale_pose(scale=self.cfgs.scale_radius / (max_cam_norm_t * 1.1))
 
     def precache_ray(self):
         """Precache all the rays for all images first"""
@@ -85,17 +84,6 @@ class Base3dDataset(BaseDataset):
             self.ray_bundles = []
             for i in range(self.n_imgs):
                 self.ray_bundles.append(self.cameras[i].get_rays())
-
-    def get_sparse_point_cloud(self):
-        """Get sparse point cloud. You should write it in child class if needed
-
-        Returns:
-            point_cloud: a dict. only 'pts' is required, 'color', 'vis' is optional
-                - pts: (n_pts, 3), xyz points
-                - color: (n_pts, 3), rgb color.
-                - vis: (n_cam, n_pts), visibility in each cam.
-        """
-        return None
 
     def __len__(self):
         """Len of dataset"""

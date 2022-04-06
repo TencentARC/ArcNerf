@@ -218,6 +218,48 @@ class TestDict(unittest.TestCase):
         video_path = osp.join(self.spec_result_dir, 'reproj_pc.mp4')
         write_video(proj_imgs, video_path, fps=5)
 
+    def tests_pc_plot3d(self):
+        pc = self.dataset[0]['pc']
+        if pc is None:
+            return
+        if self.dataset[0]['img'].shape[0] != (self.H * self.W):  # Sample
+            return
+
+        pts = pc['pts']  # (n_pts, 3)
+        pts_color = pc['color'].astype(np.float64) / 255.0 if 'color' in pc else None
+
+        if pts_color is not None:
+            self.assertEqual(pts_color.shape, pts.shape)  # (n_pts, 3)
+
+        file_path = osp.join(self.spec_result_dir, 'point_cloud_3d.png')
+        draw_3d_components(
+            c2w=self.c2w,
+            points=pts,
+            point_colors=pts_color,
+            point_size=1.0,
+            sphere_radius=self.radius,
+            sphere_origin=(0, 0, 0),
+            title='Cams with all point cloud',
+            save_path=file_path
+        )
+
+        # single camera visual
+        cam = self.c2w[:1, ...]
+        index = np.array([[0, 0]])
+        ray_bundle = self.cameras[0].get_rays(index=index, to_np=True)
+
+        file_path = osp.join(self.spec_result_dir, 'single_cam_ray_pc.png')
+        draw_3d_components(
+            cam,
+            intrinsic=self.intrinsic,
+            points=pts,
+            point_colors=pts_color,
+            point_size=1.0,
+            rays=(ray_bundle[0], ray_bundle[1]),
+            title='Cam ray at (0,0). y-axis is flipped',
+            save_path=file_path
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

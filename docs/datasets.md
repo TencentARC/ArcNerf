@@ -1,6 +1,20 @@
 # base_3d_dataset
 Base class for all 3d dataset. Contains image/mask(optional)/camera.
 Support precache_ray/norm_cam_pose/rescale_image_pose/get_item in a uniform way.
+## base_3d_pc_dataset
+Based on `base_3d_dataset`, it provides functions mainly on point cloud adjustment.
+Point cloud are in world coordinate.
+
+# Some configs in data processing:
+- img_scale: Resize image by this scale. `>1` means larger image.
+Will change intrinsic for actual re-projection as well, but not change extrinsic.
+- scale_radius: Rescale all camera pose such that cameras are roughly align on the surface of sphere with such radius.
+Will not touch intrinsic. If point cloud exists, rescale them by same factor to keep consistency.
+- precache: If True, will precache all the rays for all pixels at once.
+- pc_radius(base_3d_pc_dataset): Remove point cloud that are outside such absolute radius.
+Done before camera `scale_radius`.
+## Augmentation:
+- N_rays: Sample `N_rays` instead of using all, good for training.
 
 ## Capture
 This class provides dataset from your capture data.

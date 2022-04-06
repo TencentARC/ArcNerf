@@ -5,14 +5,14 @@ import os.path as osp
 
 import numpy as np
 
-from .base_3d_dataset import Base3dDataset
+from .base_3d_pc_dataset import Base3dPCDataset
 from ..datasets import DATASET_REGISTRY
 from arcnerf.geometry.poses import invert_poses
 from arcnerf.render.camera import PerspectiveCamera
 
 
 @DATASET_REGISTRY.register()
-class Capture(Base3dDataset):
+class Capture(Base3dPCDataset):
     """A dataset class for self-capture images with colmap pose estimation"""
 
     def __init__(self, cfgs, data_dir, mode, transforms):
@@ -34,6 +34,7 @@ class Capture(Base3dDataset):
 
         # get pointcloud
         self.point_cloud = self.get_sparse_point_cloud()
+        self.filter_point_cloud()
 
         # norm camera_pose
         self.norm_cam_pose()
