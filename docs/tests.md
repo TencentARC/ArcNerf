@@ -37,3 +37,8 @@ Test function in triangle, like getting norm, getting circumcircle, etc.
 #### tests_camera
 Test camera creation, get_rays and project rays into pixel, visualize ray and ray points
 Also check when we rescale camera and image, whether rays get projected correctly.
+
+
+### tests_models
+#### tests_base_modules
+Test embedder, implicit function, radiance function, with correct input/output.

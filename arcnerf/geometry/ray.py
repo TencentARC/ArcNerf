@@ -3,7 +3,7 @@
 import torch
 
 
-def get_ray_points_by_zvals(rays_o, rays_d, zvals):
+def get_ray_points_by_zvals(rays_o: torch.Tensor, rays_d: torch.Tensor, zvals: torch.Tensor):
     """Get ray points by zvals. Each ray can be sampled by N_pts
 
     Args:

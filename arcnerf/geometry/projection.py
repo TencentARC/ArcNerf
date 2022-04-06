@@ -5,7 +5,7 @@ import torch
 from .transformation import rotate_points
 
 
-def pixel_to_cam(pixels, z, intrinsic):
+def pixel_to_cam(pixels: torch.Tensor, z: torch.Tensor, intrinsic: torch.Tensor):
     """Pixel to cam space xyz
 
     Args:
@@ -33,7 +33,7 @@ def pixel_to_cam(pixels, z, intrinsic):
     return xyz_cam
 
 
-def cam_to_world(points, c2w):
+def cam_to_world(points: torch.Tensor, c2w: torch.Tensor):
     """points in camera to world coord
 
     Args:
@@ -48,7 +48,7 @@ def cam_to_world(points, c2w):
     return xyz_world
 
 
-def pixel_to_world(pixels, z, intrinsic, c2w):
+def pixel_to_world(pixels: torch.Tensor, z: torch.Tensor, intrinsic: torch.Tensor, c2w: torch.Tensor):
     """pixel to world coord
 
     Args:
@@ -65,7 +65,7 @@ def pixel_to_world(pixels, z, intrinsic, c2w):
     return xyz_world
 
 
-def world_to_cam(points, w2c):
+def world_to_cam(points: torch.Tensor, w2c: torch.Tensor):
     """points in world to cam coord
 
     Args:
@@ -80,7 +80,7 @@ def world_to_cam(points, w2c):
     return xyz_cam
 
 
-def cam_to_pixel(points, intrinsic):
+def cam_to_pixel(points: torch.Tensor, intrinsic: torch.Tensor):
     """Points in cam coord to pixels locations
 
     Args:
@@ -96,7 +96,7 @@ def cam_to_pixel(points, intrinsic):
     return pixels[:, :, :2]
 
 
-def world_to_pixel(points, intrinsic, w2c, distort=None):
+def world_to_pixel(points: torch.Tensor, intrinsic: torch.Tensor, w2c: torch.Tensor, distort=None):
     """points in world to cam coord. Distortion is allowed to be adjusted in cam space.
 
     Args:
@@ -104,6 +104,7 @@ def world_to_pixel(points, intrinsic, w2c, distort=None):
         intrinsic: intrinsic, torch.tensor(B, 3, 3)
         w2c: world_to_cam transformation, torch.tensor(B, 4, 4)
         distort: a tuple of distortion (radial(B, 3), tan(B, 2))
+
     Returns:
         pixels: index in x(horizontal)/y(vertical), torch.tensor (B, N, 2)
     """
@@ -117,7 +118,7 @@ def world_to_pixel(points, intrinsic, w2c, distort=None):
     return pixels
 
 
-def apply_distortion(points, radial, tan):
+def apply_distortion(points: torch.Tensor, radial: torch.Tensor, tan: torch.Tensor):
     """Apply distortion to points in cam space.
 
     Args:

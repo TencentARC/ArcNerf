@@ -25,7 +25,7 @@ def normalize(vec):
     return vec
 
 
-def rotate_points(points, rot):
+def rotate_points(points: torch.Tensor, rot: torch.Tensor):
     """Rotate points by a rot
 
     Args:
@@ -45,7 +45,7 @@ def rotate_points(points, rot):
     return proj_points[..., :3]
 
 
-def rotate_matrix(rot, source):
+def rotate_matrix(rot: torch.Tensor, source: torch.Tensor):
     """Rotate a matrix by a rot
 
     Args:

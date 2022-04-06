@@ -13,7 +13,7 @@ from arcnerf.geometry.transformation import normalize
 class PerspectiveCamera(object):
     """A camera with intrinsic and c2w pose"""
 
-    def __init__(self, intrinsic, c2w, W=None, H=None, dtype=torch.float32):
+    def __init__(self, intrinsic: np.ndarray, c2w: np.ndarray, W=None, H=None, dtype=torch.float32):
         """
         Args:
             Intrinsic: (3, 3) numpy array
@@ -69,11 +69,11 @@ class PerspectiveCamera(object):
 
         return pose
 
-    def get_rays(self, index=None, N_rays=-1, to_np=False):
+    def get_rays(self, index: np.ndarray = None, N_rays=-1, to_np=False):
         """Get camera rays by intrinsic and c2w, in world coord"""
         return get_rays(self.W, self.H, self.get_intrinsic(), self.get_pose(), index=index, N_rays=N_rays, to_np=to_np)
 
-    def proj_world_to_pixel(self, points):
+    def proj_world_to_pixel(self, points: torch.Tensor):
         """Project points onto image plane.
 
         Args:
@@ -91,7 +91,7 @@ class PerspectiveCamera(object):
         return pixel[0]
 
 
-def load_K_Rt_from_P(proj_mat):
+def load_K_Rt_from_P(proj_mat: np.ndarray):
     """ Get intrinsic and extrinsic Rt from proj_matrix
     modified from IDR https://github.com/lioryariv/idr
     """
@@ -111,7 +111,7 @@ def load_K_Rt_from_P(proj_mat):
     return intrinsics, pose
 
 
-def get_rays(W, H, intrinsic, c2w, index=None, N_rays=-1, to_np=False):
+def get_rays(W, H, intrinsic: torch.Tensor, c2w: torch.Tensor, index: np.ndarray = None, N_rays=-1, to_np=False):
     """Get rays in world coord from camera.
     No batch processing allow. Rays are produced by setting z=1 and get location.
     You can select index by a tuple, a list of tuple or a list of index

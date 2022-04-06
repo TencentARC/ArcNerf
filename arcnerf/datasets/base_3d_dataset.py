@@ -112,6 +112,13 @@ class Base3dDataset(BaseDataset):
             'pc': self.point_cloud,  # a dict contains['pts', 'color', 'vis']. Same for all cam
         }
 
+        pop_k = []
+        for k, v in inputs.items():
+            if v is None:  # in case can not collate
+                pop_k.append(k)
+        for k in pop_k:
+            inputs.pop(k)
+
         if self.transforms is not None:
             inputs = self.transforms(inputs)
 
