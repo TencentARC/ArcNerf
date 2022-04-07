@@ -1,0 +1,21 @@
+# The nerf model
+
+model:
+    type: NeRF
+    rays_chunk: 256      # num of rays to be processed in a batch
+    geometry:
+        W: 256
+        D: 8
+        skips: [4]
+        input_ch: 3
+        embed_freq: 10
+        W_feat: 256
+        geometric_init: False
+        log_sampling: False
+    radiance:
+        mode: 'vf'  # view_dir and feature only
+        W: 128
+        D: 1
+        input_ch_view: 3
+        embed_freq_view: 4
+        W_feat_in: 256

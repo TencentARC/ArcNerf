@@ -18,7 +18,7 @@ class Embedder(nn.Module):
             N_freqs: number of frequency bands. If 0, will not encode the inputs.
             log_sampling: if True, use log factor sin(2**N * x). Else use scale factor sin(N * x).
                       By default is True
-            include_input: if True, raw input is included in the embedding. Appear at first. By default is True
+            include_input: if True, raw input is included in the embedding. Appear at beginning. By default is True
             periodic_fns: a list of periodic functions used to embed input. By default is (sin, cos)
 
         Returns:
@@ -46,6 +46,10 @@ class Embedder(nn.Module):
                 self.freq_bands = 2.**torch.linspace(0., N_freqs - 1, N_freqs)
             else:
                 self.freq_bands = torch.linspace(2.**0., 2.**(N_freqs - 1), N_freqs)
+
+    def get_output_dim(self):
+        """Get output dim"""
+        return self.out_dim
 
     def forward(self, x: torch.Tensor):
         """

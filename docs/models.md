@@ -6,15 +6,16 @@ Embed inputs like xyz/view_dir into higher dimension using periodic funcs(sin, c
 - log_sampling: if True, use log factor sin(2**N * x). Else use scale factor sin(N * x).
 ## activation
 - Sine: sin() for activation.
+- get_activation: get the activation by cfg
 ## linear
 - DenseLayer: Linear with custom activation function.
 - SirenLayer: Linear with sin() activation and respective initialization.
 ## implicit network
 implicit network for mapping xyz -> sigma/sdf/rgb, etc.
 ### GeoNet
-Multiple DenseLayer/SirenLayer.
+Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
 ### RadianceNet
-Multiple DenseLayer/SirenLayer.
+Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
 
 
 ## Nerf
