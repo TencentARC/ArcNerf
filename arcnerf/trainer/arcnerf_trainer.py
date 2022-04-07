@@ -3,6 +3,7 @@
 import torch
 
 from common.trainer.basic_trainer import BasicTrainer
+from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
 from common.utils.img_utils import img_to_uint8
 from arcnerf.datasets import get_dataset
 from arcnerf.datasets.transform.augmentation import get_transforms
@@ -40,19 +41,16 @@ class ArcNerfTrainer(BasicTrainer):
         data['train'], data['train_sampler'] = self.set_dataset('train', tkwargs)
 
         # val
-        if not hasattr(self.cfgs.dataset, 'val') or self.cfgs.dataset.val is None:
+        if not valid_key_in_cfgs(self.cfgs.dataset, 'val'):
             data['val'] = None
         else:
             data['val'], data['val_sampler'], _ = self.set_dataset('val', tkwargs)
 
         # eval
-        if not hasattr(self.cfgs.dataset, 'eval') or self.cfgs.dataset.eval is None:
+        if not valid_key_in_cfgs(self.cfgs.dataset, 'eval'):
             data['eval'] = None
         else:
-            if not hasattr(self.cfgs.dataset.eval, 'eval_batch_size') or self.cfgs.dataset.eval.eval_batch_size is None:
-                eval_bs = 1
-            else:
-                eval_bs = self.cfgs.dataset.eval.eval_batch_size
+            eval_bs = get_value_from_cfgs_field(self.cfgs.dataset.eval, 'eval_batch_size', 1)
             tkwargs_eval = {
                 'batch_size': eval_bs,
                 'num_workers': self.cfgs.worker,
@@ -95,9 +93,11 @@ class ArcNerfTrainer(BasicTrainer):
 
     def get_model_feed_in(self, inputs, device):
         """Get the core model feed in and put it to the model's device"""
-        feed_in = inputs['img']
+        feed_in = {'img': inputs['img'], 'mask': inputs['mask'], 'rays_o': inputs['rays_o'], 'rays_d': inputs['rays_d']}
+
         if device == 'gpu':
-            feed_in = feed_in.cuda(non_blocking=True)
+            for k in feed_in.keys():
+                feed_in[k] = feed_in[k].cuda(non_blocking=True)
 
         batch_size = inputs['img'].shape[0]
 

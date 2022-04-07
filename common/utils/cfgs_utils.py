@@ -151,6 +151,18 @@ def load_configs(configs, unknowns=None):
     return cfgs
 
 
+def valid_key_in_cfgs(cfg_field, cfg_key):
+    """Return True if cfg_key is in cfg_field and it is not None"""
+    if hasattr(cfg_field, cfg_key) and getattr(cfg_field, cfg_key) is not None:
+        return True
+    return False
+
+
+def get_value_from_cfgs_field(cfg_field, cfg_key, default_value=None):
+    """Return None if cfg_key is invalid, else return the default_value"""
+    return default_value if not valid_key_in_cfgs(cfg_field, cfg_key) else getattr(cfg_field, cfg_key)
+
+
 def create_train_sh(rep_name, config_path, main_filepath='', save_dir='./'):
     """Create an script for reproducing the expr"""
     pycmd = 'python ' + main_filepath + ' '

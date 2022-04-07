@@ -3,14 +3,16 @@
 import torch
 import torchvision.transforms as transforms
 
+from common.utils.cfgs_utils import valid_key_in_cfgs
+
 
 def get_transforms(cfgs):
     """Get a list of transformation. You can change it in your only augmentation"""
     transforms_list = []
     aug_info = ''
 
-    if hasattr(cfgs, 'augmentation') and cfgs.augmentation is not None:
-        if hasattr(cfgs.augmentation, 'N_rays') and cfgs.augmentation.N_rays is not None:
+    if valid_key_in_cfgs(cfgs, 'augmentation'):
+        if valid_key_in_cfgs(cfgs.augmentation, 'N_rays'):
             transforms_list.append(SampleRays(cfgs.augmentation.N_rays))
             aug_info += '  Add SampleRays with N_rays {}\n'.format(cfgs.augmentation.N_rays)
 

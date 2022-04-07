@@ -3,6 +3,7 @@
 import torch
 
 from common.datasets.base_dataset import BaseDataset
+from common.utils.cfgs_utils import valid_key_in_cfgs
 from common.utils.img_utils import img_scale, read_img
 
 
@@ -25,7 +26,7 @@ class Base3dDataset(BaseDataset):
 
     def rescale_img_and_pose(self):
         """Rescale image/mask and pose if needed. It affects intrinsic only. """
-        if hasattr(self.cfgs, 'img_scale') and self.cfgs.img_scale is not None:
+        if valid_key_in_cfgs(self.cfgs, 'img_scale'):
             scale = self.cfgs.img_scale
             if scale != 1:
                 for i in range(len(self.images)):
@@ -102,7 +103,7 @@ class Base3dDataset(BaseDataset):
 
         inputs = {
             'img': img,  # (hw, 3), in rgb order / (n_rays, 3) if sample rays
-            'mask': mask,  # (hw,) / (n_rays, 3) if sample rays
+            'mask': mask,  # (hw,) / (n_rays,) if sample rays
             'c2w': c2w,  # (4, 4)
             'intrinsic': intrinsic,  # (3, 3)
             'rays_o': ray_bundle[0],  # (hw, 3) / (n_rays, 3) if sample rays

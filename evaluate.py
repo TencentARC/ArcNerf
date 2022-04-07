@@ -8,7 +8,7 @@ import cv2
 import torch
 
 from common.metric.metric_dict import MetricDictCounter
-from common.utils.cfgs_utils import parse_configs
+from common.utils.cfgs_utils import parse_configs, get_value_from_cfgs_field
 from common.utils.img_utils import img_to_uint8
 from common.utils.logger import Logger
 from common.utils.model_io import load_model
@@ -41,10 +41,7 @@ if __name__ == '__main__':
     logger.add_log('Eval on test data... Result write to {}...'.format(cfgs.dir.eval_dir))
 
     # set dataset
-    if not hasattr(cfgs.dataset.eval, 'eval_batch_size') or cfgs.dataset.eval.eval_batch_size is None:
-        eval_bs = 1
-    else:
-        eval_bs = cfgs.dataset.eval.eval_batch_size
+    eval_bs = get_value_from_cfgs_field(cfgs.dataset.eval, 'eval_batch_size', 1)
     tkwargs_eval = {'batch_size': eval_bs, 'num_workers': cfgs.worker, 'pin_memory': True, 'drop_last': False}
     eval_transform, _ = get_transforms(getattr(cfgs.dataset, 'eval'))
     dataset = get_dataset(cfgs.dataset, cfgs.dir.data_dir, logger=logger, mode='eval', transfroms=eval_transform)
