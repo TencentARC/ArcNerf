@@ -1,8 +1,10 @@
 ffmpeg-python
+kaleido
 loguru
 matplotlib
 numpy
 opencv-python
+plotly
 pyyaml
 tensorboard
 torch

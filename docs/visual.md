@@ -5,6 +5,12 @@ with customized color in all.
 For all point, it should be in world space, or transformed to world space.
 Then change to plt space
 
+## Backend
+We provide `matplotlib` and `plotly` for visualization. By default it use `plt`.
+
+`Plotly` is good for interactive visualization
+and is able to zoom-in/out, move. We can add `plotly=True` in `draw_3d_components`.
+
 ## Camera
 - c2w pose in `(N_cam, 4, 4)`. Local camera models will be created and transformed into world space
 - cam_colors in `(N_cam, 3)` or `(3,)` can be used to color each or all cams

@@ -3,6 +3,8 @@
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
+import plotly.graph_objects as go
+import plotly.io as pio
 
 from .camera_model import create_camera_model, get_cam_whf
 from arcnerf.geometry.sphere import get_sphere_surface
@@ -11,12 +13,15 @@ from common.visual.draw_cv2 import get_colors
 
 def transform_plt_space(pts, xyz_axis=0):
     """Transform any point in world space to plt space
-    This will change y/z axis. y-direction is up.
+    This will exchange y/z axis. y-direction is up.
     TODO: In fact y is down, so this could be flip up-down, need to check.
 
     Args:
         pts: np.array in (n_pts, 3) or (3, n_pts)
         xyz_axis: 0 or 1, 0 means pts in (3, n_pts), else (n_pts, 3)
+
+    Returns:
+        pts_rot: np.array with same shape as pts, exchange y/z coord
 
     """
     assert xyz_axis in [0, 1], 'invalid xyz_axis'
@@ -39,7 +44,31 @@ def transform_plt_space(pts, xyz_axis=0):
     return pts_rot
 
 
-def draw_cameras(ax, c2w, cam_colors, intrinsic, min_values, max_values):
+def colorize_np(color_np):
+    """float np color to rgb() which is used for plotly
+
+    Args:
+        color_np: np(n, 3) or np(3,) array
+
+    Returns:
+        str of list of str with 'rgb(255, 255, 255)' format
+
+    """
+    if len(color_np.shape) == 1:
+        colors = 'rgb({}, {}, {})'.format(int(color_np[0] * 255), int(color_np[1] * 255), int(color_np[2] * 255))
+    else:
+        colors = []
+        for i in range(color_np.shape[0]):
+            colors.append(
+                'rgb({}, {}, {})'.format(
+                    int(color_np[i, 0] * 255), int(color_np[i, 1] * 255), int(color_np[i, 2] * 255)
+                )
+            )
+
+    return colors
+
+
+def draw_cameras(ax, c2w, cam_colors, intrinsic, min_values, max_values, plotly):
     """Draw cameras"""
     # set color, by default is red
     N_cam = c2w.shape[0]
@@ -65,14 +94,27 @@ def draw_cameras(ax, c2w, cam_colors, intrinsic, min_values, max_values):
                 X[:4, j] = mat @ camera_model[i][:4, j]
             X = transform_plt_space(X[:3, :])
             # draw in world coord. plot3D plots line betweem neighbour vertices
-            ax.plot3D(X[0, :], X[1, :], X[2, :], color=cam_colors[idx])  # draw multi lines
+            if plotly:
+                ax.append(
+                    go.Scatter3d(
+                        x=X[0, :],
+                        y=X[1, :],
+                        z=X[2, :],
+                        mode='lines',
+                        line={'color': colorize_np(cam_colors[idx])},
+                        showlegend=False,
+                        name='cam {}'.format(i)
+                    )
+                )
+            else:
+                ax.plot3D(X[0, :], X[1, :], X[2, :], color=cam_colors[idx])  # draw multi lines
             min_values = np.minimum(min_values, X.min(1))
             max_values = np.maximum(max_values, X.max(1))
 
     return min_values, max_values
 
 
-def draw_points(ax, points, point_colors, point_size, min_values, max_values):
+def draw_points(ax, points, point_colors, point_size, min_values, max_values, plotly):
     """Draw points"""
     # set color, by default is green
     N_p = points.shape[0]
@@ -83,14 +125,29 @@ def draw_points(ax, points, point_colors, point_size, min_values, max_values):
     assert point_colors.shape == (N_p, 3), 'Invalid point colors shape...(N_p, 3) or (3,)'
 
     points_plt = transform_plt_space(points, xyz_axis=1)
-    ax.scatter3D(points_plt[:, 0], points_plt[:, 1], points_plt[:, 2], color=point_colors, s=point_size)
+    if plotly:
+        ax.append(
+            go.Scatter3d(
+                x=points_plt[:, 0],
+                y=points_plt[:, 1],
+                z=points_plt[:, 2],
+                mode='markers',
+                marker={
+                    'color': colorize_np(point_colors),
+                    'size': point_size / 5.0
+                },
+                showlegend=False
+            )
+        )
+    else:
+        ax.scatter3D(points_plt[:, 0], points_plt[:, 1], points_plt[:, 2], color=point_colors, s=point_size)
     min_values = np.minimum(min_values, points_plt.min(0))
     max_values = np.maximum(max_values, points_plt.max(0))
 
     return min_values, max_values
 
 
-def draw_rays(ax, rays, ray_colors, ray_linewidth, min_values, max_values):
+def draw_rays(ax, rays, ray_colors, ray_linewidth, min_values, max_values, plotly):
     """Draw rays"""
     # set color, by default is blue
     N_r = rays[0].shape[0]
@@ -106,38 +163,93 @@ def draw_rays(ax, rays, ray_colors, ray_linewidth, min_values, max_values):
     rays_o_plt = transform_plt_space(rays_o, xyz_axis=1)
     rays_d_plt = transform_plt_space(rays_d, xyz_axis=1)
     rays_e_plt = transform_plt_space(rays_e, xyz_axis=1)
-    for idx in range(rays_o_plt.shape[0]):
-        ax.quiver(
-            rays_o_plt[idx, 0],
-            rays_o_plt[idx, 1],
-            rays_o_plt[idx, 2],
-            rays_d_plt[idx, 0],
-            rays_d_plt[idx, 1],
-            rays_d_plt[idx, 2],
-            color=ray_colors[idx],
-            linewidths=ray_linewidth,
-        )
+    if plotly:
+        # line in arrow
+        for idx in range(rays_o_plt.shape[0]):
+            ax.append(
+                go.Scatter3d(
+                    x=np.concatenate([rays_o_plt[idx, 0:1], rays_e_plt[idx, 0:1]], axis=-1),
+                    y=np.concatenate([rays_o_plt[idx, 1:2], rays_e_plt[idx, 1:2]], axis=-1),
+                    z=np.concatenate([rays_o_plt[idx, 2:3], rays_e_plt[idx, 2:3]], axis=-1),
+                    mode='lines',
+                    line={
+                        'color': colorize_np(ray_colors[idx]),
+                        'width': ray_linewidth * 2.0
+                    },
+                    showlegend=False
+                )
+            )
+        # cone in array
+        cone_ratio = 1.0 / 50.0
+        cone_start = rays_o_plt * cone_ratio + (1 - cone_ratio) * rays_e_plt
+        cone_len = cone_ratio * (rays_d_plt)
+        for idx in range(rays_o_plt.shape[0]):
+            rgb = colorize_np(ray_colors[idx])
+            ax.append(
+                go.Cone(
+                    x=[cone_start[idx, 0]],
+                    y=[cone_start[idx, 1]],
+                    z=[cone_start[idx, 2]],
+                    u=[cone_len[idx, 0]],
+                    v=[cone_len[idx, 1]],
+                    w=[cone_len[idx, 2]],
+                    sizemode='scaled',
+                    showscale=False,
+                    sizeref=2,
+                    colorscale=[[0, rgb], [1, rgb]],
+                )
+            )
+    else:
+        for idx in range(rays_o_plt.shape[0]):
+            ax.quiver(
+                rays_o_plt[idx, 0],
+                rays_o_plt[idx, 1],
+                rays_o_plt[idx, 2],
+                rays_d_plt[idx, 0],
+                rays_d_plt[idx, 1],
+                rays_d_plt[idx, 2],
+                color=ray_colors[idx],
+                linewidths=ray_linewidth,
+            )
     min_values = np.minimum(np.minimum(min_values, rays_o_plt.min(0)), rays_e_plt.min(0))
     max_values = np.maximum(np.maximum(max_values, rays_o_plt.max(0)), rays_e_plt.max(0))
 
     return min_values, max_values
 
 
-def draw_sphere(ax, radius, origin, min_values, max_values, color='grey', alpha=0.1):
+def draw_sphere(ax, radius, origin, min_values, max_values, plotly, color=None, alpha=0.1):
     """Draw transparent sphere"""
     x, y, z = get_sphere_surface(radius, origin)
     # change coordinate
     xyz = np.concatenate([x[..., None], y[..., None], z[..., None]], axis=-1).reshape(-1, 3)
     xyz_plt = transform_plt_space(xyz, xyz_axis=1).reshape(x.shape[0], x.shape[1], -1)
     x_plt, y_plt, z_plt = xyz_plt[..., 0], xyz_plt[..., 1], xyz_plt[..., 2]
-    ax.plot_surface(x_plt, y_plt, z_plt, rstride=4, cstride=4, color=color, linewidth=0, alpha=alpha)
-    min_values = np.minimum(min_values, -radius + np.array(origin))
-    max_values = np.maximum(max_values, radius + np.array(origin))
+    if plotly:
+        color = color if color is not None else 'dark'
+        rgb = colorize_np(get_colors(color, to_int=False, to_np=True))
+        colorscale = [[0, rgb], [1, rgb]]
+        ax.append(
+            go.Surface(
+                x=x_plt,
+                y=y_plt,
+                z=z_plt,
+                surfacecolor=np.zeros_like(x_plt),
+                opacity=alpha,
+                showscale=False,
+                colorscale=colorscale,
+                name='sphere'
+            )
+        )
+    else:
+        color = color if color is not None else 'grey'
+        ax.plot_surface(x_plt, y_plt, z_plt, rstride=4, cstride=4, color=color, linewidth=0, alpha=alpha)
+    min_values = np.minimum(min_values, np.array([x_plt.min(0).min(0), y_plt.min(0).min(0), z_plt.min(0).min(0)]))
+    max_values = np.maximum(max_values, np.array([x_plt.max(0).max(0), y_plt.max(0).max(0), z_plt.max(0).max(0)]))
 
     return min_values, max_values
 
 
-def draw_lines(ax, lines, line_colors, min_values, max_values):
+def draw_lines(ax, lines, line_colors, min_values, max_values, plotly):
     """Draw lines. Each line in list is a np.array with shape (N_pt_in_line, 3)"""
     # set color, by default is dark
     N_line = len(lines)
@@ -149,14 +261,27 @@ def draw_lines(ax, lines, line_colors, min_values, max_values):
 
     for idx, line in enumerate(lines):
         line_plt = transform_plt_space(line, xyz_axis=1)  # (N_pt, 3)
-        ax.plot(line_plt[:, 0], line_plt[:, 1], line_plt[:, 2], color=line_colors[idx])
+        if plotly:
+            ax.append(
+                go.Scatter3d(
+                    x=line_plt[:, 0],
+                    y=line_plt[:, 1],
+                    z=line_plt[:, 2],
+                    mode='lines',
+                    line={'color': colorize_np(line_colors[idx])},
+                    showlegend=False,
+                    name='line {}'.format(idx)
+                )
+            )
+        else:
+            ax.plot(line_plt[:, 0], line_plt[:, 1], line_plt[:, 2], color=line_colors[idx])
         min_values = np.minimum(min_values, line_plt.min(0))
         max_values = np.maximum(max_values, line_plt.max(0))
 
     return min_values, max_values
 
 
-def draw_meshes(ax, meshes, mesh_colors, min_values, max_values):
+def draw_meshes(ax, meshes, mesh_colors, min_values, max_values, plotly):
     """Draw meshes. Each mesh in list is a np.array with shape (N_tri, 3, 3)"""
     # set color, by default is red
     N_m = len(meshes)
@@ -169,9 +294,23 @@ def draw_meshes(ax, meshes, mesh_colors, min_values, max_values):
     for idx, mesh in enumerate(meshes):
         N_tri = mesh.shape[0]
         mesh_plt = transform_plt_space(mesh.reshape(-1, 3), xyz_axis=1).reshape(N_tri, 3, -1)  # (N_tri, 3, 3)
-        ax.add_collection3d(
-            Poly3DCollection([mesh_plt[i] for i in range(N_tri)], facecolors=mesh_colors[idx], linewidths=1)
-        )
+        if plotly:
+            for tri_idx in range(N_tri):
+                ax.append(
+                    go.Mesh3d(
+                        x=mesh_plt[tri_idx][:, 0],
+                        y=mesh_plt[tri_idx][:, 1],
+                        z=mesh_plt[tri_idx][:, 2],
+                        i=[0],
+                        j=[1],
+                        k=[2],
+                        color=colorize_np(mesh_colors[idx])
+                    )
+                )
+        else:
+            ax.add_collection3d(
+                Poly3DCollection([mesh_plt[i] for i in range(N_tri)], facecolors=mesh_colors[idx], linewidths=1)
+            )
         min_values = np.minimum(min_values, mesh_plt.reshape(-1, 3).min(0))
         max_values = np.maximum(max_values, mesh_plt.reshape(-1, 3).max(0))
 
@@ -195,11 +334,13 @@ def draw_3d_components(
     sphere_radius=None,
     sphere_origin=(0, 0, 0),
     title='',
-    save_path=None
+    save_path=None,
+    plotly=False
 ):
     """draw 3d component, including cameras, points, rays, etc
     For any pts in world space, you need to transform_plt_space to switch yz axis
     You can specified color for different cam/ray/point.
+    Support plotly visual which allows zoom-in/out.
     TODO: Draw voxel grids
 
     Args:
@@ -214,17 +355,22 @@ def draw_3d_components(
         rays: a tuple (rays_o, rays_d), each in (N_r, 3), in world coord
                 rays_d is with actual len, if you want longer arrow, you need to extend rays_d
         ray_colors: color in (N_r, 3) or (3,), applied for each or all ray
-        ray_linewidth: width of ray line, by default is 1
+        ray_linewidth: width of ray line, by default is 2
         meshes: list of mesh of (N_tri, 3, 3), len is N_m
         mesh_colors: color in (N_m, 3) or (3,), applied for each or all mesh
         sphere_radius: if not None, draw a sphere with such radius
         sphere_origin: the origin of sphere, by default is (0, 0, 0)
         title: a string of figure title
         save_path: path to save the fig. None will only show fig
+        plotly: If True, use plotly instead of plt. Can be zoom-in/out. By default False.
     """
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-    ax.set_aspect('auto')
+    fig = None
+    if plotly:
+        ax = []
+    else:
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        ax.set_aspect('auto')
 
     # axis range
     min_values = np.zeros((3, 1))
@@ -234,22 +380,22 @@ def draw_3d_components(
 
     # draw components
     if c2w is not None:
-        min_values, max_values = draw_cameras(ax, c2w, cam_colors, intrinsic, min_values, max_values)
+        min_values, max_values = draw_cameras(ax, c2w, cam_colors, intrinsic, min_values, max_values, plotly)
 
     if points is not None:
-        min_values, max_values = draw_points(ax, points, point_colors, point_size, min_values, max_values)
+        min_values, max_values = draw_points(ax, points, point_colors, point_size, min_values, max_values, plotly)
 
     if rays is not None:
-        min_values, max_values = draw_rays(ax, rays, ray_colors, ray_linewidth, min_values, max_values)
+        min_values, max_values = draw_rays(ax, rays, ray_colors, ray_linewidth, min_values, max_values, plotly)
 
     if sphere_radius is not None:
-        min_values, max_values = draw_sphere(ax, sphere_radius, sphere_origin, min_values, max_values)
+        min_values, max_values = draw_sphere(ax, sphere_radius, sphere_origin, min_values, max_values, plotly)
 
     if lines is not None:
-        min_values, max_values = draw_lines(ax, lines, line_colors, min_values, max_values)
+        min_values, max_values = draw_lines(ax, lines, line_colors, min_values, max_values, plotly)
 
     if meshes is not None:
-        min_values, max_values = draw_meshes(ax, meshes, mesh_colors, min_values, max_values)
+        min_values, max_values = draw_meshes(ax, meshes, mesh_colors, min_values, max_values, plotly)
 
     # set axis limit
     axis_scale_factor = 0.25  # extent scale by such factor
@@ -263,18 +409,54 @@ def draw_3d_components(
     mid_x = (X_max + X_min) * 0.5
     mid_y = (Y_max + Y_min) * 0.5
     mid_z = (Z_max + Z_min) * 0.5
-    ax.set_xlim(mid_x - max_range, mid_x + max_range)
-    ax.set_ylim(mid_y - max_range, mid_y + max_range)
-    ax.set_zlim(mid_z - max_range, mid_z + max_range)
 
-    ax.set_xlabel('x')
-    ax.set_ylabel('z')
-    ax.set_zlabel('y')
-    ax.set_title(title)
+    if plotly:  # plotly
+        fig = {
+            'data': ax,
+            'layout': {
+                'title': {
+                    'text': title,
+                    'x': 0.5
+                },
+                'scene': {
+                    'xaxis': {
+                        'range': [mid_x - max_range, mid_x + max_range],
+                        'title': 'x'
+                    },
+                    'yaxis': {
+                        'range': [mid_y - max_range, mid_y + max_range],
+                        'title': 'z'
+                    },
+                    'zaxis': {
+                        'range': [mid_z - max_range, mid_z + max_range],
+                        'title': 'y'
+                    },
+                    'aspectmode': 'cube'
+                },
+                'showlegend': False,
+                'coloraxis': {
+                    'showscale': False
+                }
+            }
+        }
 
-    if save_path:
-        fig.savefig(save_path)
-    else:
-        plt.show()
+        if save_path:
+            pio.write_image(fig, save_path)
+        else:
+            pio.show(fig)
 
-    plt.close()
+    else:  # plt
+        ax.set_xlim(mid_x - max_range, mid_x + max_range)
+        ax.set_ylim(mid_y - max_range, mid_y + max_range)
+        ax.set_zlim(mid_z - max_range, mid_z + max_range)
+        ax.set_xlabel('x')
+        ax.set_ylabel('z')
+        ax.set_zlabel('y')
+        ax.set_title(title)
+
+        if save_path:
+            fig.savefig(save_path)
+        else:
+            plt.show()
+
+        plt.close()
