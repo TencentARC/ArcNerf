@@ -2,7 +2,6 @@
 
 
 # TODO:
-- nerf mlp模型
 - sampler使用
 - ray marching
 - shpere tracing(sdf, density)

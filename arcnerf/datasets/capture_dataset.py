@@ -50,6 +50,9 @@ class Capture(Base3dPCDataset):
         # rescale image, call from parent class
         self.rescale_img_and_pose()
 
+        # get bounds
+        self.bounds = self.get_bounds_from_pc()
+
         # precache_all rays
         self.ray_bundles = None
         self.precache = self.cfgs.precache
@@ -100,12 +103,12 @@ class Capture(Base3dPCDataset):
 
         return intrinsic
 
-    def get_sparse_point_cloud(self):
+    def get_sparse_point_cloud(self, dtype=np.float32):
         """Get sparse point cloud as the point cloud. color should be normed in (0,1)"""
         pc = {
-            'pts': self.poses['pts'],
-            'color': self.poses['rgb'].astype(np.float64) / 255.0,
-            'vis': self.poses['vis'][:self.n_imgs]
+            'pts': self.poses['pts'].astype(dtype),
+            'color': self.poses['rgb'].astype(dtype) / 255.0,
+            'vis': self.poses['vis'][:self.n_imgs].astype(dtype)
         }
 
         return pc

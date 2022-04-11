@@ -17,14 +17,16 @@ class Base3dPCDataset(Base3dDataset):
         """For any of 3d dataset, images/intrinsics/c2w are required. mask is optional"""
         super(Base3dPCDataset, self).__init__(cfgs, data_dir, mode, transforms)
 
-    def get_sparse_point_cloud(self):
+    def get_sparse_point_cloud(self, dtype=np.float32):
         """Get sparse point cloud. You should write it in child class if needed
+        For the dtype, it should matched the cam's params type(which use torch.float32 as default)
 
         Returns:
             point_cloud: a dict. only 'pts' is required, 'color', 'vis' is optional
                 - pts: (n_pts, 3), xyz points
                 - color: (n_pts, 3), rgb color. (0~1) float point
                 - vis: (n_cam, n_pts), visibility in each cam.
+            dtype: type of each component, by default np.float32
         """
         raise NotImplementedError('You must have your point_cloud init function in child class...')
 
@@ -60,6 +62,7 @@ class Base3dPCDataset(Base3dDataset):
         """Recenter camera pose by setting the common view point center at (0,0,0)
         The common view point is the closest point to all rays.
         """
+        assert len(self.cameras) > 0, 'Not camera in dataset, do not use this func'
         c2ws = self.get_poses(torch_tensor=False, concat=True)
         # use ray from image center to represent cam view dir
         center_idx = np.array([[int(self.W / 2.0), int(self.H / 2.0)]])
@@ -94,3 +97,21 @@ class Base3dPCDataset(Base3dDataset):
 
             # for point cloud adjustment
             self.point_cloud['pts'] *= (self.cfgs.scale_radius / (max_cam_norm_t * 1.1))
+
+    def get_bounds_from_pc(self, extend_factor=0.2):
+        """Get bounds from pc projected by each cam.
+         near-far by pts_cam and adjust by extend_factor, in case pc does not cover all range.
+        """
+        bounds = []
+        for idx in range(len(self.cameras)):
+            pts_reproj = np_wrapper(self.cameras[idx].proj_world_to_cam, self.point_cloud['pts'])
+            near, far = pts_reproj[:, -1].min(), pts_reproj[:, -1].max()
+            if extend_factor > 0:
+                near_far_dist = far - near
+                near -= extend_factor * near_far_dist
+                far += extend_factor * near_far_dist
+            near, far = np.clip(near, 0.0, None), np.clip(far, 0.0, None)
+            bound = np.array([near, far], dtype=near.dtype)
+            bounds.append(bound)
+
+        return bounds

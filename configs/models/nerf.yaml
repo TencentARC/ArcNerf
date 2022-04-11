@@ -1,4 +1,4 @@
-# The nerf model
+# The nerf model with only one pass
 
 model:
     type: NeRF
@@ -11,7 +11,6 @@ model:
         embed_freq: 10
         W_feat: 256
         geometric_init: False
-        log_sampling: False
     radiance:
         mode: 'vf'  # view_dir and feature only
         W: 128
@@ -19,3 +18,8 @@ model:
         input_ch_view: 3
         embed_freq_view: 4
         W_feat_in: 256
+
+rays:
+    bounding_radius: 3.0        # bounding ray sampling region
+    near: 2.0
+    far: 4.0

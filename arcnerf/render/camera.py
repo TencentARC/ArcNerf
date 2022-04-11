@@ -6,12 +6,12 @@ import torch
 
 from arcnerf.geometry import torch_to_np
 from arcnerf.geometry.poses import invert_poses
-from arcnerf.geometry.projection import pixel_to_world, world_to_pixel
+from arcnerf.geometry.projection import pixel_to_world, world_to_pixel, world_to_cam
 from arcnerf.geometry.transformation import normalize
 
 
 class PerspectiveCamera(object):
-    """A camera with intrinsic and c2w pose"""
+    """A camera with intrinsic and c2w pose. All calculation is on cpu."""
 
     def __init__(self, intrinsic: np.ndarray, c2w: np.ndarray, W=None, H=None, dtype=torch.float32):
         """
@@ -98,6 +98,19 @@ class PerspectiveCamera(object):
 
         return pixel[0]
 
+    def proj_world_to_cam(self, points: torch.Tensor):
+        """Project points onto cam space. Help to find near/far bounds
+
+        Args:
+            points: pts in world coord, torch.Tensor(N, 3)
+
+        Returns:
+            pts_cam: pts in cam space, torch.Tensor(N, 3)
+        """
+        pixel = world_to_cam(points.unsqueeze(0), self.get_pose(w2c=True).unsqueeze(0))
+
+        return pixel[0]
+
 
 def load_K_Rt_from_P(proj_mat: np.ndarray):
     """ Get intrinsic and extrinsic Rt from proj_matrix
@@ -145,7 +158,7 @@ def get_rays(W, H, intrinsic: torch.Tensor, c2w: torch.Tensor, index: np.ndarray
     i, j = torch.meshgrid(
         torch.linspace(0, W - 1, W, dtype=dtype), torch.linspace(0, H - 1, H, dtype=dtype)
     )  # i, j: (W, H)
-    pixels = torch.stack([i, j], dim=-1).view(-1, 2).unsqueeze(0)  # (1, WH, 2)
+    pixels = torch.stack([i, j], dim=-1).view(-1, 2).unsqueeze(0).to(device)  # (1, WH, 2)
 
     # index unroll
     if index is not None:

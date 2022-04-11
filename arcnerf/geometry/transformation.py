@@ -12,10 +12,10 @@ def normalize(vec):
     """Normalize vector. Support numpy and torch
 
     Args:
-        vec: (B, N, 3)
+        vec: (B, N, 3) or (B, 3)
 
     Returns:
-        vec: (B, N, 3)
+        vec: (B, N, 3) or (B, 3)
     """
     if isinstance(vec, torch.FloatTensor):
         vec = vec / (torch.norm(vec, dim=-1).unsqueeze(-1) + 1e-8)

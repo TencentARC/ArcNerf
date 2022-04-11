@@ -10,8 +10,10 @@ import numpy as np
 from arcnerf.geometry import np_wrapper
 from arcnerf.geometry.poses import look_at, generate_cam_pose_on_sphere
 from arcnerf.geometry.ray import (
-    closest_point_on_ray, closest_point_to_rays, closest_point_to_two_rays, get_ray_points_by_zvals
+    closest_point_on_ray, closest_point_to_rays, closest_point_to_two_rays, get_ray_points_by_zvals,
+    sphere_ray_intersection
 )
+from arcnerf.geometry.transformation import normalize
 from arcnerf.render.camera import PerspectiveCamera, equal_sample, get_rays
 from arcnerf.visual.plot_3d import draw_3d_components
 from common.visual import get_combine_colors
@@ -257,6 +259,55 @@ class TestDict(unittest.TestCase):
             sphere_origin=self.origin,
             sphere_radius=self.radius,
             title='find closest point to {} rays'.format(n_rays),
+            save_path=file_path
+        )
+
+    def tests_sphere_ray_intersection(self):
+        # set sphere
+        origin = (1, 1, 0)
+        radius = 1.0
+
+        # set rays
+        rays_o = np.array([
+            [1.5, 1, 0],  # inside
+            [0.5, 1.5, 0],
+            [0, 0, 0],  # outside
+            [0.2, 0.2, 0],
+            [-0.5, 0.5, 0],
+            [-0.5, -0.5, 0],
+            [0, 1, 0],  # on surface
+            [0, 1, 0]
+        ])
+        rays_d = np.array([
+            [1, 0, 0],  # 1 intersection, OC*D < 0
+            [1, 0, 0],  # 1 intersection, OC*D > 0
+            [1, 0, 0],  # 1 intersection(tangent）
+            [1, 0.1, 0],  # 2 intersection
+            [0, 1, 0],  # no intersection, similar direction to origin
+            [-1, -1, 0],  # no intersection, opposition direction to origin
+            [-1, 0, 0],  # one intersection, on surface outter ray
+            [1, 10, 0]
+        ])  # two intersection, on surface inner ray
+        rays_d = normalize(rays_d)
+        # get intersection
+        near, far, pts, mask = np_wrapper(sphere_ray_intersection, rays_o, rays_d, origin, radius)
+        pts = pts[mask, :].reshape(-1, 3)  # (n_valid_ray * 2, 3)
+
+        rays_d[mask, :] *= far[mask, :] * 1.2
+
+        blue_color = get_combine_colors(['blue'], [1])
+        ray_colors = get_combine_colors(['red'], [rays_o.shape[0]])
+        ray_colors[mask, :] = blue_color[0]
+
+        file_path = osp.join(RESULT_DIR, 'sphere_ray_intersection.png')
+        draw_3d_components(
+            points=pts,
+            rays=(rays_o, rays_d),
+            ray_linewidth=0.5,
+            ray_colors=ray_colors,
+            sphere_origin=origin,
+            sphere_radius=radius,
+            title='sphere ray intersection(ray in red no intersection)',
             save_path=file_path
         )
 

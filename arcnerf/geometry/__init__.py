@@ -38,3 +38,10 @@ def torch_to_np(tensor: torch.Tensor):
 def torch_from_np_with_ref(np_array: np.ndarray, tensor_ref: torch.Tensor):
     """Create a torch.tensor on the same device of tensor_ref and with same dtype"""
     return torch.Tensor(np_array, dtype=tensor_ref.dtype, device=tensor_ref.device)
+
+
+def set_tensor_to_zeros(tensor: torch.Tensor, a_tol=1e-5):
+    """Set tensor with very small value as 0"""
+    tensor[torch.abs(tensor) < a_tol] = 0.0
+
+    return tensor

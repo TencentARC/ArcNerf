@@ -7,7 +7,6 @@ import os.path as osp
 import unittest
 
 import numpy as np
-import torch
 
 from arcnerf.datasets import get_dataset
 from arcnerf.datasets.transform.augmentation import get_transforms
@@ -40,7 +39,6 @@ class TestDict(unittest.TestCase):
         cls.c2w, cls.intrinsic, cls.cameras = cls.get_cameras()
         cls.n_cam = cls.c2w.shape[0]
         cls.radius = np.linalg.norm(cls.c2w[:, :3, 3], axis=-1).max(0)
-        print(cls.dataset_type, cls.dataset.get_identifier())
         cls.spec_result_dir = osp.abspath(osp.join(RESULT_DIR, cls.dataset_type, cls.dataset.get_identifier()))
         os.makedirs(cls.spec_result_dir, exist_ok=True)
 
@@ -209,8 +207,7 @@ class TestDict(unittest.TestCase):
 
         proj_imgs = []
         for idx in range(self.n_cam):
-            pts_pixels = self.cameras[idx].proj_world_to_pixel(torch.FloatTensor(pts))
-            pts_pixels = torch_to_np(pts_pixels)
+            pts_pixels = np_wrapper(self.cameras[idx].proj_world_to_pixel, pts)
             pts_vis_cam = pts_vis[idx, :]
             pts_pixels = pts_pixels if pts_vis is None else pts_pixels[pts_vis_cam == 1, :]
 

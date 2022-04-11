@@ -3,6 +3,7 @@
 import numpy as np
 import torch
 
+from . import set_tensor_to_zeros
 from .transformation import batch_dot_product
 
 
@@ -173,3 +174,64 @@ def closest_distance_of_two_rays(rays_o: torch.Tensor, rays_d: torch.Tensor):
     distance = distance / torch.norm(torch.cross(r1_d, r2_d))
 
     return distance
+
+
+def sphere_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, origin=(0, 0, 0), radius=1.0):
+    """Get intersection of ray with sphere surface and the near/far zvals.
+    This will be 4 cases: (1)outside no intersection -> near/far: 0, mask = 0
+                          (2)outside 1 intersection  -> near = far, mask = 1
+                          (3)outside 2 intersections -> near=near>0, far=far
+                          (4)inside 1 intersection -> near=0, far=far
+    https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/definition-ray
+    Since floating point error exists, we set torch.tensor as 0 for small values, used for tangent case
+
+     Args:
+        rays_o: ray origin, (N_rays, 3)
+        rays_d: ray direction, assume normalized, (N_rays, 3)
+        origin: sphere origin, by default (0, 0, 0)
+        radius: sphere radius, by default 1.0
+
+    Returns:
+        near: near intersection zvals. (N_rays, 1)
+              If only 1 intersection: if not tangent, same as far; else 0. clip by 0.
+        far:  far intersection zvals. (N_rays, 1)
+              If only 1 intersection: if not tangent, same as far; else 0.
+        pts: (N_rays, 2, 3), each ray has near/far two points, if nan, means no intersection at this ray
+        mask: (N_rays,), show whether each ray has intersection with the sphere, BoolTensor
+     """
+    device = rays_o.device
+    dtype = rays_o.dtype
+    n_rays = rays_o.shape[0]
+
+    mask = torch.ones(size=(n_rays, 1)).type(torch.BoolTensor).to(device)
+
+    C = torch.tensor([origin], dtype=dtype).to(device)  # (1, 3)
+    r = torch.tensor([radius], dtype=dtype).to(device)  # (1, )
+
+    OC = C - rays_o  # (N_rays, 3)
+    z_half = batch_dot_product(OC, rays_d).unsqueeze(1)  # (N_rays, 1)
+    z_half = set_tensor_to_zeros(z_half)
+    rays_o_in_sphere = torch.norm(OC, dim=-1) <= radius
+    rays_o_in_sphere = rays_o_in_sphere.unsqueeze(-1)  # (N_rays, 1)
+    mask = torch.logical_and(mask, torch.logical_or(z_half > 0, rays_o_in_sphere))
+
+    d_2 = batch_dot_product(OC, OC) - batch_dot_product(z_half, z_half)
+    d_2 = d_2.unsqueeze(1)  # (N_rays, 1)
+    d_2 = set_tensor_to_zeros(d_2)
+    mask = torch.logical_and(mask, (d_2 >= 0))
+
+    z_offset = r**2 - d_2  # (N_rays, 1)
+    z_offset = set_tensor_to_zeros(z_offset)
+    mask = torch.logical_and(mask, (z_offset >= 0))
+    z_offset = torch.sqrt(z_offset)
+
+    near = z_half - z_offset
+    near = torch.clamp(near, 0.0, None)
+    far = z_half + z_offset
+    far = torch.clamp(far, 0.0, None)
+    near[~mask], far[~mask] = 0.0, 0.0
+
+    zvals = torch.cat([near, far], dim=1)  # (N_rays, 2)
+    pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)
+
+    return near, far, pts, mask[:, 0]

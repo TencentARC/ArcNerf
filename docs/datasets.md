@@ -3,6 +3,8 @@ Base class for all 3d dataset. Contains image/mask(optional)/camera.
 Support precache_ray/norm_cam_pose/rescale_image_pose/get_item in a uniform way.
 - Each dataset contains an `identifier` that is a string separating the scene from same dataset.
 (like scan_id, scene_name, etc)
+
+- point_cloud: a dict with
 ## base_3d_pc_dataset
 Based on `base_3d_dataset`, it provides functions mainly on point cloud adjustment.
 Point cloud are in world coordinate.
@@ -19,12 +21,20 @@ Done after camera `scale_radius`. The radius is restricted within `scale_radius`
 - N_rays: Sample `N_rays` instead of using all, good for training.
 ## rgb and mask
 - All color are in `rgb` order and normed by `255` into `0~1` range.
-- All masks should be binary masks with `{0,1}` values.
+- All masks should be binary masks with `{0,1}` values. Can be [] if not exist.
+## cameras
+- cameras: a list of `render.camera.PerspectiveCamera`, used for ray generation.
+- For every dataset, you should setup cameras by reading their own `c2w` and `intrinsic`
 ## point cloud
 - pts: `(n_pts, 3)` in world coordinate, `xyz` order
 - color: `(n_pts, 3)`, `rgb` order, should be normed into `0~1` range.
 - vis: `(n_cam, n_pts)`, visibility of each point in each cam. `{0,1}` values.
 - pts is required, color/vis is optional.
+## bounds
+- a list of bounds in `(2, )` dim representing the near, far zvals.
+- If exists, help the ray sampling in modeling progress. Can be [] if not exist.
+- For the near/far, you can also set in `cfgs.rays.near/far`, or use ray-sphere intersection
+for near/far calculation by setting `cfgs.rays.bounding_radius`.
 
 ## Capture
 This class provides dataset from your capture data.

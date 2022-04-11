@@ -1,0 +1,42 @@
+# The nerf_full model with with two pass(coarse + fine)
+
+model:
+    type: NeRFFULL
+    rays_chunk: 256      # num of rays to be processed in a batch
+    nerf_coarse:
+        geometry:
+            W: 256
+            D: 8
+            skips: [4]
+            input_ch: 3
+            embed_freq: 10
+            W_feat: 256
+            geometric_init: False
+        radiance:
+            mode: 'vf'  # view_dir and feature only
+            W: 128
+            D: 1
+            input_ch_view: 3
+            embed_freq_view: 4
+            W_feat_in: 256
+    nerf_fine:
+        geometry:
+            W: 256
+            D: 8
+            skips: [ 4 ]
+            input_ch: 3
+            embed_freq: 10
+            W_feat: 256
+            geometric_init: False
+            radiance:
+                mode: 'vf'  # view_dir and feature only
+                W: 128
+                D: 1
+                input_ch_view: 3
+                embed_freq_view: 4
+                W_feat_in: 256
+
+rays:
+    bounding_radius: 3.0        # bounding ray sampling region
+    near: 2.0
+    far: 4.0

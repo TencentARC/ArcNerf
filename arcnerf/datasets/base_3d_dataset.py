@@ -28,6 +28,7 @@ class Base3dDataset(BaseDataset):
         # below are optional
         self.masks = []
         self.point_cloud = None
+        self.bounds = []
 
     def get_identifier(self):
         """string identifier of a dataset like scan_id/scene_name"""
@@ -95,6 +96,7 @@ class Base3dDataset(BaseDataset):
         """Recenter camera pose by setting the common view point center at (0,0,0)
         The common view point is the closest point to all rays.
         """
+        assert len(self.cameras) > 0, 'Not camera in dataset, do not use this func'
         c2ws = self.get_poses(torch_tensor=False, concat=True)
         # use ray from image center to represent cam view dir
         center_idx = np.array([[int(self.W / 2.0), int(self.H / 2.0)]])
@@ -130,6 +132,8 @@ class Base3dDataset(BaseDataset):
         mask = torch.FloatTensor(mask) if mask is not None else None
         c2w = self.cameras[idx].get_pose()
         intrinsic = self.cameras[idx].get_intrinsic()
+        bounds = self.bounds[idx] if len(self.bounds) > 0 else None  # (2,)
+        bounds = torch.FloatTensor(bounds) if self.bounds is not None else None
 
         if self.precache:
             ray_bundle = self.ray_bundles[idx]
@@ -146,6 +150,7 @@ class Base3dDataset(BaseDataset):
             'H': self.H,
             'W': self.W,
             'pc': self.point_cloud,  # a dict contains['pts', 'color', 'vis']. Same for all cam
+            'bounds': bounds  # (2,) for (near, far), if set bounds(generally for pc)
         }
 
         pop_k = []
