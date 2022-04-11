@@ -87,7 +87,7 @@ def get_circle(origin, radius, normal, n_pts=100, close=True):
 
 
 def get_sphere_surface(radius, origin=(0, 0, 0), n_pts=100):
-    """Get sphere surface position. y is up-down axis
+    """Get sphere surface position. y is up-down axis, y+ is down.
 
     Args:
         radius: radius fo sphere
@@ -110,7 +110,7 @@ def get_regular_sphere_line(
     radius, u_start=0, origin=(0, 0, 0), n_rot=3, n_pts=100, upper=None, close=True, concat=True
 ):
     """Get several sphere surface line(circle) with regular vertical distance. from top to down.
-     The circle is face up-down, rotate in counter-clockwise, y is up-down axis
+     The circle is face up-down, rotate in counter-clockwise, y is up-down axis, y+ is down.
 
     Args:
         radius: radius fo sphere
@@ -139,11 +139,11 @@ def get_regular_sphere_line(
     u = np.concatenate([u] * n_rot)[:n_pts]
 
     if upper is None:
-        v_levels = np.linspace(1, -1, n_rot + 2)[1:-1]  # (n_rot,)
+        v_levels = np.linspace(-1, 1, n_rot + 2)[1:-1]  # (n_rot,)
     elif upper is True:
-        v_levels = np.linspace(1, 0, n_rot + 1)[1:]  # (n_rot,)
-    elif upper is False:
         v_levels = np.linspace(-1, 0, n_rot + 1)[1:]  # (n_rot,)
+    elif upper is False:
+        v_levels = np.linspace(1, 0, n_rot + 1)[1:]  # (n_rot,)
 
     v_levels = (1 - v_levels) * np.pi / 2.0
     lines = []
@@ -161,12 +161,12 @@ def get_regular_sphere_line(
 
 def get_sphere_line(radius, u_start=0, v_ratio=0, origin=(0, 0, 0), n_pts=100, close=True):
     """Get sphere surface line(circle) different by angle. The circle is face up-down, rotate in counter-clockwise
-     y is up-down axis
+     y is up-down axis, y+ is down.
 
     Args:
         radius: radius fo sphere
         u_start: start u in (0, 1), counter-clockwise direction, 0 is x-> direction
-        v_ratio: vertical lift ratio, in (-1, 1). 0 is largest, pos is on above.
+        v_ratio: vertical lift ratio, in (-1, 1). 0 is largest, pos is on below part.
         origin: origin of sphere, tuple of 3
         n_pts: num of point on line, by default 100.
         close: if true, first one will be the same as last
@@ -189,14 +189,14 @@ def get_sphere_line(radius, u_start=0, v_ratio=0, origin=(0, 0, 0), n_pts=100, c
     return line
 
 
-def get_spiral_line(radius, u_start=0, v_range=(1, 0), origin=(0, 0, 0), n_rot=3, n_pts=100):
+def get_spiral_line(radius, u_start=0, v_range=(-1, 0), origin=(0, 0, 0), n_rot=3, n_pts=100):
     """Get spiral surface line, rotate in counter-clockwise
 
     Args:
         radius: radius fo sphere
         u_start: start u in (0, 1), counter-clockwise direction, 0 is x-> direction
         v_range: a tuple of v (v_start, v_end), start and end v ratio of spiral line
-                    vertical lift angle, in (-1, 0). 0 is largest circle level, pos is on above.
+                    vertical lift angle, in (-1, 1). 0 is largest circle level, pos is on below part.
         origin: origin of sphere, tuple of 3
         n_rot: num of full rotation, by default 3
         n_pts: num of point on line, by default 100.

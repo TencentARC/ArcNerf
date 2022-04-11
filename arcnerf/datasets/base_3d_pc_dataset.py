@@ -3,6 +3,9 @@
 import numpy as np
 
 from .base_3d_dataset import Base3dDataset
+from arcnerf.geometry import np_wrapper
+from arcnerf.geometry.poses import center_poses
+from arcnerf.geometry.ray import closest_point_to_rays
 
 
 class Base3dPCDataset(Base3dDataset):
@@ -26,7 +29,7 @@ class Base3dPCDataset(Base3dDataset):
         raise NotImplementedError('You must have your point_cloud init function in child class...')
 
     def filter_point_cloud(self):
-        """Filter point cloud in pc_radius """
+        """Filter point cloud in pc_radius, it is in scale after cam normalization """
         if hasattr(self.cfgs, 'pc_radius') and self.cfgs.pc_radius > 0:
             if 'pts' not in self.point_cloud:
                 raise RuntimeError('Not pts in point_cloud, do not use this function...')
@@ -39,6 +42,43 @@ class Base3dPCDataset(Base3dDataset):
 
             if 'vis' in self.point_cloud:
                 self.point_cloud['vis'] = self.point_cloud['vis'][:, pts_valid]
+
+    def center_cam_poses_by_pc_mean(self):
+        """Recenter camera pose by recenter the point_cloud center as (0,0,0)
+        You should filter noisy point cloud that not belong to the main object
+        """
+        c2ws = self.get_poses(torch_tensor=False, concat=True)
+        pts_mean = self.point_cloud['pts'].mean(0)
+        center_c2w = center_poses(c2ws, pts_mean)
+        for idx in range(len(self.cameras)):
+            self.cameras[idx].reset_pose(center_c2w[idx])
+
+        # adjust point cloud as well
+        self.point_cloud['pts'] -= pts_mean[None]
+
+    def center_cam_poses_by_view_dir(self):
+        """Recenter camera pose by setting the common view point center at (0,0,0)
+        The common view point is the closest point to all rays.
+        """
+        c2ws = self.get_poses(torch_tensor=False, concat=True)
+        # use ray from image center to represent cam view dir
+        center_idx = np.array([[int(self.W / 2.0), int(self.H / 2.0)]])
+        rays_o = []
+        rays_d = []
+        for idx in range(len(self.cameras)):
+            ray = self.cameras[idx].get_rays(index=center_idx, to_np=True)
+            rays_o.append(ray[0])
+            rays_d.append(ray[1])
+        rays = (np.concatenate(rays_o, axis=0), np.concatenate(rays_d, axis=0))
+        # calculate mean view point
+        view_point_mean, _, _ = np_wrapper(closest_point_to_rays, rays[0], rays[1])  # (1, 3)
+        center_c2w = center_poses(c2ws, view_point_mean[0])
+        for idx in range(len(self.cameras)):
+            self.cameras[idx].reset_pose(center_c2w[idx])
+
+        # if point cloud exist, also adjust it
+        if self.point_cloud is not None and 'pts' in self.point_cloud:
+            self.point_cloud['pts'] -= view_point_mean
 
     def norm_cam_pose(self):
         """Normalize camera pose by scale_radius, point cloud as well"""

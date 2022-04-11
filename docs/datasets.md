@@ -1,6 +1,8 @@
 # base_3d_dataset
 Base class for all 3d dataset. Contains image/mask(optional)/camera.
 Support precache_ray/norm_cam_pose/rescale_image_pose/get_item in a uniform way.
+- Each dataset contains an `identifier` that is a string separating the scene from same dataset.
+(like scan_id, scene_name, etc)
 ## base_3d_pc_dataset
 Based on `base_3d_dataset`, it provides functions mainly on point cloud adjustment.
 Point cloud are in world coordinate.
@@ -12,7 +14,7 @@ Will change intrinsic for actual re-projection as well, but not change extrinsic
 Will not touch intrinsic. If point cloud exists, rescale them by same factor to keep consistency.
 - precache: If True, will precache all the rays for all pixels at once.
 - pc_radius(base_3d_pc_dataset): Remove point cloud that are outside such absolute radius.
-Done before camera `scale_radius`.
+Done after camera `scale_radius`. The radius is restricted within `scale_radius` range.
 ## Augmentation:
 - N_rays: Sample `N_rays` instead of using all, good for training.
 ## rgb and mask
@@ -45,11 +47,23 @@ Will write data to `cfgs.dir.data_dir/Capture/scene_name`
 - TODO: We may add it in the future.
 ### Dataset
 Use `Capture` class for this dataset. It is specified by scene_name.
-- scene_name: scene_name that  is the folder name under `Capture`.
+- scene_name: scene_name that is the folder name under `Capture`. Use it to be identifier.
+#### Processing
+Since we need to rescale the point_cloud and cam so that object(pc) is centered at (0,0,0). If we directly set pc.mean()
+as (0,0,0), noise not on object will make the center incorrect. We do the following:
+- Use all camera and ray from center image plane to get a closely approximate common view point,
+which is close to object center, adjust cam/pc by this offset.
+- Norm cam and point by `scale_radius` to make them within a sphere with known range.
+- Filter point cloud by `pc_radius` and remove point outside
+- Recenter cam and point by setting the filtered point cloud center as (0,0,0)
+- Re-norm cam and point again to make cam on the surface of sphere with `scale_radius`
+
+We test and show that the method is robust to make the coordinate system such that object is centered at (0,0,0),
+cam is on surface with `scale_radius`. Only scale and translation is applied, do not affect the intrinsic.
 
 ## DTU
 Specified by scan_id, read image/mask/camera.
-- scan_id: int num for item selection.
+- scan_id: int num for item selection. Use it to be identifier.
 
 
 # Train/Val/Test

@@ -13,8 +13,7 @@ from common.visual.draw_cv2 import get_colors
 
 def transform_plt_space(pts, xyz_axis=0):
     """Transform any point in world space to plt space
-    This will exchange y/z axis. y-direction is up.
-    TODO: In fact y is down, so this could be flip up-down, need to check.
+    This will exchange y/z axis. y-direction is down(But use -y)
 
     Args:
         pts: np.array in (n_pts, 3) or (3, n_pts)
@@ -34,7 +33,7 @@ def transform_plt_space(pts, xyz_axis=0):
     rot_mat = np.identity(3, dtype=pts.dtype)
     rot_mat[1, 1] = 0
     rot_mat[1, 2] = 1
-    rot_mat[2, 1] = 1
+    rot_mat[2, 1] = -1
     rot_mat[2, 2] = 0
 
     pts_rot = rot_mat @ pts
@@ -429,7 +428,7 @@ def draw_3d_components(
                     },
                     'zaxis': {
                         'range': [mid_z - max_range, mid_z + max_range],
-                        'title': 'y'
+                        'title': '- y'
                     },
                     'aspectmode': 'cube'
                 },
@@ -451,7 +450,7 @@ def draw_3d_components(
         ax.set_zlim(mid_z - max_range, mid_z + max_range)
         ax.set_xlabel('x')
         ax.set_ylabel('z')
-        ax.set_zlabel('y')
+        ax.set_zlabel('- y')
         ax.set_title(title)
 
         if save_path:

@@ -18,10 +18,16 @@ class TestDict(unittest.TestCase):
     def setUpClass(cls):
         cls.cfgs = load_configs(CONFIG, None)
         cls.batch_size = 10
+        cls.n_rays = 1024
 
     def tests_nerf_model(self):
         self.model = build_model(self.cfgs, None)
-        inputs = {'x': torch.ones((self.batch_size, 3)), 'view_dirs': torch.ones((self.batch_size, 3))}
-        sigma, rgb = self.model(inputs)
+        feed_in = {
+            'img': torch.ones(self.batch_size, self.n_rays, 3),
+            'mask': torch.ones(self.batch_size, self.n_rays),
+            'rays_o': torch.ones(self.batch_size, self.n_rays, 3),
+            'rays_d': torch.ones(self.batch_size, self.n_rays, 3),
+        }
+        sigma, rgb = self.model(feed_in)
         self.assertEqual(sigma.shape, (self.batch_size, 1))
         self.assertEqual(rgb.shape, (self.batch_size, 3))

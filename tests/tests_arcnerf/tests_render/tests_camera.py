@@ -130,7 +130,7 @@ class TestDict(unittest.TestCase):
         file_path = osp.join(RESULT_DIR, 'sample_10_rays.png')
         draw_3d_components(
             self.c2w[None, :],
-            points=np.array(self.origin)[None, :],
+            points=np.array([self.origin]),
             rays=(rays_origin, rays_dir),
             ray_colors=ray_colors,
             sphere_radius=self.radius,
@@ -145,7 +145,7 @@ class TestDict(unittest.TestCase):
         file_path = osp.join(RESULT_DIR, 'sample_(0,0)_rays.png')
         draw_3d_components(
             self.c2w[None, :],
-            points=np.array(self.origin)[None, :],
+            points=np.array([self.origin]),
             rays=(ray_bundle[0], ray_bundle[1]),
             title='Cam ray at (0,0)',
             save_path=file_path
@@ -157,7 +157,7 @@ class TestDict(unittest.TestCase):
         draw_3d_components(
             self.c2w[None, :],
             intrinsic=self.intrinsic,
-            points=np.array(self.origin)[None, :],
+            points=np.array([self.origin]),
             rays=(ray_bundle[0], ray_bundle[1]),
             title='Cam ray at (W-1,H-1)',
             save_path=file_path
@@ -177,7 +177,7 @@ class TestDict(unittest.TestCase):
         points = np_wrapper(get_ray_points_by_zvals, ray_bundle[0], ray_bundle[1], zvals)  # (n_rays, n_pts, 3)
         points = points.reshape(-1, 3)
         self.assertEqual(points.shape[0], n_rays * n_pts)
-        points_all = np.concatenate([np.array(self.origin)[None, :], points], axis=0)
+        points_all = np.concatenate([np.array([self.origin]), points], axis=0)
         point_colors = get_combine_colors(['green', 'red'], [1, points.shape[0]])
         ray_colors = get_combine_colors(['sky_blue'], [n_rays])
 

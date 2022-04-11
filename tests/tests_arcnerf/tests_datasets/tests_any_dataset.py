@@ -40,8 +40,8 @@ class TestDict(unittest.TestCase):
         cls.c2w, cls.intrinsic, cls.cameras = cls.get_cameras()
         cls.n_cam = cls.c2w.shape[0]
         cls.radius = np.linalg.norm(cls.c2w[:, :3, 3], axis=-1).max(0)
-
-        cls.spec_result_dir = osp.abspath(osp.join(RESULT_DIR, cls.dataset_type))
+        print(cls.dataset_type, cls.dataset.get_identifier())
+        cls.spec_result_dir = osp.abspath(osp.join(RESULT_DIR, cls.dataset_type, cls.dataset.get_identifier()))
         os.makedirs(cls.spec_result_dir, exist_ok=True)
 
     @classmethod
@@ -115,7 +115,7 @@ class TestDict(unittest.TestCase):
                 n_test_cam,
                 u_start=u_start,
                 v_ratio=v_ratio,
-                v_range=(v_max, v_min),
+                v_range=(v_min, v_max),
                 origin=origin,
                 n_rot=3,
                 close=False  # just for test, should be true for actual visual
@@ -144,6 +144,7 @@ class TestDict(unittest.TestCase):
         n_rays = n_rays_w * n_rays_h
         index = equal_sample(n_rays_w, n_rays_h, self.W, self.H)
 
+        # change this range if you are not set cam in radius=3
         n_pts = 5
         z_min, z_max = 2, 4
         zvals = np.linspace(z_min, z_max, n_pts)  # (n_pts, )
@@ -195,9 +196,9 @@ class TestDict(unittest.TestCase):
         )
 
     def tests_pc_reproject(self):
-        pc = self.dataset[0]['pc']
-        if pc is None:
+        if 'pc' not in self.dataset[0] or self.dataset[0]['pc'] is None:
             return
+        pc = self.dataset[0]['pc']
         if self.dataset[0]['img'].shape[0] != (self.H * self.W):  # Sample
             return
 
@@ -219,9 +220,9 @@ class TestDict(unittest.TestCase):
         write_video(proj_imgs, video_path, fps=5)
 
     def tests_pc_plot3d(self):
-        pc = self.dataset[0]['pc']
-        if pc is None:
+        if 'pc' not in self.dataset[0] or self.dataset[0]['pc'] is None:
             return
+        pc = self.dataset[0]['pc']
         if self.dataset[0]['img'].shape[0] != (self.H * self.W):  # Sample
             return
 
@@ -256,7 +257,7 @@ class TestDict(unittest.TestCase):
             point_colors=pts_color,
             point_size=1.0,
             rays=(ray_bundle[0], ray_bundle[1]),
-            title='Cam ray at (0,0). y-axis is flipped',
+            title='Cam ray at (0,0).',
             save_path=file_path
         )
 

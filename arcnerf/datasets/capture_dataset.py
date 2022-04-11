@@ -20,6 +20,7 @@ class Capture(Base3dPCDataset):
 
         # real capture dataset with scene_name
         self.data_spec_dir = osp.join(self.data_dir, 'Capture', self.cfgs.scene_name)
+        self.identifier = self.cfgs.scene_name
 
         # get image
         img_list, self.n_imgs = self.get_image_list()
@@ -34,9 +35,16 @@ class Capture(Base3dPCDataset):
 
         # get pointcloud
         self.point_cloud = self.get_sparse_point_cloud()
-        self.filter_point_cloud()
 
-        # norm camera_pose
+        # roughly center the cameras by common view point
+        self.center_cam_poses_by_view_dir()
+        # norm camera_pose to restrict pc range
+        self.norm_cam_pose()
+        # filter point outside sphere
+        self.filter_point_cloud()
+        # recenter the cameras by remaining point cloud
+        self.center_cam_poses_by_pc_mean()
+        # # re-norm again
         self.norm_cam_pose()
 
         # rescale image, call from parent class

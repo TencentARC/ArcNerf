@@ -21,6 +21,7 @@ class DTU(Base3dDataset):
 
         # real DTU dataset with scan_id
         self.data_spec_dir = osp.join(self.data_dir, 'DTU', 'scan{}'.format(self.cfgs.scan_id))
+        self.identifier = str(self.cfgs.scan_id)
 
         # get image and mask
         img_list, self.n_imgs = self.get_image_list()

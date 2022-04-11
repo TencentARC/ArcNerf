@@ -25,6 +25,22 @@ def normalize(vec):
     return vec
 
 
+def batch_dot_product(a: torch.Tensor, b: torch.Tensor):
+    """Dot product in batch
+
+    Args:
+        a: (B, v)
+        b: (B, v)
+
+    Returns:
+        dot_prod: (B,)
+    """
+    assert len(a.shape) == 2 and a.shape == b.shape
+    dot_prod = torch.bmm(a.unsqueeze(1), b.unsqueeze(-1))[:, 0, 0]
+
+    return dot_prod
+
+
 def rotate_points(points: torch.Tensor, rot: torch.Tensor):
     """Rotate points by a rot
 

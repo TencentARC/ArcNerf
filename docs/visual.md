@@ -3,7 +3,8 @@ We provide a `draw_3d_components` that is helpful to plot camera/points/rays/lin
 with customized color in all.
 
 For all point, it should be in world space, or transformed to world space.
-Then change to plt space
+Then change to plt space. The visual space is (x-right, y-down, z-forward).
+But we show the y values as -y inorder to make y goes downward
 
 ## Backend
 We provide `matplotlib` and `plotly` for visualization. By default it use `plt`.
@@ -45,6 +46,7 @@ each line prints `N_pt_in_line-1` line seg
 ## Other:
 - title: title of the fig
 - save_path: if `None`, will show the fig, otherwise save it
+- axis range: update by the component with max values (xyz), show in a cube with same lengths.
 
 
 # TODO:

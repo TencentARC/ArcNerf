@@ -59,6 +59,14 @@ class PerspectiveCamera(object):
         else:
             return self.intrinsic
 
+    def reset_pose(self, c2w):
+        """reset the c2w (4, 4)"""
+        self.c2w = c2w.copy()
+
+    def reset_intrinsic(self, intrinsic):
+        """reset_pose the intrinsic (3, 3)"""
+        self.intrinsic = intrinsic.copy()
+
     def get_pose(self, torch_tensor=True, w2c=False):
         """Get pose, return numpy array by default. Support w2c transformation"""
         pose = self.c2w.copy()
@@ -137,7 +145,7 @@ def get_rays(W, H, intrinsic: torch.Tensor, c2w: torch.Tensor, index: np.ndarray
     i, j = torch.meshgrid(
         torch.linspace(0, W - 1, W, dtype=dtype), torch.linspace(0, H - 1, H, dtype=dtype)
     )  # i, j: (W, H)
-    pixels = torch.stack([i, j], dim=-1).reshape(-1, 2).unsqueeze(0)  # (1, WH, 2)
+    pixels = torch.stack([i, j], dim=-1).view(-1, 2).unsqueeze(0)  # (1, WH, 2)
 
     # index unroll
     if index is not None:

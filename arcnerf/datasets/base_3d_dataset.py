@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 
+import numpy as np
 import torch
 
+from arcnerf.geometry import np_wrapper
+from arcnerf.geometry.poses import center_poses
+from arcnerf.geometry.ray import closest_point_to_rays
 from common.datasets.base_dataset import BaseDataset
 from common.utils.cfgs_utils import valid_key_in_cfgs
 from common.utils.img_utils import img_scale, read_img
@@ -20,9 +24,14 @@ class Base3dDataset(BaseDataset):
         self.H, self.W = 0, 0
         self.precache = False
         self.ray_bundles = None
+        self.identifier = ''
         # below are optional
         self.masks = []
         self.point_cloud = None
+
+    def get_identifier(self):
+        """string identifier of a dataset like scan_id/scene_name"""
+        return self.identifier
 
     def rescale_img_and_pose(self):
         """Rescale image/mask and pose if needed. It affects intrinsic only. """
@@ -56,11 +65,17 @@ class Base3dDataset(BaseDataset):
         """Return a list of render.camera with c2w and intrinsic"""
         raise NotImplementedError('Please implement the detail function in child class....')
 
-    def get_poses(self, torch_tensor=True, w2c=False):
-        """Get the a list of poses of all cameras"""
+    def get_poses(self, torch_tensor=True, w2c=False, concat=False):
+        """Get the a list of poses of all cameras. If concat, get (n_cam, 4, 4)"""
         extrinsic = []
         for cam in self.cameras:
             extrinsic.append(cam.get_pose(torch_tensor=torch_tensor, w2c=w2c))
+        if concat:
+            extrinsic = [ext[None] for ext in extrinsic]
+            if torch_tensor:
+                extrinsic = torch.cat(extrinsic, dim=0)
+            else:
+                extrinsic = np.concatenate(extrinsic, axis=0)
 
         return extrinsic
 
@@ -75,6 +90,26 @@ class Base3dDataset(BaseDataset):
 
             for camera in self.cameras:
                 camera.rescale_pose(scale=self.cfgs.scale_radius / (max_cam_norm_t * 1.1))
+
+    def center_cam_poses_by_view_dir(self):
+        """Recenter camera pose by setting the common view point center at (0,0,0)
+        The common view point is the closest point to all rays.
+        """
+        c2ws = self.get_poses(torch_tensor=False, concat=True)
+        # use ray from image center to represent cam view dir
+        center_idx = np.array([[int(self.W / 2.0), int(self.H / 2.0)]])
+        rays_o = []
+        rays_d = []
+        for idx in range(len(self.cameras)):
+            ray = self.cameras[idx].get_rays(index=center_idx, to_np=True)
+            rays_o.append(ray[0])
+            rays_d.append(ray[1])
+        rays = (np.concatenate(rays_o, axis=0), np.concatenate(rays_d, axis=0))
+        # calculate mean view point
+        view_point_mean, _, _ = np_wrapper(closest_point_to_rays, rays[0], rays[1])  # (1, 3)
+        center_c2w = center_poses(c2ws, view_point_mean[0])
+        for idx in range(len(self.cameras)):
+            self.cameras[idx].reset_pose(center_c2w[idx])
 
     def precache_ray(self):
         """Precache all the rays for all images first"""
