@@ -3,12 +3,12 @@
 import numpy as np
 import torch
 
-from arcnerf.geometry import np_wrapper
 from arcnerf.geometry.poses import center_poses
 from arcnerf.geometry.ray import closest_point_to_rays
 from common.datasets.base_dataset import BaseDataset
 from common.utils.cfgs_utils import valid_key_in_cfgs
 from common.utils.img_utils import img_scale, read_img
+from common.utils.torch_utils import np_wrapper
 
 
 class Base3dDataset(BaseDataset):

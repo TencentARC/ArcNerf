@@ -4,10 +4,10 @@ import cv2
 import numpy as np
 import torch
 
-from arcnerf.geometry import torch_to_np
 from arcnerf.geometry.poses import invert_poses
 from arcnerf.geometry.projection import pixel_to_world, world_to_pixel, world_to_cam
 from arcnerf.geometry.transformation import normalize
+from common.utils.torch_utils import torch_to_np
 
 
 class PerspectiveCamera(object):

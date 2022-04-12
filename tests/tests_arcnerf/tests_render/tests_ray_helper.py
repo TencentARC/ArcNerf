@@ -7,8 +7,8 @@ import unittest
 
 import numpy as np
 
-from arcnerf.geometry import np_wrapper
 from arcnerf.render.ray_helper import get_zvals_from_near_far
+from common.utils.torch_utils import np_wrapper
 from common.visual.plot_2d import draw_2d_components
 
 RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results', 'ray_helper'))

@@ -10,13 +10,13 @@ import numpy as np
 
 from arcnerf.datasets import get_dataset
 from arcnerf.datasets.transform.augmentation import get_transforms
-from arcnerf.geometry import np_wrapper, torch_to_np
 from arcnerf.geometry.poses import average_poses, generate_cam_pose_on_sphere
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.sphere import get_uv_from_pos
 from arcnerf.geometry.transformation import normalize
 from arcnerf.render.camera import equal_sample, get_rays, PerspectiveCamera
 from arcnerf.visual.plot_3d import draw_3d_components
+from common.utils.torch_utils import np_wrapper, torch_to_np
 from common.utils.video_utils import write_video
 from common.visual import get_combine_colors
 from common.visual.draw_cv2 import draw_vert_on_img

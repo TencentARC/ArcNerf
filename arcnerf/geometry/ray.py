@@ -3,8 +3,8 @@
 import numpy as np
 import torch
 
-from . import set_tensor_to_zeros
 from .transformation import batch_dot_product
+from common.utils.torch_utils import set_tensor_to_zeros
 
 
 def get_ray_points_by_zvals(rays_o: torch.Tensor, rays_d: torch.Tensor, zvals: torch.Tensor):

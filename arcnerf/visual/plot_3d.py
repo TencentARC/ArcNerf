@@ -334,7 +334,8 @@ def draw_3d_components(
     sphere_origin=(0, 0, 0),
     title='',
     save_path=None,
-    plotly=False
+    plotly=False,
+    plotly_html=False
 ):
     """draw 3d component, including cameras, points, rays, etc
     For any pts in world space, you need to transform_plt_space to switch yz axis
@@ -362,6 +363,7 @@ def draw_3d_components(
         title: a string of figure title
         save_path: path to save the fig. None will only show fig
         plotly: If True, use plotly instead of plt. Can be zoom-in/out. By default False.
+        plotly_html: If True and save_path is not True, save to .html file instead of .png, good for interactive
     """
     fig = None
     if plotly:
@@ -440,7 +442,13 @@ def draw_3d_components(
         }
 
         if save_path:
-            pio.write_image(fig, save_path)
+            if plotly_html:
+                html_path = save_path.split('.')[:-1]
+                html_path.append('.html')
+                html_path = '.'.join(html_path)
+                pio.write_html(fig, html_path)
+            else:
+                pio.write_image(fig, save_path)
         else:
             pio.show(fig)
 

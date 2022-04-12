@@ -2,11 +2,10 @@
 
 
 # TODO:
-- sampler使用
+- resample
 - ray marching
 - shpere tracing(sdf, density)
 - batch化处理
-- ray和圆的交点之类的函数
 - 可视化（voxel， mesh， ray）各种， 根据需求加进去
   - ray上的sampler变化（2d， 3d）
   - voxel grid可视化

@@ -7,7 +7,6 @@ import unittest
 
 import numpy as np
 
-from arcnerf.geometry import np_wrapper
 from arcnerf.geometry.poses import look_at, generate_cam_pose_on_sphere
 from arcnerf.geometry.ray import (
     closest_point_on_ray, closest_point_to_rays, closest_point_to_two_rays, get_ray_points_by_zvals,
@@ -16,6 +15,7 @@ from arcnerf.geometry.ray import (
 from arcnerf.geometry.transformation import normalize
 from arcnerf.render.camera import PerspectiveCamera, equal_sample, get_rays
 from arcnerf.visual.plot_3d import draw_3d_components
+from common.utils.torch_utils import np_wrapper
 from common.visual import get_combine_colors
 from tests import setup_test_config
 

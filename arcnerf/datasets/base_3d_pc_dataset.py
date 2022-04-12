@@ -3,9 +3,9 @@
 import numpy as np
 
 from .base_3d_dataset import Base3dDataset
-from arcnerf.geometry import np_wrapper
 from arcnerf.geometry.poses import center_poses
 from arcnerf.geometry.ray import closest_point_to_rays
+from common.utils.torch_utils import np_wrapper
 
 
 class Base3dPCDataset(Base3dDataset):
