@@ -77,9 +77,9 @@ class PerspectiveCamera(object):
 
         return pose
 
-    def get_rays(self, index: np.ndarray = None, N_rays=-1, to_np=False):
+    def get_rays(self, index: np.ndarray = None, n_rays=-1, to_np=False):
         """Get camera rays by intrinsic and c2w, in world coord"""
-        return get_rays(self.W, self.H, self.get_intrinsic(), self.get_pose(), index=index, N_rays=N_rays, to_np=to_np)
+        return get_rays(self.W, self.H, self.get_intrinsic(), self.get_pose(), index=index, n_rays=n_rays, to_np=to_np)
 
     def proj_world_to_pixel(self, points: torch.Tensor):
         """Project points onto image plane.
@@ -132,7 +132,7 @@ def load_K_Rt_from_P(proj_mat: np.ndarray):
     return intrinsics, pose
 
 
-def get_rays(W, H, intrinsic: torch.Tensor, c2w: torch.Tensor, index: np.ndarray = None, N_rays=-1, to_np=False):
+def get_rays(W, H, intrinsic: torch.Tensor, c2w: torch.Tensor, index: np.ndarray = None, n_rays=-1, to_np=False):
     """Get rays in world coord from camera.
     No batch processing allow. Rays are produced by setting z=1 and get location.
     You can select index by a tuple, a list of tuple or a list of index
@@ -144,7 +144,7 @@ def get_rays(W, H, intrinsic: torch.Tensor, c2w: torch.Tensor, index: np.ndarray
         c2w: torch.tensor(4, 4) cam pose. cam_to_world transform
         index: sample ray by (i, j) index from (W, H), np.array/torch.tensor(N_ind, 2) for (i, j) index
                 first index is X and second is Y, any index should be in range (0, W-1) and (0, H-1)
-        N_rays: random sample ray by such num if it > 0
+        n_rays: random sample ray by such num if it > 0
         to_np: if to np, return np array instead of torch.tensor
 
     Returns:
@@ -152,7 +152,7 @@ def get_rays(W, H, intrinsic: torch.Tensor, c2w: torch.Tensor, index: np.ndarray
              If no sampler is used, return (WH, 3) num of rays
         ind_unroll: sample index in list of (N_ind, ) for index in (WH, ) range
     """
-    assert (index is None) or N_rays <= 0, 'You are not allowed to sampled both by index and N_ray'
+    assert (index is None) or n_rays <= 0, 'You are not allowed to sampled both by index and N_ray'
     device = intrinsic.device
     dtype = intrinsic.dtype
     i, j = torch.meshgrid(
@@ -169,8 +169,8 @@ def get_rays(W, H, intrinsic: torch.Tensor, c2w: torch.Tensor, index: np.ndarray
             index = index.type(torch.long).to(device)
         index = index[:, 0] * H + index[:, 1]  # (N_rays, ) unroll from (i, j)
     # sample by N_rays
-    if N_rays > 0:
-        index = np.random.choice(range(0, W * H), N_rays, replace=False)  # (N_rays, )
+    if n_rays > 0:
+        index = np.random.choice(range(0, W * H), n_rays, replace=False)  # (N_rays, )
         index = torch.tensor(index, dtype=torch.long).to(device)
     # sampled by index
     if index is not None:

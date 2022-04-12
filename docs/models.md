@@ -19,5 +19,5 @@ Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
 
 
 ## Nerf
-Nerf model with single forward, and hierarchical sampling.
-It is combination of GeoNet and RadianceNet.
+Nerf model with single forward(NeRF), and hierarchical sampling(NeRFFull).
+It is combination of GeoNet and RadianceNet, with ray sampling, resample pdf, ray marching, etc.

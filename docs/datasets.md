@@ -18,7 +18,7 @@ Will not touch intrinsic. If point cloud exists, rescale them by same factor to 
 - pc_radius(base_3d_pc_dataset): Remove point cloud that are outside such absolute radius.
 Done after camera `scale_radius`. The radius is restricted within `scale_radius` range.
 ## Augmentation:
-- N_rays: Sample `N_rays` instead of using all, good for training.
+- n_rays: Sample `n_rays` instead of using all, good for training.
 ## rgb and mask
 - All color are in `rgb` order and normed by `255` into `0~1` range.
 - All masks should be binary masks with `{0,1}` values. Can be [] if not exist.

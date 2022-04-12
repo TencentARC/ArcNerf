@@ -49,6 +49,10 @@ each line prints `N_pt_in_line-1` line seg
 - axis range: update by the component with max values (xyz), show in a cube with same lengths.
 
 
+# plot2d
+In `common.visual`, we provide a `draw_2d_components` that is
+helpful to plot points/lines in defined colors and legends. We use `matplotlib` as backend.
+
 # TODO:
 - Write a python notebook showing how to use
 - open3d version for pc, mesh visual with rays if necessary

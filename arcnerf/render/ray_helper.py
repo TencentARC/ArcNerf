@@ -53,3 +53,41 @@ def get_near_far_from_rays(
         far = torch.ones(size=(n_rays, 1), dtype=dtype).to(device) * far_hardcode  # (BN, 1)
 
     return near, far
+
+
+def get_zvals_from_near_far(near, far, n_pts, inclusive=True, inverse_linear=False, perturb=False):
+    """Get zvals from near/far distance
+
+    Args:
+        near: tensor(N_rays, 1), near zvals
+        far: tensor(N_rays, 1), far zvals
+        n_pts: num of points sampled in (near, far)
+        inclusive: If True, zvals include near,far. If False, only in range not inclusive. By default True.
+        inverse_linear: If False, uniform sampling in (near, far). If True, use inverse sampling and closer to near.
+                        By default False.
+        perturb: If True, disturb sampling in all segment. By default False.
+
+    Returns:
+        zvals: (N_rays, n_pts), each ray samples n_pts points
+    """
+    device = near.device
+    dtype = near.dtype
+
+    if inclusive:
+        t_vals = torch.linspace(0.0, 1.0, n_pts, dtype=dtype).to(device)  # (N_pts,)
+    else:
+        t_vals = torch.linspace(0.0, 1.0, n_pts + 2, dtype=dtype)[1:-1].to(device)  # (N_pts,)
+
+    if inverse_linear:
+        zvals = 1.0 / (1.0 / near * (1.0 - t_vals) + 1.0 / far * t_vals)  # (N_rays, N_pts)
+    else:
+        zvals = near * (1 - t_vals) + far * t_vals
+
+    if perturb:
+        _mids = .5 * (zvals[..., 1:] + zvals[..., :-1])
+        _upper = torch.cat([_mids, zvals[..., -1:]], -1)
+        _lower = torch.cat([zvals[..., :1], _mids], -1)
+        _z_rand = torch.rand(size=_upper.shape, dtype=dtype).to(device)
+        zvals = _lower + (_upper - _lower) * _z_rand  # (N_rays, N_pts)
+
+    return zvals

@@ -27,11 +27,11 @@ class TestDict(unittest.TestCase):
 
     def tests_embedder(self):
         input_dims = range(1, 10)
-        N_freqs = [0, 5, 10]
+        n_freqs = [0, 5, 10]
         periodic_fns = (torch.sin, torch.cos)
         include_inputs = [True, False]
         for input_dim in input_dims:
-            for freq in N_freqs:
+            for freq in n_freqs:
                 for include in include_inputs:
                     if freq == 0 and include is False:
                         continue  # this case is not allowed

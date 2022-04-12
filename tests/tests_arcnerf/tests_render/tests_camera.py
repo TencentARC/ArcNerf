@@ -103,23 +103,23 @@ class TestDict(unittest.TestCase):
         self.assertEqual(ray_bundle[0].shape, (self.H * self.W, 3))
         self.assertEqual(ray_bundle[1].shape, (self.H * self.W, 3))
         self.assertIsNone(ray_bundle[2])
-        for N_rays in [1, 10, 100, 1000, 10000]:
-            ray_bundle = self.camera.get_rays(N_rays=N_rays)
-            self.assertEqual(ray_bundle[0].shape, (N_rays, 3))
-            self.assertEqual(ray_bundle[1].shape, (N_rays, 3))
-            self.assertEqual(len(ray_bundle[2]), N_rays)
-        for N_rays in [1, 10, 100, 1000, 10000]:
-            index = np.random.choice(range(0, self.W * self.H - 1), N_rays, replace=False)  # N_rays in (HW)
+        for n_rays in [1, 10, 100, 1000, 10000]:
+            ray_bundle = self.camera.get_rays(n_rays=n_rays)
+            self.assertEqual(ray_bundle[0].shape, (n_rays, 3))
+            self.assertEqual(ray_bundle[1].shape, (n_rays, 3))
+            self.assertEqual(len(ray_bundle[2]), n_rays)
+        for n_rays in [1, 10, 100, 1000, 10000]:
+            index = np.random.choice(range(0, self.W * self.H - 1), n_rays, replace=False)  # N_rays in (HW)
             ind_x, ind_y = index // self.W, index % self.H
             index = np.concatenate([ind_x[:, None], ind_y[:, None]], axis=-1)
-            self.assertEqual(index.shape, (N_rays, 2))
+            self.assertEqual(index.shape, (n_rays, 2))
             ray_bundle = self.camera.get_rays(index=index)
-            self.assertEqual(ray_bundle[0].shape, (N_rays, 3))
-            self.assertEqual(ray_bundle[1].shape, (N_rays, 3))
-            self.assertEqual(len(ray_bundle[2]), N_rays)
+            self.assertEqual(ray_bundle[0].shape, (n_rays, 3))
+            self.assertEqual(ray_bundle[1].shape, (n_rays, 3))
+            self.assertEqual(len(ray_bundle[2]), n_rays)
 
     def tests_n_rays_visual(self):
-        ray_bundle = self.camera.get_rays(N_rays=10, to_np=True)
+        ray_bundle = self.camera.get_rays(n_rays=10, to_np=True)
         up = self.c2w[:3, 1][None, :]
 
         z_factor = 3

@@ -7,6 +7,8 @@ all unittest for checking.
 For some tests that are not `unittest`, they are python by
 `python test_file.py`. They generally provide visual results.
 
+We set default cfg file path at `__init__.py`. You can change it and tests will read the config from it.
+
 ## tests_common
 Tests for common class. Directly obtained from `common_trainer` project.
 
@@ -32,13 +34,19 @@ back to pixels. Check the difference.
 Test function in transform, like normalization, rotation
 #### tests_triangle
 Test function in triangle, like getting norm, getting circumcircle, etc.
+#### tests_rays
+Test function in ray, like getting sphere-ray-intersection, point-ray distance, etc.
+
 
 ### tests_render
 #### tests_camera
 Test camera creation, get_rays and project rays into pixel, visualize ray and ray points
 Also check when we rescale camera and image, whether rays get projected correctly.
-
+#### tests_ray_helper
+Test func for ray sampling, resample cdf/pdf, etc.
 
 ### tests_models
 #### tests_base_modules
 Test embedder, implicit function, radiance function, with correct input/output.
+#### tests_nerf
+Test NeRF model and NeRFFull Model

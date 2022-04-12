@@ -11,11 +11,11 @@ class Embedder(nn.Module):
         ref: https://github.com/ventusff/neurecon/blob/main/models/base.py
     """
 
-    def __init__(self, input_dim, N_freqs, log_sampling=True, include_input=True, periodic_fns=(torch.sin, torch.cos)):
+    def __init__(self, input_dim, n_freqs, log_sampling=True, include_input=True, periodic_fns=(torch.sin, torch.cos)):
         """
         Args:
             input_dim: dimension of input to be embedded. For example, xyz is dim=3
-            N_freqs: number of frequency bands. If 0, will not encode the inputs.
+            n_freqs: number of frequency bands. If 0, will not encode the inputs.
             log_sampling: if True, use log factor sin(2**N * x). Else use scale factor sin(N * x).
                       By default is True
             include_input: if True, raw input is included in the embedding. Appear at beginning. By default is True
@@ -37,15 +37,15 @@ class Embedder(nn.Module):
         self.out_dim = 0
         if self.include_input:
             self.out_dim += self.input_dim
-        self.out_dim += self.input_dim * N_freqs * len(self.periodic_fns)
+        self.out_dim += self.input_dim * n_freqs * len(self.periodic_fns)
 
-        if N_freqs == 0 and include_input:  # inputs only
+        if n_freqs == 0 and include_input:  # inputs only
             self.freq_bands = []
         else:
             if log_sampling:
-                self.freq_bands = 2.**torch.linspace(0., N_freqs - 1, N_freqs)
+                self.freq_bands = 2.**torch.linspace(0., n_freqs - 1, n_freqs)
             else:
-                self.freq_bands = torch.linspace(2.**0., 2.**(N_freqs - 1), N_freqs)
+                self.freq_bands = torch.linspace(2.**0., 2.**(n_freqs - 1), n_freqs)
 
     def get_output_dim(self):
         """Get output dim"""

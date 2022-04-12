@@ -70,12 +70,12 @@ def colorize_np(color_np):
 def draw_cameras(ax, c2w, cam_colors, intrinsic, min_values, max_values, plotly):
     """Draw cameras"""
     # set color, by default is red
-    N_cam = c2w.shape[0]
+    n_cam = c2w.shape[0]
     if cam_colors is None:
         cam_colors = get_colors('red', to_int=False, to_np=True)
     if cam_colors.shape == (3, ):
-        cam_colors = np.repeat(cam_colors[None, :], N_cam, axis=0)
-    assert cam_colors.shape == (N_cam, 3), 'Invalid cam colors shape...(N_cam, 3) or (3,)'
+        cam_colors = np.repeat(cam_colors[None, :], n_cam, axis=0)
+    assert cam_colors.shape == (n_cam, 3), 'Invalid cam colors shape...(N_cam, 3) or (3,)'
 
     # set vis params, adjust by camera loc
     max_cam_pose_norm = np.linalg.norm(c2w[:, :3, 3], axis=-1).max()
@@ -116,12 +116,12 @@ def draw_cameras(ax, c2w, cam_colors, intrinsic, min_values, max_values, plotly)
 def draw_points(ax, points, point_colors, point_size, min_values, max_values, plotly):
     """Draw points"""
     # set color, by default is green
-    N_p = points.shape[0]
+    n_p = points.shape[0]
     if point_colors is None:
         point_colors = get_colors('green', to_int=False, to_np=True)
     if point_colors.shape == (3, ):
-        point_colors = np.repeat(point_colors[None, :], N_p, axis=0)
-    assert point_colors.shape == (N_p, 3), 'Invalid point colors shape...(N_p, 3) or (3,)'
+        point_colors = np.repeat(point_colors[None, :], n_p, axis=0)
+    assert point_colors.shape == (n_p, 3), 'Invalid point colors shape...(N_p, 3) or (3,)'
 
     points_plt = transform_plt_space(points, xyz_axis=1)
     if plotly:
@@ -149,12 +149,12 @@ def draw_points(ax, points, point_colors, point_size, min_values, max_values, pl
 def draw_rays(ax, rays, ray_colors, ray_linewidth, min_values, max_values, plotly):
     """Draw rays"""
     # set color, by default is blue
-    N_r = rays[0].shape[0]
+    n_r = rays[0].shape[0]
     if ray_colors is None:
         ray_colors = get_colors('blue', to_int=False, to_np=True)
     if ray_colors.shape == (3, ):
-        ray_colors = np.repeat(ray_colors[None, :], N_r, axis=0)
-    assert ray_colors.shape == (N_r, 3), 'Invalid ray colors shape...(N_r, 3) or (3,)'
+        ray_colors = np.repeat(ray_colors[None, :], n_r, axis=0)
+    assert ray_colors.shape == (n_r, 3), 'Invalid ray colors shape...(N_r, 3) or (3,)'
 
     rays_o = rays[0]
     rays_d = rays[1]
@@ -251,12 +251,12 @@ def draw_sphere(ax, radius, origin, min_values, max_values, plotly, color=None, 
 def draw_lines(ax, lines, line_colors, min_values, max_values, plotly):
     """Draw lines. Each line in list is a np.array with shape (N_pt_in_line, 3)"""
     # set color, by default is dark
-    N_line = len(lines)
+    n_line = len(lines)
     if line_colors is None:
         line_colors = get_colors('dark', to_int=False, to_np=True)
     if line_colors.shape == (3, ):
-        line_colors = np.repeat(line_colors[None, :], N_line, axis=0)
-    assert line_colors.shape == (N_line, 3), 'Invalid line colors shape...(N_line, 3) or (3,)'
+        line_colors = np.repeat(line_colors[None, :], n_line, axis=0)
+    assert line_colors.shape == (n_line, 3), 'Invalid line colors shape...(N_line, 3) or (3,)'
 
     for idx, line in enumerate(lines):
         line_plt = transform_plt_space(line, xyz_axis=1)  # (N_pt, 3)
@@ -283,18 +283,18 @@ def draw_lines(ax, lines, line_colors, min_values, max_values, plotly):
 def draw_meshes(ax, meshes, mesh_colors, min_values, max_values, plotly):
     """Draw meshes. Each mesh in list is a np.array with shape (N_tri, 3, 3)"""
     # set color, by default is red
-    N_m = len(meshes)
+    n_m = len(meshes)
     if mesh_colors is None:
         mesh_colors = get_colors('red', to_int=False, to_np=True)
     if mesh_colors.shape == (3, ):
-        mesh_colors = np.repeat(mesh_colors[None, :], N_m, axis=0)
-    assert mesh_colors.shape == (N_m, 3), 'Invalid mesh colors shape...(N_m, 3) or (3,)'
+        mesh_colors = np.repeat(mesh_colors[None, :], n_m, axis=0)
+    assert mesh_colors.shape == (n_m, 3), 'Invalid mesh colors shape...(N_m, 3) or (3,)'
 
     for idx, mesh in enumerate(meshes):
-        N_tri = mesh.shape[0]
-        mesh_plt = transform_plt_space(mesh.reshape(-1, 3), xyz_axis=1).reshape(N_tri, 3, -1)  # (N_tri, 3, 3)
+        n_tri = mesh.shape[0]
+        mesh_plt = transform_plt_space(mesh.reshape(-1, 3), xyz_axis=1).reshape(n_tri, 3, -1)  # (N_tri, 3, 3)
         if plotly:
-            for tri_idx in range(N_tri):
+            for tri_idx in range(n_tri):
                 ax.append(
                     go.Mesh3d(
                         x=mesh_plt[tri_idx][:, 0],
@@ -308,7 +308,7 @@ def draw_meshes(ax, meshes, mesh_colors, min_values, max_values, plotly):
                 )
         else:
             ax.add_collection3d(
-                Poly3DCollection([mesh_plt[i] for i in range(N_tri)], facecolors=mesh_colors[idx], linewidths=1)
+                Poly3DCollection([mesh_plt[i] for i in range(n_tri)], facecolors=mesh_colors[idx], linewidths=1)
             )
         min_values = np.minimum(min_values, mesh_plt.reshape(-1, 3).min(0))
         max_values = np.maximum(max_values, mesh_plt.reshape(-1, 3).max(0))
