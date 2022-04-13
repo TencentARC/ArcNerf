@@ -179,7 +179,77 @@ def get_zvals_from_near_far(
     return zvals
 
 
-def ray_marching(sigma: torch.Tensor, radiance: torch.Tensor, zvals: torch.Tensor, add_inf_z=False, noise_std=0.0):
+def sample_pdf(bins: torch.Tensor, weights: torch.Tensor, n_sample, det=False, eps=1e-5):
+    """Weighted sampling in bins by pdf weights
+
+    Args:
+        bins: (B, n_pts), each bin contain ordered n_pts, sample in such (n_pts-1) intervals
+        weights: (B, n_pts-1), the weight for each interval
+        n_sample: resample num
+        det: If det, uniform sample in (0,1), else random sample in (0,1), by default False
+        eps: small value, 1e-5
+
+    Returns:
+        samples: (B, n_sample) sampled based on pdf from bins
+    """
+    weights = weights + eps
+    pdf = weights / torch.sum(weights, -1, keepdim=True)  # (B, n_pts-1)
+    cdf = torch.cumsum(pdf, -1)  # (B, n_pts-1)
+    cdf = torch.cat([torch.zeros_like(cdf[..., :1]), cdf], -1)  # (B, n_pts)
+    samples = sample_cdf(bins, cdf, n_sample, det)
+
+    return samples
+
+
+def sample_cdf(bins: torch.Tensor, cdf: torch.Tensor, n_sample, det=False, eps=1e-5):
+    """Weighted sampling in bins by cdf weights
+
+    Args:
+        bins: (B, n_pts), each bin contain ordered n_pts, sample in such (n_pts-1) intervals
+        cdf: (B, n_pts), the accumulated weight for each pts, increase from 0~1
+        n_sample: resample num
+        det: If det, uniform sample in (0,1), else random sample in (0,1), by default False
+        eps: small value, 1e-5
+
+    Returns:
+        samples: (B, n_sample) sampled based on cdf from bins
+    """
+    # Take uniform samples
+    device = bins.device
+    n_pts = bins.shape[-1]
+
+    if det:
+        u = torch.linspace(0.0, 1.0, steps=n_sample, device=device)
+        u = u.expand(list(cdf.shape[:-1]) + [n_sample])
+    else:
+        u = torch.rand(list(cdf.shape[:-1]) + [n_sample], device=device)
+    u = u.contiguous()  # (B, n_sample)
+
+    # inverse cdf, get index
+    inds = torch.searchsorted(cdf.detach(), u, right=True)  # (B, n_sample)
+    below = torch.clamp_min(inds - 1, 0)
+    above = torch.clamp_max(inds, n_pts - 1)
+    inds_g = torch.stack([below, above], -1).view(-1, 2 * n_sample)  # (B, n_sample*2)
+
+    cdf_g = torch.gather(cdf, 1, inds_g).view(-1, n_sample, 2)
+    bins_g = torch.gather(bins, 1, inds_g).view(-1, n_sample, 2)
+
+    denom = cdf_g[..., 1] - cdf_g[..., 0]
+    denom[denom < eps] = 1
+    t = (u - cdf_g[..., 0]) / denom
+    samples = bins_g[..., 0] + t * (bins_g[..., 1] - bins_g[..., 0])  # (B, n_sample)
+
+    return samples
+
+
+def ray_marching(
+    sigma: torch.Tensor,
+    radiance: torch.Tensor,
+    zvals: torch.Tensor,
+    add_inf_z=False,
+    noise_std=0.0,
+    weights_only=False
+):
     """Ray marching and get color for each ray, get weight for each ray
         For p_i, the delta_i is p_i -> p_i+1 on the right side
         The full function is:
@@ -196,19 +266,25 @@ def ray_marching(sigma: torch.Tensor, radiance: torch.Tensor, zvals: torch.Tenso
 
     Args:
         sigma: (N_rays, N_pts), density value
-        radiance: (N_rays, N_pts, 3), radiance value for each point
+        radiance: (N_rays, N_pts, 3), radiance value for each point. If none, will not cal rgb from weighted radiance
         zvals: (N_rays, N_pts), zvals for ray in unit-length
         add_inf_z: If True, add inf zvals(1e10) for calculation. If False, ignore last point for rgb/depth calculation
         noise_std: noise level add to density if noise > 0, used for training. By default 0.0.
+        weights_only: If True, return weights only, used in inference time for hierarchical sampling
 
     Returns:
-        rgb: (N_rays, 3), rgb for each ray
-        depth: (N_rays), weighted zvals for each ray that approximate for the surface
-        mask: (N_ray), accumulated weights for the ray. Like a mask for background
-                    If =1, the ray is stop some whether.
-                    If =0, the ray does not stop, it pass through air.
-                If you add rgb + (1-mask), background will become all 1.
-        weights: (N_rays, N_pts) if add_inf_z else (N_rays, N_pts-1). Use for normalizing other values like normals.
+        output a dict with following keys:
+            rgb: (N_rays, 3), rgb for each ray, None if radiance not input
+            depth: (N_rays), weighted zvals for each ray that approximate for the surface
+            mask: (N_ray), accumulated weights for the ray. Like a mask for background
+                        If =1, the ray is stop some whether.
+                        If =0, the ray does not stop, it pass through air.
+                    If you add rgb + (1-mask), background will become all 1.
+            sigma: (N_rays, N_pts/N_pts-1), sigma after add_inf_z
+            zvals:  (N_rays, N_pts/N_pts-1), zvals after add_inf_z
+            alpha: (N_rays, N_pts/N_pts-1). prob not pass the point
+            trans_shift: (N_rays, N_pts/N_pts-1). prob pass all previous light
+            weights: (N_rays, N_pts/N_pts-1). Use for weighting other values like normals.
     """
     dtype = sigma.dtype
     device = sigma.device
@@ -219,25 +295,91 @@ def ray_marching(sigma: torch.Tensor, radiance: torch.Tensor, zvals: torch.Tenso
         deltas = torch.cat([deltas, torch.ones(size=(n_rays, 1), dtype=dtype).to(device)], dim=-1)
     else:
         sigma = sigma[:, :-1]  # (N_rays, N_pts-1)
-        radiance = radiance[:, :-1, ]  # (N_rays, N_pts-1, 3)
+        radiance = radiance[:, :-1, ] if radiance is not None else None  # (N_rays, N_pts-1, 3)
         zvals = zvals[:, :-1]  # (N_rays, N_pts-1)
 
-    noise = 0.0
+    noise = 1.0
     if noise_std > 0.0:
         noise = torch.randn(sigma.shape, dtype=dtype).to(device) * noise_std
 
     # alpha_i = (1 - exp(- relu(sigma) * delta_i)
-    alpha = 1 - torch.exp(deltas * torch.relu(sigma * noise))  # (N_rays, N_p)
+    alpha = 1 - torch.exp(-torch.relu(sigma * noise) * deltas)  # (N_rays, N_p)
     # Ti = mul_1_i-1(1 - alpha_i)
     alpha_one = torch.ones_like(alpha[:, :1], dtype=dtype).to(device)
     trans_shift = torch.cat([alpha_one, 1 - alpha + 1e-10], -1)  # (N_rays, N_p+1)
+    trans_shift = torch.cumprod(trans_shift, -1)[:, :-1]  # (N_rays, N_p)
     # weight_i = Ti * alpha_i
-    weights = alpha * torch.cumprod(trans_shift, -1)[:, :-1]  # (N_rays, N_p)
-    # rgb = sum(weight_i * radiance_i)
-    rgb = torch.sum(weights.unsqueeze(-1) * radiance, -2)  # (N_rays, 3)
+    weights = alpha * trans_shift  # (N_rays, N_p)
     # depth = sum(weight_i * zvals_i)
     depth = torch.sum(weights * zvals, -1)  # (N_rays)
     # accumulated weight(mask)
     mask = torch.sum(weights, -1)  # (N_rays)
 
-    return rgb, depth, mask, weights
+    # rgb = sum(weight_i * radiance_i)
+    if radiance is not None:
+        rgb = torch.sum(weights.unsqueeze(-1) * radiance, -2)  # (N_rays, 3)
+    else:
+        rgb = None
+
+    if weights_only:
+        output = {'weights': weights}
+
+    else:
+        output = {
+            'rgb': rgb,  # (N_rays, 3)
+            'depth': depth,  # (N_rays)
+            'mask': mask,  # (N_rays)
+            'sigma': sigma,  # (N_rays, N_pts/N_pts-1)
+            'zvals': zvals,  # (N_rays, N_pts/N_pts-1)
+            'alpha': alpha,  # (N_rays, N_pts/N_pts-1)
+            'trans_shift': trans_shift,  # (N_rays, N_pts/N_pts-1)
+            'weights': weights  # (N_rays, N_pts/N_pts-1)
+        }
+
+    return output
+
+
+def sample_ray_marching_output_by_index(output, n_rays=1, sigma_scale=2.0):
+    """Sample output from ray marching by index, which is directly used for 2d visualization
+
+    Args:
+        output: output from ray_marching, with 'depth', 'mask', etc, each is torch.tensor
+        n_rays: num of sampled rays, by default, 1
+        sigma_scale: used to scale sigma value up by this value for visual consistency. By default 2.0
+
+    Returns:
+        out_list: a list contain dicts for each ray sample
+                Each dict has points, lines, legends which are lists of [x, y] and str for 2d visual
+    """
+    total_rays = output['depth'].shape[0]
+    n_pts_per_ray = output['zvals'].shape[1]
+
+    sample_index = np.random.choice(range(total_rays), n_rays, replace=False).tolist()
+    out_list = []
+    for idx in sample_index:
+        res = {'points': [], 'lines': [], 'legends': []}
+        # zvals as x
+        x = torch_to_np(output['zvals'][idx]).tolist()
+        res['points'].append([x, [-1] * n_pts_per_ray])
+        # sigma
+        sigma = torch_to_np(output['sigma'][idx])
+        sigma = sigma / sigma.max() * sigma_scale
+        sigma = sigma.tolist()
+        res['lines'].append([x, sigma])
+        res['legends'].append('sigma')
+        # alpha
+        alpha = torch_to_np(output['alpha'][idx]).tolist()
+        res['lines'].append([x, alpha])
+        res['legends'].append('alpha')
+        # trans_shift
+        trans_shift = torch_to_np(output['trans_shift'][idx]).tolist()
+        res['lines'].append([x, trans_shift])
+        res['legends'].append('trans_shift')
+        # weights
+        weights = torch_to_np(output['weights'][idx]).tolist()
+        res['lines'].append([x, weights])
+        res['legends'].append('weights')
+
+        out_list.append(res)
+
+    return out_list

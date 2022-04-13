@@ -50,7 +50,7 @@ def closest_point_on_ray(rays_o: torch.Tensor, rays_d: torch.Tensor, pts: torch.
     AB = torch.repeat_interleave(rays_d.unsqueeze(1), n_pts, 1)  # (N_rays, N_pts, 3)
     zvals = batch_dot_product(CA.view(-1, 3), AB.view(-1, 3))  # (N_rays, N_pts)
     zvals = zvals / batch_dot_product(AB.view(-1, 3), AB.view(-1, 3))
-    zvals = torch.clamp(zvals, 0.0).view(n_rays, n_pts)
+    zvals = torch.clamp_min(zvals, 0.0).view(n_rays, n_pts)
 
     pts_closest = get_ray_points_by_zvals(rays_o, rays_d, zvals)
 
@@ -226,9 +226,9 @@ def sphere_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, origin=(
     z_offset = torch.sqrt(z_offset)
 
     near = z_half - z_offset
-    near = torch.clamp(near, 0.0, None)
+    near = torch.clamp_min(near, 0.0)
     far = z_half + z_offset
-    far = torch.clamp(far, 0.0, None)
+    far = torch.clamp_min(far, 0.0)
     near[~mask], far[~mask] = 0.0, 0.0
 
     zvals = torch.cat([near, far], dim=1)  # (N_rays, 2)

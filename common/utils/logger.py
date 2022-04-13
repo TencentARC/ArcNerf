@@ -8,11 +8,20 @@ from .file_utils import remove_if_exists
 class Logger(object):
     """A logger for print inputs"""
 
-    def __init__(self, rank=0, level='DEBUG', format='{time:YYYY-MM-DD-HH:mm:ss} | {level} | {message}', path=None):
+    def __init__(
+        self,
+        rank=0,
+        level='DEBUG',
+        format='{time:YYYY-MM-DD-HH:mm:ss} | {level} | {message}',
+        path=None,
+        keep_console=True
+    ):
         """Init a logger, remove original log"""
         self.rank = rank
         if path is not None and self.rank == 0:
             remove_if_exists(path)
+            if keep_console is False:
+                logger.remove(handler_id=None)
             logger.add(path, level=level, format=format)
 
     def add_log(self, msg, level='INFO'):

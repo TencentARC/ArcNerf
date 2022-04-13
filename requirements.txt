@@ -7,5 +7,6 @@ opencv-python
 plotly
 pyyaml
 tensorboard
+thop
 torch
 torchvision
