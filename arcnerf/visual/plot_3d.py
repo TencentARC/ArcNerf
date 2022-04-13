@@ -285,7 +285,7 @@ def draw_meshes(ax, meshes, mesh_colors, min_values, max_values, plotly):
     # set color, by default is red
     n_m = len(meshes)
     if mesh_colors is None:
-        mesh_colors = get_colors('red', to_int=False, to_np=True)
+        mesh_colors = get_colors('silver', to_int=False, to_np=True)
     if mesh_colors.shape == (3, ):
         mesh_colors = np.repeat(mesh_colors[None, :], n_m, axis=0)
     assert mesh_colors.shape == (n_m, 3), 'Invalid mesh colors shape...(N_m, 3) or (3,)'
@@ -294,18 +294,17 @@ def draw_meshes(ax, meshes, mesh_colors, min_values, max_values, plotly):
         n_tri = mesh.shape[0]
         mesh_plt = transform_plt_space(mesh.reshape(-1, 3), xyz_axis=1).reshape(n_tri, 3, -1)  # (N_tri, 3, 3)
         if plotly:
-            for tri_idx in range(n_tri):
-                ax.append(
-                    go.Mesh3d(
-                        x=mesh_plt[tri_idx][:, 0],
-                        y=mesh_plt[tri_idx][:, 1],
-                        z=mesh_plt[tri_idx][:, 2],
-                        i=[0],
-                        j=[1],
-                        k=[2],
-                        color=colorize_np(mesh_colors[idx])
-                    )
+            ax.append(
+                go.Mesh3d(
+                    x=mesh_plt.reshape(-1, 3)[:, 0],  # (N_tri * 3)
+                    y=mesh_plt.reshape(-1, 3)[:, 1],  # (N_tri * 3)
+                    z=mesh_plt.reshape(-1, 3)[:, 2],  # (N_tri * 3)
+                    i=[0 + i * 3 for i in range(n_tri)],
+                    j=[1 + i * 3 for i in range(n_tri)],
+                    k=[2 + i * 3 for i in range(n_tri)],
+                    color=colorize_np(mesh_colors[idx])
                 )
+            )
         else:
             ax.add_collection3d(
                 Poly3DCollection([mesh_plt[i] for i in range(n_tri)], facecolors=mesh_colors[idx], linewidths=1)

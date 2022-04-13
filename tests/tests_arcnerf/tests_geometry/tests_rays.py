@@ -13,7 +13,8 @@ from arcnerf.geometry.ray import (
     sphere_ray_intersection
 )
 from arcnerf.geometry.transformation import normalize
-from arcnerf.render.camera import PerspectiveCamera, equal_sample, get_rays
+from arcnerf.render.camera import PerspectiveCamera
+from arcnerf.render.ray_helper import equal_sample, get_rays
 from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.torch_utils import np_wrapper
 from common.visual import get_combine_colors
