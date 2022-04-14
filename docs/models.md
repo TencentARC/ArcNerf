@@ -17,6 +17,27 @@ Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
 ### RadianceNet
 Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
 
+# chunk_size
+The model is hard to process `batch_size * n_rays_per_sample * n_pts_per_ray` in a single
+forward, set it to be `n_rays * n_pts` to be process in a single forward.
+By default use `1024*32 = 32768`.
+
+## Rays
+The dataset only provides `rays_o` and `rays_d`, but the actual sampling procedure is in model. Dataset may provide
+`bounds` for sampling guidance, which is generally coming from point_cloud in cam space.
+- near: Hard reset the near zvals for all rays
+- far: Hard reset the far zvals for all rays
+- bounding_radius: If not None, will use to calculate near/far in the sphere.
+But it could be overwrite by hardcode near/far.
+- bounds: If bounds is provided in dataset, use it instead of bounding radus.
+But it could be overwrite by hardcode near/far.
+- n_sample: Init sample point.
+- n_importance: Point sampled from hierarchical sampling
+- add_inf_z: When True, will use inf_z at last for raymarching, needed for rays including background range.
+    - If you add a separate background model, you should not use it, so that ray inside the sphere focus on the object.
+- noise_std: if >0.0, add to sigma when ray marching. good for training.
+- perturb: perturb zvals during training.
+- inverse_linear: If True, more points are sampled closer to near zvals.
 
 ## Nerf
 Nerf model with single forward(NeRF), and hierarchical sampling(NeRFFull).

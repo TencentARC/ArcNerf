@@ -29,7 +29,7 @@ each line prints `N_pt_in_line-1` line seg
 
 ## Meshes
 - meshes: a list of mesh of `(N_tri, 3, 3)` in world space, len is `N_m`
--  mesh_colors: color in `(N_m, 3)` or (3,), applied for each or all mesh
+- mesh_colors: color in `(N_m, 3)` or (3,), applied for each or all mesh
 
 ## Rays
 - rays: a tuple `(rays_o, rays_d)`, each in `(N_r, 3)`, in world coord. `rays_d` is with actual len, if you want longer arrow, you need to extend `rays_d`
@@ -51,7 +51,7 @@ each line prints `N_pt_in_line-1` line seg
 
 # plot2d
 In `common.visual`, we provide a `draw_2d_components` that is
-helpful to plot points/lines in defined colors and legends. We use `matplotlib` as backend.
+helpful to plot points/lines in defined colors with legends. We use `matplotlib` as backend.
 
 # TODO:
 - Write a python notebook showing how to use

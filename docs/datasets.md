@@ -1,7 +1,7 @@
 # base_3d_dataset
 Base class for all 3d dataset. Contains image/mask(optional)/camera.
 Support precache_ray/norm_cam_pose/rescale_image_pose/get_item in a uniform way.
-- Each dataset contains an `identifier` that is a string separating the scene from same dataset.
+- Each dataset contains an `identifier` that is a string separating the scene from the same dataset.
 (like scan_id, scene_name, etc)
 
 - point_cloud: a dict with
@@ -14,8 +14,10 @@ Point cloud are in world coordinate.
 Will change intrinsic for actual re-projection as well, but not change extrinsic.
 - scale_radius: Rescale all camera pose such that cameras are roughly align on the surface of sphere with such radius.
 Will not touch intrinsic. If point cloud exists, rescale them by same factor to keep consistency.
+    - This actual cam radius will be adjusted by a factor of `1.05` which ensure cam `inside` the sphere, which will be
+  good for ray-sphere computation(forbid nan).
 - precache: If True, will precache all the rays for all pixels at once.
-- pc_radius(base_3d_pc_dataset): Remove point cloud that are outside such absolute radius.
+- pc_radius(base_3d_pc_dataset): Remove point cloud that are outside such absolute radius(all scaled by extra `1.05`).
 Done after camera `scale_radius`. The radius is restricted within `scale_radius` range.
 ## Augmentation:
 - n_rays: Sample `n_rays` instead of using all, good for training.
@@ -64,9 +66,9 @@ as (0,0,0), noise not on object will make the center incorrect. We do the follow
 - Use all camera and ray from center image plane to get a closely approximate common view point,
 which is close to object center, adjust cam/pc by this offset.
 - Norm cam and point by `scale_radius` to make them within a sphere with known range.
-- Filter point cloud by `pc_radius` and remove point outside
-- Recenter cam and point by setting the filtered point cloud center as (0,0,0)
-- Re-norm cam and point again to make cam on the surface of sphere with `scale_radius`
+- Filter point cloud by `pc_radius` and remove point outside.
+- Recenter cam and point by setting the filtered point cloud center as (0,0,0).
+- Re-norm cam and point again to make cam on the surface of sphere with `scale_radius` and obj is centered.
 
 We test and show that the method is robust to make the coordinate system such that object is centered at (0,0,0),
 cam is on surface with `scale_radius`. Only scale and translation is applied, do not affect the intrinsic.

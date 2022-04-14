@@ -34,10 +34,7 @@ class Base3dPCDataset(Base3dDataset):
         """Filter point cloud in pc_radius, it is in scale after cam normalization """
         # TODO: Better filter to remove isolated points should be applied
         if hasattr(self.cfgs, 'pc_radius') and self.cfgs.pc_radius > 0:
-            if 'pts' not in self.point_cloud:
-                raise RuntimeError('Not pts in point_cloud, do not use this function...')
-
-            pts_valid = np.linalg.norm(self.point_cloud['pts'], axis=-1) < self.cfgs.pc_radius
+            pts_valid = np.linalg.norm(self.point_cloud['pts'], axis=-1) < (self.cfgs.pc_radius / 1.05)
             self.point_cloud['pts'] = self.point_cloud['pts'][pts_valid, :]
 
             if 'color' in self.point_cloud:
@@ -81,8 +78,7 @@ class Base3dPCDataset(Base3dDataset):
             self.cameras[idx].reset_pose(center_c2w[idx])
 
         # if point cloud exist, also adjust it
-        if self.point_cloud is not None and 'pts' in self.point_cloud:
-            self.point_cloud['pts'] -= view_point_mean
+        self.point_cloud['pts'] -= view_point_mean
 
     def norm_cam_pose(self):
         """Normalize camera pose by scale_radius, point cloud as well"""
