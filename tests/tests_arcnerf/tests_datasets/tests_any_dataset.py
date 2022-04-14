@@ -1,12 +1,12 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import cv2
 import os
 import os.path as osp
 import unittest
 
 import numpy as np
+import cv2
 
 from arcnerf.datasets import get_dataset
 from arcnerf.datasets.transform.augmentation import get_transforms
@@ -15,8 +15,9 @@ from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.sphere import get_uv_from_pos
 from arcnerf.geometry.transformation import normalize
 from arcnerf.render.camera import PerspectiveCamera
-from arcnerf.render.ray_helper import equal_sample, get_rays
+from arcnerf.render.ray_helper import equal_sample, get_rays, get_near_far_from_rays, get_zvals_from_near_far
 from arcnerf.visual.plot_3d import draw_3d_components
+from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.torch_utils import np_wrapper, torch_to_np
 from common.utils.video_utils import write_video
 from common.visual import get_combine_colors
@@ -39,7 +40,8 @@ class TestDict(unittest.TestCase):
         cls.H, cls.W = int(cls.dataset[0]['H']), int(cls.dataset[0]['W'])
         cls.c2w, cls.intrinsic, cls.cameras = cls.get_cameras()
         cls.n_cam = cls.c2w.shape[0]
-        cls.radius = np.linalg.norm(cls.c2w[:, :3, 3], axis=-1).max(0)
+        radius = get_value_from_cfgs_field(cls.cfgs.model.rays, 'bounding_radius')
+        cls.radius = radius if radius is not None else np.linalg.norm(cls.c2w[:, :3, 3], axis=-1).max(0)
         cls.spec_result_dir = osp.abspath(osp.join(RESULT_DIR, cls.dataset_type, cls.dataset.get_identifier()))
         os.makedirs(cls.spec_result_dir, exist_ok=True)
 
@@ -101,9 +103,9 @@ class TestDict(unittest.TestCase):
         origin = (0, 0, 0)
         avg_pose = average_poses(self.c2w)[None, :]  # (1, 4, 4)
 
-        u_start, v_ratio, _ = get_uv_from_pos(avg_pose[0, :3, 3], origin)
-        _, v_min, _ = get_uv_from_pos(self.c2w[np.argmin(self.c2w[:, 1, 3]), :3, 3], origin)
-        _, v_max, _ = get_uv_from_pos(self.c2w[np.argmax(self.c2w[:, 1, 3]), :3, 3], origin)
+        u_start, v_ratio, _ = get_uv_from_pos(avg_pose[0, :3, 3], origin, self.radius)
+        _, v_min, _ = get_uv_from_pos(self.c2w[np.argmin(self.c2w[:, 1, 3]), :3, 3], origin, self.radius)
+        _, v_max, _ = get_uv_from_pos(self.c2w[np.argmax(self.c2w[:, 1, 3]), :3, 3], origin, self.radius)
 
         modes = ['circle', 'spiral']
         for mode in modes:
@@ -139,59 +141,90 @@ class TestDict(unittest.TestCase):
             )
 
     def tests_ray_points(self):
-        n_rays_w, n_rays_h = 4, 3
+        n_rays_w, n_rays_h = 8, 6
         n_rays = n_rays_w * n_rays_h
         index = equal_sample(n_rays_w, n_rays_h, self.W, self.H)
 
-        # change this range if you are not set cam in radius=3
-        n_pts = 5
-        z_min, z_max = 2, 4
-        zvals = np.linspace(z_min, z_max, n_pts)  # (n_pts, )
-        zvals = np.repeat(zvals[None, :], n_rays, axis=0)  # (n_rays, n_pts)
+        # near/far from config
+        bounding_radius = get_value_from_cfgs_field(self.cfgs.model.rays, 'bounding_radius')
+        near = get_value_from_cfgs_field(self.cfgs.model.rays, 'near')
+        far = get_value_from_cfgs_field(self.cfgs.model.rays, 'far')
 
-        points = []
-        rays = []
+        # change this range if you are not set cam in radius=3
+        n_pts = 15
+
+        # get combine bounds and rays
+        rays_o = []
+        rays_d = []
+        bounds = []
         for idx in range(self.n_cam):
             ray_bundle = np_wrapper(get_rays, self.W, self.H, self.intrinsic, self.c2w[idx], index)[:2]  # (n_rays, 3)
-            pts = np_wrapper(get_ray_points_by_zvals, ray_bundle[0], ray_bundle[1], zvals)  # (n_rays, n_pts, 3)
-            rays.append(ray_bundle)
-            points.append(pts.reshape(-1, 3))  # (n_rays*n_pts, 3)
-        points = np.concatenate(points, axis=0)
-        rays_all = (np.concatenate([r[0] for r in rays], axis=0), np.concatenate([r[1] for r in rays], axis=0))
+            rays_o.append(ray_bundle[0])
+            rays_d.append(ray_bundle[1])
+            if 'bounds' in self.dataset[idx]:  # (n_rays, 2)
+                bound = torch_to_np(self.dataset[idx]['bounds'][None, :]).repeat(ray_bundle[0].shape[0], axis=0)
+                bounds.append(bound)
+
+        rays_o = np.concatenate(rays_o, axis=0)  # (n_rays*n_cam, 3)
+        rays_d = np.concatenate(rays_d, axis=0)  # (n_rays*n_cam, 3)
+        bounds = None if len(bounds) == 0 else np.concatenate(bounds, axis=0)  # (n_rays*n_cam, 2)
+
+        near_all, far_all = np_wrapper(get_near_far_from_rays, rays_o, rays_d, bounds, near, far, bounding_radius)
+        zvals = np_wrapper(get_zvals_from_near_far, near_all, far_all, n_pts)  # (n_rays*n_cam, n_pts)
+        pts = np_wrapper(get_ray_points_by_zvals, rays_o, rays_d, zvals)  # (n_rays*n_cam, n_pts, 3)
+        points = pts.reshape(-1, 3)  # (n_rays*n_cam*n_pts, 3)
         self.assertEqual(points.shape, (self.n_cam * n_rays * n_pts, 3))
-        self.assertEqual(rays_all[0].shape, (self.n_cam * n_rays, 3))
-        self.assertEqual(rays_all[1].shape, (self.n_cam * n_rays, 3))
+        self.assertEqual(rays_o.shape, (self.n_cam * n_rays, 3))
+        self.assertEqual(rays_d.shape, (self.n_cam * n_rays, 3))
 
         ray_colors = get_combine_colors(['sky_blue'], [self.n_cam * n_rays])
         points_with_cam = np.concatenate([np.array([0, 0, 0])[None, :], self.c2w[:, :3, 3]], axis=0)
         point_colors_with_cam = get_combine_colors(['green', 'red'], [1, self.c2w.shape[0]])
 
+        points_all = np.concatenate([np.array([0, 0, 0])[None, :], points], axis=0)
+        point_colors = get_combine_colors(['green', 'red'], [1, points.shape[0]])
+        if 'pc' in self.dataset[0] and self.dataset[0]['pc'] is not None:
+            if self.dataset[0]['img'].shape[0] == (self.H * self.W):  # Sample
+                pc = self.dataset[0]['pc']
+                pts = pc['pts']  # (n_pts, 3)
+                if 'color' in pc:  # only show
+                    # add to pts
+                    points_with_cam = np.concatenate([points_with_cam, pts], axis=0)
+                    point_colors_with_cam = np.concatenate([point_colors_with_cam, pc['color']], axis=0)
+                    points_all = np.concatenate([points_all, pts], axis=0)
+                    point_colors = np.concatenate([point_colors, pc['color']], axis=0)
+
         file_path = osp.join(self.spec_result_dir, 'rays_from_all_cams.png')
         draw_3d_components(
             points=points_with_cam,
-            point_size=5,
+            point_size=1.0,
             point_colors=point_colors_with_cam,
-            rays=(rays_all[0], z_max * rays_all[1]),
+            rays=(rays_o, zvals[:, -1][:, None] * rays_d),
             ray_colors=ray_colors,
             ray_linewidth=0.5,
             sphere_radius=self.radius,
             sphere_origin=(0, 0, 0),
             title='Each cam sampled {} rays'.format(n_rays),
-            save_path=file_path
+            save_path=file_path,
         )
 
-        points_all = np.concatenate([np.array([0, 0, 0])[None, :], points], axis=0)
-        point_colors = get_combine_colors(['green', 'red'], [1, points.shape[0]])
-
+        title_with_setting = 'Each ray sampled {} points, z_range({:.1f}-{:.1f}).\n'.format(
+            n_pts, zvals.min(), zvals.max()
+        )
+        title_with_setting += 'Settings - bounds:{}/near:{}/far:{}/bounding_radius:{}'.format(
+            bounds is not None, near, far, bounding_radius
+        )
         file_path = osp.join(self.spec_result_dir, 'points_from_all_cams.png')
         draw_3d_components(
             points=points_all,
             point_colors=point_colors,
-            point_size=1,
+            point_size=5,
             sphere_radius=self.radius,
             sphere_origin=(0, 0, 0),
-            title='Each ray sampled {} points, z_range({}-{})'.format(n_pts, z_min, z_max),
-            save_path=file_path
+            title=title_with_setting,
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True
         )
 
     def tests_pc_reproject(self):
@@ -233,6 +266,7 @@ class TestDict(unittest.TestCase):
         file_path = osp.join(self.spec_result_dir, 'point_cloud_3d.png')
         draw_3d_components(
             c2w=self.c2w,
+            intrinsic=self.intrinsic,
             points=pts,
             point_colors=pts_color,
             point_size=1.0,

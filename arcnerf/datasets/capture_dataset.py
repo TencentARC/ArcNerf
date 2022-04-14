@@ -44,7 +44,7 @@ class Capture(Base3dPCDataset):
         self.filter_point_cloud()
         # recenter the cameras by remaining point cloud
         self.center_cam_poses_by_pc_mean()
-        # # re-norm again
+        # re-norm again
         self.norm_cam_pose()
 
         # rescale image, call from parent class

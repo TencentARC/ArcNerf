@@ -102,7 +102,8 @@ def get_near_far_from_rays(
     Args:
         rays_o: tensor(N_rays, 3), ray origin
         rays_d: tensor(N_rays, 3), ray direction
-        bounds: tensor(N_rays, 2), input bounds, generally obtained from data with point_cloud
+        bounds: tensor(N_rays, 2), input bounds, generally obtained from data with point_cloud.
+                 Use ray-sphere far bound whenever bounding_radius is not None to restrict the pts in sphere.
         near_hardcode: If not None, will force all near to be this value
         far_hardcode: If not None, will force all far to be this value
         bounding_radius: If not None, will use this to calculate the ray-sphere intersection as near/far
@@ -111,7 +112,6 @@ def get_near_far_from_rays(
         near: tensor(N_rays, 1), near zvals
         far:  tensor(N_rays, 1), far zvals
     """
-
     device = rays_o.device
     dtype = rays_o.dtype
     n_rays = rays_o.shape[0]
@@ -123,8 +123,6 @@ def get_near_far_from_rays(
         if bounds is None:
             near, far, _, mask = sphere_ray_intersection(rays_o, rays_d, radius=bounding_radius)  # (BN, 1)
         else:
-            # TODO: When use bounds from dataset, it may only cover range with object(far is not enough),
-            # TODO: no background applied. You may need to extent far or use extra background layer for such dataset
             near, far = bounds[:, 0:1], bounds[:, 1:2]
 
         # hard set for near/far
@@ -164,8 +162,8 @@ def get_zvals_from_near_far(
     else:
         t_vals = torch.linspace(0.0, 1.0, n_pts + 2, dtype=dtype)[1:-1].to(device)  # (N_pts,)
 
-    if inverse_linear:
-        zvals = 1.0 / (1.0 / near * (1.0 - t_vals) + 1.0 / far * t_vals)  # (N_rays, N_pts)
+    if inverse_linear:  # +1e-8 in case nan
+        zvals = 1.0 / (1.0 / (near + 1e-8) * (1.0 - t_vals) + 1.0 / (far + 1e-8) * t_vals)  # (N_rays, N_pts)
     else:
         zvals = near * (1 - t_vals) + far * t_vals
 

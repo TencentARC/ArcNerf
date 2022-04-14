@@ -1,6 +1,6 @@
 # default config.
 
-name: default
+name: capture
 
 resume: None
 
@@ -31,8 +31,8 @@ dist:
     random_seed: None               # None will not require reproducibility, run benchmark to be faster
     slurm: False                    # use slurm for management
 
-batch_size: 2
-worker: 4
+batch_size: 1
+worker: 1
 
 optim:
     lr: 1e-5
@@ -72,39 +72,38 @@ progress:
 
 dataset:
     train:
-        type: DTU
-        scan_id: 65
-        img_scale: 1.0              # scale image and intrinsic, < 1 means scale_down
-        scale_radius: 3.0           # norm the camera within a sphere with such radius(actual radius litter smaller)
-        precache: True              # precache all the rays at once
+        type: Capture
+        scene_name: joycon
+        img_scale: 1.0               # scale image and intrinsic, < 1 means scale_down
+        scale_radius: 3.0            # norm the camera within a sphere with such radius(actual radius litter smaller)
+        pc_radius: 2.0               # only keep point cloud in a fix radius ball, scale after cam norm
+        precache: True               # precache all the rays at once
         augmentation:
-            n_rays: 1024
+            N_rays: 1024
 
     val:
-        type: DTU
-        scan_id: 65
-        img_scale: 0.25
+        type: Capture
+        scene_name: qq_tiger
+        img_scale: 0.5
         scale_radius: 3.0
+        pc_radius: 3.0
         precache: False
 
     eval:
         eval_batch_size: 1
-        type: DTU
-        scan_id: 65
-        img_scale: 0.25
+        type: Capture
+        scene_name: qq_tiger
+        img_scale: 0.5
         scale_radius: 3.0
+        pc_radius: 3.0
         precache: False
-
-test:
-    render_type: spiral
-    n_cam: 20
 
 model:
     type: NeRF
     rays:
         bounding_radius: 3.0          # bounding ray sampling region
-        near: 1.0                     # hardcode near zvals
-        #far: 10.0                      # hardcode far zvals
+        # near: 1.0                     # hardcode near zvals
+        far: 3.5                   # hardcode far zvals
         n_sample: 64                  # n_sample for zvals sampling
         n_importance: 128             # n_importance for zvals for hierarchical sampling
         inverse_linear: False         # inverse_linear make zvals close to near

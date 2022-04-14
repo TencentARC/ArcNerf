@@ -32,6 +32,7 @@ class Base3dPCDataset(Base3dDataset):
 
     def filter_point_cloud(self):
         """Filter point cloud in pc_radius, it is in scale after cam normalization """
+        # TODO: Better filter to remove isolated points should be applied
         if hasattr(self.cfgs, 'pc_radius') and self.cfgs.pc_radius > 0:
             if 'pts' not in self.point_cloud:
                 raise RuntimeError('Not pts in point_cloud, do not use this function...')
@@ -93,12 +94,12 @@ class Base3dPCDataset(Base3dDataset):
             max_cam_norm_t = max(cam_norm_t)
 
             for camera in self.cameras:
-                camera.rescale_pose(scale=self.cfgs.scale_radius / (max_cam_norm_t * 1.1))
+                camera.rescale_pose(scale=self.cfgs.scale_radius / (max_cam_norm_t * 1.05))
 
             # for point cloud adjustment
-            self.point_cloud['pts'] *= (self.cfgs.scale_radius / (max_cam_norm_t * 1.1))
+            self.point_cloud['pts'] *= (self.cfgs.scale_radius / (max_cam_norm_t * 1.05))
 
-    def get_bounds_from_pc(self, extend_factor=0.2):
+    def get_bounds_from_pc(self, extend_factor=0.05):
         """Get bounds from pc projected by each cam.
          near-far by pts_cam and adjust by extend_factor, in case pc does not cover all range.
         """

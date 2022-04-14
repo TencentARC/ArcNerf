@@ -30,19 +30,20 @@ def uv_to_sphere_point(u, v, radius, origin=(0, 0, 0)):
     return xyz
 
 
-def get_uv_from_pos(pos, origin=(0.0, 0.0, 0.0)):
+def get_uv_from_pos(pos, origin=(0.0, 0.0, 0.0), radius=None):
     """Get the u, v in scaled range, and radius from pos
 
     Args:
         pos: np(3, ) position of point in xyz
         origin: the origin of sphere
+        radius: radius of sphere, If None, assume the point is on the sphere
 
     Returns:
         u: (0, 1) representing (0, 2pi) xz-direction
         v: (-1, 1) representation (0, pi) y-direction
-        radius: radius of sphere
     """
-    radius = np.linalg.norm(pos - np.array(origin, dtype=pos.dtype))
+    if radius is None:
+        radius = np.linalg.norm(pos - np.array(origin, dtype=pos.dtype))
     v = np.arccos((pos[1] - origin[1]) / radius)  # in (0, pi)
     u = np.arctan((pos[2] - origin[2]) / (pos[0] - origin[0]))
     if u < 0:

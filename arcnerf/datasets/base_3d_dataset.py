@@ -90,7 +90,7 @@ class Base3dDataset(BaseDataset):
             max_cam_norm_t = max(cam_norm_t)
 
             for camera in self.cameras:
-                camera.rescale_pose(scale=self.cfgs.scale_radius / (max_cam_norm_t * 1.1))
+                camera.rescale_pose(scale=self.cfgs.scale_radius / (max_cam_norm_t * 1.05))
 
     def center_cam_poses_by_view_dir(self):
         """Recenter camera pose by setting the common view point center at (0,0,0)
@@ -133,7 +133,7 @@ class Base3dDataset(BaseDataset):
         c2w = self.cameras[idx].get_pose()
         intrinsic = self.cameras[idx].get_intrinsic()
         bounds = self.bounds[idx] if len(self.bounds) > 0 else None  # (2,)
-        bounds = torch.FloatTensor(bounds) if self.bounds is not None else None
+        bounds = torch.FloatTensor(bounds) if bounds is not None else None
 
         if self.precache:
             ray_bundle = self.ray_bundles[idx]
