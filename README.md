@@ -8,10 +8,12 @@
   - voxel grid可视化
   - open3d版本： 如需要
 - cuda实现的geometry函数和数据结构
+- tetrahedra相关
 
 - 光照拆解
 - 材质拆解s
 
+- real time inference online demo
 
 - 参考框架
   - nerf(nerfpl)

@@ -317,14 +317,14 @@ class BasicTrainer(object):
         """Save progress img for tracking. For both training and val. By default write to monitor.
             You are allowed to send a list of imgs to write for each iteration.
         """
+        files = self.render_progress_img(inputs, output)
+        if files is None:
+            return
+
         progress_dir = osp.join(self.cfgs.dir.expr_spec_dir, 'progress')
         os.makedirs(progress_dir, exist_ok=True)
         progress_mode_dir = osp.join(progress_dir, mode)
         os.makedirs(progress_mode_dir, exist_ok=True)
-
-        files = self.render_progress_img(inputs, output)
-        if files is None:
-            return
 
         for name, img in zip(files['names'], files['imgs']):
             self.monitor.add_img(name, img, global_step, mode=mode)

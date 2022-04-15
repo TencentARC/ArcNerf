@@ -116,3 +116,30 @@ def get_batch_from_list(*args, start_idx, end_idx):
         out: list of torch or np array in (B, d_out)
     """
     return [a[start_idx:end_idx] if a is not None else None for a in args]
+
+
+def mean_tensor_by_mask(tensor: torch.Tensor, mask: torch.Tensor, keep_batch=False):
+    """Mean tensor with mask by batch size.
+    Each tensor will be multiplied by mask and norm except first dim.
+
+    Args:
+        tensor: (B, anyshape), only need the first dim as batchsize, other are random
+        mask: (B, anyshape), 0~1 with same shape as tensor
+        keep_batch: If True, return (B, ), else return single mean value. By default False
+
+    Returns:
+        tensor_mean: (B, ) if keep batch; else (1, )
+    """
+    assert len(tensor.shape) > 1, 'At least two dim...'
+    assert tensor.shape == mask.shape, 'Dim not match...'
+    reduce_dim = tuple(range(1, len(tensor.shape)))
+
+    tensor_mask = tensor * mask
+    tensor_mask_sum = torch.sum(tensor_mask, dim=reduce_dim)  # (B, )
+    mask_sum = torch.sum(mask, dim=reduce_dim)  # (B, )
+    tensor_mean = tensor_mask_sum / mask_sum  # (B, )
+
+    if not keep_batch:
+        tensor_mean = tensor_mean.mean()
+
+    return tensor_mean

@@ -39,6 +39,16 @@ But it could be overwrite by hardcode near/far.
 - perturb: perturb zvals during training.
 - inverse_linear: If True, more points are sampled closer to near zvals.
 
+## background
+There are three ways to handle background
+- (1) Set a far zvals in rays for sampling. It will combine obj+background together for rendering.
+`ImgLoss` can be applied on the whole image for optimization.
+- (2) Constrain the far zvals by bounds or bounding_radius. Use `white_bkg`, then all the background will be in white.
+`MaskImgLoss` needs to be applied to get obj area optimized. `MaskLoss` can also be applied for geometry.
+- (3) Use a separate background model(nerf++), restrict the inner rays in sphere. Combine the inner and background model
+For color.
+`ImgLoss` and be applied on the combined image. `MaskLoss` and `MaskImageLoss` can be applied on obj image.
+
 ## Nerf
 Nerf model with single forward(NeRF), and hierarchical sampling(NeRFFull).
 It is combination of GeoNet and RadianceNet, with ray sampling, resample pdf, ray marching, etc.

@@ -25,12 +25,22 @@ class Monitor(object):
         """Add a scalar"""
         self.monitor.add_scalar(key, float(value), global_step)
 
-    def add_img(self, filename, img, global_step, mode):
-        """Add an image. Should be numpy array. """
-        if len(img.shape) != 3:
+    def add_img(self, filename, img, global_step, mode, bgr2rgb=True):
+        """Add an image, color or grey scale are all allowed.
+         Should be numpy array in (h, w, c). c is optional and equal to 1/3
+         If bgr2rgb is True, will assume the c in bgr order and change it to rgb order
+
+         Monitor takes (h, w) or (c, h, w) image for writing.
+        """
+        if len(img.shape) != 2 and len(img.shape) != 3:
             raise RuntimeError('Image shape error. ')
 
-        if img.shape[-1] == 3 and img.shape[0] != 0:
+        if len(img.shape) == 3 and img.shape[-1] == 3:  # rgb scale
+            if bgr2rgb:
+                img = img[:, :, [2, 1, 0]]
+            img = np.transpose(img, [2, 0, 1])
+
+        if len(img.shape) == 3 and img.shape[-1] == 1:  # gray scale
             img = np.transpose(img, [2, 0, 1])
 
         self.monitor.add_image('{}/{}'.format(mode, filename), img, global_step)
