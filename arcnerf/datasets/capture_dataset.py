@@ -53,6 +53,9 @@ class Capture(Base3dPCDataset):
         # get bounds
         self.bounds = self.get_bounds_from_pc()
 
+        # set eval mode, keep less samples
+        self.keep_eval_samples()
+
         # precache_all rays
         self.ray_bundles = None
         self.precache = self.cfgs.precache

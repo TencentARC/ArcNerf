@@ -41,7 +41,8 @@ class NeRF(Base3dModel):
             inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
             inputs['bound']: torch.tensor (B, 2)
             inference_only: If True, will not output coarse results. By default False
-            get_progress: If True, output some progress for recording. By default False
+            get_progress: If True, output some progress for recording, can not used in inference only mode.
+                          By default False
 
         Returns:
             output is a dict with following keys:
@@ -91,12 +92,17 @@ class NeRF(Base3dModel):
         sigma = sigma.view(-1, self.rays_cfgs['n_sample'], 1)[..., 0]  # (BN, N_sample)
         radiance = radiance.view(-1, self.rays_cfgs['n_sample'], 3)  # (BN, N_sample, 3)
 
+        # ray marching. If two stage and inference only, get weights from single stage.
+        weights_only = inference_only and self.rays_cfgs['n_importance'] > 0
         output_coarse = ray_marching(
-            sigma, radiance, zvals, self.rays_cfgs['add_inf_z'],
-            self.rays_cfgs['noise_std'] if not inference_only else 0.0, inference_only
+            sigma,
+            radiance,
+            zvals,
+            self.rays_cfgs['add_inf_z'],
+            self.rays_cfgs['noise_std'] if not inference_only else 0.0,
+            weights_only=weights_only
         )
-
-        if not inference_only:
+        if not weights_only:
             output['rgb_coarse'] = output_coarse['rgb'].view(batch_size, n_rays_per_batch, 3)  # (B, N, 3)
             output['depth_coarse'] = output_coarse['depth'].view(batch_size, n_rays_per_batch)  # (B, N)
             output['mask_coarse'] = output_coarse['mask'].view(batch_size, n_rays_per_batch)  # (B, N)

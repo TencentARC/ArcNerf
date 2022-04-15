@@ -30,9 +30,28 @@ class Base3dPCDataset(Base3dDataset):
         """
         raise NotImplementedError('You must have your point_cloud init function in child class...')
 
+    def get_identifier(self):
+        """string identifier of a dataset like scan_id/scene_name"""
+        return self.identifier
+
+    def keep_eval_samples(self):
+        """For eval model, only keep a small number of samples. Which are closer to the avg pose
+         It should be done before precache_rays in child class to avoid full precache.
+         """
+        if self.eval_max_sample is not None:
+            n_imgs = min(self.eval_max_sample, self.n_imgs)
+            self.n_imgs = n_imgs
+            ind = self.find_closest_cam_ind(n_imgs)
+            self.images = [self.images[i] for i in ind]
+            self.cameras = [self.cameras[i] for i in ind]
+            self.masks = [self.masks[i] for i in ind] if len(self.masks) > 0 else []
+            self.bounds = [self.bounds[i] for i in ind] if len(self.bounds) > 0 else []
+            if 'vis' in self.point_cloud:
+                self.point_cloud['vis'] = self.point_cloud['vis'][ind, :]
+
     def filter_point_cloud(self):
         """Filter point cloud in pc_radius, it is in scale after cam normalization """
-        # TODO: Better filter to remove isolated points should be applied
+        # TODO: Better filter to remove outlier points should be applied
         if hasattr(self.cfgs, 'pc_radius') and self.cfgs.pc_radius > 0:
             pts_valid = np.linalg.norm(self.point_cloud['pts'], axis=-1) < (self.cfgs.pc_radius / 1.05)
             self.point_cloud['pts'] = self.point_cloud['pts'][pts_valid, :]

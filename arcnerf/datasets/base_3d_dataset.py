@@ -3,10 +3,10 @@
 import numpy as np
 import torch
 
-from arcnerf.geometry.poses import center_poses
+from arcnerf.geometry.poses import center_poses, average_poses
 from arcnerf.geometry.ray import closest_point_to_rays
 from common.datasets.base_dataset import BaseDataset
-from common.utils.cfgs_utils import valid_key_in_cfgs
+from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
 from common.utils.img_utils import img_scale, read_img
 from common.utils.torch_utils import np_wrapper
 
@@ -29,10 +29,37 @@ class Base3dDataset(BaseDataset):
         self.masks = []
         self.point_cloud = None
         self.bounds = []
+        # set for eval
+        self.eval_max_sample = get_value_from_cfgs_field(cfgs, 'eval_max_sample')
 
     def get_identifier(self):
         """string identifier of a dataset like scan_id/scene_name"""
         return self.identifier
+
+    def keep_eval_samples(self):
+        """For eval model, only keep a small number of samples. Which are closer to the avg pose
+         It should be done before precache_rays in child class to avoid full precache.
+         """
+        if self.eval_max_sample is not None:
+            n_imgs = min(self.eval_max_sample, self.n_imgs)
+            self.n_imgs = n_imgs
+            ind = self.find_closest_cam_ind(n_imgs)
+            self.images = [self.images[i] for i in ind]
+            self.cameras = [self.cameras[i] for i in ind]
+            self.masks = [self.masks[i] for i in ind] if len(self.masks) > 0 else []
+            self.bounds = [self.bounds[i] for i in ind] if len(self.bounds) > 0 else []
+
+    def find_closest_cam_ind(self, n_close):
+        """Find the closest cam ind to the avg pose, return a list of index"""
+        c2ws = self.get_poses(torch_tensor=False, concat=True)  # (N_total_cam, 4, 4)
+        if n_close >= c2ws.shape[0]:
+            return range(c2ws.shape[0])
+        avg_pose = average_poses(c2ws)[None, :]  # (1, 4, 4)
+        dist = np.linalg.norm(c2ws[:, :3, 3] - avg_pose[:, :3, 3], axis=-1)  # (N_total_cam)
+        min_dist = np.argsort(dist)  # (N_total_cam)
+        ind = min_dist[:n_close].tolist()  # (N_total_cam)
+
+        return ind
 
     def rescale_img_and_pose(self):
         """Rescale image/mask and pose if needed. It affects intrinsic only. """

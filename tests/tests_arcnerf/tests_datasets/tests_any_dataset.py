@@ -177,6 +177,8 @@ class TestDict(unittest.TestCase):
         self.assertEqual(rays_o.shape, (self.n_cam * n_rays, 3))
         self.assertEqual(rays_d.shape, (self.n_cam * n_rays, 3))
 
+        cam_colors = get_combine_colors(['blue'], [self.c2w.shape[0]])
+
         ray_colors = get_combine_colors(['sky_blue'], [self.n_cam * n_rays])
         points_with_cam = np.concatenate([np.array([0, 0, 0])[None, :], self.c2w[:, :3, 3]], axis=0)
         point_colors_with_cam = get_combine_colors(['green', 'red'], [1, self.c2w.shape[0]])
@@ -216,6 +218,9 @@ class TestDict(unittest.TestCase):
         )
         file_path = osp.join(self.spec_result_dir, 'points_from_all_cams.png')
         draw_3d_components(
+            self.c2w,
+            intrinsic=self.intrinsic,
+            cam_colors=cam_colors,
             points=points_all,
             point_colors=point_colors,
             point_size=5,

@@ -88,7 +88,8 @@ class TestDict(unittest.TestCase):
         self.assertEqual(output['alpha'].shape, (1, self.n_pts - 1))
         self.assertEqual(output['trans_shift'].shape, (1, self.n_pts - 1))
 
-        visual_list = sample_ray_marching_output_by_index(output)[0]
+        visual_list, _ = sample_ray_marching_output_by_index(output)
+        visual_list = visual_list[0]
 
         file_path = osp.join(RESULT_DIR, 'ray_marching.png')
         draw_2d_components(
@@ -104,14 +105,15 @@ class TestDict(unittest.TestCase):
     def tests_sample_pdf(self):
         sigma, zvals = self.create_systhesis_ray_input()
         output = np_wrapper(ray_marching, sigma, None, zvals)
-        visual_list = sample_ray_marching_output_by_index(output)[0]
+        visual_list, _ = sample_ray_marching_output_by_index(output)
+        visual_list = visual_list[0]
         pdf = output['weights']
 
         zvals_mid = 0.5 * (zvals[:, 1:] + zvals[:, :-1])
         _zvals = np_wrapper(sample_pdf, zvals_mid, pdf[:, :-2], self.n_importance)
 
         points = visual_list['points']
-        points.append([_zvals[0], [-2] * _zvals.shape[-1]])
+        points.append([_zvals[0], [-1.5] * _zvals.shape[-1]])
 
         file_path = osp.join(RESULT_DIR, 'sample_pdf.png')
         draw_2d_components(

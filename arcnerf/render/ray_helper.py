@@ -289,19 +289,22 @@ def ray_marching(
     n_rays, n_pts = sigma.shape[:2]
 
     deltas = zvals[:, 1:] - zvals[:, :-1]  # (N_rays, N_pts-1)
+    _sigma = sigma
+    _radiance = radiance
+    _zvals = zvals
     if add_inf_z:  # (N_rays, N_pts)
         deltas = torch.cat([deltas, torch.ones(size=(n_rays, 1), dtype=dtype).to(device)], dim=-1)
     else:
-        sigma = sigma[:, :-1]  # (N_rays, N_pts-1)
-        radiance = radiance[:, :-1, ] if radiance is not None else None  # (N_rays, N_pts-1, 3)
-        zvals = zvals[:, :-1]  # (N_rays, N_pts-1)
+        _sigma = sigma[:, :-1]  # (N_rays, N_pts-1)
+        _radiance = radiance[:, :-1, :] if radiance is not None else None  # (N_rays, N_pts-1, 3)
+        _zvals = zvals[:, :-1]  # (N_rays, N_pts-1)
 
     noise = 1.0
     if noise_std > 0.0:
-        noise = torch.randn(sigma.shape, dtype=dtype).to(device) * noise_std
+        noise = torch.randn(_sigma.shape, dtype=dtype).to(device) * noise_std
 
     # alpha_i = (1 - exp(- relu(sigma) * delta_i)
-    alpha = 1 - torch.exp(-torch.relu(sigma * noise) * deltas)  # (N_rays, N_p)
+    alpha = 1 - torch.exp(-torch.relu(_sigma * noise) * deltas)  # (N_rays, N_p)
     # Ti = mul_1_i-1(1 - alpha_i)
     alpha_one = torch.ones_like(alpha[:, :1], dtype=dtype).to(device)
     trans_shift = torch.cat([alpha_one, 1 - alpha + 1e-10], -1)  # (N_rays, N_p+1)
@@ -309,13 +312,13 @@ def ray_marching(
     # weight_i = Ti * alpha_i
     weights = alpha * trans_shift  # (N_rays, N_p)
     # depth = sum(weight_i * zvals_i)
-    depth = torch.sum(weights * zvals, -1)  # (N_rays)
+    depth = torch.sum(weights * _zvals, -1)  # (N_rays)
     # accumulated weight(mask)
     mask = torch.sum(weights, -1)  # (N_rays)
 
     # rgb = sum(weight_i * radiance_i)
-    if radiance is not None:
-        rgb = torch.sum(weights.unsqueeze(-1) * radiance, -2)  # (N_rays, 3)
+    if _radiance is not None:
+        rgb = torch.sum(weights.unsqueeze(-1) * _radiance, -2)  # (N_rays, 3)
     else:
         rgb = None
 
@@ -327,8 +330,8 @@ def ray_marching(
             'rgb': rgb,  # (N_rays, 3)
             'depth': depth,  # (N_rays)
             'mask': mask,  # (N_rays)
-            'sigma': sigma,  # (N_rays, N_pts/N_pts-1)
-            'zvals': zvals,  # (N_rays, N_pts/N_pts-1)
+            'sigma': _sigma,  # (N_rays, N_pts/N_pts-1)
+            'zvals': _zvals,  # (N_rays, N_pts/N_pts-1)
             'alpha': alpha,  # (N_rays, N_pts/N_pts-1)
             'trans_shift': trans_shift,  # (N_rays, N_pts/N_pts-1)
             'weights': weights  # (N_rays, N_pts/N_pts-1)
@@ -348,6 +351,7 @@ def sample_ray_marching_output_by_index(output, n_rays=1, sigma_scale=2.0):
     Returns:
         out_list: a list contain dicts for each ray sample
                 Each dict has points, lines, legends which are lists of [x, y] and str for 2d visual
+        sample_index: the index sampled
     """
     total_rays = output['depth'].shape[0]
     n_pts_per_ray = output['zvals'].shape[1]
@@ -380,4 +384,4 @@ def sample_ray_marching_output_by_index(output, n_rays=1, sigma_scale=2.0):
 
         out_list.append(res)
 
-    return out_list
+    return out_list, sample_index

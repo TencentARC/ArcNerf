@@ -4,10 +4,10 @@ Support precache_ray/norm_cam_pose/rescale_image_pose/get_item in a uniform way.
 - Each dataset contains an `identifier` that is a string separating the scene from the same dataset.
 (like scan_id, scene_name, etc)
 
-- point_cloud: a dict with
 ## base_3d_pc_dataset
 Based on `base_3d_dataset`, it provides functions mainly on point cloud adjustment.
-Point cloud are in world coordinate.
+Points are in world coordinate.
+- point_cloud: a dict with 'pts'/'color'/'vis'. Last two are optional.
 
 # Some configs in data processing:
 - img_scale: Resize image by this scale. `>1` means larger image.
@@ -38,6 +38,8 @@ Done after camera `scale_radius`. The radius is restricted within `scale_radius`
 - For the near/far, you can also set in `cfgs.rays.near/far`, or use ray-sphere intersection
 for near/far calculation by setting `cfgs.rays.bounding_radius`.
 
+# Dataset Class
+Below are supported dataset class.
 ## Capture
 This class provides dataset from your capture data.
 You need to run colmap to extract corresponding poses and train.
@@ -81,14 +83,21 @@ Specified by scan_id, read image/mask/camera.
 # Train/Val/Test
 
 ## Train
-Use all images for training. Same resolution as required
+Use all images for training. Same resolution as required.
+- augmentation: You should set to it for data augmentation, detail in above.
 
 
 ## Val
-Use all images for training, downsampled by 2/4 depends on shape.
+Use all images for validation, downsampled by 2/4 depends on shape.
 
-Each valid epoch just input one image for rendering
+Each valid epoch just input one image for rendering, so the batch_size for val is cast to be 1.
 
 
 ## Test
-Use three closest camera(to avg_cam) for metric evaluation, use same resolution, and use a custom cam path with xx videos for rendering video
+Use several closest camera(to avg_cam) for metric evaluation,
+
+use same resolution, and use custom cam paths for rendering video
+
+- eval_batch_size: batch size for eval
+- eval_max_sample: max num of sample in eval dataset.
+only those will be fully rendered can calculate metric.

@@ -34,12 +34,12 @@ class TestDict(unittest.TestCase):
             self.cfgs.optim.lr_scheduler.type = lr_type
 
             lr_scheduler = get_learning_rate_scheduler(
-                optimizer, last_epoch=0, total_epoch=self.cfgs.progress.epoch, **self.cfgs.optim.lr_scheduler.__dict__
+                optimizer, last_epoch=-1, total_epoch=self.cfgs.progress.epoch, **self.cfgs.optim.lr_scheduler.__dict__
             )
 
-            x = list(range(100))
+            x = list(range(self.cfgs.progress.epoch))
             y = [self.cfgs.optim.lr]
-            for epoch in range(99):
+            for epoch in range(self.cfgs.progress.epoch - 1):
                 optimizer.zero_grad()
                 optimizer.step()
                 lr = lr_scheduler.get_last_lr()[0]
