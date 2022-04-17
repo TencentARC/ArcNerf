@@ -21,6 +21,7 @@ def build_model(cfgs, logger):
     Args:
         cfgs (dict): Configuration. It must contain:
             model_type (str): Model type.
+        logger: logger for logging
     """
     cfgs = deepcopy(cfgs)
     model = MODEL_REGISTRY.get(cfgs.model.type)(cfgs)

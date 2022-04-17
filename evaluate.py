@@ -9,7 +9,6 @@ import torch
 
 from common.metric.metric_dict import MetricDictCounter
 from common.utils.cfgs_utils import parse_configs, get_value_from_cfgs_field
-from common.utils.img_utils import img_to_uint8
 from common.utils.logger import Logger
 from common.utils.model_io import load_model
 from arcnerf.datasets import get_dataset
@@ -17,6 +16,7 @@ from arcnerf.datasets.transform.augmentation import get_transforms
 from arcnerf.eval.eval_func import run_eval
 from arcnerf.metric import build_metric
 from arcnerf.models import build_model
+from arcnerf.visual.render_img import render_progress_img
 
 if __name__ == '__main__':
     cfgs = parse_configs()
@@ -51,24 +51,15 @@ if __name__ == '__main__':
     # get_model_feed_in_func
     def get_model_feed_in(data, device):
         """Get core model feed in."""
-        feed_in = data['img']
+        feed_in = {'img': data['img'], 'mask': data['mask'], 'rays_o': data['rays_o'], 'rays_d': data['rays_d']}
+
         if device == 'gpu':
-            feed_in = feed_in.cuda(non_blocking=True)
+            for k in feed_in.keys():
+                feed_in[k] = feed_in[k].cuda(non_blocking=True)
 
         batch_size = data['img'].shape[0]
 
         return feed_in, batch_size
-
-    # get_render_img
-    def render_eval_img(inputs, output):
-        """Render eval img and return a dict containing name and images for each batch"""
-        img = inputs['img'][0].detach().cpu().numpy()
-
-        img = img_to_uint8(img, transpose=[1, 2, 0])
-        name = ['sample1', 'sample2']
-        dic = {'names': name, 'imgs': [img] * 2}
-
-        return dic
 
     # set and load model
     assert cfgs.model_pt is not None, 'Please specify the model_pt for evaluation...'
@@ -84,7 +75,7 @@ if __name__ == '__main__':
 
     # eval
     metric_info, files = run_eval(
-        loader, get_model_feed_in, model, logger, eval_metric, metric_dict, device, render_eval_img,
+        loader, get_model_feed_in, model, logger, eval_metric, metric_dict, device, render_progress_img,
         cfgs.progress.max_samples_eval
     )
 

@@ -27,7 +27,7 @@ class BasicTrainer(object):
         self.cfgs = cfgs
 
         # distributed params
-        self.cfgs.dist.rank, self.cfgs.dist.local_rank, self.cfgs.world_size = self.set_dist_rank()
+        self.cfgs.dist.rank, self.cfgs.dist.local_rank, self.cfgs.dist.world_size = self.set_dist_rank()
 
         # set gpu for each process and init distribution
         self.gpu_id = self.set_gpu_id()

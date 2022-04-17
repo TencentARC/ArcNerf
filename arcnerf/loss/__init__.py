@@ -19,6 +19,7 @@ def build_loss(cfgs, logger):
 
     Args:
         cfgs (dict): Configuration.
+        logger: logger for logging
     """
     cfgs = deepcopy(cfgs)
     loss_names = []
@@ -39,7 +40,6 @@ def build_loss(cfgs, logger):
 class AllLoss(object):
     """All loss combine. Weights will be multiplied here.
         For all the loss, you should change var from inputs to output's device for calculation
-        :return loss: a dict containing all loss and sum
     """
 
     def __init__(self, loss_funcs, loss_names, loss_weights):

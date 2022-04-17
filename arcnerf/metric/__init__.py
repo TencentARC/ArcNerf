@@ -19,6 +19,7 @@ def build_metric(cfgs, logger):
 
     Args:
         cfgs (dict): Configuration.
+        logger: logger for logging
     """
     cfgs = deepcopy(cfgs)
     metric_names = []
@@ -36,7 +37,6 @@ def build_metric(cfgs, logger):
 class AllMetric(object):
     """All Metric separately.
     For all the metric, you should change var from inputs to output's device for calculation
-        :return metric: a dict containing all metric separately
     """
 
     def __init__(self, metric_funcs, metric_names):

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import numpy as np
+import time
+
 import torch
 
 from arcnerf.datasets import get_dataset
@@ -9,11 +10,10 @@ from arcnerf.eval.eval_func import run_eval
 from arcnerf.loss import build_loss
 from arcnerf.metric import build_metric
 from arcnerf.models import build_model
+from arcnerf.visual.render_img import render_progress_img
 from common.loss.loss_dict import LossDictCounter
 from common.trainer.basic_trainer import BasicTrainer
 from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
-from common.utils.img_utils import img_to_uint8
-from common.utils.torch_utils import torch_to_np
 from common.utils.train_utils import master_only
 
 
@@ -123,7 +123,14 @@ class ArcNerfTrainer(BasicTrainer):
         for step, inputs in enumerate(self.data['val']):
             with torch.no_grad():
                 feed_in, batch_size = self.get_model_feed_in(inputs, self.device)
+                time0 = time.time()
                 output = self.model(feed_in, get_progress=True)
+                self.logger.add_log(
+                    '   Valid one sample (H,W)=({},{}) time {:.2f}s'.format(
+                        int(inputs['H'][0]), int(inputs['W'][0]),
+                        time.time() - time0
+                    )
+                )
             if self.cfgs.progress.save_progress_val and step < self.cfgs.progress.max_samples_val:  # Just some samples
                 self.save_progress(epoch, 0, global_step, inputs, output, mode='val')
 
@@ -153,54 +160,7 @@ class ArcNerfTrainer(BasicTrainer):
          Image should be in bgr with shape(h,w,3), which can be directly writen by cv.imwrite().
          Return None will not write anything.
         """
-        if inputs['H'][0] * inputs['W'][0] != inputs['img'].shape[1]:  # sampled rays, do not show anything
-            return None
-
-        names = []
-        images = []
-        idx = 0  # only sample from the first
-        w, h = int(inputs['W'][idx]), int(inputs['H'][idx])
-        # origin image, mask
-        img = img_to_uint8(torch_to_np(inputs['img'][idx]).reshape(h, w, 3))  # (H, W, 3)
-        mask = torch_to_np(inputs['mask'][idx]).reshape(h, w) if 'mask' in inputs else None  # (H, W)
-        mask = (255.0 * mask).astype(np.uint8)[..., None].repeat(3, axis=-1) if mask is not None else None  # (H, W, 3)
-
-        # pred rgb + img + error
-        pred_rgb = ['rgb_coarse', 'rgb_fine', 'rgb']
-        for pred_name in pred_rgb:
-            if pred_name in output:
-                pred_img = img_to_uint8(torch_to_np(output[pred_name][idx]).reshape(h, w, 3))  # (H, W, 3)
-                error_map = np.abs(img - pred_img)  # (H, W, 3)
-                pred_cat = np.concatenate([img, pred_img, error_map], axis=1)  # (H, 3W, 3)
-                names.append(pred_name)
-                images.append(pred_cat)
-        # depth, norm and put to uint8(0-255)
-        pred_depth = ['depth_coarse', 'depth_fine', 'depth']
-        for pred_name in pred_depth:
-            if pred_name in output:
-                pred_depth = torch_to_np(output[pred_name][idx]).reshape(h, w)  # (H, W), 0~1
-                pred_depth = (255.0 * pred_depth / (pred_depth.max() + 1e-8)).astype(np.uint8)
-                pred_cat = np.concatenate([img, pred_depth[..., None].repeat(3, axis=-1)], axis=1)  # (H, 2W, 3)
-                names.append(pred_name)
-                images.append(pred_cat)
-        # mask
-        pred_mask = ['mask_coarse', 'mask_fine', 'mask']
-        for pred_name in pred_mask:
-            if pred_name in output:
-                pred_mask = torch_to_np(output[pred_name][idx]).reshape(h, w)  # (H, W), 0~1, obj area with 1
-                pred_mask = (255.0 * pred_mask).astype(np.uint8)[..., None].repeat(3, axis=-1)  # (H, W, 3), 0~255
-                mask_img = (255 - pred_mask) + img  # (H, W, 3), white bkg
-                if mask is not None:
-                    error_map = (255.0 * np.abs(pred_mask - mask)).astype(np.uint8)  # (H, W, 3), 0~255
-                    pred_cat = np.concatenate([mask_img, pred_mask, error_map], axis=1)  # (H, 3W, 3)
-                else:
-                    pred_cat = np.concatenate([mask_img, pred_mask], axis=1)  # (H, 2W, 3)
-                names.append(pred_name)
-                images.append(pred_cat)
-
-        dic = {'names': names, 'imgs': images}
-
-        return dic
+        return render_progress_img(inputs, output)
 
     def evaluate(self, data, model, metric_summary, device, max_samples_eval):
         """Actual eval function for the model. Use run_eval since we want to run it locally as well"""

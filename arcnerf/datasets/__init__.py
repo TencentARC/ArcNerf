@@ -24,14 +24,17 @@ def get_dataset(cfgs, data_dir, logger, mode='train', transfroms=None):
 
     Args:
         cfgs (dict): Configuration.
-        mode: control workflow for different split
         data_dir: main data_dir storing the data
+        logger: logger for logging
+        mode: control workflow for different split
+        transfroms: the transforms/augmentation used for dataset
     """
     cfgs = deepcopy(cfgs)
     cfgs_mode = get_mode_cfgs(cfgs, mode)
-    model = DATASET_REGISTRY.get(getattr(cfgs_mode, 'type'))(cfgs_mode, data_dir, mode, transfroms)
+    dataset = DATASET_REGISTRY.get(getattr(cfgs_mode, 'type'))(cfgs_mode, data_dir, mode, transfroms)
     if logger is not None:
         logger.add_log('Dataset type : {} - mode: {}'.format(getattr(cfgs_mode, 'type'), mode))
         logger.add_log('Dataset Configs: {}'.format(obj_to_dict(cfgs_mode)))
+        logger.add_log('Dataset Length: {}'.format(len(dataset)))
 
-    return model
+    return dataset
