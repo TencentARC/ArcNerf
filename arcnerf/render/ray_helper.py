@@ -299,12 +299,12 @@ def ray_marching(
         _radiance = radiance[:, :-1, :] if radiance is not None else None  # (N_rays, N_pts-1, 3)
         _zvals = zvals[:, :-1]  # (N_rays, N_pts-1)
 
-    noise = 1.0
+    noise = 0.0
     if noise_std > 0.0:
         noise = torch.randn(_sigma.shape, dtype=dtype).to(device) * noise_std
 
-    # alpha_i = (1 - exp(- relu(sigma) * delta_i)
-    alpha = 1 - torch.exp(-torch.relu(_sigma * noise) * deltas)  # (N_rays, N_p)
+    # alpha_i = (1 - exp(- relu(sigma + noise) * delta_i)
+    alpha = 1 - torch.exp(-torch.relu(_sigma + noise) * deltas)  # (N_rays, N_p)
     # Ti = mul_1_i-1(1 - alpha_i)
     alpha_one = torch.ones_like(alpha[:, :1], dtype=dtype).to(device)
     trans_shift = torch.cat([alpha_one, 1 - alpha + 1e-10], -1)  # (N_rays, N_p+1)

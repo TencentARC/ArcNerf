@@ -388,6 +388,7 @@ class BasicTrainer(object):
             # save model after a period of time
             if self.cfgs.progress.save_time is not None and (self.cfgs.progress.save_time > 0) \
                     and (time.time() - self.time0 > self.cfgs.progress.save_time):
+                self.logger.add_log('----Periodically save model now----')
                 self.save_model(epoch + 1, loss_all, spec_name='latest')
                 self.time0 = time.time()
                 self.logger.add_log('----Periodically save model as latest.pt.tar----')

@@ -119,6 +119,10 @@ def update_configs(cfgs, unknows):
     if unknows is None:
         return cfgs
 
+    # this is special param using launch
+    if unknows[0].startswith('--local_rank='):
+        unknows.pop(0)
+
     for idx, arg in enumerate(unknows):
         if idx == len(unknows) - 1:
             break
