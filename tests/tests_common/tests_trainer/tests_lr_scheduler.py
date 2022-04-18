@@ -52,3 +52,7 @@ class TestDict(unittest.TestCase):
         draw_2d_components(
             lines=lines, legends=legends, xlabel='step', ylabel='lr', title='lr scheduler', save_path=file_name
         )
+
+
+if __name__ == '__main__':
+    unittest.main()

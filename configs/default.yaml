@@ -10,10 +10,10 @@ debug:
 
 dir:
     expr_dir: None
-    data_dir: '/Users/leoyluo/Desktop/Immerse/data'       # It is the main dataset address containing all dataset
+    data_dir: '/group/30042/leoyluo/Immerse/data'      # It is the main dataset address containing all dataset
 
 data:
-    video_path: '/Users/leoyluo/Desktop/Immerse/data/Capture/qq_tiger.MOV'
+    video_path: '/group/30042/leoyluo/Immerse/data/Capture/qq_tiger.MOV'
     scene_name: qq_tiger
     video_downsample: 15            # fps downsample ratio, default 15 (fps=30, each second 2 image)
     image_downsample: 4             # image rescale downsample ratio, default 4 (each length 1/4)
@@ -35,14 +35,14 @@ batch_size: 2
 worker: 4
 
 optim:
-    lr: 1e-5
+    lr: 5e-4
     optim_type: adam                # [adam, sgd, lbfgs, rmsprop]
     weight_decay: 0.0
-    maxiters: 5
+    maxiters: 5                     # for lbfgs only
     lr_scheduler:
-        type: MultiStepLR           # [MultiStepLR, ExponentialLR, PolyLR, CosineAnnealingLR]
+        type: ExponentialLR         # [MultiStepLR, ExponentialLR, PolyLR, CosineAnnealingLR]
         lr_gamma: 0.1               # for ExponentialLR, MultiStepLR, PolyLR
-        lr_steps: [50, 80]          # for MultiStepLR, PolyLR
+        lr_steps: [4000]            # for ExponentialLR(Use first), MultiStepLR(Use all), PolyLR(Use all)
         tmax: 20                    # for CosineAnnealingLR
 
     clip_gradients: 0.0             # grad clipping set for init
@@ -51,24 +51,24 @@ optim:
 
 progress:
     start_epoch: -1                 # -1: resume; 0: finetune. Only for resume mode
-    epoch: 100                      # Num of epoch for training
+    epoch: 6000                     # Num of epoch for training
     save_time: 1800                 # save model after this time(in second). By default 30min
 
-    iter_loss: 10                   # Num of iteration to display loss
+    iter_loss: 5                    # Num of iteration to display loss
     save_progress: True             # Whether to save progress during training
-    epoch_save_progress: 1          # Num of epoch for saving progress
-    iter_save_progress: 100         # Num of iteration for saving progress
+    epoch_save_progress: 100        # Num of epoch for saving progress
+    iter_save_progress: 10          # Num of iteration for saving progress
 
-    epoch_val: 1                    # Num of epoch for validation. -1 means not validation
+    epoch_val: 50                   # Num of epoch for validation. -1 means not validation
     save_progress_val: True         # Whether to save progress during validation
-    max_samples_val: 5              # Max num of sample to write into image in valid
+    max_samples_val: 1              # Max num of sample to write into image in valid
 
-    epoch_save_checkpoint: 10       # Num of epoch save checkpoint
+    epoch_save_checkpoint: 1000     # Num of epoch save checkpoint
     local_progress: False           # When local progress, will write to local files. Otherwise to tensorboard only
 
     init_eval: False                # Whether to eval the model at first epoch
-    epoch_eval: 10                  # Num of epoch eval model on test set. -1 means no evaluation
-    max_samples_eval: 10            # Max num of sample to write into image in eval
+    epoch_eval: 1000                # Num of epoch eval model on test set. -1 means no evaluation
+    max_samples_eval: 3             # Max num of sample to write into image in eval
 
 dataset:
     train:
@@ -89,11 +89,12 @@ dataset:
 
     eval:
         eval_batch_size: 1
+        eval_max_sample: 3
         type: DTU
         scan_id: 65
-        img_scale: 0.25
+        img_scale: 1.0
         scale_radius: 3.0
-        precache: False
+        precache: True
 
 test:
     render_type: spiral
@@ -104,14 +105,14 @@ model:
     rays:
         bounding_radius: 3.0          # bounding ray sampling region
         near: 1.0                     # hardcode near zvals
-        #far: 10.0                      # hardcode far zvals
+        far: 8.0                     # hardcode far zvals
         n_sample: 64                  # n_sample for zvals sampling
         n_importance: 128             # n_importance for zvals for hierarchical sampling
         inverse_linear: False         # inverse_linear make zvals close to near
         perturb: True                 # perturb zvals interval
         add_inf_z: True               # Add inf zval for ray marching, do not applied for background
-        noise_std: 0.1                # noise for sigma in training
-    chunk_size: 32768                 # each chunk to process 1024(ray)*32(pts)
+        noise_std: 1.0                # noise for sigma in training
+    chunk_size: 32768                 # each chunk to process 1024*32(ray), enough for 32 GB
     geometry:
         W: 256                        # linear hidden neuron
         D: 8                          # num of linear, not include final
@@ -129,11 +130,9 @@ model:
         W_feat_in: 256                # dim for feature from geometry
 
 loss:
-    L2Loss:
+    ImgCFLoss:
         weight: 1.0
-    RegLoss:
-        weight: 2.0
 
 metric:
-    M1:
-    M2:
+    PSNRCoarse:
+    PSNRFine:

@@ -19,8 +19,16 @@ Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
 
 # chunk_size
 The model is hard to process `batch_size * n_rays_per_sample * n_pts_per_ray` in a single
-forward, set it to be `n_rays * n_pts` to be process in a single forward.
-By default use `1024*32 = 32768`.
+forward, set it to be `n_rays` to be process in a single forward.
+By default use `1024*32 = 32768` rays together.
+
+For input, dataset generate `(B, N_rays, ...)`, where `B` is the num of image/sample in a batch, `N_rays` is num of
+rays from each sample. We flat samples in batch and get `(B*N_rays, ...)` together to send to the network. Those
+rays are processed in chunk and output return in `(B*N_rays, ...)` as well. Finally, we reshape them and
+get `(B, N_rays, ...)` as final results.
+
+The main `forward` function in `Base3dModel` is a wrapper for `(B, N_rays, ...)` input, call `_forward` by chunk,
+and the core `_forward` in child class (like `NeRF`) process `(N_rays_per_chunk, ...)` and get result for rays.
 
 ## Rays
 The dataset only provides `rays_o` and `rays_d`, but the actual sampling procedure is in model. Dataset may provide

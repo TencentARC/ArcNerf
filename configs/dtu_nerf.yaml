@@ -1,6 +1,6 @@
 # default config.
 
-name: default
+name: dtu_nerf
 
 resume: None
 
@@ -10,17 +10,7 @@ debug:
 
 dir:
     expr_dir: None
-    data_dir: '/Users/leoyluo/Desktop/Immerse/data'       # It is the main dataset address containing all dataset
-    #data_dir: '/group/30042/leoyluo/Desktop/Immerse/data'
-data:
-    video_path: '/Users/leoyluo/Desktop/Immerse/data/Capture/qq_tiger.MOV'
-    #video_path: '/group/30042/leoyluo/Desktop/Immerse/data/Capture/qq_tiger.MOV'
-    scene_name: qq_tiger
-    video_downsample: 15            # fps downsample ratio, default 15 (fps=30, each second 2 image)
-    image_downsample: 4             # image rescale downsample ratio, default 4 (each length 1/4)
-    colmap:
-        match_type: 'sequential_matcher'        # ['sequential_matcher', 'exhaustive_matcher']
-        dense_reconstruct: False                # run for dense reconstruction with point cloud and mesh
+    data_dir: '/group/30042/leoyluo/Immerse/data'   # It is the main dataset address containing all dataset
 
 gpu_ids: -1                         # -1 is cpu, otherwise use list of gpus
 
@@ -36,50 +26,48 @@ batch_size: 2
 worker: 4
 
 optim:
-    lr: 1e-5
-    optim_type: adam                # [adam, sgd, lbfgs, rmsprop]
+    lr: 5e-4
+    optim_type: adam
     weight_decay: 0.0
-    maxiters: 5                     # for lbfgs only
     lr_scheduler:
-        type: MultiStepLR           # [MultiStepLR, ExponentialLR, PolyLR, CosineAnnealingLR]
-        lr_gamma: 0.1               # for ExponentialLR, MultiStepLR, PolyLR
-        lr_steps: [50, 80]          # for MultiStepLR, PolyLR
-        tmax: 20                    # for CosineAnnealingLR
+        type: ExponentialLR
+        lr_gamma: 0.1
+        lr_steps: [4000]
 
-    clip_gradients: 0.0             # grad clipping set for init
-    clip_warmup: -1                 # warmup epoches. -1 mean not change after warmup
-    clip_gradients_warmup: 0.0      # grad cliping after warmup period. Can be smaller incase explode
+    clip_gradients: 0.0
+    clip_warmup: -1
+    clip_gradients_warmup: 0.0
 
 progress:
-    start_epoch: -1                 # -1: resume; 0: finetune. Only for resume mode
-    epoch: 100                      # Num of epoch for training
-    save_time: 1800                 # save model after this time(in second). By default 30min
+    start_epoch: -1
+    epoch: 6000                     # 6000 * 50 img = 300k iter
+    save_time: 1800
 
-    iter_loss: 10                   # Num of iteration to display loss
-    save_progress: True             # Whether to save progress during training
-    epoch_save_progress: 1          # Num of epoch for saving progress
-    iter_save_progress: 100         # Num of iteration for saving progress
+    iter_loss: 5
+    save_progress: False             # actually when training, sample rays do not have progress image
+    epoch_save_progress: 100
+    iter_save_progress: 10
 
-    epoch_val: 1                    # Num of epoch for validation. -1 means not validation
-    save_progress_val: True         # Whether to save progress during validation
-    max_samples_val: 5              # Max num of sample to write into image in valid
+    epoch_val: 50
+    save_progress_val: True
+    max_samples_val: 1
 
-    epoch_save_checkpoint: 10       # Num of epoch save checkpoint
-    local_progress: False           # When local progress, will write to local files. Otherwise to tensorboard only
+    epoch_save_checkpoint: 1000
+    local_progress: False
 
-    init_eval: False                # Whether to eval the model at first epoch
-    epoch_eval: 10                  # Num of epoch eval model on test set. -1 means no evaluation
-    max_samples_eval: 10            # Max num of sample to write into image in eval
+    init_eval: False
+    epoch_eval: 1000
+    max_samples_eval: 3
 
 dataset:
     train:
         type: DTU
         scan_id: 65
-        img_scale: 1.0              # scale image and intrinsic, < 1 means scale_down
-        scale_radius: 3.0           # norm the camera within a sphere with such radius(actual radius litter smaller)
-        precache: True              # precache all the rays at once
+        img_scale: 1.0
+        scale_radius: 3.0
+        precache: True
         augmentation:
-            n_rays: 1024
+            n_rays: 4096
 
     val:
         type: DTU
@@ -90,51 +78,50 @@ dataset:
 
     eval:
         eval_batch_size: 1
+        eval_max_sample: 3
         type: DTU
         scan_id: 65
-        img_scale: 0.25
+        img_scale: 1.0
         scale_radius: 3.0
-        precache: False
+        precache: True
 
-test:
+inference:
     render_type: spiral
     n_cam: 20
 
 model:
     type: NeRF
     rays:
-        bounding_radius: 3.0          # bounding ray sampling region
-        near: 1.0                     # hardcode near zvals
-        far: 10.0                      # hardcode far zvals
-        n_sample: 64                  # n_sample for zvals sampling
-        n_importance: 128             # n_importance for zvals for hierarchical sampling
-        inverse_linear: False         # inverse_linear make zvals close to near
-        perturb: True                 # perturb zvals interval
-        add_inf_z: True               # Add inf zval for ray marching, do not applied for background
-        noise_std: 0.1                # noise for sigma in training
-    chunk_size: 32768                 # each chunk to process 1024(ray)*32(pts)
+        bounding_radius: 3.0
+        near: 1.0
+        far: 8.0
+        n_sample: 64
+        n_importance: 128
+        inverse_linear: False
+        perturb: True
+        add_inf_z: True
+        noise_std: 1.0
+    chunk_size: 32768           # 32 GB memory
     geometry:
-        W: 256                        # linear hidden neuron
-        D: 8                          # num of linear, not include final
-        skips: [4]                    # pos to add input embedding
-        input_ch: 3                   # xyz input channel
-        embed_freq: 10                # xyz embed freq
-        W_feat: 256                   # extra feature output
-        geometric_init: False         # whether to use geometric init. need radius_init
+        W: 256
+        D: 8
+        skips: [4]
+        input_ch: 3
+        embed_freq: 10
+        W_feat: 256
+        geometric_init: False
     radiance:
-        mode: 'vf'                    # view_dir and feature only
-        W: 128                        # linear hidden dim
-        D: 1                          # num of linear, not include final
-        input_ch_view: 3              # view input channel
-        embed_freq_view: 4            # view embed freq
-        W_feat_in: 256                # dim for feature from geometry
+        mode: 'vf'
+        W: 128
+        D: 1
+        input_ch_view: 3
+        embed_freq_view: 4
+        W_feat_in: 256
 
 loss:
-    L2Loss:
+    ImgCFLoss:
         weight: 1.0
-    RegLoss:
-        weight: 2.0
 
 metric:
-    M1:
-    M2:
+    PSNRCoarse:
+    PSNRFine:

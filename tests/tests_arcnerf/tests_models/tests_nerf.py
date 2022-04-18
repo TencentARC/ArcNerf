@@ -22,7 +22,7 @@ class TestDict(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.batch_size = 1
-        cls.n_rays = 7 * 5
+        cls.n_rays = 72 * 35
         cls.cfgs = load_configs(osp.join(CONFIG), None)
         cls.logger = Logger(path=osp.join(RESULT_DIR, 'nerf.txt'), keep_console=False)
 

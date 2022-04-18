@@ -306,10 +306,10 @@ class BasicTrainer(object):
     @master_only
     def print_loss_msg(self, epoch, step, step_in_epoch, loss, learning_rate):
         """Get the loss msg info and show in logger"""
-        loss_msg = 'Epoch {:06d} - Iter {}/{} - lr {}: '.format(epoch, step, step_in_epoch - 1, learning_rate)
+        loss_msg = 'Epoch {:06d} - Iter {}/{} - lr {:.8f}: '.format(epoch, step, step_in_epoch - 1, learning_rate)
         for key in loss['names']:
-            loss_msg += '{} [{:.2f}] | '.format(key, float(loss[key]))
-        loss_msg += '--> Loss Sum [{:.2f}]'.format(float(loss['sum']))
+            loss_msg += '{} [{:.3f}] | '.format(key, float(loss[key]))
+        loss_msg += '--> Loss Sum [{:.3f}]'.format(float(loss['sum']))
         self.logger.add_log(loss_msg)
 
     @master_only
@@ -488,7 +488,7 @@ class BasicTrainer(object):
 
         if loss_summary.get_avg_summary() is not None:
             self.monitor.add_loss(loss_summary.get_avg_summary(), global_step, mode='val')
-            loss_msg = 'Validation Avg Loss --> Sum [{:.2f}]'.format(loss_summary.get_avg_sum())
+            loss_msg = 'Validation Avg Loss --> Sum [{:.3f}]'.format(loss_summary.get_avg_sum())
             self.logger.add_log(loss_msg)
 
         self.model.train()
@@ -507,13 +507,13 @@ class BasicTrainer(object):
             loss_all, step_in_epoch = self.train_epoch(epoch)
             epoch_time = time.time() - t_start
             iter_time = epoch_time / float(step_in_epoch)
-            self.logger.add_log('Epoch time {:.1f} min...({:.1f}s/iter)'.format(epoch_time / 60.0, iter_time / 3600.0))
+            self.logger.add_log('Epoch time {:.2f} min...({:.3f}s/iter)'.format(epoch_time / 60.0, iter_time))
 
             if (epoch + 1) % self.cfgs.progress.epoch_save_checkpoint == 0:
                 self.save_model(epoch + 1, loss_all)
 
             if self.data['val'] is not None and self.cfgs.progress.epoch_val > 0:
-                if epoch % self.cfgs.progress.epoch_val == 0:
+                if epoch > 0 and epoch % self.cfgs.progress.epoch_val == 0:
                     self.valid_epoch(epoch, step_in_epoch)
 
             if self.data['eval'] is not None and self.cfgs.progress.epoch_eval > 0:

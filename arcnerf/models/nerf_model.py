@@ -22,23 +22,21 @@ class NeRF(Base3dModel):
         super(NeRF, self).__init__(cfgs)
         self.coarse_geo_net = GeoNet(**self.cfgs.model.geometry.__dict__)
         self.coarse_radiance_net = RadianceNet(**self.cfgs.model.radiance.__dict__)
-        # ray_cfgs
-        self.rays_cfgs = self.read_ray_cfgs()
+        # custom rays cfgs
         self.rays_cfgs['n_importance'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'n_importance', 0)
-        self.chunk_size = self.cfgs.model.chunk_size
         # set fine model if n_importance > 0
         if self.rays_cfgs['n_importance'] > 0:
             self.fine_geo_net = GeoNet(**self.cfgs.model.geometry.__dict__)
             self.fine_radiance_net = RadianceNet(**self.cfgs.model.radiance.__dict__)
 
-    def forward(self, inputs, inference_only=False, get_progress=False):
+    def _forward(self, inputs, inference_only=False, get_progress=False):
         """
-        TODO: How to due with background, how mask can be applied
+        All the tensor are in chunk. B is total num of rays by grouping different samples in batch
         Args:
-            inputs['img']: torch.tensor (B, N, 3), rgb value in 0-1
-            inputs['rays_o']: torch.tensor (B, N, 3), cam_loc/ray_start position
-            inputs['rays_d']: torch.tensor (B, N, 3), view dir(assume normed)
-            inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
+            inputs['img']: torch.tensor (B, 3), rgb value in 0-1
+            inputs['rays_o']: torch.tensor (B, 3), cam_loc/ray_start position
+            inputs['rays_d']: torch.tensor (B, 3), view dir(assume normed)
+            inputs['mask']: torch.tensor (B,), mask value in {0, 1}. optional
             inputs['bound']: torch.tensor (B, 2)
             inference_only: If True, will not output coarse results. By default False
             get_progress: If True, output some progress for recording, can not used in inference only mode.
@@ -46,26 +44,22 @@ class NeRF(Base3dModel):
 
         Returns:
             output is a dict with following keys:
-                coarse_rgb: torch.tensor (B, N, 3), only if inference_only=False
-                coarse_depth: torch.tensor (B, N), only if inference_only=False
-                coarse_mask: torch.tensor (B, N), only if inference_only=False
-                fine_rgb: torch.tensor (B, N, 3)
-                fine_depth: torch.tensor (B, N)
-                fine_mask: torch.tensor (B, N)
+                coarse_rgb: torch.tensor (B, 3), only if inference_only=False
+                coarse_depth: torch.tensor (B,), only if inference_only=False
+                coarse_mask: torch.tensor (B,), only if inference_only=False
+                fine_rgb: torch.tensor (B, 3)
+                fine_depth: torch.tensor (B,)
+                fine_mask: torch.tensor (B,)
                 If get_progress is True:
                     TODO: visual progress
-
         """
-        rays_o = inputs['rays_o'].view(-1, 3)  # (BN, 3)
-        rays_d = inputs['rays_d'].view(-1, 3)  # (BN, 3)
-        batch_size, n_rays_per_batch = inputs['rays_o'].shape[:2]
+        rays_o = inputs['rays_o']  # (B, 3)
+        rays_d = inputs['rays_d']  # (B, 3)
         output = {}
-        rays_d_repeat = torch.repeat_interleave(rays_d, self.rays_cfgs['n_sample'], dim=0)
 
-        # get bounds for object, (BN, 1) * 2
-        bounds = None
+        # get bounds for object, (B, 1) * 2
         if 'bounds' in inputs:
-            bounds = torch.repeat_interleave(inputs['bounds'], n_rays_per_batch, dim=0)
+            bounds = inputs['bounds'] if 'bounds' in inputs else None
         near, far = get_near_far_from_rays(
             rays_o, rays_d, bounds, self.rays_cfgs['near'], self.rays_cfgs['far'], self.rays_cfgs['bounding_radius']
         )
@@ -78,19 +72,20 @@ class NeRF(Base3dModel):
             self.rays_cfgs['n_sample'],
             inverse_linear=self.rays_cfgs['inverse_linear'],
             perturb=self.rays_cfgs['perturb'] if not inference_only else False
-        )  # (BN, N_sample)
+        )  # (B, N_sample)
 
         # get points
-        pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (BN, N_sample, 3)
-        pts = pts.view(-1, 3)  # (BN*N_sample, 3)
+        pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (B, N_sample, 3)
+        pts = pts.view(-1, 3)  # (B*N_sample, 3)
 
-        # get sigma and rgb,  expand rays_d to all pts. shape in (BN*N_sample, dim)
-        sigma, feature = chunk_processing(self.coarse_geo_net, self.chunk_size, pts)
-        radiance = chunk_processing(self.coarse_radiance_net, self.chunk_size, pts, rays_d_repeat, None, feature)
+        # get sigma and rgb,  expand rays_d to all pts. shape in (B*N_sample, dim)
+        sigma, feature = self.coarse_geo_net(pts)
+        rays_d_repeat = torch.repeat_interleave(rays_d, self.rays_cfgs['n_sample'], dim=0)
+        radiance = self.coarse_radiance_net(pts, rays_d_repeat, None, feature)
 
         # reshape, ray marching and get color/weights
-        sigma = sigma.view(-1, self.rays_cfgs['n_sample'], 1)[..., 0]  # (BN, N_sample)
-        radiance = radiance.view(-1, self.rays_cfgs['n_sample'], 3)  # (BN, N_sample, 3)
+        sigma = sigma.view(-1, self.rays_cfgs['n_sample'], 1)[..., 0]  # (B, N_sample)
+        radiance = radiance.view(-1, self.rays_cfgs['n_sample'], 3)  # (B, N_sample, 3)
 
         # ray marching. If two stage and inference only, get weights from single stage.
         weights_only = inference_only and self.rays_cfgs['n_importance'] > 0
@@ -103,42 +98,41 @@ class NeRF(Base3dModel):
             weights_only=weights_only
         )
         if not weights_only:
-            output['rgb_coarse'] = output_coarse['rgb'].view(batch_size, n_rays_per_batch, 3)  # (B, N, 3)
-            output['depth_coarse'] = output_coarse['depth'].view(batch_size, n_rays_per_batch)  # (B, N)
-            output['mask_coarse'] = output_coarse['mask'].view(batch_size, n_rays_per_batch)  # (B, N)
+            output['rgb_coarse'] = output_coarse['rgb']  # (B, 3)
+            output['depth_coarse'] = output_coarse['depth']  # (B,)
+            output['mask_coarse'] = output_coarse['mask']  # (B,)
 
         # fine model
         if self.rays_cfgs['n_importance'] > 0:
-            weights_coarse = output_coarse['weights'][:, :self.rays_cfgs['n_sample'] - 2]  # (BN, N_sample-2)
-            zvals_mid = 0.5 * (zvals[..., 1:] + zvals[..., :-1])  # (BN, N_sample-1)
+            weights_coarse = output_coarse['weights'][:, :self.rays_cfgs['n_sample'] - 2]  # (B, N_sample-2)
+            zvals_mid = 0.5 * (zvals[..., 1:] + zvals[..., :-1])  # (B, N_sample-1)
             _zvals = sample_pdf(
                 zvals_mid, weights_coarse, self.rays_cfgs['n_importance'],
                 not self.rays_cfgs['perturb'] if not inference_only else True
             )
-            zvals, _ = torch.sort(torch.cat([zvals, _zvals], -1), -1)  # (BN, N_sample+N_importance=N_total)
+            zvals, _ = torch.sort(torch.cat([zvals, _zvals], -1), -1)  # (B, N_sample+N_importance=N_total)
             n_total = self.rays_cfgs['n_sample'] + self.rays_cfgs['n_importance']
 
-            pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (BN, N_total, 3)
-            pts = pts.view(-1, 3)  # (BN*N_total, 3)
+            pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (B, N_total, 3)
+            pts = pts.view(-1, 3)  # (B*N_total, 3)
 
+            # get sigma and rgb,  expand rays_d to all pts. shape in (B*N_total, dim)
+            sigma, feature = self.fine_geo_net(pts)
             rays_d_repeat = torch.repeat_interleave(rays_d, n_total, dim=0)
-
-            # get sigma and rgb,  expand rays_d to all pts. shape in (BN*N_total, dim)
-            sigma, feature = chunk_processing(self.fine_geo_net, self.chunk_size, pts)
-            radiance = chunk_processing(self.fine_radiance_net, self.chunk_size, pts, rays_d_repeat, None, feature)
+            radiance = self.fine_radiance_net(pts, rays_d_repeat, None, feature)
 
             # reshape, ray marching and get color/weights
-            sigma = sigma.view(-1, n_total, 1)[..., 0]  # (BN, n_total)
-            radiance = radiance.view(-1, n_total, 3)  # (BN, n_total, 3)
+            sigma = sigma.view(-1, n_total, 1)[..., 0]  # (B, n_total)
+            radiance = radiance.view(-1, n_total, 3)  # (B, n_total, 3)
 
             output_fine = ray_marching(
                 sigma, radiance, zvals, self.rays_cfgs['add_inf_z'],
                 self.rays_cfgs['noise_std'] if not inference_only else 0.0
             )
 
-            output['rgb_fine'] = output_fine['rgb'].view(batch_size, n_rays_per_batch, 3)  # (B, N, 3)
-            output['depth_fine'] = output_fine['depth'].view(batch_size, n_rays_per_batch)  # (B, N)
-            output['mask_fine'] = output_fine['mask'].view(batch_size, n_rays_per_batch)  # (B, N)
+            output['rgb_fine'] = output_fine['rgb']  # (B, 3)
+            output['depth_fine'] = output_fine['depth']  # (B,)
+            output['mask_fine'] = output_fine['mask']  # (B,)
 
         return output
 
