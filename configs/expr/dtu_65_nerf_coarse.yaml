@@ -1,6 +1,4 @@
-# default config.
-
-name: dtu_nerf
+name: dtu_65_nerf_coarse
 
 resume: None
 
@@ -23,6 +21,7 @@ dist:
     slurm: False                    # use slurm for management
 
 batch_size: 2
+n_rays: 4096
 worker: 4
 
 optim:
@@ -32,7 +31,7 @@ optim:
     lr_scheduler:
         type: ExponentialLR
         lr_gamma: 0.1
-        lr_steps: [4000]
+        lr_steps: [200000]
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -40,23 +39,24 @@ optim:
 
 progress:
     start_epoch: -1
-    epoch: 6000                     # 6000 * 50 img = 300k iter
+    epoch: 300000
     save_time: 1800
 
-    iter_loss: 5
+    epoch_loss: 10
+    iter_loss: 1
     save_progress: False             # actually when training, sample rays do not have progress image
-    epoch_save_progress: 100
-    iter_save_progress: 10
+    epoch_save_progress: 10
+    iter_save_progress: 5
 
-    epoch_val: 50
+    epoch_val: 1000
     save_progress_val: True
     max_samples_val: 1
 
-    epoch_save_checkpoint: 1000
+    epoch_save_checkpoint: 50000
     local_progress: False
 
     init_eval: False
-    epoch_eval: 1000
+    epoch_eval: 50000
     max_samples_eval: 3
 
 dataset:
@@ -67,7 +67,7 @@ dataset:
         scale_radius: 3.0
         precache: True
         augmentation:
-            n_rays: 4096
+            shuffle: True
 
     val:
         type: DTU
@@ -96,12 +96,13 @@ model:
         near: 1.0
         far: 8.0
         n_sample: 64
-        n_importance: 128
+        n_importance: 0
         inverse_linear: False
         perturb: True
         add_inf_z: True
         noise_std: 1.0
-    chunk_size: 32768           # 32 GB memory
+    chunk_rays: 32768                 # each chunk to process 1024*32(ray), enough for 32 GB
+    chunk_pts: 786432                 # each chunk to progress 4096*192(pts), for model forward
     geometry:
         W: 256
         D: 8
@@ -124,4 +125,3 @@ loss:
 
 metric:
     PSNRCoarse:
-    PSNRFine:

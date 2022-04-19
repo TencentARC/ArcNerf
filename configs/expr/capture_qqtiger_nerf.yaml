@@ -1,0 +1,129 @@
+name: capture_qqtiger_nerf
+
+resume: None
+
+debug:
+    debug_mode: False               # support debug like checking grad.
+    print_all_grad: False           # print all grad for all param in model. Only in debug mode
+
+dir:
+    expr_dir: None
+    data_dir: '/group/30042/leoyluo/Immerse/data'   # It is the main dataset address containing all dataset
+
+gpu_ids: -1                         # -1 is cpu, otherwise use list of gpus
+
+dist:
+    local_rank: 0
+    rank: 0
+    world_size: 1
+    distributed_backend: nccl       # nccl/mpi
+    random_seed: None               # None will not require reproducibility, run benchmark to be faster
+    slurm: False                    # use slurm for management
+
+batch_size: 2
+n_rays: 4096
+worker: 4
+
+optim:
+    lr: 5e-4
+    optim_type: adam
+    weight_decay: 0.0
+    lr_scheduler:
+        type: ExponentialLR
+        lr_gamma: 0.1
+        lr_steps: [200000]
+
+    clip_gradients: 0.0
+    clip_warmup: -1
+    clip_gradients_warmup: 0.0
+
+progress:
+    start_epoch: -1
+    epoch: 300000
+    save_time: 1800
+
+    epoch_loss: 10
+    iter_loss: 1
+    save_progress: False             # actually when training, sample rays do not have progress image
+    epoch_save_progress: 10
+    iter_save_progress: 10
+
+    epoch_val: 1000
+    save_progress_val: True
+    max_samples_val: 1
+
+    epoch_save_checkpoint: 50000
+    local_progress: False
+
+    init_eval: False
+    epoch_eval: 50000
+    max_samples_eval: 3
+
+dataset:
+    train:
+        type: Capture
+        scene_name: qqtiger
+        img_scale: 1.0               # scale image and intrinsic, < 1 means scale_down
+        scale_radius: 3.0            # norm the camera within a sphere with such radius(actual radius litter smaller)
+        pc_radius: 2.0               # only keep point cloud in a fix radius ball, scale after cam norm
+        precache: True               # precache all the rays at once
+        augmentation:
+            shuffle: True
+
+    val:
+        type: Capture
+        scene_name: qqtiger
+        img_scale: 0.5
+        scale_radius: 3.0
+        pc_radius: 2.0
+        precache: False
+
+    eval:
+        eval_batch_size: 1
+        eval_max_sample: 3
+        type: Capture
+        scene_name: qqtiger
+        img_scale: 0.5
+        scale_radius: 3.0
+        pc_radius: 2.0
+        precache: True
+
+inference:
+    render_type: spiral
+    n_cam: 20
+
+model:
+    type: NeRF
+    rays:
+        bounding_radius: 3.0
+        far: 8.0
+        n_sample: 64
+        n_importance: 128
+        inverse_linear: False
+        perturb: True
+        add_inf_z: True
+        noise_std: 1.0
+    chunk_rays: 32768                 # 1024*32, 32GB
+    chunk_pts: 786432                 # 4096*192
+    geometry:
+        W: 256
+        D: 8
+        skips: [4]
+        input_ch: 3
+        embed_freq: 10
+        W_feat: 256
+        geometric_init: False
+    radiance:
+        mode: 'vf'
+        W: 128
+        D: 1
+        input_ch_view: 3
+        embed_freq_view: 4
+        W_feat_in: 256
+
+loss:
+    ImgCFLoss:
+        weight: 1.0
+
+metric:
+    PSNRFine:

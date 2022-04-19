@@ -31,7 +31,8 @@ dist:
     random_seed: None               # None will not require reproducibility, run benchmark to be faster
     slurm: False                    # use slurm for management
 
-batch_size: 2
+batch_size: 2                       # actually do not use it in training
+n_rays: 4096                        # n_rays for each training batch
 worker: 4
 
 optim:
@@ -42,7 +43,7 @@ optim:
     lr_scheduler:
         type: ExponentialLR         # [MultiStepLR, ExponentialLR, PolyLR, CosineAnnealingLR]
         lr_gamma: 0.1               # for ExponentialLR, MultiStepLR, PolyLR
-        lr_steps: [4000]            # for ExponentialLR(Use first), MultiStepLR(Use all), PolyLR(Use all)
+        lr_steps: [200000]          # for ExponentialLR(Use first), MultiStepLR(Use all), PolyLR(Use all)
         tmax: 20                    # for CosineAnnealingLR
 
     clip_gradients: 0.0             # grad clipping set for init
@@ -51,23 +52,24 @@ optim:
 
 progress:
     start_epoch: -1                 # -1: resume; 0: finetune. Only for resume mode
-    epoch: 6000                     # Num of epoch for training
+    epoch: 300000                   # Num of epoch for training
     save_time: 1800                 # save model after this time(in second). By default 30min
 
-    iter_loss: 5                    # Num of iteration to display loss
-    save_progress: True             # Whether to save progress during training
+    epoch_loss: 10                  # Num of epoch to display loss
+    iter_loss: 1                    # Num of iteration to display loss
+    save_progress: False            # Whether to save progress during training
     epoch_save_progress: 100        # Num of epoch for saving progress
     iter_save_progress: 10          # Num of iteration for saving progress
 
-    epoch_val: 50                   # Num of epoch for validation. -1 means not validation
+    epoch_val: 1000                  # Num of epoch for validation. -1 means not validation
     save_progress_val: True         # Whether to save progress during validation
     max_samples_val: 1              # Max num of sample to write into image in valid
 
-    epoch_save_checkpoint: 1000     # Num of epoch save checkpoint
+    epoch_save_checkpoint: 50000    # Num of epoch save checkpoint
     local_progress: False           # When local progress, will write to local files. Otherwise to tensorboard only
 
     init_eval: False                # Whether to eval the model at first epoch
-    epoch_eval: 1000                # Num of epoch eval model on test set. -1 means no evaluation
+    epoch_eval: 50000               # Num of epoch eval model on test set. -1 means no evaluation
     max_samples_eval: 3             # Max num of sample to write into image in eval
 
 dataset:
@@ -78,7 +80,7 @@ dataset:
         scale_radius: 3.0           # norm the camera within a sphere with such radius(actual radius litter smaller)
         precache: True              # precache all the rays at once
         augmentation:
-            n_rays: 1024
+            shuffle: True
 
     val:
         type: DTU
@@ -112,7 +114,8 @@ model:
         perturb: True                 # perturb zvals interval
         add_inf_z: True               # Add inf zval for ray marching, do not applied for background
         noise_std: 1.0                # noise for sigma in training
-    chunk_size: 32768                 # each chunk to process 1024*32(ray), enough for 32 GB
+    chunk_rays: 32768                 # each chunk to process 1024*32(ray), enough for 32 GB
+    chunk_pts: 786432                 # each chunk to progress 4096*192(pts), for model forward
     geometry:
         W: 256                        # linear hidden neuron
         D: 8                          # num of linear, not include final
@@ -134,5 +137,5 @@ loss:
         weight: 1.0
 
 metric:
-    PSNRCoarse:
+    # PSNRCoarse:
     PSNRFine:

@@ -20,7 +20,8 @@ Will not touch intrinsic. If point cloud exists, rescale them by same factor to 
 - pc_radius(base_3d_pc_dataset): Remove point cloud that are outside such absolute radius(all scaled by extra `1.05`).
 Done after camera `scale_radius`. The radius is restricted within `scale_radius` range.
 ## Augmentation:
-- n_rays: Sample `n_rays` instead of using all, good for training.
+- n_rays: Sample `n_rays` instead of using all. But calling it every time may sample overlapping rays, not use in train.
+- shuffle: shuffle all the rays from the same image together
 ## rgb and mask
 - All color are in `rgb` order and normed by `255` into `0~1` range.
 - All masks should be binary masks with `{0,1}` values. Can be [] if not exist.
@@ -84,7 +85,10 @@ Specified by scan_id, read image/mask/camera.
 
 ## Train
 Use all images for training. Same resolution as required.
-- augmentation: You should set to it for data augmentation, detail in above.
+
+For training, we should read all rays from all images together, shuffle each image pixels(rays), shuffle images,
+concat all the image, sample in batch with `n_rays`. Each epoch just trained on batch. When all rays from all images
+have been chosen, shuffle again.
 
 
 ## Val

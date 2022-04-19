@@ -16,6 +16,10 @@ def get_transforms(cfgs):
             transforms_list.append(SampleRays(cfgs.augmentation.n_rays))
             aug_info += '  Add SampleRays with N_rays {}\n'.format(cfgs.augmentation.n_rays)
 
+        if valid_key_in_cfgs(cfgs.augmentation, 'shuffle'):
+            transforms_list.append(ShuffleRays())
+            aug_info += '  Add Rays shuffle\n'
+
     return transforms.Compose(transforms_list), aug_info
 
 
@@ -31,8 +35,31 @@ class SampleRays(object):
         select_idx = torch.randint(0, n_total, size=[self.n_rays]).to(device)
 
         inputs['img'] = inputs['img'][select_idx, :]
-        inputs['mask'] = inputs['mask'][select_idx] if inputs['mask'] is not None else None
         inputs['rays_o'] = inputs['rays_o'][select_idx, :]
         inputs['rays_d'] = inputs['rays_d'][select_idx, :]
+
+        if 'mask' in inputs:
+            inputs['mask'] = inputs['mask'][select_idx, ...]
+
+        return inputs
+
+
+class ShuffleRays(object):
+    """Shuffle rays and images"""
+
+    def __init__(self):
+        return
+
+    def __call__(self, inputs):
+        n_total = inputs['img'].shape[0]
+        device = inputs['img'].device
+        select_idx = torch.randint(0, n_total, size=[n_total]).to(device)
+
+        inputs['img'] = inputs['img'][select_idx, :]
+        inputs['rays_o'] = inputs['rays_o'][select_idx, :]
+        inputs['rays_d'] = inputs['rays_d'][select_idx, :]
+
+        if 'mask' in inputs:
+            inputs['mask'] = inputs['mask'][select_idx, ...]
 
         return inputs

@@ -58,6 +58,7 @@ class NeRF(Base3dModel):
         output = {}
 
         # get bounds for object, (B, 1) * 2
+        bounds = None
         if 'bounds' in inputs:
             bounds = inputs['bounds'] if 'bounds' in inputs else None
         near, far = get_near_far_from_rays(
@@ -79,9 +80,9 @@ class NeRF(Base3dModel):
         pts = pts.view(-1, 3)  # (B*N_sample, 3)
 
         # get sigma and rgb,  expand rays_d to all pts. shape in (B*N_sample, dim)
-        sigma, feature = self.coarse_geo_net(pts)
+        sigma, feature = chunk_processing(self.coarse_geo_net, self.chunk_pts, pts)
         rays_d_repeat = torch.repeat_interleave(rays_d, self.rays_cfgs['n_sample'], dim=0)
-        radiance = self.coarse_radiance_net(pts, rays_d_repeat, None, feature)
+        radiance = chunk_processing(self.coarse_radiance_net, self.chunk_pts, pts, rays_d_repeat, None, feature)
 
         # reshape, ray marching and get color/weights
         sigma = sigma.view(-1, self.rays_cfgs['n_sample'], 1)[..., 0]  # (B, N_sample)
@@ -109,7 +110,7 @@ class NeRF(Base3dModel):
             _zvals = sample_pdf(
                 zvals_mid, weights_coarse, self.rays_cfgs['n_importance'],
                 not self.rays_cfgs['perturb'] if not inference_only else True
-            )
+            ).detach()
             zvals, _ = torch.sort(torch.cat([zvals, _zvals], -1), -1)  # (B, N_sample+N_importance=N_total)
             n_total = self.rays_cfgs['n_sample'] + self.rays_cfgs['n_importance']
 
@@ -117,9 +118,9 @@ class NeRF(Base3dModel):
             pts = pts.view(-1, 3)  # (B*N_total, 3)
 
             # get sigma and rgb,  expand rays_d to all pts. shape in (B*N_total, dim)
-            sigma, feature = self.fine_geo_net(pts)
+            sigma, feature = chunk_processing(self.fine_geo_net, self.chunk_pts, pts)
             rays_d_repeat = torch.repeat_interleave(rays_d, n_total, dim=0)
-            radiance = self.fine_radiance_net(pts, rays_d_repeat, None, feature)
+            radiance = chunk_processing(self.fine_radiance_net, self.chunk_pts, pts, rays_d_repeat, None, feature)
 
             # reshape, ray marching and get color/weights
             sigma = sigma.view(-1, n_total, 1)[..., 0]  # (B, n_total)
@@ -155,8 +156,8 @@ class NeRF(Base3dModel):
             geo_net = self.coarse_geo_net
             radiance_net = self.coarse_radiance_net
 
-        sigma, feature = chunk_processing(geo_net, self.chunk_size, pts)
+        sigma, feature = chunk_processing(geo_net, self.chunk_pts, pts)
         rays_d = normalize(view_dir)  # norm view dir
-        rgb = chunk_processing(radiance_net, self.chunk_size, pts, rays_d, None, feature)
+        rgb = chunk_processing(radiance_net, self.chunk_pts, pts, rays_d, None, feature)
 
         return sigma[..., 0], rgb

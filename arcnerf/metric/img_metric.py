@@ -32,11 +32,14 @@ class PSNR(nn.Module):
         if self.use_mask:
             mask = data['mask'].to(device)
 
-        psnr = -10.0 * torch.log10(self.mse(output[self.key], gt))  # (B, N_rays, 3)
+        # avg mse first in case inf psnr
+        mse = self.mse(output[self.key], gt)  # (B, N_rays, 3)
         if self.use_mask:
-            psnr = mean_tensor_by_mask(psnr.mean(-1), mask)
+            mse = mean_tensor_by_mask(mse.mean(-1), mask)
         else:
-            psnr = psnr.mean()
+            mse = mse.mean()
+
+        psnr = -10.0 * torch.log10(mse)
 
         return psnr
 

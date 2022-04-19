@@ -1,0 +1,22 @@
+dir:
+    data_dir:  '/Users/leoyluo/Desktop/Immerse/data'   # It is the main dataset address containing all dataset
+
+dataset:
+    train:
+        type: DTU
+        scan_id: 65
+        img_scale: 1.0
+        scale_radius: 3.0
+        precache: True
+
+model:
+    rays:
+        bounding_radius: 3.0
+        near: 1.0
+        # far: 4.0
+        n_sample: 64
+        n_importance: 128
+        inverse_linear: False
+        perturb: True
+        add_inf_z: True
+        noise_std: 1.0

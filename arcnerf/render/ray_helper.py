@@ -293,7 +293,7 @@ def ray_marching(
     _radiance = radiance
     _zvals = zvals
     if add_inf_z:  # (N_rays, N_pts)
-        deltas = torch.cat([deltas, torch.ones(size=(n_rays, 1), dtype=dtype).to(device)], dim=-1)
+        deltas = torch.cat([deltas, 1e10 * torch.ones(size=(n_rays, 1), dtype=dtype).to(device)], dim=-1)
     else:
         _sigma = sigma[:, :-1]  # (N_rays, N_pts-1)
         _radiance = radiance[:, :-1, :] if radiance is not None else None  # (N_rays, N_pts-1, 3)
@@ -365,10 +365,11 @@ def sample_ray_marching_output_by_index(output, n_rays=1, sigma_scale=2.0):
         res['points'].append([x, [-1] * n_pts_per_ray])
         # sigma
         sigma = torch_to_np(output['sigma'][idx])
+        sigm_max = float(sigma.max())
         sigma = sigma / sigma.max() * sigma_scale
         sigma = sigma.tolist()
         res['lines'].append([x, sigma])
-        res['legends'].append('sigma')
+        res['legends'].append('sigma(max={:.1f})'.format(sigm_max))
         # alpha
         alpha = torch_to_np(output['alpha'][idx]).tolist()
         res['lines'].append([x, alpha])

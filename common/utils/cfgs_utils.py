@@ -120,7 +120,7 @@ def update_configs(cfgs, unknows):
         return cfgs
 
     # this is special param using launch
-    if unknows[0].startswith('--local_rank='):
+    if len(unknows) > 0 and unknows[0].startswith('--local_rank='):
         unknows.pop(0)
 
     for idx, arg in enumerate(unknows):

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import math
+import random
 import time
 
 import torch
@@ -33,23 +35,23 @@ class ArcNerfTrainer(BasicTrainer):
     def prepare_data(self):
         """Prepare dataset for train, val, eval. Gets data loader and sampler"""
         self.logger.add_log('-' * 60)
+
+        # cfgs for n_rays in training
+        self.train_count = 0
+        self.total_samples = None
+        self.n_rays = get_value_from_cfgs_field(self.cfgs, 'n_rays', 1024)
+        self.logger.add_log('Num of rays for each training batch: {}'.format(self.n_rays))
+
         data = {}
         # train
-        assert self.cfgs.dataset.train is not None, 'Please input train dataset...'
-        tkwargs = {
-            'batch_size': self.cfgs.batch_size,
-            'num_workers': self.cfgs.worker,
-            'pin_memory': True,
-            'drop_last': True
-        }
-        data['train'], data['train_sampler'] = self.set_dataset('train', tkwargs)
+        data['train'] = self.set_train_dataset()
 
         # val. Only eval one sample per epoch.
-        tkwargs['batch_size'] = 1
+        tkwargs_val = {'batch_size': 1, 'num_workers': self.cfgs.worker, 'pin_memory': True, 'drop_last': True}
         if not valid_key_in_cfgs(self.cfgs.dataset, 'val'):
             data['val'] = None
         else:
-            data['val'], data['val_sampler'] = self.set_dataset('val', tkwargs)
+            data['val'], data['val_sampler'] = self.set_dataset('val', tkwargs_val)
 
         # eval
         if not valid_key_in_cfgs(self.cfgs.dataset, 'eval'):
@@ -65,6 +67,79 @@ class ArcNerfTrainer(BasicTrainer):
             data['eval'], _ = self.set_dataset('eval', tkwargs_eval)
 
         return data
+
+    def set_train_dataset(self, epoch=0):
+        """We will call this every time all rays have been trained.
+        Every time we reset the dataset, make train_count as 0. And reset sampler by epoch
+        """
+        assert self.cfgs.dataset.train is not None, 'Please input train dataset...'
+        tkwargs = {
+            'batch_size': 1,  # does not matter
+            'num_workers': self.cfgs.worker,
+            'pin_memory': True,
+            'drop_last': True
+        }
+        loader, sampler = self.set_dataset('train', tkwargs)
+        if sampler is not None:  # in case sample can not be distributed equally among machine, do not want miss
+            self.reset_sampler(sampler, epoch)
+
+        # concat all batch
+        self.train_count = 0
+        data = self.concat_train_batch(loader)
+
+        return data
+
+    def concat_train_batch(self, loader):
+        """Concat all elements from different samples together. The first dim is n_img * n_rays_per_img"""
+        potential_keys = ['img', 'mask', 'rays_o', 'rays_d', 'bounds']
+
+        concat_data = {'H': [0], 'W': [0]}  # will not write progress image during training
+        total_item = len(loader)
+        all_item = []
+        for data in loader:
+            all_item.append(data)
+
+        rand_idx = list(range(total_item))
+        random.shuffle(rand_idx)
+        init_idx = rand_idx[0]
+        for key in potential_keys:
+            if key in all_item[init_idx]:
+                concat_data[key] = all_item[init_idx][key]
+
+        for idx in rand_idx[1:]:
+            for key in potential_keys:
+                if key in all_item[idx]:
+                    concat_data[key] = torch.cat([concat_data[key], all_item[idx][key]], dim=0)
+
+        for k, v in concat_data.items():
+            if isinstance(v, torch.FloatTensor):
+                v_shape = v.shape
+                if self.total_samples is None:
+                    self.total_samples = v_shape[0] * v_shape[1]
+                else:  # TODO: do not support point cloud or other tensor not in (nhw, ...) now
+                    assert self.total_samples == v_shape[0] * v_shape[1], 'Invalid input dim...'
+                concat_data[k] = v.view(v_shape[0] * v_shape[1], *v_shape[2:])[None, :]  # (1, n_img * n_rays, ...)
+
+        self.logger.add_log(
+            'Need {} epoch to run all the rays...'.format(math.ceil(float(self.total_samples) / float(self.n_rays)))
+        )
+
+        return concat_data
+
+    def get_train_batch(self):
+        """Get the train batch base on self.train_count"""
+        assert self.train_count < self.total_samples, 'All rays have been sampled, please reset train dataset...'
+
+        data_batch = {}
+        for k, v in self.data['train'].items():
+            if isinstance(v, torch.FloatTensor):
+                data_batch[k] = v[:, self.train_count:self.train_count + self.n_rays, ...]
+            else:
+                data_batch[k] = v
+
+        self.train_count += self.n_rays
+
+        return data_batch
 
     def set_dataset(self, mode, tkwargs):
         """Get loader, sampler and aug_info"""
@@ -98,12 +173,15 @@ class ArcNerfTrainer(BasicTrainer):
 
     def get_model_feed_in(self, inputs, device):
         """Get the core model feed in and put it to the model's device"""
-        feed_in = {'img': inputs['img'], 'mask': inputs['mask'], 'rays_o': inputs['rays_o'], 'rays_d': inputs['rays_d']}
+        potential_keys = ['img', 'mask', 'rays_o', 'rays_d', 'bounds']
+        feed_in = {}
+        for key in potential_keys:
+            if key in inputs:
+                feed_in[key] = inputs[key]
+                if device == 'gpu':
+                    feed_in[key] = feed_in[key].cuda(non_blocking=True)
 
-        if device == 'gpu':
-            for k in feed_in.keys():
-                feed_in[k] = feed_in[k].cuda(non_blocking=True)
-
+        # img must be there
         batch_size = inputs['img'].shape[0]
 
         return feed_in, batch_size
@@ -116,6 +194,12 @@ class ArcNerfTrainer(BasicTrainer):
            For object reconstruction, only one valid sample in each epoch. Shuffle sampler all the time.
         """
         self.logger.add_log('Valid on data...')
+
+        # refresh valid sampler
+        refresh = self.data['val_sampler'] is not None
+        if refresh:
+            self.reset_sampler(self.data['val_sampler'], epoch)
+
         self.model.eval()
         loss_summary = LossDictCounter()
         count = 0
@@ -178,3 +262,53 @@ class ArcNerfTrainer(BasicTrainer):
         )
 
         return metric_info, files
+
+    def train_epoch(self, epoch):
+        """Train for one epoch. Each epoch return the final sum of loss and total num of iter in epoch"""
+        if epoch % self.cfgs.progress.epoch_loss == 0:
+            self.logger.add_log('Epoch {:06d}:'.format(epoch))
+        step_in_epoch = 1
+
+        if self.train_count >= self.total_samples:
+            self.logger.add_log('Reset training sample togethers... ')
+            self.set_train_dataset(epoch)
+
+        loss_all = self.train_step(epoch, 0, step_in_epoch, self.get_train_batch())
+
+        self.lr_scheduler.step()
+
+        return loss_all, step_in_epoch
+
+    def train(self):
+        """Train for the whole progress.
+
+        In nerf-kind algorithm, it groups all rays from different samples together,
+        then sample n_rays as the batch to the model. reset_sampler until all rays have been selected.
+        """
+        self.logger.add_log('-' * 60)
+        if self.cfgs.progress.init_eval and self.data['eval'] is not None:
+            self.eval_epoch(self.cfgs.progress.start_epoch)
+
+        loss_all = 0.0
+        for epoch in range(self.cfgs.progress.start_epoch, self.cfgs.progress.epoch):
+            # train and record speed
+            self.model.train()
+            t_start = time.time()
+            loss_all, step_in_epoch = self.train_epoch(epoch)
+            epoch_time = time.time() - t_start
+            if epoch % self.cfgs.progress.epoch_loss == 0:
+                self.logger.add_log('Epoch time {:.3f} s/iter'.format(epoch_time))
+
+            if (epoch + 1) % self.cfgs.progress.epoch_save_checkpoint == 0:
+                self.save_model(epoch + 1, loss_all)
+
+            if self.data['val'] is not None and self.cfgs.progress.epoch_val > 0:
+                if epoch > 0 and epoch % self.cfgs.progress.epoch_val == 0:
+                    self.valid_epoch(epoch, step_in_epoch)
+
+            if self.data['eval'] is not None and self.cfgs.progress.epoch_eval > 0:
+                if (epoch + 1) % self.cfgs.progress.epoch_eval == 0:
+                    self.eval_epoch(epoch + 1)
+
+        self.save_model(self.cfgs.progress.epoch, loss_all, spec_name='final')
+        self.logger.add_log('Training for expr {} done... Final model is saved...'.format(self.cfgs.name))

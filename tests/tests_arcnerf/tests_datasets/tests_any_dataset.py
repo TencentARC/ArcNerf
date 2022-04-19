@@ -8,6 +8,7 @@ import unittest
 import numpy as np
 import cv2
 
+from . import setup_test_config
 from arcnerf.datasets import get_dataset
 from arcnerf.datasets.transform.augmentation import get_transforms
 from arcnerf.geometry.poses import average_poses, generate_cam_pose_on_sphere
@@ -18,11 +19,10 @@ from arcnerf.render.camera import PerspectiveCamera
 from arcnerf.render.ray_helper import equal_sample, get_rays, get_near_far_from_rays, get_zvals_from_near_far
 from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.cfgs_utils import get_value_from_cfgs_field
-from common.utils.torch_utils import np_wrapper, torch_to_np
+from common.utils.torch_utils import np_wrapper
 from common.utils.video_utils import write_video
 from common.visual import get_combine_colors
 from common.visual.draw_cv2 import draw_vert_on_img
-from tests import setup_test_config
 
 MODE = 'train'
 RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results'))
@@ -61,13 +61,11 @@ class TestDict(unittest.TestCase):
 
     @classmethod
     def get_cameras(cls):
-        intrinsic = cls.dataset[0]['intrinsic']
-        c2w = []
+        intrinsic = cls.dataset.get_intrinsic(torch_tensor=False).astype(np.float32)  # (3, 3)
+        c2w = cls.dataset.get_poses(torch_tensor=False, concat=True).astype(np.float32)  # (n, 4, 4)
         cameras = []
-        for sample in cls.dataset:
-            c2w.append(sample['c2w'][None, ...])
-            cameras.append(PerspectiveCamera(torch_to_np(intrinsic), torch_to_np(sample['c2w']), cls.W, cls.H))
-        c2w = np.concatenate(c2w, axis=0)  # (n, 4, 4)
+        for idx in range(c2w.shape[0]):
+            cameras.append(PerspectiveCamera(intrinsic, c2w[idx], cls.W, cls.H))
 
         return c2w, intrinsic, cameras
 
@@ -162,8 +160,7 @@ class TestDict(unittest.TestCase):
             rays_o.append(ray_bundle[0])
             rays_d.append(ray_bundle[1])
             if 'bounds' in self.dataset[idx]:  # (n_rays, 2)
-                bound = torch_to_np(self.dataset[idx]['bounds'][None, :]).repeat(ray_bundle[0].shape[0], axis=0)
-                bounds.append(bound)
+                bounds.append(self.dataset[idx]['bounds'][:n_rays])
 
         rays_o = np.concatenate(rays_o, axis=0)  # (n_rays*n_cam, 3)
         rays_d = np.concatenate(rays_d, axis=0)  # (n_rays*n_cam, 3)

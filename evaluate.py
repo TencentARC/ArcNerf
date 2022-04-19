@@ -49,15 +49,18 @@ if __name__ == '__main__':
     loader = torch.utils.data.DataLoader(dataset, **tkwargs_eval)
 
     # get_model_feed_in_func
-    def get_model_feed_in(data, device):
+    def get_model_feed_in(inputs, device):
         """Get core model feed in."""
-        feed_in = {'img': data['img'], 'mask': data['mask'], 'rays_o': data['rays_o'], 'rays_d': data['rays_d']}
+        potential_keys = ['img', 'mask', 'rays_o', 'rays_d']
+        feed_in = {}
+        for key in potential_keys:
+            if key in inputs:
+                feed_in[key] = inputs[key]
+                if device == 'gpu':
+                    feed_in[key] = feed_in[key].cuda(non_blocking=True)
 
-        if device == 'gpu':
-            for k in feed_in.keys():
-                feed_in[k] = feed_in[k].cuda(non_blocking=True)
-
-        batch_size = data['img'].shape[0]
+        # img must be there
+        batch_size = inputs['img'].shape[0]
 
         return feed_in, batch_size
 

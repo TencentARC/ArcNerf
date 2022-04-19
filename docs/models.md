@@ -27,8 +27,11 @@ rays from each sample. We flat samples in batch and get `(B*N_rays, ...)` togeth
 rays are processed in chunk and output return in `(B*N_rays, ...)` as well. Finally, we reshape them and
 get `(B, N_rays, ...)` as final results.
 
-The main `forward` function in `Base3dModel` is a wrapper for `(B, N_rays, ...)` input, call `_forward` by chunk,
-and the core `_forward` in child class (like `NeRF`) process `(N_rays_per_chunk, ...)` and get result for rays.
+The main `forward` function in `Base3dModel` is a wrapper for `(B, N_rays, ...)` input, call `_forward` by `chunk_rays`
+size,  and the core `_forward` in child class (like `NeRF`) process `(N_rays_per_chunk, ...)` and get result for rays.
+
+In the core `_forward`, the model may forward the pts sampled on rays. We set `chunk_pts` for a single forward size for
+pts. By default we use `4096*192=786432`, it works good for 32GB memory GPU.
 
 ## Rays
 The dataset only provides `rays_o` and `rays_d`, but the actual sampling procedure is in model. Dataset may provide

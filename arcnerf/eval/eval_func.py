@@ -31,7 +31,7 @@ def run_eval(
                 logger.add_log('Progress : {}/{}'.format(step, len(loader) - 1))
             feed_in, batch_size = get_model_feed_in(inputs, device)
             time0 = time.time()
-            output = model(feed_in)
+            output = model(feed_in, inference_only=True)
             total_forward_time += (time.time() - time0)
             h, w = int(inputs['H'][0]), int(inputs['W'][0])
 

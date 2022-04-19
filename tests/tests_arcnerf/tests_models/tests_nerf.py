@@ -33,7 +33,7 @@ class TestDict(unittest.TestCase):
             'mask': torch.ones(self.batch_size, self.n_rays),
             'rays_o': torch.rand(self.batch_size, self.n_rays, 3),
             'rays_d': torch.rand(self.batch_size, self.n_rays, 3),
-            'bounds': torch.rand(self.batch_size, 2)
+            'bounds': torch.rand(self.batch_size, self.n_rays, 2)
         }
 
         log_model_info(self.logger, model, feed_in, self.cfgs, self.batch_size, self.n_rays)

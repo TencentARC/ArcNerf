@@ -14,7 +14,8 @@ class Base3dModel(BaseModel):
         super(Base3dModel, self).__init__(cfgs)
         # ray_cfgs
         self.rays_cfgs = self.read_ray_cfgs()
-        self.chunk_size = self.cfgs.model.chunk_size  # for n_rays together, do not consider n_pts on ray
+        self.chunk_rays = self.cfgs.model.chunk_rays  # for n_rays together, do not consider n_pts on ray
+        self.chunk_pts = self.cfgs.model.chunk_pts  # for n_pts together, only for model forward
 
     def read_ray_cfgs(self):
         """Read cfgs for ray, common case"""
@@ -59,7 +60,7 @@ class Base3dModel(BaseModel):
 
         bounds = None
         if 'bounds' in inputs:
-            bounds = torch.repeat_interleave(inputs['bounds'], n_rays_per_batch, dim=0)  # (BN, 3)
+            bounds = inputs['bounds'].view(-1, 2)  # (BN, 3)
         flat_inputs['bounds'] = bounds
 
         masks = None
@@ -68,7 +69,7 @@ class Base3dModel(BaseModel):
         flat_inputs['masks'] = masks
 
         # all output tensor in (B*N, ...), reshape to (B, N, ...)
-        output = chunk_processing(self._forward, self.chunk_size, flat_inputs, inference_only, get_progress)
+        output = chunk_processing(self._forward, self.chunk_rays, flat_inputs, inference_only, get_progress)
         for k, v in output.items():
             if isinstance(v, torch.Tensor):
                 old_shape = v.shape

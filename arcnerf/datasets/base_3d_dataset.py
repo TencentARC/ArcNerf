@@ -93,6 +93,12 @@ class Base3dDataset(BaseDataset):
         """Return a list of render.camera with c2w and intrinsic"""
         raise NotImplementedError('Please implement the detail function in child class....')
 
+    def get_intrinsic(self, torch_tensor=True):
+        """Get the intrinsic from camera_0, (3, 3)"""
+        intrinsic = self.cameras[0].get_intrinsic(torch_tensor)
+
+        return intrinsic
+
     def get_poses(self, torch_tensor=True, w2c=False, concat=False):
         """Get the a list of poses of all cameras. If concat, get (n_cam, 4, 4)"""
         extrinsic = []
@@ -153,14 +159,17 @@ class Base3dDataset(BaseDataset):
 
     def __getitem__(self, idx):
         """Get the image, mask and rays"""
-        img = self.images[idx].reshape(-1, 3)
+        img = self.images[idx].reshape(-1, 3)  # (hw, 3)
         mask = self.masks[idx].reshape(-1) if len(self.masks) > 0 else None  # (hw)
         img = torch.FloatTensor(img)
         mask = torch.FloatTensor(mask) if mask is not None else None
         c2w = self.cameras[idx].get_pose()
         intrinsic = self.cameras[idx].get_intrinsic()
-        bounds = self.bounds[idx] if len(self.bounds) > 0 else None  # (2,)
-        bounds = torch.FloatTensor(bounds) if bounds is not None else None
+        bounds = None
+        if len(self.bounds) > 0:
+            bounds = self.bounds[idx]  # (2,)
+            bounds = torch.FloatTensor(bounds).unsqueeze(0)
+            bounds = torch.repeat_interleave(bounds, img.shape[0], dim=0)
 
         if self.precache:
             ray_bundle = self.ray_bundles[idx]
@@ -177,7 +186,7 @@ class Base3dDataset(BaseDataset):
             'H': self.H,
             'W': self.W,
             'pc': self.point_cloud,  # a dict contains['pts', 'color', 'vis']. Same for all cam
-            'bounds': bounds  # (2,) for (near, far), if set bounds(generally for pc)
+            'bounds': bounds  # (hw, 2) for (near, far), if set bounds(generally for pc)
         }
 
         pop_k = []

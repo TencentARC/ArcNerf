@@ -344,7 +344,7 @@ class BasicTrainer(object):
         self.monitor.add_scalar('learning_rate', learning_rate, global_step)
 
         # save loss logs
-        if step % self.cfgs.progress.iter_loss == 0:
+        if epoch % self.cfgs.progress.epoch_loss == 0 and step % self.cfgs.progress.iter_loss == 0:
             self.print_loss_msg(epoch, step, step_in_epoch, loss, learning_rate)
 
         # save progress results in training progress. Only do in certain epoch and iter
