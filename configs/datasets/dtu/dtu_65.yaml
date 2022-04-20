@@ -20,3 +20,18 @@ model:
         perturb: True
         add_inf_z: True
         noise_std: 1.0
+
+inference:
+    render:
+        type: [circle, spiral]
+        n_cam: [30, 60]
+        radius: 3.0
+        u_start: 0.9
+        v_ratio: 0.0
+        v_range: [-0.5, 0]
+        n_rot: 3
+        fps: 5
+
+    volume:
+        n_grid: 4
+        side: 1.5

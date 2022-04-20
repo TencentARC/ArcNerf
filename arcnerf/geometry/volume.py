@@ -163,7 +163,7 @@ class Volume(nn.Module):
             n: num of point on each axis
 
         Returns:
-            lines: 3*(n^3) lines of (2, 3) array
+            lines: 3*(n^3) lines of (2, 3) np array
         """
         assert verts.shape == (n**3, 3), 'Invalid input dim, should be (n^3, 3)'
         corner = verts.view(n, n, n, 3)
@@ -196,7 +196,7 @@ class Volume(nn.Module):
         """Get the outside bounding surface. for visual purpose.
 
         Returns:
-            faces: (6, 4, 3) tensor
+            faces: (6, 4, 3) np array
         """
         assert self.corner is not None, 'Please set the params first'
         faces = self.get_faces_from_vertices(self.corner, 2)
@@ -211,7 +211,7 @@ class Volume(nn.Module):
             n: num of point on each axis
 
         Returns:
-            faces: (n(n-1)^2*3, 4, 3) tensor
+            faces: (n(n-1)^2*3, 4, 3) np array
         """
         assert verts.shape == (n**3, 3), 'Invalid input dim, should be (n^3, 3)'
         corner = verts.view(n, n, n, 3)
@@ -245,7 +245,7 @@ class Volume(nn.Module):
         """Get the bounding + inner faces. for visual purpose.
 
         Returns:
-            faces: ((n_grid^2(n_grid+1)*3, 4, 3) tensor
+            faces: ((n_grid^2(n_grid+1)*3, 4, 3) np array
         """
         assert self.grid_pts is not None, 'Please set the params first'
         faces = self.get_faces_from_vertices(self.grid_pts, self.n_grid + 1)

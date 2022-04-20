@@ -11,6 +11,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'      # It is the main dataset address containing all dataset
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_nerf'
+
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_nerf/checkpoints/latest.pt.tar'
 
 data:
     video_path: '/group/30042/leoyluo/Immerse/data/Capture/qq_tiger.MOV'
@@ -98,16 +101,31 @@ dataset:
         scale_radius: 3.0
         precache: True
 
-test:
-    render_type: spiral
-    n_cam: 20
+inference:
+    render:                         # set a list of render camera on sphere
+        type: [circle, spiral]      # list of render cam type
+        n_cam: [30, 60]             # each render type num of cam
+        radius: 3.0                 # sphere radius
+        u_start: 0.0                # for start pos u in (0~1)
+        v_ratio: 0.0                # for circle path, vertical position
+        v_range: [-0.5, 0]          # for spiral path, vertical pos range
+        n_rot: 3                    # n_rot of camera path
+        fps: 5                      # render video fps
+
+    volume:                         # volume params
+        origin: (0.0, 0.0, 0.0)           # volume center
+        n_grid: 128                 # n_grid is the num of voxel in each dim. For visual set a small num only
+        side: 1.5                   # if set, all len at each dim will be side
+        xlen: 1.5                   # x-dim length, only when side is None
+        ylen: 1.5                   # y-dim length, only when side is None
+        zlen: 1.5                   # z-dim length, only when side is None
 
 model:
     type: NeRF
     rays:
         bounding_radius: 3.0          # bounding ray sampling region
         near: 1.0                     # hardcode near zvals
-        far: 8.0                     # hardcode far zvals
+        far: 8.0                      # hardcode far zvals
         n_sample: 64                  # n_sample for zvals sampling
         n_importance: 128             # n_importance for zvals for hierarchical sampling
         inverse_linear: False         # inverse_linear make zvals close to near
