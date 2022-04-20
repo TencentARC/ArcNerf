@@ -44,3 +44,15 @@ Functions for ray point. ray is (rays_o, rays_d), rays_d is always assumed to be
 Functions for triangle calculation.
 - get tri normal
 - get tri circumcircle
+
+# volume
+Definition and function of a volume. For all the point you can get it in grid or fatten(by default)
+- n_grid: num of volume/line seg on each side
+- corner: 8 corner pts
+- grid_pts: all the grid points, in total `(n_grid+1)^3`
+- volume_pts: all the volume center points, in total `(n_grid)^3`
+  - This can be sent to the network and get the volume density
+- bound_lines: outside bounding lines, `12` lines with `(2, 3)` start-end pts.
+- dense_lines: inner+outside bounding lines, `3*(n+1)^3` lines with `(2, 3)` start-end pts.
+- bound_faces: outside bounding faces, `6 faces`, tensor in `(6, 4, 3)` shape
+- dense_faces: inner+outside bounding faces, tensor in `((n_grid+1)n_grid^2*3, 4, 3)` shape

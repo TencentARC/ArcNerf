@@ -280,9 +280,9 @@ def draw_lines(ax, lines, line_colors, min_values, max_values, plotly):
     return min_values, max_values
 
 
-def draw_meshes(ax, meshes, mesh_colors, min_values, max_values, plotly):
+def draw_meshes(ax, meshes, mesh_colors, min_values, max_values, plotly, alpha=1.0):
     """Draw meshes. Each mesh in list is a np.array with shape (N_tri, 3, 3)"""
-    # set color, by default is red
+    # set color, by default is silver
     n_m = len(meshes)
     if mesh_colors is None:
         mesh_colors = get_colors('silver', to_int=False, to_np=True)
@@ -302,15 +302,59 @@ def draw_meshes(ax, meshes, mesh_colors, min_values, max_values, plotly):
                     i=[0 + i * 3 for i in range(n_tri)],
                     j=[1 + i * 3 for i in range(n_tri)],
                     k=[2 + i * 3 for i in range(n_tri)],
-                    color=colorize_np(mesh_colors[idx])
+                    color=colorize_np(mesh_colors[idx]),
+                    opacity=alpha,
+                    lighting={'ambient': 1},
                 )
             )
         else:
             ax.add_collection3d(
-                Poly3DCollection([mesh_plt[i] for i in range(n_tri)], facecolors=mesh_colors[idx], linewidths=1)
+                Poly3DCollection([mesh_plt[i] for i in range(n_tri)],
+                                 facecolors=mesh_colors[idx],
+                                 linewidths=1,
+                                 alpha=alpha)
             )
         min_values = np.minimum(min_values, mesh_plt.reshape(-1, 3).min(0))
         max_values = np.maximum(max_values, mesh_plt.reshape(-1, 3).max(0))
+
+    return min_values, max_values
+
+
+def draw_volume(ax, volume, min_values, max_values, plotly):
+    """Draw volume with grid pts line and faces."""
+    if 'grid_pts' in volume:
+        grid_pts = volume['grid_pts']  # ((n_grid+1)^3, 3) or (8, 3)
+        grid_pts_colors = 'chocolate' if 'grid_pts_colors' not in volume else volume['grid_pts_colors']
+        grid_pts_colors = get_colors(grid_pts_colors, to_int=False, to_np=True)[None, :]
+        grid_pts_colors = np.repeat(grid_pts_colors, grid_pts.shape[0], axis=0)
+        grid_pts_size = 10 if 'grid_pts_size' not in volume else volume['grid_pts_size']
+        min_values, max_values = draw_points(
+            ax, grid_pts, grid_pts_colors, grid_pts_size, min_values, max_values, plotly
+        )
+
+    if 'volume_pts' in volume:
+        volume_pts = volume['volume_pts']  # ((n_grid)^3, 3)
+        volume_pts_colors = 'green' if 'volume_pts_colors' not in volume else volume['volume_pts_colors']
+        volume_pts_colors = get_colors(volume_pts_colors, to_int=False, to_np=True)[None, :]
+        volume_pts_colors = np.repeat(volume_pts_colors, volume_pts.shape[0], axis=0)
+        volume_pts_size = 20 if 'volume_pts_size' not in volume else volume['volume_pts_size']
+        min_values, max_values = draw_points(
+            ax, volume_pts, volume_pts_colors, volume_pts_size, min_values, max_values, plotly
+        )
+
+    if 'lines' in volume:
+        lines = volume['lines']  # n_lines * (2, 3)
+        min_values, max_values = draw_lines(ax, lines, None, min_values, max_values, plotly)
+
+    if 'faces' in volume:
+        faces = volume['faces']  # (n, 4, 3)
+        faces_triangle = np.concatenate([faces[:, [0, 1, 2], :], faces[:, [3, 1, 2], :]])  # (2n, 3, 3)
+        face_colors = 'silver' if 'face_colors' not in volume else volume['face_colors']
+        face_colors = get_colors(face_colors, to_int=False, to_np=True)
+
+        min_values, max_values = draw_meshes(
+            ax, [faces_triangle], face_colors, min_values, max_values, plotly, alpha=0.8
+        )
 
     return min_values, max_values
 
@@ -329,6 +373,7 @@ def draw_3d_components(
     ray_linewidth=2,
     meshes=None,
     mesh_colors=None,
+    volume=None,
     sphere_radius=None,
     sphere_origin=(0, 0, 0),
     title='',
@@ -340,7 +385,6 @@ def draw_3d_components(
     For any pts in world space, you need to transform_plt_space to switch yz axis
     You can specified color for different cam/ray/point.
     Support plotly visual which allows zoom-in/out.
-    TODO: Draw voxel grids
 
     Args:
         c2w: c2w pose stack in in shape(N_cam, 4, 4). None means not visual
@@ -357,6 +401,7 @@ def draw_3d_components(
         ray_linewidth: width of ray line, by default is 2
         meshes: list of mesh of (N_tri, 3, 3), len is N_m
         mesh_colors: color in (N_m, 3) or (3,), applied for each or all mesh
+        volume: a volume dict containing `grid_pts`, `volume_pts`, `lines`, `faces`
         sphere_radius: if not None, draw a sphere with such radius
         sphere_origin: the origin of sphere, by default is (0, 0, 0)
         title: a string of figure title
@@ -396,6 +441,9 @@ def draw_3d_components(
 
     if meshes is not None:
         min_values, max_values = draw_meshes(ax, meshes, mesh_colors, min_values, max_values, plotly)
+
+    if volume is not None:
+        min_values, max_values = draw_volume(ax, volume, min_values, max_values, plotly)
 
     # set axis limit
     axis_scale_factor = 0.25  # extent scale by such factor

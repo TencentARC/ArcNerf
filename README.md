@@ -3,9 +3,8 @@
 
 # TODO:
 - shpere tracing(sdf, density)
-- 可视化（voxel， mesh， ray）各种， 根据需求加进去
+- 可视化
   - ray上的sampler变化（2d， 3d）
-  - voxel grid可视化
   - open3d版本： 如需要
 - cuda实现的geometry函数和数据结构
 - tetrahedra相关

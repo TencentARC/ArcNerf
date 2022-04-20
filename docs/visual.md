@@ -40,8 +40,19 @@ each line prints `N_pt_in_line-1` line seg
 - sphere_radius: draw a sphere with such `radius` if not None
 - sphere_origin: the origin of sphere, by default is `(0, 0, 0)`
 
-## Voxel
-- TBD
+## Volume
+A complete volume implementation is in `geometry.volume`. You only inputs
+points/lines/faces for visual results.
+- 'grid_pts': grid point, ((n+1)^3, 3). If use corner only, (8,3)
+  - grid_pts_colors: pts_colors in str. If not exist, use `chocolate`.
+  - 'grid_pts_size': pts_size. If not exist, set 20.
+- 'volume_pts': volume point, (n^3, 3)
+  - 'volume_pts_colors: pts_colors in str. If not exist, use `green`.
+  - 'volume_pts_size': pts_size. If not exist, set 20.
+- 'lines': lines of bounding lines or dense lines. list of lines in (2, 3)
+- 'faces': faces of bounding faces or dense faces, np in ((n+1)n^2, 4, 3).
+regroup each face to 2 triangles for visual
+  - face_colors: face_colors in str. If not exist, use `silver`.
 
 ## Other:
 - title: title of the fig
