@@ -311,8 +311,6 @@ class ArcNerfTrainer(BasicTrainer):
 
     def train_epoch(self, epoch):
         """Train for one epoch. Each epoch return the final sum of loss and total num of iter in epoch"""
-        if epoch % self.cfgs.progress.epoch_loss == 0:
-            self.logger.add_log('Epoch {:06d}:'.format(epoch))
         step_in_epoch = 1
 
         if self.train_count >= self.total_samples:

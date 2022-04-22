@@ -4,7 +4,7 @@ import os.path as osp
 
 from common.utils.cfgs_utils import load_configs
 
-CONFIG = osp.abspath(osp.join(__file__, '../../../..', 'configs', 'datasets', 'dtu', 'dtu_65.yaml'))
+CONFIG = osp.abspath(osp.join(__file__, '../../../..', 'configs', 'datasets', 'dtu', '65.yaml'))
 
 
 def setup_test_config(unknows=None):

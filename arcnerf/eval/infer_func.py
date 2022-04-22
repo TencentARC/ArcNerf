@@ -249,6 +249,7 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
     time0 = time.time()
     sigma, rgb = get_sigma_rgb_from_model(volume_pts, model, device, None)
     logger.add_log('    Forward {}^3 time for model is {:.2f}s'.format(n_grid, time.time() - time0))
+    logger.add_log('    Sigma value range {:.2f}-{:.2f}'.format(sigma.min(), sigma.max()))
 
     # for 3d point cloud visual, valid sigma is area with large enough sigma
     valid_sigma = (sigma >= level)  # (n^3,)
@@ -283,18 +284,19 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
             logger.add_log('    Extract {} verts, {} faces'.format(verts.shape[0], faces.shape[0]))
 
             volume_out['mesh'] = {}
-            volume_out['mesh']['full'] = get_mesh_components(verts, faces, model, device, logger, volume_pts.dtype)
+            volume_out['mesh']['full'] = get_mesh_components(verts, faces, model, device, volume_pts.dtype, logger)
 
             # simplify mesh if need
             time0 = time.time()
-            verts_sim, faces_sim = simplify_mesh(verts, faces, max_faces)
-            logger.add_log('    Simplify mesh time {:.2f}s'.format(time.time() - time0))
-            logger.add_log('    Simplify {} verts, {} faces'.format(verts_sim.shape[0], faces_sim.shape[0]))
-
-            volume_out['mesh'] = {}
-            volume_out['mesh']['simplify'] = get_mesh_components(
-                verts_sim, faces_sim, model, device, logger, volume_pts.dtype
-            )
+            if faces.shape[0] <= max_faces:  # do not need to run again
+                volume_out['mesh']['simplify'] = volume_out['mesh']['full']
+            else:
+                verts_sim, faces_sim = simplify_mesh(verts, faces, max_faces)
+                logger.add_log('    Simplify mesh time {:.2f}s'.format(time.time() - time0))
+                logger.add_log('    Simplify {} verts, {} faces'.format(verts_sim.shape[0], faces_sim.shape[0]))
+                volume_out['mesh']['simplify'] = get_mesh_components(
+                    verts_sim, faces_sim, model, device, volume_pts.dtype, logger
+                )
 
         except ValueError:
             logger.add_log('Can not extract mesh from volue', level='warning')
@@ -409,14 +411,15 @@ def write_infer_files(files, folder, data, logger):
         bound_lines = files['volume']['bound_lines']
         volume_dict = {'grid_pts': corner, 'lines': bound_lines}
         if 'pc' in files['volume']:
+            pc = files['volume']['pc']
             # full pts to ply
-            pts = files['volume']['pc']['full']['pts']
-            pts_colors = files['volume']['full']['color']
+            pts = pc['full']['pts']
+            pts_colors = pc['full']['color']
             pc_file = osp.join(folder, 'pc_extract.ply')
             save_point_cloud(pc_file, pts, pts_colors)
             # sample pts to plotly
-            pts = files['volume']['pc']['sample']['pts']
-            pts_colors = files['volume']['sample']['color']
+            pts = pc['sample']['pts']
+            pts_colors = pc['sample']['color']
             # draw pts in plotly
             file_path = osp.join(folder, 'pc_extract.png')
             draw_3d_components(
