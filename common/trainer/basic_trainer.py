@@ -425,7 +425,7 @@ class BasicTrainer(object):
     def eval_epoch(self, epoch):
         """Eval the epoch using test data"""
         if self.eval_metric is None:
-            self.logger.add_log('Not eval_metric provided... Check the setting...', level='warning')
+            self.logger.add_log('No eval_metric provided... Check the setting...', level='warning')
             return
 
         self.logger.add_log('Eval on test data... Epoch {}'.format(epoch))
@@ -439,7 +439,7 @@ class BasicTrainer(object):
             self.data['eval'], self.model, metric_summary, self.device, self.cfgs.progress.max_samples_eval
         )
         if metric_info is None:
-            self.logger.add_log('Not evaluation perform...', level='warning')
+            self.logger.add_log('No evaluation perform...', level='warning')
         else:
             self.logger.add_log('Evaluation at Epoch {} Benchmark result. \n {}'.format(epoch, metric_info))
             if files is not None and len(files) > 0:
@@ -480,7 +480,7 @@ class BasicTrainer(object):
             loss_summary(loss, batch_size)
 
         if count == 0:
-            self.logger.add_log('Not batch was sent to valid...')
+            self.logger.add_log('No batch was sent to valid...')
             self.model.train()
             return
 

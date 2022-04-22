@@ -2,15 +2,11 @@
 
 name: eval
 
-model_pt: None
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_nerf/checkpoints/latest.pt.tar'
 
 dir:
-    data_dir: None
-    eval_dir: None
-
-data:
-    video_downsample: 15
-    image_downsample: 4
+    data_dir: '/group/30042/leoyluo/Immerse/data'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_nerf'
 
 gpu_ids: -1                   # -1 for cpu, 0/1/2 for gpu. Do not use multiple gpu
 

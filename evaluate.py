@@ -11,7 +11,7 @@ from common.metric.metric_dict import MetricDictCounter
 from common.utils.cfgs_utils import parse_configs, get_value_from_cfgs_field
 from common.utils.logger import Logger
 from common.utils.model_io import load_model
-from arcnerf.datasets import get_dataset
+from arcnerf.datasets import get_dataset, get_model_feed_in
 from arcnerf.datasets.transform.augmentation import get_transforms
 from arcnerf.eval.eval_func import run_eval
 from arcnerf.metric import build_metric
@@ -48,22 +48,6 @@ if __name__ == '__main__':
 
     loader = torch.utils.data.DataLoader(dataset, **tkwargs_eval)
 
-    # get_model_feed_in_func
-    def get_model_feed_in(inputs, device):
-        """Get core model feed in."""
-        potential_keys = ['img', 'mask', 'rays_o', 'rays_d']
-        feed_in = {}
-        for key in potential_keys:
-            if key in inputs:
-                feed_in[key] = inputs[key]
-                if device == 'gpu':
-                    feed_in[key] = feed_in[key].cuda(non_blocking=True)
-
-        # img must be there
-        batch_size = inputs['img'].shape[0]
-
-        return feed_in, batch_size
-
     # set and load model
     assert cfgs.model_pt is not None, 'Please specify the model_pt for evaluation...'
     model = build_model(cfgs, logger)
@@ -84,7 +68,7 @@ if __name__ == '__main__':
 
     # write down results
     if metric_info is None:
-        logger.add_log('Not evaluation perform...', level='warning')
+        logger.add_log('No evaluation perform...', level='warning')
         exit()
 
     if files is not None and len(files) > 0:

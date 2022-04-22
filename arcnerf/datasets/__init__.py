@@ -8,7 +8,7 @@ from common.utils.cfgs_utils import obj_to_dict
 from common.utils.file_utils import scan_dir
 from common.utils.registry import DATASET_REGISTRY
 
-__all__ = ['get_dataset']
+__all__ = ['get_dataset', 'get_model_feed_in']
 
 datasets_folder = osp.dirname(osp.abspath(__file__))
 datasets_filenames = [osp.splitext(osp.basename(v))[0] for v in scan_dir(datasets_folder) if v.endswith('_dataset.py')]
@@ -38,3 +38,21 @@ def get_dataset(cfgs, data_dir, logger, mode='train', transfroms=None):
         logger.add_log('Dataset Length: {}'.format(len(dataset)))
 
     return dataset
+
+
+def get_model_feed_in(inputs, device):
+    """Get the core model feed in and put it to the model's device
+    device is only 'cpu' or 'gpu'
+    """
+    potential_keys = ['img', 'mask', 'rays_o', 'rays_d', 'bounds']
+    feed_in = {}
+    for key in potential_keys:
+        if key in inputs:
+            feed_in[key] = inputs[key]
+            if device == 'gpu':
+                feed_in[key] = feed_in[key].cuda(non_blocking=True)
+
+    # rays must be there
+    batch_size = inputs['rays_o'].shape[0]
+
+    return feed_in, batch_size

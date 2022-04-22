@@ -1,0 +1,77 @@
+# inference script
+
+name: inference
+
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_nerf/checkpoints/latest.pt.tar'
+
+dir:
+    data_dir: None
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_nerf'
+
+gpu_ids: -1                   # -1 for cpu, 0/1/2 for gpu. Do not use multiple gpu
+
+dist:
+    rank: 0
+    local_rank: 0
+    world_size: 1
+
+dataset:
+    eval:       # for getting intrinsic
+        eval_max_sample: 1
+        type: DTU
+        scan_id: 65
+        img_scale: 1.0
+        scale_radius: 3.0
+        precache: False
+
+inference:
+    # set render if you want to render view
+    render:                         # set a list of render camera on sphere
+        type: [circle, spiral]      # list of render cam type
+        n_cam: [30, 60]             # each render type num of cam
+        radius: 3.0                 # sphere radius
+        u_start: 0.0                # for start pos u in (0~1)
+        v_ratio: 0.0                # for circle path, vertical position
+        v_range: [-0.5, 0]          # for spiral path, vertical pos range
+        n_rot: 3                    # n_rot of camera path
+        fps: 5                      # render video fps
+
+    # set volume if you want to extract mesh
+    volume:                         # volume params
+        origin: (0.0, 0.0, 0.0)     # volume center
+        n_grid: 256                 # n_grid is the num of voxel in each dim. For visual set a small num only
+        side: 1.5                   # if set, all len at each dim will be side
+        xlen: 1.5                   # x-dim length, only when side is None
+        ylen: 1.5                   # y-dim length, only when side is None
+        zlen: 1.5                   # z-dim length, only when side is None
+        level: 50.0                 # level set for mesh extracting. For sigma is around 50. For sdf is 0.
+
+model:
+    type: NeRF
+    rays:
+        bounding_radius: 3.0          # bounding ray sampling region
+        near: 1.0                     # hardcode near zvals
+        far: 8.0                      # hardcode far zvals
+        n_sample: 64                  # n_sample for zvals sampling
+        n_importance: 128             # n_importance for zvals for hierarchical sampling
+        inverse_linear: False         # inverse_linear make zvals close to near
+        perturb: True                 # perturb zvals interval
+        add_inf_z: True               # Add inf zval for ray marching, do not applied for background
+        noise_std: 1.0                # noise for sigma in training
+    chunk_rays: 32768                 # each chunk to process 1024*32(ray), enough for 32 GB
+    chunk_pts: 786432                 # each chunk to progress 4096*192(pts), for model forward
+    geometry:
+        W: 256                        # linear hidden neuron
+        D: 8                          # num of linear, not include final
+        skips: [4]                    # pos to add input embedding
+        input_ch: 3                   # xyz input channel
+        embed_freq: 10                # xyz embed freq
+        W_feat: 256                   # extra feature output
+        geometric_init: False         # whether to use geometric init. need radius_init
+    radiance:
+        mode: 'vf'                    # view_dir and feature only
+        W: 128                        # linear hidden dim
+        D: 1                          # num of linear, not include final
+        input_ch_view: 3              # view input channel
+        embed_freq_view: 4            # view embed freq
+        W_feat_in: 256                # dim for feature from geometry

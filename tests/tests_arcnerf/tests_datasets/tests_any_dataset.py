@@ -100,8 +100,8 @@ class TestDict(unittest.TestCase):
 
     @classmethod
     def parse_render(cls, render_cfgs):
-        cls.render_type = get_value_from_cfgs_field(render_cfgs, 'type', ['circle'])
-        cls.render_n_cam = get_value_from_cfgs_field(render_cfgs, 'n_cam', [30])
+        cls.render_type = get_value_from_cfgs_field(render_cfgs, 'type', ['circle', 'spiral'])
+        cls.render_n_cam = get_value_from_cfgs_field(render_cfgs, 'n_cam', [30, 60])
         cls.render_radius = get_value_from_cfgs_field(render_cfgs, 'radius', 3.0)
         cls.render_u_start = get_value_from_cfgs_field(render_cfgs, 'u_start', 0.0)
         cls.render_v_ratio = get_value_from_cfgs_field(render_cfgs, 'v_ratio', 0.0)
@@ -310,17 +310,17 @@ class TestDict(unittest.TestCase):
             return
 
         pts = pc['pts']  # (n_pts, 3)
-        pts_color = pc['color'] if 'color' in pc else None
+        pts_colors = pc['color'] if 'color' in pc else None
 
-        if pts_color is not None:
-            self.assertEqual(pts_color.shape, pts.shape)  # (n_pts, 3)
+        if pts_colors is not None:
+            self.assertEqual(pts_colors.shape, pts.shape)  # (n_pts, 3)
 
         file_path = osp.join(self.spec_result_dir, 'point_cloud_3d.png')
         draw_3d_components(
             c2w=self.c2w,
             intrinsic=self.intrinsic,
             points=pts,
-            point_colors=pts_color,
+            point_colors=pts_colors,
             point_size=1.0,
             volume=self.volume_dict,
             sphere_radius=self.radius,
@@ -339,7 +339,7 @@ class TestDict(unittest.TestCase):
             cam,
             intrinsic=self.intrinsic,
             points=pts,
-            point_colors=pts_color,
+            point_colors=pts_colors,
             point_size=1.0,
             rays=(ray_bundle[0], ray_bundle[1]),
             title='Cam ray at (0,0).',

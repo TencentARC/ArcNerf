@@ -5,7 +5,9 @@ matplotlib
 numpy
 opencv-python
 plotly
+pyfqmr
 pyyaml
+scikit-image
 tensorboard
 thop
 torch

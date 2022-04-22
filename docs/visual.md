@@ -30,6 +30,7 @@ each line prints `N_pt_in_line-1` line seg
 ## Meshes
 - meshes: a list of mesh of `(N_tri, 3, 3)` in world space, len is `N_m`
 - mesh_colors: color in `(N_m, 3)` or (3,), applied for each or all mesh
+- face_colors: color in `(N_tri, 3)`, len is `N_m`, for each mesh if set.
 
 ## Rays
 - rays: a tuple `(rays_o, rays_d)`, each in `(N_r, 3)`, in world coord. `rays_d` is with actual len, if you want longer arrow, you need to extend `rays_d`

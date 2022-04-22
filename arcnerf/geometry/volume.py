@@ -9,7 +9,17 @@ from common.utils.torch_utils import torch_to_np
 class Volume(nn.Module):
     """A volume with custom operation"""
 
-    def __init__(self, n_grid, origin=(0, 0, 0), side=None, xlen=None, ylen=None, zlen=None, requires_grad=False):
+    def __init__(
+        self,
+        n_grid,
+        origin=(0, 0, 0),
+        side=None,
+        xlen=None,
+        ylen=None,
+        zlen=None,
+        dtype=torch.float32,
+        requires_grad=False
+    ):
         """
         Args:
             n_grid: N of volume/line seg on each side. Each side is divided into n_grid seg with n_grid+1 pts.
@@ -19,6 +29,7 @@ class Volume(nn.Module):
             xlen: len of x dim, if None use side
             ylen: len of y dim, if None use side
             zlen: len of z dim, if None use side
+            dtype: dtype of params. By default is torch.float32
             requires_grad: whether the parameters requires grad
         """
         super(Volume, self).__init__()
@@ -26,10 +37,10 @@ class Volume(nn.Module):
 
         # set nn params
         self.n_grid = n_grid
-        self.origin = nn.Parameter(torch.tensor([0.0, 0.0, 0.0]), requires_grad=self.requires_grad)
-        self.xlen = nn.Parameter(torch.tensor([0.0]), requires_grad=self.requires_grad)
-        self.ylen = nn.Parameter(torch.tensor([0.0]), requires_grad=self.requires_grad)
-        self.zlen = nn.Parameter(torch.tensor([0.0]), requires_grad=self.requires_grad)
+        self.origin = nn.Parameter(torch.tensor([0.0, 0.0, 0.0], dtype=dtype), requires_grad=self.requires_grad)
+        self.xlen = nn.Parameter(torch.tensor([0.0], dtype=dtype), requires_grad=self.requires_grad)
+        self.ylen = nn.Parameter(torch.tensor([0.0], dtype=dtype), requires_grad=self.requires_grad)
+        self.zlen = nn.Parameter(torch.tensor([0.0], dtype=dtype), requires_grad=self.requires_grad)
         self.range = None
         self.corner = None
         self.grid_pts = None
@@ -61,6 +72,10 @@ class Volume(nn.Module):
             self.xlen[0] = xlen
             self.ylen[0] = ylen
             self.zlen[0] = zlen
+
+    def get_len(self):
+        """Return len of each dim, in tuple of float num"""
+        return float(self.xlen[0]), float(self.ylen[0]), float(self.zlen[0]),
 
     @torch.no_grad()
     def set_origin(self, origin=(0.0, 0.0, 0.0)):

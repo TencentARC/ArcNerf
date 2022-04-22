@@ -5,14 +5,13 @@
 - shpere tracing(sdf, density)
 - 可视化
   - ray上的sampler变化（2d， 3d）
-  - open3d版本： 如需要
 - cuda实现的geometry函数和数据结构
 - tetrahedra相关
 
 - 光照拆解
-- 材质拆解s
+- 材质拆解
 
-- real time inference online demo
+- real time inference online demo, any view point visual(opengl, cuda, etc)
 
 - 参考框架
   - nerf(nerfpl)

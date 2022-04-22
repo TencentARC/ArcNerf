@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
 
 import math
+import os
+import os.path as osp
 import random
 import time
 
 import torch
 
-from arcnerf.datasets import get_dataset
+from arcnerf.datasets import get_dataset, get_model_feed_in
 from arcnerf.datasets.transform.augmentation import get_transforms
 from arcnerf.eval.eval_func import run_eval
+from arcnerf.eval.infer_func import set_inference_data, run_infer, write_infer_files
 from arcnerf.loss import build_loss
 from arcnerf.metric import build_metric
 from arcnerf.models import build_model
@@ -33,7 +36,7 @@ class ArcNerfTrainer(BasicTrainer):
         return model
 
     def prepare_data(self):
-        """Prepare dataset for train, val, eval. Gets data loader and sampler"""
+        """Prepare dataset for train, val, eval, inference. Gets data loader and sampler"""
         self.logger.add_log('-' * 60)
 
         # cfgs for n_rays in training
@@ -41,6 +44,9 @@ class ArcNerfTrainer(BasicTrainer):
         self.total_samples = None
         self.n_rays = get_value_from_cfgs_field(self.cfgs, 'n_rays', 1024)
         self.logger.add_log('Num of rays for each training batch: {}'.format(self.n_rays))
+        # for inference only
+        self.intrinsic = None
+        self.wh = None
 
         data = {}
         # train
@@ -65,6 +71,25 @@ class ArcNerfTrainer(BasicTrainer):
                 'drop_last': False
             }
             data['eval'], _ = self.set_dataset('eval', tkwargs_eval)
+
+        # inference
+        if valid_key_in_cfgs(self.cfgs, 'inference') and self.intrinsic is not None and self.wh is not None:
+            self.logger.add_log('-' * 60)
+            self.logger.add_log('Setting Inference data...')
+            data['inference'] = set_inference_data(self.cfgs.inference, self.intrinsic, self.wh)
+            if data['inference']['render'] is not None:
+                self.logger.add_log(
+                    'Render novel view - type: {}, n_cam {}, resolution: wh({}/{})'.format(
+                        data['inference']['render']['cfgs']['type'], data['inference']['render']['cfgs']['n_cam'],
+                        data['inference']['render']['wh'][0], data['inference']['render']['wh'][1]
+                    )
+                )
+            if data['inference']['volume'] is not data['inference']:
+                self.logger.add_log(
+                    'Extracting geometry from volume - n_grid {}'.format(data['inference']['volume']['cfgs']['n_grid'])
+                )
+        else:
+            data['inference'] = None
 
         return data
 
@@ -91,6 +116,7 @@ class ArcNerfTrainer(BasicTrainer):
 
     def concat_train_batch(self, loader):
         """Concat all elements from different samples together. The first dim is n_img * n_rays_per_img"""
+        self.logger.add_log('Concat all training rays...')
         potential_keys = ['img', 'mask', 'rays_o', 'rays_d', 'bounds']
 
         concat_data = {'H': [0], 'W': [0]}  # will not write progress image during training
@@ -120,6 +146,12 @@ class ArcNerfTrainer(BasicTrainer):
                     assert self.total_samples == v_shape[0] * v_shape[1], 'Invalid input dim...'
                 concat_data[k] = v.view(v_shape[0] * v_shape[1], *v_shape[2:])[None, :]  # (1, n_img * n_rays, ...)
 
+        # shuffle all samples
+        random_idx = torch.randint(0, self.total_samples, size=[self.total_samples])
+        for k, v in concat_data.items():
+            if isinstance(v, torch.FloatTensor):
+                concat_data[k] = concat_data[k][:, random_idx, ...]
+
         self.logger.add_log(
             'Need {} epoch to run all the rays...'.format(math.ceil(float(self.total_samples) / float(self.n_rays)))
         )
@@ -147,6 +179,10 @@ class ArcNerfTrainer(BasicTrainer):
         dataset = get_dataset(
             self.cfgs.dataset, self.cfgs.dir.data_dir, logger=self.logger, mode=mode, transfroms=transforms
         )
+        # must have eval data to set the intrinsic and wh
+        if mode == 'eval':
+            self.intrinsic = dataset.get_intrinsic(torch_tensor=False)
+            self.wh = dataset.get_wh()
 
         sampler = None
         if mode != 'eval' and self.cfgs.dist.world_size > 1:
@@ -173,18 +209,7 @@ class ArcNerfTrainer(BasicTrainer):
 
     def get_model_feed_in(self, inputs, device):
         """Get the core model feed in and put it to the model's device"""
-        potential_keys = ['img', 'mask', 'rays_o', 'rays_d', 'bounds']
-        feed_in = {}
-        for key in potential_keys:
-            if key in inputs:
-                feed_in[key] = inputs[key]
-                if device == 'gpu':
-                    feed_in[key] = feed_in[key].cuda(non_blocking=True)
-
-        # img must be there
-        batch_size = inputs['img'].shape[0]
-
-        return feed_in, batch_size
+        return get_model_feed_in(inputs, device)
 
     @master_only
     def valid_epoch(self, epoch, step_in_epoch):
@@ -238,6 +263,21 @@ class ArcNerfTrainer(BasicTrainer):
 
         self.model.train()
 
+    @master_only
+    def infer_epoch(self, epoch):
+        """Infer in this epoch, render path and extract mesh.
+         Will be performed when dataset.eval is set and inference cfgs exists.
+        """
+        self.logger.add_log('Inference using model... Epoch {}'.format(epoch))
+        eval_dir_epoch = osp.join(self.cfgs.dir.eval_dir, 'epoch_{:06d}'.format(epoch))
+        os.makedirs(eval_dir_epoch, exist_ok=True)
+
+        # inference and save result
+        self.model.eval()
+        files = self.inference(self.data['inference'], self.model, self.device)
+        write_infer_files(files, eval_dir_epoch, self.data['inference'], self.logger)
+        self.model.train()
+
     def render_progress_img(self, inputs, output):
         """Actual render for progress image with label. It is perform in each step with a batch.
          Return a dict with list of image and filename. filenames should be irrelevant to progress
@@ -245,6 +285,12 @@ class ArcNerfTrainer(BasicTrainer):
          Return None will not write anything.
         """
         return render_progress_img(inputs, output)
+
+    def inference(self, data, model, device):
+        """Actual infer function for the model. Use run_infer since we want to run it local as well"""
+        files = run_infer(data, self.get_model_feed_in, model, self.logger, device)
+
+        return files
 
     def evaluate(self, data, model, metric_summary, device, max_samples_eval):
         """Actual eval function for the model. Use run_eval since we want to run it locally as well"""
@@ -288,6 +334,8 @@ class ArcNerfTrainer(BasicTrainer):
         self.logger.add_log('-' * 60)
         if self.cfgs.progress.init_eval and self.data['eval'] is not None:
             self.eval_epoch(self.cfgs.progress.start_epoch)
+        if self.cfgs.progress.init_eval and self.data['inference'] is not None:
+            self.infer_epoch(self.cfgs.progress.start_epoch)
 
         loss_all = 0.0
         for epoch in range(self.cfgs.progress.start_epoch, self.cfgs.progress.epoch):
@@ -309,6 +357,10 @@ class ArcNerfTrainer(BasicTrainer):
             if self.data['eval'] is not None and self.cfgs.progress.epoch_eval > 0:
                 if (epoch + 1) % self.cfgs.progress.epoch_eval == 0:
                     self.eval_epoch(epoch + 1)
+
+            if self.data['inference'] is not None and self.cfgs.progress.epoch_eval > 0:
+                if (epoch + 1) % self.cfgs.progress.epoch_eval == 0:
+                    self.infer_epoch(epoch + 1)
 
         self.save_model(self.cfgs.progress.epoch, loss_all, spec_name='final')
         self.logger.add_log('Training for expr {} done... Final model is saved...'.format(self.cfgs.name))

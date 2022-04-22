@@ -140,7 +140,7 @@ class TestDict(unittest.TestCase):
 
         pts_on_rays = np_wrapper(get_ray_points_by_zvals, rays[0], rays[1], zvals)[:, 0, :]  # (n, 3)
         pts_all = np.concatenate([pts_closest, pts_on_rays])
-        pts_color = get_combine_colors(['green', 'red'], [1, n_cam])
+        pts_colors = get_combine_colors(['green', 'red'], [1, n_cam])
         lines = [np.concatenate([pts_closest, pts_on_rays[idx:idx + 1]]) for idx in range(n_cam)]
 
         file_path = osp.join(RESULT_DIR, 'closest_point_to_rays(from_cam_center).png')
@@ -148,7 +148,7 @@ class TestDict(unittest.TestCase):
             c2w,
             intrinsic=self.intrinsic,
             points=pts_all,
-            point_colors=pts_color,
+            point_colors=pts_colors,
             rays=(rays[0], zvals * 1.2 * rays[1]),
             ray_linewidth=0.5,
             lines=lines,
@@ -165,7 +165,7 @@ class TestDict(unittest.TestCase):
 
         pts_on_rays = np_wrapper(get_ray_points_by_zvals, rays[0], rays[1], zvals)[:, 0, :]  # (n, 3)
         pts_all = np.concatenate([pts_closest, pts_on_rays])
-        pts_color = get_combine_colors(['green', 'red'], [1, n_cam])
+        pts_colors = get_combine_colors(['green', 'red'], [1, n_cam])
         lines = [np.concatenate([pts_closest, pts_on_rays[idx:idx + 1]]) for idx in range(n_cam)]
 
         file_path = osp.join(RESULT_DIR, 'closest_point_to_rays(from_(0,0)_of_cam).png')
@@ -173,7 +173,7 @@ class TestDict(unittest.TestCase):
             c2w,
             intrinsic=self.intrinsic,
             points=pts_all,
-            point_colors=pts_color,
+            point_colors=pts_colors,
             rays=(rays[0], zvals * 1.2 * rays[1]),
             ray_linewidth=0.5,
             lines=lines,
@@ -195,7 +195,7 @@ class TestDict(unittest.TestCase):
 
         pts_on_rays = np_wrapper(get_ray_points_by_zvals, rays[0], rays[1], zvals)[:, 0, :]  # (2, 3)
         pts_all = np.concatenate([pts_closest, pts_on_rays])
-        pts_color = get_combine_colors(['green', 'red'], [1, 2])
+        pts_colors = get_combine_colors(['green', 'red'], [1, 2])
         lines = [np.concatenate([pts_closest, pts_on_rays[0:1]]), np.concatenate([pts_closest, pts_on_rays[1:2]])]
 
         file_path = osp.join(RESULT_DIR, 'closest_point_to_two_rays(from _cam_center).png')
@@ -203,7 +203,7 @@ class TestDict(unittest.TestCase):
             c2w,
             intrinsic=self.intrinsic,
             points=pts_all,
-            point_colors=pts_color,
+            point_colors=pts_colors,
             rays=(rays[0], zvals * 1.2 * rays[1]),
             ray_linewidth=0.5,
             lines=lines,
@@ -219,7 +219,7 @@ class TestDict(unittest.TestCase):
         pts_closest, distance, zvals = np_wrapper(closest_point_to_two_rays, rays[0], rays[1])  # (1, 3), 1, (2, 1)
         pts_on_rays = np_wrapper(get_ray_points_by_zvals, rays[0], rays[1], zvals)[:, 0, :]  # (2, 3)
         pts_all = np.concatenate([pts_closest, pts_on_rays])
-        pts_color = get_combine_colors(['green', 'red'], [1, 2])
+        pts_colors = get_combine_colors(['green', 'red'], [1, 2])
         lines = [np.concatenate([pts_closest, pts_on_rays[0:1]]), np.concatenate([pts_closest, pts_on_rays[1:2]])]
 
         file_path = osp.join(RESULT_DIR, 'closest_point_to_two_rays(from_(0,0)_of_cam).png')
@@ -227,7 +227,7 @@ class TestDict(unittest.TestCase):
             c2w,
             intrinsic=self.intrinsic,
             points=pts_all,
-            point_colors=pts_color,
+            point_colors=pts_colors,
             rays=(rays[0], zvals * 1.2 * rays[1]),
             ray_linewidth=0.5,
             lines=lines,
@@ -245,7 +245,7 @@ class TestDict(unittest.TestCase):
         pts_closest, distance, zvals = np_wrapper(closest_point_to_two_rays, rays[0], rays[1])  # (1, 3), 1, (2, 1)
         pts_on_rays = np_wrapper(get_ray_points_by_zvals, rays[0], rays[1], zvals)[:, 0, :]  # (2, 3)
         pts_all = np.concatenate([pts_closest, pts_on_rays])
-        pts_color = get_combine_colors(['green', 'red'], [1, 2])
+        pts_colors = get_combine_colors(['green', 'red'], [1, 2])
         lines = [np.concatenate([pts_closest, pts_on_rays[0:1]]), np.concatenate([pts_closest, pts_on_rays[1:2]])]
 
         file_path = osp.join(RESULT_DIR, 'closest_point_to_two_rays_backward.png')
@@ -253,7 +253,7 @@ class TestDict(unittest.TestCase):
             c2w,
             intrinsic=self.intrinsic,
             points=pts_all,
-            point_colors=pts_color,
+            point_colors=pts_colors,
             rays=(rays[0], rays[1]),
             ray_linewidth=0.5,
             lines=lines,

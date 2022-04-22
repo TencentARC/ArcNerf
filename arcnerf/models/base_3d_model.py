@@ -31,17 +31,25 @@ class Base3dModel(BaseModel):
         }
         return ray_cfgs
 
+    def get_chunk_rays(self):
+        """Get the chunk rays num"""
+        return self.chunk_rays
+
+    def get_chunk_pts(self):
+        """Get the chunk pts num"""
+        return self.chunk_pts
+
     def forward(self, inputs, inference_only=False, get_progress=False):
         """The forward function actually call chunk process func _forward
         to avoid large memory at same time.
         Do not call this directly using chunk since the tensor are not flatten to represent batch of rays.
 
         Args:
-            inputs['img']: torch.tensor (B, N, 3), rgb value in 0-1
             inputs['rays_o']: torch.tensor (B, N, 3), cam_loc/ray_start position
             inputs['rays_d']: torch.tensor (B, N, 3), view dir(assume normed)
+            inputs['img']: torch.tensor (B, N, 3), rgb value in 0-1, optional
             inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
-            inputs['bound']: torch.tensor (B, 2). optional
+            inputs['bounds']: torch.tensor (B, 2). optional
             inference_only: If True, will not output coarse results. By default False
             get_progress: If True, output some progress for recording, can not used in inference only mode.
                           By default False
@@ -50,13 +58,18 @@ class Base3dModel(BaseModel):
             output is a dict keys like (rgb, rgb_coarse, rgb_dense, depth, etc) based on the _forward function.
         """
         flat_inputs = {}
-        img = inputs['img'].view(-1, 3)  # (BN, 3)
         rays_o = inputs['rays_o'].view(-1, 3)  # (BN, 3)
         rays_d = inputs['rays_d'].view(-1, 3)  # (BN, 3)
         batch_size, n_rays_per_batch = inputs['rays_o'].shape[:2]
-        flat_inputs['img'] = img
+
         flat_inputs['rays_o'] = rays_o
         flat_inputs['rays_d'] = rays_d
+
+        # optional inputs
+        img = None
+        if 'img' in inputs:
+            img = inputs['img'].view(-1, 3)  # (BN, 3)
+        flat_inputs['img'] = img
 
         bounds = None
         if 'bounds' in inputs:
@@ -82,3 +95,31 @@ class Base3dModel(BaseModel):
     def _forward(self, inputs, inference_only=False, get_progress=False):
         """The core forward function, each process a chunk of rays with components in (B, x)"""
         raise NotImplementedError('Please implement the core forward function')
+
+    @torch.no_grad()
+    def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
+        """This function forward pts and view dir directly, only for inference the geometry/color
+
+        Args:
+            pts: torch.tensor (N_pts, 3), pts in world coord
+            view_dir: torch.tensor (N_pts, 3) view dir associate with each point. It can be normal or others.
+                      If None, use (0, 0, 0) as the dir for each point.
+        Returns:
+            output is a dict with following keys:
+                sigma/sdf: torch.tensor (N_pts), geometry value for each point
+                rgb: torch.tensor (N_pts, 3), color for each point
+        """
+        raise NotImplementedError('Please implement the core forward_pts_dir function for simple extracting')
+
+    @torch.no_grad()
+    def forward_pts(self, pts: torch.Tensor):
+        """This function forward pts directly, only for inference the geometry
+
+        Args:
+            pts: torch.tensor (N_pts, 3), pts in world coord
+
+        Returns:
+            output is a dict with following keys:
+                sigma/sdf: torch.tensor (N_pts), geometry value for each point
+        """
+        raise NotImplementedError('Please implement the core forward_pts function for getting sigma or sdf')

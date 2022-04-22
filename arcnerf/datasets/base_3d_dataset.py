@@ -36,6 +36,10 @@ class Base3dDataset(BaseDataset):
         """string identifier of a dataset like scan_id/scene_name"""
         return self.identifier
 
+    def get_wh(self):
+        """Get the image shape"""
+        return self.W, self.H
+
     def keep_eval_samples(self):
         """For eval model, only keep a small number of samples. Which are closer to the avg pose
          It should be done before precache_rays in child class to avoid full precache.

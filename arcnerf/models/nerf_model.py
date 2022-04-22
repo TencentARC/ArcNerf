@@ -33,11 +33,11 @@ class NeRF(Base3dModel):
         """
         All the tensor are in chunk. B is total num of rays by grouping different samples in batch
         Args:
-            inputs['img']: torch.tensor (B, 3), rgb value in 0-1
             inputs['rays_o']: torch.tensor (B, 3), cam_loc/ray_start position
             inputs['rays_d']: torch.tensor (B, 3), view dir(assume normed)
+            inputs['img']: torch.tensor (B, 3), rgb value in 0-1, optional
             inputs['mask']: torch.tensor (B,), mask value in {0, 1}. optional
-            inputs['bound']: torch.tensor (B, 2)
+            inputs['bounds']: torch.tensor (B, 2)
             inference_only: If True, will not output coarse results. By default False
             get_progress: If True, output some progress for recording, can not used in inference only mode.
                           By default False
@@ -138,12 +138,13 @@ class NeRF(Base3dModel):
         return output
 
     @torch.no_grad()
-    def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor):
+    def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
         """This function forward pts and view dir directly, only for inference the geometry/color
 
         Args:
             pts: torch.tensor (N_pts, 3), pts in world coord
-            view_dir: torch.tensor (N_pts, 3) view dir associate with each point
+            view_dir: torch.tensor (N_pts, 3) view dir associate with each point. It can be normal or others.
+                      If None, use (0, 0, 0) as the dir for each point.
         Returns:
             output is a dict with following keys:
                 sigma: torch.tensor (N_pts), density value for each point
@@ -157,7 +158,30 @@ class NeRF(Base3dModel):
             radiance_net = self.coarse_radiance_net
 
         sigma, feature = chunk_processing(geo_net, self.chunk_pts, pts)
-        rays_d = normalize(view_dir)  # norm view dir
+        if view_dir is None:
+            rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
+        else:
+            rays_d = normalize(view_dir)  # norm view dir
         rgb = chunk_processing(radiance_net, self.chunk_pts, pts, rays_d, None, feature)
 
         return sigma[..., 0], rgb
+
+    @torch.no_grad()
+    def forward_pts(self, pts: torch.Tensor):
+        """This function forward pts directly, only for inference the geometry
+
+        Args:
+            pts: torch.tensor (N_pts, 3), pts in world coord
+
+        Returns:
+            output is a dict with following keys:
+                sigma/sdf: torch.tensor (N_pts), geometry value for each point
+        """
+        if self.rays_cfgs['n_importance'] > 0:
+            geo_net = self.fine_geo_net
+        else:
+            geo_net = self.coarse_geo_net
+
+        sigma, _ = chunk_processing(geo_net, self.chunk_pts, pts)
+
+        return sigma[..., 0]

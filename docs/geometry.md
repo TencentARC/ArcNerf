@@ -42,8 +42,17 @@ Functions for ray point. ray is (rays_o, rays_d), rays_d is always assumed to be
 
 # triangle
 Functions for triangle calculation.
-- get tri normal
-- get tri circumcircle
+- get_tri_normal
+- get_tri_circumcircle
+
+# mesh
+Function for mesh extraction, color extraction, etc.
+- extract_mesh: simple marching cubes on cpu
+- save_meshes: save mesh to .ply files
+- get_verts_by_faces: rearrange verts from (V, 3) to (F, 3, 3) by faces.
+- get_normals: get the vert/face normals
+- get_face_centers: get the triangle centers
+- simplify_mesh: simplify mesh
 
 # volume
 Definition and function of a volume. For all the point you can get it in grid or fatten(by default)
@@ -56,3 +65,7 @@ Definition and function of a volume. For all the point you can get it in grid or
 - dense_lines: inner+outside bounding lines, `3*(n+1)^3` lines with `(2, 3)` start-end pts.
 - bound_faces: outside bounding faces, `6 faces`, tensor in `(6, 4, 3)` shape
 - dense_faces: inner+outside bounding faces, tensor in `((n_grid+1)n_grid^2*3, 4, 3)` shape
+
+# point cloud
+Function of point cloud with pts and color.
+- save_point_cloud: export pc file as .ply file

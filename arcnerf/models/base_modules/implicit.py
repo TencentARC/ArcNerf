@@ -102,7 +102,7 @@ class GeoNet(nn.Module):
             if geometric_init and not use_siren:
                 if i == D:  # last layer
                     nn.init.normal_(layer.weight, mean=np.sqrt(np.pi) / np.sqrt(W), std=0.0001)
-                    nn.init.constant_(layer.bias, -radius_init)
+                    nn.init.constant_(layer.bias[:1], -radius_init)  # bias only for geo value
                 elif embed_freq > 0:
                     torch.nn.init.constant_(layer.bias, 0.0)
                     if i == 0:  # first layer, [x, embed_x], do not init for embed_x

@@ -81,7 +81,7 @@ Specified by scan_id, read image/mask/camera.
 - scan_id: int num for item selection. Use it to be identifier.
 
 
-# Train/Val/Test
+# Train/Val/Eval/Inference
 
 ## Train
 Use all images for training. Same resolution as required.
@@ -97,7 +97,7 @@ Use all images for validation, downsampled by 2/4 depends on shape.
 Each valid epoch just input one image for rendering, so the batch_size for val is cast to be 1.
 
 
-## Test
+## eval
 Use several closest camera(to avg_cam) for metric evaluation,
 
 use same resolution, and use custom cam paths for rendering video
@@ -105,3 +105,10 @@ use same resolution, and use custom cam paths for rendering video
 - eval_batch_size: batch size for eval
 - eval_max_sample: max num of sample in eval dataset.
 only those will be fully rendered can calculate metric.
+
+
+## inference
+Inference will be performed based on eval dataset params(intrinsic, img shape).
+
+- render: controls the params of render novel view, like the camera path
+- volume: controls the params of volume estimation and mesh extraction.

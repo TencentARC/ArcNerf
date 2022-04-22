@@ -33,5 +33,5 @@ inference:
         fps: 5
 
     volume:
-        n_grid: 4
+        n_grid: 4       # just for visual purpose
         side: 1.5

@@ -280,7 +280,7 @@ def draw_lines(ax, lines, line_colors, min_values, max_values, plotly):
     return min_values, max_values
 
 
-def draw_meshes(ax, meshes, mesh_colors, min_values, max_values, plotly, alpha=1.0):
+def draw_meshes(ax, meshes, mesh_colors, face_colors, min_values, max_values, plotly, alpha=1.0):
     """Draw meshes. Each mesh in list is a np.array with shape (N_tri, 3, 3)"""
     # set color, by default is silver
     n_m = len(meshes)
@@ -294,6 +294,10 @@ def draw_meshes(ax, meshes, mesh_colors, min_values, max_values, plotly, alpha=1
         n_tri = mesh.shape[0]
         mesh_plt = transform_plt_space(mesh.reshape(-1, 3), xyz_axis=1).reshape(n_tri, 3, -1)  # (N_tri, 3, 3)
         if plotly:
+            if face_colors is not None:
+                face_color = face_colors[idx]
+            else:
+                face_color = None
             ax.append(
                 go.Mesh3d(
                     x=mesh_plt.reshape(-1, 3)[:, 0],  # (N_tri * 3)
@@ -303,16 +307,18 @@ def draw_meshes(ax, meshes, mesh_colors, min_values, max_values, plotly, alpha=1
                     j=[1 + i * 3 for i in range(n_tri)],
                     k=[2 + i * 3 for i in range(n_tri)],
                     color=colorize_np(mesh_colors[idx]),
+                    facecolor=colorize_np(face_color) if face_color is not None else None,
                     opacity=alpha,
                     lighting={'ambient': 1},
                 )
             )
         else:
+            if face_colors is not None:
+                colors = face_colors[idx]
+            else:
+                colors = mesh_colors[idx]
             ax.add_collection3d(
-                Poly3DCollection([mesh_plt[i] for i in range(n_tri)],
-                                 facecolors=mesh_colors[idx],
-                                 linewidths=1,
-                                 alpha=alpha)
+                Poly3DCollection([mesh_plt[i] for i in range(n_tri)], facecolors=colors, linewidths=1, alpha=alpha)
             )
         min_values = np.minimum(min_values, mesh_plt.reshape(-1, 3).min(0))
         max_values = np.maximum(max_values, mesh_plt.reshape(-1, 3).max(0))
@@ -353,7 +359,7 @@ def draw_volume(ax, volume, min_values, max_values, plotly):
         face_colors = get_colors(face_colors, to_int=False, to_np=True)
 
         min_values, max_values = draw_meshes(
-            ax, [faces_triangle], face_colors, min_values, max_values, plotly, alpha=0.8
+            ax, [faces_triangle], face_colors, None, min_values, max_values, plotly, alpha=0.6
         )
 
     return min_values, max_values
@@ -373,6 +379,7 @@ def draw_3d_components(
     ray_linewidth=2,
     meshes=None,
     mesh_colors=None,
+    face_colors=None,
     volume=None,
     sphere_radius=None,
     sphere_origin=(0, 0, 0),
@@ -401,6 +408,7 @@ def draw_3d_components(
         ray_linewidth: width of ray line, by default is 2
         meshes: list of mesh of (N_tri, 3, 3), len is N_m
         mesh_colors: color in (N_m, 3) or (3,), applied for each or all mesh
+        face_colors: list of color in (N_tri, 3), len is N_m, applied for each face in each mesh
         volume: a volume dict containing `grid_pts`, `volume_pts`, `lines`, `faces`
         sphere_radius: if not None, draw a sphere with such radius
         sphere_origin: the origin of sphere, by default is (0, 0, 0)
@@ -440,7 +448,7 @@ def draw_3d_components(
         min_values, max_values = draw_lines(ax, lines, line_colors, min_values, max_values, plotly)
 
     if meshes is not None:
-        min_values, max_values = draw_meshes(ax, meshes, mesh_colors, min_values, max_values, plotly)
+        min_values, max_values = draw_meshes(ax, meshes, mesh_colors, face_colors, min_values, max_values, plotly)
 
     if volume is not None:
         min_values, max_values = draw_volume(ax, volume, min_values, max_values, plotly)
@@ -491,7 +499,7 @@ def draw_3d_components(
         if save_path:
             if plotly_html:
                 html_path = save_path.split('.')[:-1]
-                html_path.append('.html')
+                html_path.append('html')
                 html_path = '.'.join(html_path)
                 pio.write_html(fig, html_path)
             else:

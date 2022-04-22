@@ -20,9 +20,14 @@ Tests for datasets. Including showing cameras, avg cams and test cam trajectory.
 #### tests_any_datasets
 This tests is not `unittest`. It will read datasets from `default.yaml`,
 save related visual results into results folder.
+Change the config file in `tests_datasets.__init__`.
 
 ### tests_geometry
 Test geometry function.
+#### tests_mesh
+Test mesh function, like cal normals, getting face centers.
+#### tests_point_cloud
+Test mesh function, like point cloud io.
 #### tests_sphere
 Test the sphere representation and circle/spiral line creation
 #### tests_poses

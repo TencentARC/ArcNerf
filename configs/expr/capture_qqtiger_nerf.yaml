@@ -9,6 +9,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'   # It is the main dataset address containing all dataset
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_nerf'
+
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_nerf/checkpoints/latest.pt.tar'
 
 gpu_ids: -1                         # -1 is cpu, otherwise use list of gpus
 
@@ -83,14 +86,26 @@ dataset:
         eval_max_sample: 3
         type: Capture
         scene_name: qqtiger
-        img_scale: 0.5
+        img_scale: 1.0
         scale_radius: 3.0
         pc_radius: 2.0
         precache: True
 
 inference:
-    render_type: spiral
-    n_cam: 20
+    render:
+        type: [circle, spiral]
+        n_cam: [30, 60]
+        radius: 3.0
+        u_start: 0.8
+        v_ratio: 0.0
+        v_range: [-0.5, 0]
+        n_rot: 3
+        fps: 5
+
+    volume:
+        n_grid: 256
+        side: 1.5
+        level: 50.0
 
 model:
     type: NeRF
