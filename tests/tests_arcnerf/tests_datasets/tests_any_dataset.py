@@ -331,8 +331,9 @@ class TestDict(unittest.TestCase):
 
         # single camera visual
         cam = self.c2w[:1, ...]
-        index = np.array([[0, 0]])
+        index = np.array([[0, 0], [0, self.H - 1], [self.W - 1, 0], [self.W - 1, self.H - 1]])
         ray_bundle = self.cameras[0].get_rays(index=index, to_np=True)
+        ray_colors = get_combine_colors(['blue', 'green', 'yellow', 'maroon'], [1] * 4)
 
         file_path = osp.join(self.spec_result_dir, 'single_cam_ray_pc.png')
         draw_3d_components(
@@ -340,10 +341,13 @@ class TestDict(unittest.TestCase):
             intrinsic=self.intrinsic,
             points=pts,
             point_colors=pts_colors,
-            point_size=1.0,
+            point_size=5.0,
             rays=(ray_bundle[0], ray_bundle[1]),
-            title='Cam ray at (0,0).',
-            save_path=file_path
+            ray_colors=ray_colors,
+            title='Cam ray at corner(lt: blue/lb: green/rt: yellow/rb: maroon)',
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True,
         )
 
 
