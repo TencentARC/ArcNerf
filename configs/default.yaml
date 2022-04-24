@@ -35,7 +35,7 @@ dist:
     slurm: False                    # use slurm for management
 
 batch_size: 2                       # actually do not use it in training
-n_rays: 4096                        # n_rays for each training batch
+n_rays: 4096                        # n_rays for each training batch, does not affect inference/val, capacity by model
 worker: 4
 
 optim:

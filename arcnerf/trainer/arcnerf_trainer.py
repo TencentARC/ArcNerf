@@ -219,7 +219,7 @@ class ArcNerfTrainer(BasicTrainer):
            For object reconstruction, only one valid sample in each epoch. Shuffle sampler all the time.
         """
         self.logger.add_log('Valid on data...')
-
+        # TODO: Do not free memory after valid, fix it
         # refresh valid sampler
         refresh = self.data['val_sampler'] is not None
         if refresh:
@@ -261,6 +261,10 @@ class ArcNerfTrainer(BasicTrainer):
             loss_msg = 'Validation Avg Loss --> Sum [{:.2f}]'.format(loss_summary.get_avg_sum())
             self.logger.add_log(loss_msg)
 
+        # release gpu memory
+        if self.device == 'gpu':
+            torch.cuda.empty_cache()
+
         self.model.train()
 
     @master_only
@@ -276,6 +280,11 @@ class ArcNerfTrainer(BasicTrainer):
         self.model.eval()
         files = self.inference(self.data['inference'], self.model, self.device)
         write_infer_files(files, eval_dir_epoch, self.data['inference'], self.logger)
+
+        # release gpu memory
+        if self.device == 'gpu':
+            torch.cuda.empty_cache()
+
         self.model.train()
 
     def render_progress_img(self, inputs, output):

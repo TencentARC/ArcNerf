@@ -456,6 +456,10 @@ class BasicTrainer(object):
             with open(eval_log_file, 'w') as f:
                 f.writelines(metric_info)
 
+        # release gpu memory
+        if self.device == 'gpu':
+            torch.cuda.empty_cache()
+
         self.model.train()
 
     @master_only
@@ -491,6 +495,10 @@ class BasicTrainer(object):
             self.monitor.add_loss(loss_summary.get_avg_summary(), global_step, mode='val')
             loss_msg = 'Validation Avg Loss --> Sum [{:.3f}]'.format(loss_summary.get_avg_sum())
             self.logger.add_log(loss_msg)
+
+        # release gpu memory
+        if self.device == 'gpu':
+            torch.cuda.empty_cache()
 
         self.model.train()
 
