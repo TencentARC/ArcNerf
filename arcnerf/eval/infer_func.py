@@ -426,7 +426,7 @@ def write_infer_files(files, folder, data, logger):
                 points=pts,
                 point_colors=pts_colors,
                 volume=volume_dict,
-                title='valid pts from volume',
+                title='valid pts({}) from volume'.format(pts.shape[0]),
                 save_path=file_path,
                 plotly=True,
                 plotly_html=True
@@ -452,7 +452,7 @@ def write_infer_files(files, folder, data, logger):
                 volume=volume_dict,
                 meshes=[verts_by_faces],
                 face_colors=[face_colors_sim],
-                title='Meshes extract from volume',
+                title='Meshes ({} faces) extract from volume'.format(verts_by_faces.shape[0]),
                 save_path=file_path,
                 plotly=True,
                 plotly_html=True

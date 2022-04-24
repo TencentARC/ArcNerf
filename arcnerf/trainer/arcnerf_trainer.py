@@ -219,7 +219,7 @@ class ArcNerfTrainer(BasicTrainer):
            For object reconstruction, only one valid sample in each epoch. Shuffle sampler all the time.
         """
         self.logger.add_log('Valid on data...')
-        # TODO: Do not free memory after valid, fix it
+
         # refresh valid sampler
         refresh = self.data['val_sampler'] is not None
         if refresh:
@@ -258,7 +258,7 @@ class ArcNerfTrainer(BasicTrainer):
 
         if loss_summary.get_avg_summary() is not None:
             self.monitor.add_loss(loss_summary.get_avg_summary(), global_step, mode='val')
-            loss_msg = 'Validation Avg Loss --> Sum [{:.2f}]'.format(loss_summary.get_avg_sum())
+            loss_msg = 'Validation Avg Loss --> Sum [{:.3f}]'.format(loss_summary.get_avg_sum())
             self.logger.add_log(loss_msg)
 
         # release gpu memory

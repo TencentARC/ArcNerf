@@ -151,7 +151,7 @@ class GeoNet(nn.Module):
         if self.W_feat <= 0:  # (B, 1), None
             return out, None
         else:  # (B, 1), (B, W_feat)
-            return out[:, 1].unsqueeze(-1), out[:, 1:]
+            return out[:, 0].unsqueeze(-1), out[:, 1:]
 
     def forward_geo_value(self, x: torch.Tensor):
         """Only get geometry value like sigma/sdf/occ"""
