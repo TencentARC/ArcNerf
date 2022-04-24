@@ -15,7 +15,7 @@ from arcnerf.eval.infer_func import set_inference_data, run_infer, write_infer_f
 from arcnerf.loss import build_loss
 from arcnerf.metric import build_metric
 from arcnerf.models import build_model
-from arcnerf.visual.render_img import render_progress_img
+from arcnerf.visual.render_img import render_progress_imgs, write_progress_imgs
 from common.loss.loss_dict import LossDictCounter
 from common.trainer.basic_trainer import BasicTrainer
 from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
@@ -287,13 +287,13 @@ class ArcNerfTrainer(BasicTrainer):
 
         self.model.train()
 
-    def render_progress_img(self, inputs, output):
+    def render_progress_imgs(self, inputs, output):
         """Actual render for progress image with label. It is perform in each step with a batch.
          Return a dict with list of image and filename. filenames should be irrelevant to progress
          Image should be in bgr with shape(h,w,3), which can be directly writen by cv.imwrite().
          Return None will not write anything.
         """
-        return render_progress_img(inputs, output)
+        return render_progress_imgs(inputs, output)
 
     def inference(self, data, model, device):
         """Actual infer function for the model. Use run_infer since we want to run it local as well"""
@@ -311,12 +311,16 @@ class ArcNerfTrainer(BasicTrainer):
             self.eval_metric,
             metric_summary,
             device,
-            self.render_progress_img,
+            self.render_progress_imgs,
             max_samples_eval,
             show_progress=False
         )
 
         return metric_info, files
+
+    def write_progress_imgs(self, files, folder, epoch=None, step=None, global_step=None, eval=False):
+        """Actual function to write the progress images"""
+        write_progress_imgs(files, folder, epoch, step, global_step, eval)
 
     def train_epoch(self, epoch):
         """Train for one epoch. Each epoch return the final sum of loss and total num of iter in epoch"""

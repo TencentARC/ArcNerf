@@ -6,7 +6,6 @@ import subprocess
 import sys
 import time
 
-import cv2
 import torch
 
 from common.loss.loss_dict import LossDictCounter
@@ -44,7 +43,7 @@ class BasicTrainer(object):
 
         # set up exp folder
         self.set_dir()
-        self.backup(cfgs)
+        self.backup()
 
         self.logger = self.set_logger()
         self.set_reproducibility()
@@ -128,7 +127,7 @@ class BasicTrainer(object):
         os.makedirs(self.cfgs.dir.event_dir, exist_ok=True)
 
     @master_only
-    def backup(self, cfgs):
+    def backup(self):
         """Backup experiment configs in result folder"""
         backup_config_path = osp.join(self.cfgs.dir.expr_spec_dir, 'cfg_backup.yaml')
         dump_configs(self.cfgs, backup_config_path)
@@ -317,25 +316,20 @@ class BasicTrainer(object):
         """Save progress img for tracking. For both training and val. By default write to monitor.
             You are allowed to send a list of imgs to write for each iteration.
         """
-        files = self.render_progress_img(inputs, output)
+        files = self.render_progress_imgs(inputs, output)
         if files is None:
             return
 
-        progress_dir = osp.join(self.cfgs.dir.expr_spec_dir, 'progress')
-        os.makedirs(progress_dir, exist_ok=True)
-        progress_mode_dir = osp.join(progress_dir, mode)
-        os.makedirs(progress_mode_dir, exist_ok=True)
-
-        for name, img in zip(files['names'], files['imgs']):
+        # only add the images from file. Other like figs, etc are not support for monitor. You need to overwrite it.
+        for name, img in zip(files['imgs']['names'], files['imgs']['imgs']):
             self.monitor.add_img(name, img, global_step, mode=mode)
-            if self.cfgs.progress.local_progress:
-                img_folder = osp.join(progress_mode_dir, name)
-                os.makedirs(img_folder, exist_ok=True)
-                img_path = osp.join(
-                    img_folder, 'epoch{:06d}_step{:05d}_global{:08d}.png'.format(epoch, step, global_step)
-                )
 
-                cv2.imwrite(img_path, img)
+        if self.cfgs.progress.local_progress:
+            progress_dir = osp.join(self.cfgs.dir.expr_spec_dir, 'progress')
+            os.makedirs(progress_dir, exist_ok=True)
+            progress_mode_dir = osp.join(progress_dir, mode)
+            os.makedirs(progress_mode_dir, exist_ok=True)
+            self.write_progress_imgs([files], progress_mode_dir, epoch, step, global_step, eval=False)
 
     @master_only
     def train_step_writer(self, epoch, step, step_in_epoch, loss, learning_rate, global_step, inputs, output, **kwargs):
@@ -442,14 +436,8 @@ class BasicTrainer(object):
             self.logger.add_log('No evaluation perform...', level='warning')
         else:
             self.logger.add_log('Evaluation at Epoch {} Benchmark result. \n {}'.format(epoch, metric_info))
-            if files is not None and len(files) > 0:
-                # write down a list of rendered outputs in eval_dir
-                for img_name in files[0]['names']:
-                    os.makedirs(osp.join(eval_dir_epoch, img_name), exist_ok=True)
-                for idx, file in enumerate(files):
-                    for name, img in zip(file['names'], file['imgs']):
-                        img_path = osp.join(eval_dir_epoch, name, 'eval_{:04d}.png'.format(idx))
-                        cv2.imwrite(img_path, img)
+            if files is not None:
+                self.write_progress_imgs(files, folder=eval_dir_epoch, eval=True)
                 self.logger.add_log('Visual results add to {}'.format(eval_dir_epoch))
 
             eval_log_file = os.path.join(eval_dir_epoch, 'eval_log.txt')
@@ -559,10 +547,14 @@ class BasicTrainer(object):
         """Actual eval function for the model. """
         raise NotImplementedError('Please implement the detail evaluate method in child class...')
 
-    def render_progress_img(self, inputs, output):
+    def render_progress_imgs(self, inputs, output):
         """Actual render for progress image with label. It is perform in each step with a batch.
          Return a dict with list of image and filename. filenames should be irrelevant to progress
          Image should be in bgr with shape(h,w,3), which can be directly writen by cv.imwrite().
          Return None will not write anything.
          """
         raise NotImplementedError('Please implement the detail render function in child class...')
+
+    def write_progress_imgs(self, files, folder, epoch=None, step=None, global_step=None, eval=False):
+        """Actual function to write the progress images"""
+        raise NotImplementedError('Please implement the detail write progress function in child class...')

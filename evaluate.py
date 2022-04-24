@@ -2,9 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-import os.path as osp
 
-import cv2
 import torch
 
 from common.metric.metric_dict import MetricDictCounter
@@ -16,7 +14,7 @@ from arcnerf.datasets.transform.augmentation import get_transforms
 from arcnerf.eval.eval_func import run_eval
 from arcnerf.metric import build_metric
 from arcnerf.models import build_model
-from arcnerf.visual.render_img import render_progress_img
+from arcnerf.visual.render_img import render_progress_imgs, write_progress_imgs
 
 if __name__ == '__main__':
     cfgs = parse_configs()
@@ -62,7 +60,7 @@ if __name__ == '__main__':
 
     # eval
     metric_info, files = run_eval(
-        loader, get_model_feed_in, model, logger, eval_metric, metric_dict, device, render_progress_img,
+        loader, get_model_feed_in, model, logger, eval_metric, metric_dict, device, render_progress_imgs,
         cfgs.progress.max_samples_eval
     )
 
@@ -72,13 +70,7 @@ if __name__ == '__main__':
         exit()
 
     if files is not None and len(files) > 0:
-        # write down a list of rendered outputs in eval_dir
-        for img_name in files[0]['names']:
-            os.makedirs(osp.join(eval_dir, img_name), exist_ok=True)
-        for idx, file in enumerate(files):
-            for name, img in zip(file['names'], file['imgs']):
-                img_path = osp.join(eval_dir, name, 'eval_{:04d}.png'.format(idx))
-                cv2.imwrite(img_path, img)
+        write_progress_imgs(files, eval_dir, eval=True)
         logger.add_log('Visual results add to {}'.format(eval_dir))
 
     logger.add_log('Evaluation Benchmark result. \n {}'.format(metric_info))
