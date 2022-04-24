@@ -311,6 +311,10 @@ def ray_marching(
     trans_shift = torch.cumprod(trans_shift, -1)[:, :-1]  # (N_rays, N_p)
     # weight_i = Ti * alpha_i
     weights = alpha * trans_shift  # (N_rays, N_p)
+    if weights_only:
+        output = {'weights': weights}
+        return output
+
     # depth = sum(weight_i * zvals_i)
     depth = torch.sum(weights * _zvals, -1)  # (N_rays)
     # accumulated weight(mask)
@@ -322,20 +326,16 @@ def ray_marching(
     else:
         rgb = None
 
-    if weights_only:
-        output = {'weights': weights}
-
-    else:
-        output = {
-            'rgb': rgb,  # (N_rays, 3)
-            'depth': depth,  # (N_rays)
-            'mask': mask,  # (N_rays)
-            'sigma': _sigma,  # (N_rays, N_pts/N_pts-1)
-            'zvals': _zvals,  # (N_rays, N_pts/N_pts-1)
-            'alpha': alpha,  # (N_rays, N_pts/N_pts-1)
-            'trans_shift': trans_shift,  # (N_rays, N_pts/N_pts-1)
-            'weights': weights  # (N_rays, N_pts/N_pts-1)
-        }
+    output = {
+        'rgb': rgb,  # (N_rays, 3)
+        'depth': depth,  # (N_rays)
+        'mask': mask,  # (N_rays)
+        'sigma': _sigma,  # (N_rays, N_pts/N_pts-1)
+        'zvals': _zvals,  # (N_rays, N_pts/N_pts-1)
+        'alpha': alpha,  # (N_rays, N_pts/N_pts-1)
+        'trans_shift': trans_shift,  # (N_rays, N_pts/N_pts-1)
+        'weights': weights  # (N_rays, N_pts/N_pts-1)
+    }
 
     return output
 
