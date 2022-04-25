@@ -9,7 +9,9 @@ from arcnerf.geometry.transformation import normalize
 from common.utils.torch_utils import torch_to_np
 
 
-def get_rays(W, H, intrinsic: torch.Tensor, c2w: torch.Tensor, index: np.ndarray = None, n_rays=-1, to_np=False):
+def get_rays(
+    W, H, intrinsic: torch.Tensor, c2w: torch.Tensor, wh_order=True, index: np.ndarray = None, n_rays=-1, to_np=False
+):
     """Get rays in world coord from camera.
     No batch processing allow. Rays are produced by setting z=1 and get location.
     You can select index by a tuple, a list of tuple or a list of index
@@ -19,6 +21,7 @@ def get_rays(W, H, intrinsic: torch.Tensor, c2w: torch.Tensor, index: np.ndarray
         H: img_height
         intrinsic: torch.tensor(3, 3) intrinsic matrix
         c2w: torch.tensor(4, 4) cam pose. cam_to_world transform
+        wh_order: If True, the rays are flatten in column-major. If False, in row-major. By default True
         index: sample ray by (i, j) index from (W, H), np.array/torch.tensor(N_ind, 2) for (i, j) index
                 first index is X and second is Y, any index should be in range (0, W-1) and (0, H-1)
         n_rays: random sample ray by such num if it > 0
@@ -53,6 +56,10 @@ def get_rays(W, H, intrinsic: torch.Tensor, c2w: torch.Tensor, index: np.ndarray
     if index is not None:
         pixels = pixels[:, index, :]
         index = torch_to_np(index).tolist()
+
+    # reorder if full rays
+    if not wh_order and index is None and n_rays <= 0:  # (HW, 2)
+        pixels = pixels.squeeze(0).contiguous().view(W, H, 2).permute(1, 0, 2).contiguous().view(-1, 2).unsqueeze(0)
 
     z = torch.ones(size=(1, pixels.shape[1]), dtype=dtype).to(device)  # (1, WH/N_rays)
     xyz_world = pixel_to_world(pixels, z, intrinsic.unsqueeze(0), c2w.unsqueeze(0))  # (1, WH/N_rays, 3)

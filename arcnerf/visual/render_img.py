@@ -9,6 +9,7 @@ import numpy as np
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.render.ray_helper import sample_ray_marching_output_by_index
 from arcnerf.visual.plot_3d import draw_3d_components
+from common.utils.cfgs_utils import pop_none_item
 from common.utils.img_utils import img_to_uint8
 from common.utils.torch_utils import torch_to_np, np_wrapper
 from common.visual import get_colors
@@ -30,9 +31,11 @@ def render_progress_imgs(inputs, output):
     else:  # sample some rays for visual
         dic = {'rays': get_sample_ray_imgs(inputs, output, train=True)}
 
-    # remove none dict
+    # remove if all None, pop None item
     if all([v is None for v in dic.values()]):
         return None
+
+    pop_none_item(dic)
 
     return dic
 

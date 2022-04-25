@@ -31,6 +31,16 @@ def obj_to_dict(nested_obj):
     return dic
 
 
+def pop_none_item(input_dict):
+    """Pop the None item in dict"""
+    pop_k = []
+    for k, v in input_dict.items():
+        if v is None:
+            pop_k.append(k)
+    for k in pop_k:
+        input_dict.pop(k)
+
+
 def remap_str_list(value):
     """Remap a string of list"""
     assert value.startswith('[') and value.endswith(']'), 'Should be in []'

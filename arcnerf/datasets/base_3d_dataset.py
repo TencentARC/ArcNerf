@@ -6,7 +6,7 @@ import torch
 from arcnerf.geometry.poses import center_poses, average_poses
 from arcnerf.geometry.ray import closest_point_to_rays
 from common.datasets.base_dataset import BaseDataset
-from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
+from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field, pop_none_item
 from common.utils.img_utils import img_scale, read_img
 from common.utils.torch_utils import np_wrapper
 
@@ -155,7 +155,7 @@ class Base3dDataset(BaseDataset):
         if self.ray_bundles is None:
             self.ray_bundles = []
             for i in range(self.n_imgs):
-                self.ray_bundles.append(self.cameras[i].get_rays())
+                self.ray_bundles.append(self.cameras[i].get_rays(wh_order=False))
 
     def __len__(self):
         """Len of dataset"""
@@ -178,7 +178,7 @@ class Base3dDataset(BaseDataset):
         if self.precache:
             ray_bundle = self.ray_bundles[idx]
         else:
-            ray_bundle = self.cameras[idx].get_rays()  # We don't sample rays here, although you can do that
+            ray_bundle = self.cameras[idx].get_rays(wh_order=False)  # We don't sample rays here
 
         inputs = {
             'img': img,  # (hw, 3), in rgb order / (n_rays, 3) if sample rays
@@ -193,12 +193,8 @@ class Base3dDataset(BaseDataset):
             'bounds': bounds  # (hw, 2) for (near, far), if set bounds(generally for pc)
         }
 
-        pop_k = []
-        for k, v in inputs.items():
-            if v is None:  # in case can not collate
-                pop_k.append(k)
-        for k in pop_k:
-            inputs.pop(k)
+        # in case can not collate, pop none item
+        pop_none_item(inputs)
 
         if self.transforms is not None:
             inputs = self.transforms(inputs)

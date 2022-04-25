@@ -76,9 +76,9 @@ class PerspectiveCamera(object):
 
         return pose
 
-    def get_rays(self, index: np.ndarray = None, n_rays=-1, to_np=False):
+    def get_rays(self, wh_order=True, index: np.ndarray = None, n_rays=-1, to_np=False):
         """Get camera rays by intrinsic and c2w, in world coord"""
-        return get_rays(self.W, self.H, self.get_intrinsic(), self.get_pose(), index=index, n_rays=n_rays, to_np=to_np)
+        return get_rays(self.W, self.H, self.get_intrinsic(), self.get_pose(), wh_order, index, n_rays, to_np)
 
     def proj_world_to_pixel(self, points: torch.Tensor):
         """Project points onto image plane.
