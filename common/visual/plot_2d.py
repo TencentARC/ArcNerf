@@ -44,6 +44,7 @@ def draw_2d_components(
     ylabel='y',
     title='',
     save_path=None,
+    return_fig=False
 ):
     """draw 2d component, including lines, points, etc
 
@@ -57,6 +58,7 @@ def draw_2d_components(
         ylabel: y-axis label, by dafault y
         title: a string of figure title
         save_path: path to save the fig. None will only show fig
+        return_fig: If True, return the fig for usage like monitor save. Do not show. By defalt False
     """
     fig = plt.figure()
     ax = fig.add_subplot()
@@ -92,7 +94,9 @@ def draw_2d_components(
     ax.set_title(title)
 
     if save_path:
-        plt.savefig(save_path)
+        fig.savefig(save_path)
+    elif return_fig:
+        return fig
     else:
         plt.show()
 

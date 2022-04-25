@@ -15,12 +15,14 @@ from arcnerf.eval.infer_func import set_inference_data, run_infer, write_infer_f
 from arcnerf.loss import build_loss
 from arcnerf.metric import build_metric
 from arcnerf.models import build_model
+from arcnerf.visual.plot_3d import draw_3d_components
 from arcnerf.visual.render_img import render_progress_imgs, write_progress_imgs
 from common.loss.loss_dict import LossDictCounter
 from common.trainer.basic_trainer import BasicTrainer
 from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
 from common.utils.torch_utils import torch_to_np
 from common.utils.train_utils import master_only
+from common.visual.plot_2d import draw_2d_components
 
 
 class ArcNerfTrainer(BasicTrainer):
@@ -49,6 +51,9 @@ class ArcNerfTrainer(BasicTrainer):
         # for inference only
         self.intrinsic = None
         self.wh = None
+        # for progress save
+        self.radius = None
+        self.volume_dict = None
 
         data = {}
         # train
@@ -92,6 +97,13 @@ class ArcNerfTrainer(BasicTrainer):
                 )
         else:
             data['inference'] = None
+
+        # set the sphere and volume for rendering
+        if data['inference'] is not None and 'render' in data['inference']:
+            self.radius = data['inference']['render']['cfgs']['radius']
+        if data['inference'] is not None and 'volume' in data['inference']:
+            vol = data['inference']['volume']['Vol']
+            self.volume_dict = {'grid_pts': torch_to_np(vol.get_corner()), 'lines': vol.get_bound_lines()}
 
         return data
 
@@ -236,6 +248,7 @@ class ArcNerfTrainer(BasicTrainer):
            Remember to set eval mode at beginning and set train mode at the end.
 
            For object reconstruction, only one valid sample in each epoch. Shuffle sampler all the time.
+           get_progress for writting if debug.get_progress is True
         """
         self.logger.add_log('Valid on data...')
 
@@ -314,16 +327,50 @@ class ArcNerfTrainer(BasicTrainer):
         """
         return render_progress_imgs(inputs, output)
 
+    @master_only
+    def save_progress(self, epoch, step, global_step, inputs, output, mode='train'):
+        """Save progress img for tracking. For both training and val. By default write to monitor.
+            You are allowed to send a list of imgs to write for each iteration.
+        """
+        files = self.render_progress_imgs(inputs, output)
+        if files is None:
+            return
+
+        # monitor write image
+        if 'imgs' in files:
+            for name, img in zip(files['imgs']['names'], files['imgs']['imgs']):
+                self.monitor.add_img(name, img, global_step, mode=mode)
+        # monitor write rays
+        if 'rays' in files:
+            if '2d' in files['rays']:
+                for name, rays_2d in zip(files['rays']['2d']['names'], files['rays']['2d']['samples']):
+                    fig = draw_2d_components(**rays_2d, title='2d rays, id: {}'.format(name), return_fig=True)
+                    self.monitor.add_fig(name, fig, global_step, mode=mode)
+
+            if '3d' in files['rays']:
+                param = files['rays']['3d']
+                if 'point_size' in param:
+                    param['point_size'] = param['point_size'] / 5.0 if param['point_size'] is not None else None
+                img = draw_3d_components(
+                    **param,
+                    sphere_radius=self.radius,
+                    volume=self.volume_dict,
+                    title='3d rays. pts size proportional to sigma',
+                    plotly=True,
+                    return_fig=True
+                )
+                self.monitor.add_img('rays_3d', img, global_step, mode=mode + '_rays3d')
+
+        if self.cfgs.progress.local_progress:
+            progress_dir = osp.join(self.cfgs.dir.expr_spec_dir, 'progress')
+            os.makedirs(progress_dir, exist_ok=True)
+            progress_mode_dir = osp.join(progress_dir, mode)
+            os.makedirs(progress_mode_dir, exist_ok=True)
+            self.write_progress_imgs([files], progress_mode_dir, epoch, step, global_step, False)
+
     def write_progress_imgs(self, files, folder, epoch=None, step=None, global_step=None, eval=False):
         """Actual function to write the progress images"""
-        radius, volume_dict = None, None
-        if self.data['inference'] is not None and 'render' in self.data['inference']:
-            radius = self.data['inference']['render']['cfgs']['radius']
-        if self.data['inference'] is not None and 'volume' in self.data['inference']:
-            vol = self.data['inference']['volume']['Vol']
-            volume_dict = {'grid_pts': torch_to_np(vol.get_corner()), 'lines': vol.get_bound_lines()}
-
-        write_progress_imgs(files, folder, epoch, step, global_step, eval, radius, volume_dict)
+        write_progress_imgs(files, folder, epoch, step, global_step, eval, self.radius, self.volume_dict)
 
     def inference(self, data, model, device):
         """Actual infer function for the model. Use run_infer since we want to run it local as well"""

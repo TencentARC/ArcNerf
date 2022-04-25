@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 
+import io
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
+from PIL import Image
 
 from .camera_model import create_camera_model, get_cam_whf
 from arcnerf.geometry.sphere import get_sphere_surface
@@ -386,7 +389,8 @@ def draw_3d_components(
     title='',
     save_path=None,
     plotly=False,
-    plotly_html=False
+    plotly_html=False,
+    return_fig=False
 ):
     """draw 3d component, including cameras, points, rays, etc
     For any pts in world space, you need to transform_plt_space to switch yz axis
@@ -416,6 +420,7 @@ def draw_3d_components(
         save_path: path to save the fig. None will only show fig
         plotly: If True, use plotly instead of plt. Can be zoom-in/out. By default False.
         plotly_html: If True and save_path is not True, save to .html file instead of .png, good for interactive
+        return_fig: If True, return the fig for usage like monitor save. Do not show. By defalt False
     """
     fig = None
     if plotly:
@@ -504,6 +509,12 @@ def draw_3d_components(
                 pio.write_html(fig, html_path)
             else:
                 pio.write_image(fig, save_path)
+        elif return_fig:
+            if plotly_html:
+                return pio.to_html(fig)
+            else:
+                img = np.asarray(Image.open(io.BytesIO(pio.to_image(fig, 'png'))))[:, :, :3]
+                return img
         else:
             pio.show(fig)
 
@@ -518,6 +529,8 @@ def draw_3d_components(
 
         if save_path:
             fig.savefig(save_path)
+        elif return_fig:
+            return fig
         else:
             plt.show()
 

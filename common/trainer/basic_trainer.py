@@ -60,6 +60,8 @@ class BasicTrainer(object):
 
         # loss
         self.loss_factory = self.set_loss_factory()
+
+        # monitor
         self.monitor = self.set_monitor()
 
         # metric
@@ -310,27 +312,6 @@ class BasicTrainer(object):
             loss_msg += '{} [{:.3f}] | '.format(key, float(loss[key]))
         loss_msg += '--> Loss Sum [{:.3f}]'.format(float(loss['sum']))
         self.logger.add_log(loss_msg)
-
-    @master_only
-    def save_progress(self, epoch, step, global_step, inputs, output, mode='train'):
-        """Save progress img for tracking. For both training and val. By default write to monitor.
-            You are allowed to send a list of imgs to write for each iteration.
-        """
-        files = self.render_progress_imgs(inputs, output)
-        if files is None:
-            return
-
-        # only add the images from file. Other like figs, etc are not support for monitor. You need to overwrite it.
-        if 'imgs' in files:
-            for name, img in zip(files['imgs']['names'], files['imgs']['imgs']):
-                self.monitor.add_img(name, img, global_step, mode=mode)
-
-        if self.cfgs.progress.local_progress:
-            progress_dir = osp.join(self.cfgs.dir.expr_spec_dir, 'progress')
-            os.makedirs(progress_dir, exist_ok=True)
-            progress_mode_dir = osp.join(progress_dir, mode)
-            os.makedirs(progress_mode_dir, exist_ok=True)
-            self.write_progress_imgs([files], progress_mode_dir, epoch, step, global_step, eval=False)
 
     @master_only
     def train_step_writer(self, epoch, step, step_in_epoch, loss, learning_rate, global_step, inputs, output, **kwargs):

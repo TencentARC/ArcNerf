@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
@@ -44,3 +45,8 @@ class Monitor(object):
             img = np.transpose(img, [2, 0, 1])
 
         self.monitor.add_image('{}/{}'.format(mode, filename), img, global_step)
+
+    def add_fig(self, filename, fig, global_step, mode):
+        """Add a fig from plt"""
+        self.monitor.add_figure('{}_fig/{}'.format(mode, filename), fig, global_step)
+        plt.close(fig)
