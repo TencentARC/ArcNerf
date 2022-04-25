@@ -30,9 +30,14 @@ def np_wrapper(func, *args):
         return result
 
 
-def torch_to_np(tensor: torch.Tensor):
+def torch_to_np(tensor):
     """Torch tensor to numpy array"""
-    return tensor.detach().cpu().numpy()
+    if isinstance(tensor, np.ndarray):
+        return tensor
+    elif isinstance(tensor, torch.Tensor):
+        return tensor.detach().cpu().numpy()
+    else:
+        raise NotImplementedError('Please use torch tensor or np array')
 
 
 def torch_from_np_with_ref(np_array: np.ndarray, tensor_ref: torch.Tensor):

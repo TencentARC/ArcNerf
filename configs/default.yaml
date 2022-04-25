@@ -7,6 +7,7 @@ resume: None
 debug:
     debug_mode: False               # support debug like checking grad.
     print_all_grad: False           # print all grad for all param in model. Only in debug mode
+    get_progress: False             # get the progress to print during train/val, need save_progress and local_progress
 
 dir:
     expr_dir: None

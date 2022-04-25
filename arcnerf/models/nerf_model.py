@@ -103,6 +103,10 @@ class NeRF(Base3dModel):
             output['depth_coarse'] = output_coarse['depth']  # (B,)
             output['mask_coarse'] = output_coarse['mask']  # (B,)
 
+        if get_progress:
+            for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
+                output['progress_{}'.format(key)] = output_coarse[key].detach()  # (B, N_sample(-1))
+
         # fine model
         if self.rays_cfgs['n_importance'] > 0:
             weights_coarse = output_coarse['weights'][:, :self.rays_cfgs['n_sample'] - 2]  # (B, N_sample-2)
@@ -134,6 +138,10 @@ class NeRF(Base3dModel):
             output['rgb_fine'] = output_fine['rgb']  # (B, 3)
             output['depth_fine'] = output_fine['depth']  # (B,)
             output['mask_fine'] = output_fine['mask']  # (B,)
+
+            if get_progress:  # replace with fine
+                for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
+                    output['progress_{}'.format(key)] = output_fine[key].detach()  # (B, N_sample(-1))
 
         return output
 

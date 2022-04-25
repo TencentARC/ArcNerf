@@ -50,12 +50,13 @@ class Base3dModel(BaseModel):
             inputs['img']: torch.tensor (B, N, 3), rgb value in 0-1, optional
             inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
             inputs['bounds']: torch.tensor (B, 2). optional
-            inference_only: If True, will not output coarse results. By default False
+            inference_only: If True, only return the final results(not coarse). By default False
             get_progress: If True, output some progress for recording, can not used in inference only mode.
                           By default False
 
         Returns:
             output is a dict keys like (rgb, rgb_coarse, rgb_dense, depth, etc) based on the _forward function.
+            If get_progress is True, output will contain keys like 'progress_xx' for xx in ['sigma', 'zvals'] etc.
         """
         flat_inputs = {}
         rays_o = inputs['rays_o'].view(-1, 3)  # (BN, 3)
@@ -84,11 +85,11 @@ class Base3dModel(BaseModel):
         # all output tensor in (B*N, ...), reshape to (B, N, ...)
         output = chunk_processing(self._forward, self.chunk_rays, flat_inputs, inference_only, get_progress)
         for k, v in output.items():
-            if isinstance(v, torch.Tensor):
-                old_shape = v.shape
-                assert batch_size * n_rays_per_batch == old_shape[0], 'Invalid output shape...Not flatten...'
-                new_shape = tuple([batch_size, n_rays_per_batch] + list(old_shape)[1:])
+            if isinstance(v, torch.Tensor) and batch_size * n_rays_per_batch == v.shape[0]:
+                new_shape = tuple([batch_size, n_rays_per_batch] + list(v.shape)[1:])
                 output[k] = v.view(new_shape)
+            else:
+                output[k] = v
 
         return output
 

@@ -321,8 +321,9 @@ class BasicTrainer(object):
             return
 
         # only add the images from file. Other like figs, etc are not support for monitor. You need to overwrite it.
-        for name, img in zip(files['imgs']['names'], files['imgs']['imgs']):
-            self.monitor.add_img(name, img, global_step, mode=mode)
+        if 'imgs' in files:
+            for name, img in zip(files['imgs']['names'], files['imgs']['imgs']):
+                self.monitor.add_img(name, img, global_step, mode=mode)
 
         if self.cfgs.progress.local_progress:
             progress_dir = osp.join(self.cfgs.dir.expr_spec_dir, 'progress')

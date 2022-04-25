@@ -340,11 +340,13 @@ def ray_marching(
     return output
 
 
-def sample_ray_marching_output_by_index(output, n_rays=1, sigma_scale=2.0):
+def sample_ray_marching_output_by_index(output, index=None, n_rays=1, sigma_scale=2.0):
     """Sample output from ray marching by index, which is directly used for 2d visualization
 
     Args:
-        output: output from ray_marching, with 'depth', 'mask', etc, each is torch.tensor
+        output: output from ray_marching progress samples, with 'sigma', 'zvals', etc
+                each is torch.tensor or np array
+        index: a list of index to select. If None, use n_rays to sample.
         n_rays: num of sampled rays, by default, 1
         sigma_scale: used to scale sigma value up by this value for visual consistency. By default 2.0
 
@@ -353,10 +355,14 @@ def sample_ray_marching_output_by_index(output, n_rays=1, sigma_scale=2.0):
                 Each dict has points, lines, legends which are lists of [x, y] and str for 2d visual
         sample_index: the index sampled
     """
-    total_rays = output['depth'].shape[0]
+    total_rays = output['zvals'].shape[0]
     n_pts_per_ray = output['zvals'].shape[1]
 
-    sample_index = np.random.choice(range(total_rays), n_rays, replace=False).tolist()
+    if index is None:
+        sample_index = np.random.choice(range(total_rays), n_rays, replace=False).tolist()
+    else:
+        sample_index = index
+
     out_list = []
     for idx in sample_index:
         res = {'points': [], 'lines': [], 'legends': []}
@@ -364,7 +370,7 @@ def sample_ray_marching_output_by_index(output, n_rays=1, sigma_scale=2.0):
         x = torch_to_np(output['zvals'][idx]).tolist()
         res['points'].append([x, [-1] * n_pts_per_ray])
         # sigma
-        sigma = torch_to_np(output['sigma'][idx])
+        sigma = torch_to_np(output['sigma'][idx]).copy()
         sigm_max = float(sigma.max())
         sigma = sigma / sigma.max() * sigma_scale
         sigma = sigma.tolist()
