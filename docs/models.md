@@ -18,6 +18,7 @@ Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
 Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
 
 # chunk_size
+## chunk_rays
 The model is hard to process `batch_size * n_rays_per_sample * n_pts_per_ray` in a single
 forward, set it to be `n_rays` to be process in a single forward.
 By default use `1024*32 = 32768` rays together.
@@ -30,6 +31,7 @@ get `(B, N_rays, ...)` as final results.
 The main `forward` function in `Base3dModel` is a wrapper for `(B, N_rays, ...)` input, call `_forward` by `chunk_rays`
 size,  and the core `_forward` in child class (like `NeRF`) process `(N_rays_per_chunk, ...)` and get result for rays.
 
+## chunk_pts
 In the core `_forward`, the model may forward the pts sampled on rays. We set `chunk_pts` for a single forward size for
 pts. By default we use `4096*192=786432`, it works good for 32GB memory GPU.
 

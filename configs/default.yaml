@@ -134,8 +134,8 @@ model:
         perturb: True                 # perturb zvals interval
         add_inf_z: True               # Add inf zval for ray marching, do not applied for background
         noise_std: 1.0                # noise for sigma in training
-    chunk_rays: 65536                 # each chunk to process 1024*64(ray), enough for 32 GB
-    chunk_pts: 786432                 # each chunk to progress 4096*192(pts), for model forward
+    chunk_rays: 32768                 # each chunk to process 1024*32(rays), full nerf takes more momory
+    chunk_pts: 131072                 # each chunk to progress 4096*32(pts), full nerf takes more momory
     geometry:
         W: 256                        # linear hidden neuron
         D: 8                          # num of linear, not include final

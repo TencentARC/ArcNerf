@@ -43,7 +43,7 @@ optim:
 
 progress:
     start_epoch: -1
-    epoch: 300000
+    epoch: 200000
     save_time: 1800
 
     epoch_loss: 10
@@ -119,8 +119,8 @@ model:
         perturb: True
         add_inf_z: True
         noise_std: 1.0
-    chunk_rays: 65536                 # 1024*64, 32GB
-    chunk_pts: 786432                 # 4096*192
+    chunk_rays: 32768
+    chunk_pts: 131072
     geometry:
         W: 256
         D: 8

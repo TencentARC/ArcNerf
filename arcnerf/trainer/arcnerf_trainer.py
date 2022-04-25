@@ -123,7 +123,6 @@ class ArcNerfTrainer(BasicTrainer):
             self.reset_sampler(sampler, epoch)
 
         # concat all batch
-        self.train_count = 0
         data = self.concat_train_batch(loader)
 
         return data
@@ -160,17 +159,21 @@ class ArcNerfTrainer(BasicTrainer):
                     assert self.total_samples == v_shape[0] * v_shape[1], 'Invalid input dim...'
                 concat_data[k] = v.view(v_shape[0] * v_shape[1], *v_shape[2:])[None, :]  # (1, n_img * n_rays, ...)
 
-        # shuffle all samples
+        return concat_data
+
+    def shuffle_train_data(self):
+        """Shuffle all training data"""
+        self.train_count = 0
+
+        self.logger.add_log('Shuffling training samples... ')
         random_idx = torch.randint(0, self.total_samples, size=[self.total_samples])
-        for k, v in concat_data.items():
+        for k, v in self.data['train'].items():
             if isinstance(v, torch.FloatTensor):
-                concat_data[k] = concat_data[k][:, random_idx, ...]
+                self.data['train'][k] = self.data['train'][k][:, random_idx, ...]
 
         self.logger.add_log(
             'Need {} epoch to run all the rays...'.format(math.ceil(float(self.total_samples) / float(self.n_rays)))
         )
-
-        return concat_data
 
     def get_train_batch(self):
         """Get the train batch base on self.train_count"""
@@ -400,8 +403,7 @@ class ArcNerfTrainer(BasicTrainer):
         step_in_epoch = 1
 
         if self.train_count >= self.total_samples:
-            self.logger.add_log('Reset training sample togethers... ')
-            self.set_train_dataset(epoch)
+            self.shuffle_train_data()
 
         loss_all = self.train_step(epoch, 0, step_in_epoch, self.get_train_batch())
 
@@ -420,6 +422,9 @@ class ArcNerfTrainer(BasicTrainer):
             self.eval_epoch(self.cfgs.progress.start_epoch)
         if self.cfgs.progress.init_eval and self.data['inference'] is not None:
             self.infer_epoch(self.cfgs.progress.start_epoch)
+
+        # init shuffle
+        self.shuffle_train_data()
 
         loss_all = 0.0
         for epoch in range(self.cfgs.progress.start_epoch, self.cfgs.progress.epoch):

@@ -59,7 +59,7 @@ regroup each face to 2 triangles for visual
 - title: title of the fig
 - save_path: if `None`, will show the fig, otherwise save it
 - axis range: update by the component with max values (xyz), show in a cube with same lengths.
-
+- return_fig: If set to True and save_path is None, will return the fig(plt) or numpy array(plotly) for further usage.
 
 # plot2d
 In `common.visual`, we provide a `draw_2d_components` that is
@@ -67,4 +67,3 @@ helpful to plot points/lines in defined colors with legends. We use `matplotlib`
 
 # TODO:
 - Write a python notebook showing how to use
-- open3d version for pc, mesh visual with rays if necessary

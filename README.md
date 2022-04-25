@@ -14,7 +14,7 @@
 - real time inference online demo, any view point visual(opengl, cuda, etc)
 
 - 参考框架
-  - nerf(nerfpl)
+  - nerf(nerfpl) - DONE
   - nerf++
   - unisurf/neus/volsdf - neurcon
   - neuraltex

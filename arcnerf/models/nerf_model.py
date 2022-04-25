@@ -47,11 +47,13 @@ class NeRF(Base3dModel):
                 coarse_rgb: torch.tensor (B, 3), only if inference_only=False
                 coarse_depth: torch.tensor (B,), only if inference_only=False
                 coarse_mask: torch.tensor (B,), only if inference_only=False
-                fine_rgb: torch.tensor (B, 3)
-                fine_depth: torch.tensor (B,)
-                fine_mask: torch.tensor (B,)
+                Return bellow if inference_only
+                    fine_rgb: torch.tensor (B, 3)
+                    fine_depth: torch.tensor (B,)
+                    fine_mask: torch.tensor (B,)
                 If get_progress is True:
-                    TODO: visual progress
+                    sigma/zvals/alpha/trans_shift/weights: torch.tensor (B, n_pts)
+                    Use from fine stage if n_importance > 0
         """
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)
