@@ -19,6 +19,7 @@ from arcnerf.visual.render_img import render_progress_imgs, write_progress_imgs
 from common.loss.loss_dict import LossDictCounter
 from common.trainer.basic_trainer import BasicTrainer
 from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
+from common.utils.torch_utils import torch_to_np
 from common.utils.train_utils import master_only
 
 
@@ -27,6 +28,7 @@ class ArcNerfTrainer(BasicTrainer):
 
     def __init__(self, cfgs):
         super(ArcNerfTrainer, self).__init__(cfgs)
+        self.get_progress = get_value_from_cfgs_field(self.cfgs.debug, 'get_progress', False)
 
     def get_model(self):
         """Get custom model"""
@@ -211,6 +213,23 @@ class ArcNerfTrainer(BasicTrainer):
         """Get the core model feed in and put it to the model's device"""
         return get_model_feed_in(inputs, device)
 
+    def step_optimize(self, epoch, step, feed_in, inputs):
+        """Set get progress for training"""
+        output = self.model(feed_in, get_progress=self.get_progress)
+        loss = self.calculate_loss(inputs, output)
+
+        self.optimizer.zero_grad()
+        loss['sum'].backward()
+
+        # grad clipping and step
+        self.clip_gradients(epoch)
+        self.optimizer.step()
+
+        # print grad for debug
+        self.debug_print_grad(epoch, step)
+
+        return output, loss
+
     @master_only
     def valid_epoch(self, epoch, step_in_epoch):
         """Validate the epoch.
@@ -233,7 +252,7 @@ class ArcNerfTrainer(BasicTrainer):
             with torch.no_grad():
                 feed_in, batch_size = self.get_model_feed_in(inputs, self.device)
                 time0 = time.time()
-                output = self.model(feed_in, get_progress=True)
+                output = self.model(feed_in, get_progress=self.get_progress)
                 self.logger.add_log(
                     '   Valid one sample (H,W)=({},{}) time {:.2f}s'.format(
                         int(inputs['H'][0]), int(inputs['W'][0]),
@@ -295,6 +314,17 @@ class ArcNerfTrainer(BasicTrainer):
         """
         return render_progress_imgs(inputs, output)
 
+    def write_progress_imgs(self, files, folder, epoch=None, step=None, global_step=None, eval=False):
+        """Actual function to write the progress images"""
+        radius, volume_dict = None, None
+        if self.data['inference'] is not None and 'render' in self.data['inference']:
+            radius = self.data['inference']['render']['cfgs']['radius']
+        if self.data['inference'] is not None and 'volume' in self.data['inference']:
+            vol = self.data['inference']['volume']['Vol']
+            volume_dict = {'grid_pts': torch_to_np(vol.get_corner()), 'lines': vol.get_bound_lines()}
+
+        write_progress_imgs(files, folder, epoch, step, global_step, eval, radius, volume_dict)
+
     def inference(self, data, model, device):
         """Actual infer function for the model. Use run_infer since we want to run it local as well"""
         files = run_infer(data, self.get_model_feed_in, model, self.logger, device)
@@ -317,10 +347,6 @@ class ArcNerfTrainer(BasicTrainer):
         )
 
         return metric_info, files
-
-    def write_progress_imgs(self, files, folder, epoch=None, step=None, global_step=None, eval=False):
-        """Actual function to write the progress images"""
-        write_progress_imgs(files, folder, epoch, step, global_step, eval)
 
     def train_epoch(self, epoch):
         """Train for one epoch. Each epoch return the final sum of loss and total num of iter in epoch"""
