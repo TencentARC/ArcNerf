@@ -2,7 +2,7 @@
 
 name: eval
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_nerf/checkpoints/latest.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_nerf/checkpoints/final.pt.tar'
 
 dir:
     data_dir: '/group/30042/leoyluo/Immerse/data'

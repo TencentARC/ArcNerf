@@ -2,7 +2,7 @@
 
 name: inference
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_nerf/checkpoints/latest.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_nerf/checkpoints/final.pt.tar'
 
 dir:
     data_dir: None
@@ -39,7 +39,7 @@ inference:
     # set volume if you want to extract mesh
     volume:                         # volume params
         origin: (0.0, 0.0, 0.0)     # volume center
-        n_grid: 256                 # n_grid is the num of voxel in each dim. For visual set a small num only
+        n_grid: 512                 # n_grid is the num of voxel in each dim. For visual set a small num only
         side: 1.5                   # if set, all len at each dim will be side
         xlen: 1.5                   # x-dim length, only when side is None
         ylen: 1.5                   # y-dim length, only when side is None

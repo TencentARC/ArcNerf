@@ -57,7 +57,7 @@ def get_render_imgs(inputs, output):
     for pred_name in pred_rgb:
         if pred_name in output:
             pred_img = img_to_uint8(torch_to_np(output[pred_name][idx]).copy().reshape(h, w, 3))  # (H, W, 3)
-            error_map = np.abs(img - pred_img)  # (H, W, 3)
+            error_map = cv2.applyColorMap(cv2.cvtColor(np.abs(img - pred_img), cv2.COLOR_BGR2GRAY), cv2.COLORMAP_JET)
             pred_cat = np.concatenate([img, pred_img, error_map], axis=1)  # (H, 3W, 3)
             names.append(pred_name)
             images.append(pred_cat)

@@ -12,7 +12,7 @@ dir:
     data_dir: '/group/30042/leoyluo/Immerse/data'   # It is the main dataset address containing all dataset
     eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_65_nerf'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_65_nerf/checkpoints/latest.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_65_nerf/checkpoints/final.pt.tar'
 
 gpu_ids: -1                         # -1 is cpu, otherwise use list of gpus
 
@@ -56,11 +56,11 @@ progress:
     save_progress_val: True
     max_samples_val: 1
 
-    epoch_save_checkpoint: 50000
+    epoch_save_checkpoint: 100000
     local_progress: False
 
     init_eval: False
-    epoch_eval: 50000
+    epoch_eval: 100000
     max_samples_eval: 3
 
 dataset:
@@ -101,7 +101,7 @@ inference:
         fps: 5
 
     volume:
-        n_grid: 256
+        n_grid: 512
         side: 1.5
         level: 50.0
 

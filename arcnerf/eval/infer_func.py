@@ -43,8 +43,8 @@ def set_inference_data(cfgs, intrinsic, wh: tuple, dtype=torch.float32):
                     each list contain n_cam dict with following keys:
                         c2w: novel view camera postion, (4, 4) np array
                         intrinsic: cam intrinsic, (3, 3) np array
-                        rays_o: (1, WH, 3) torch tensor
-                        rays_d: (1, WH, 3) torch tensor
+                        rays_o: (1, HW, 3) torch tensor
+                        rays_d: (1, HW, 3) torch tensor
 
             volume:
                 cfgs: volume cfgs
@@ -82,13 +82,17 @@ def set_inference_data(cfgs, intrinsic, wh: tuple, dtype=torch.float32):
             input = []
             for cam_id in range(c2w.shape[0]):
                 ray_bundle = get_rays(
-                    W, H, torch.tensor(intrinsic, dtype=dtype), torch.tensor(c2w[cam_id], dtype=dtype)
-                )  # (WH, 3) * 2
+                    W,
+                    H,
+                    torch.tensor(intrinsic, dtype=dtype),
+                    torch.tensor(c2w[cam_id], dtype=dtype),
+                    wh_order=False,
+                )  # (HW, 3) * 2
                 input_per_img = {
                     'c2w': c2w[cam_id],  # (4, 4) np array
                     'intrinsic': intrinsic,  # (3, 3) np array
-                    'rays_o': ray_bundle[0][None, :],  # (1, WH, 3) torch tensor
-                    'rays_d': ray_bundle[1][None, :]  # (1, WH, 3) torch tensor
+                    'rays_o': ray_bundle[0][None, :],  # (1, HW, 3) torch tensor
+                    'rays_d': ray_bundle[1][None, :]  # (1, HW, 3) torch tensor
                 }
                 input.append(input_per_img)
 
@@ -211,14 +215,14 @@ def run_infer_render(data, get_model_feed_in, model, device, logger):
             # get rgb only
             rgb_key = [key for key in output if key.startswith('rgb')]
             assert len(rgb_key) == 1, 'Only one rgb value should be produced by model in inference mode...'
-            rgb = output[rgb_key[0]]  # (1, WH, 3)
+            rgb = output[rgb_key[0]]  # (1, HW, 3)
             rgb = img_to_uint8(torch_to_np(rgb).copy()).reshape(img_h, img_w, 3)  # (H, W, 3), bgr
             images.append(rgb)
         render_out.append(images)
 
         logger.add_log(
-            '    Render {} image, each wh({}/{}) total time {:.2f}s'.format(
-                len(input), img_w, img_h, total_forward_time
+            '    Render {} image, each hW({}/{}) total time {:.2f}s'.format(
+                len(input), img_h, img_w, total_forward_time
             )
         )
         logger.add_log('    Each image takes time {:.2f}s'.format(total_forward_time / float(len(input))))
