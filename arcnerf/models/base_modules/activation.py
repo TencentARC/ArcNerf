@@ -16,7 +16,7 @@ class Sine(nn.Module):
         super().__init__()
         self.w0 = w0
 
-    def forward(self, x: torch.FloatTensor):
+    def forward(self, x: torch.Tensor):
         return torch.sin(self.w0 * x)
 
 

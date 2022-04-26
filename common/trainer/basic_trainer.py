@@ -475,6 +475,7 @@ class BasicTrainer(object):
     def train(self):
         """Train for the whole progress"""
         self.logger.add_log('-' * 60)
+        self.logger.add_log('Total num of epoch: {}'.format(self.cfgs.progress.epoch))
         if self.cfgs.progress.init_eval and self.data['eval'] is not None:
             self.eval_epoch(self.cfgs.progress.start_epoch)
 

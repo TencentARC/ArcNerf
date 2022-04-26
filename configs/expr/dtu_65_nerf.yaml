@@ -3,26 +3,26 @@ name: dtu_65_nerf
 resume: None
 
 debug:
-    debug_mode: False               # support debug like checking grad.
-    print_all_grad: False           # print all grad for all param in model. Only in debug mode
-    get_progress: False             # get the progress to print during train/val
+    debug_mode: False
+    print_all_grad: False
+    get_progress: False
 
 dir:
     expr_dir: None
-    data_dir: '/group/30042/leoyluo/Immerse/data'   # It is the main dataset address containing all dataset
+    data_dir: '/group/30042/leoyluo/Immerse/data'
     eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_65_nerf'
 
 model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_65_nerf/checkpoints/final.pt.tar'
 
-gpu_ids: -1                         # -1 is cpu, otherwise use list of gpus
+gpu_ids: -1
 
 dist:
     local_rank: 0
     rank: 0
     world_size: 1
-    distributed_backend: nccl       # nccl/mpi
-    random_seed: None               # None will not require reproducibility, run benchmark to be faster
-    slurm: False                    # use slurm for management
+    distributed_backend: nccl
+    random_seed: None
+    slurm: False
 
 batch_size: 2
 n_rays: 4096
@@ -48,7 +48,7 @@ progress:
 
     epoch_loss: 10
     iter_loss: 1
-    save_progress: False             # actually when training, sample rays do not have progress image
+    save_progress: False
     epoch_save_progress: 10
     iter_save_progress: 10
 
@@ -94,9 +94,9 @@ inference:
         type: [circle, spiral]
         n_cam: [30, 60]
         radius: 3.0
-        u_start: 0.9
+        u_start: 0.75
         v_ratio: 0.0
-        v_range: [-0.5, 0]
+        v_range: [-0.25, 0.25]
         n_rot: 3
         fps: 5
 

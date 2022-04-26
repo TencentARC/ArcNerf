@@ -101,7 +101,7 @@ class TestDict(unittest.TestCase):
         rays_o = []
         rays_d = []
         for idx in range(n_cam):
-            ray = np_wrapper(get_rays, self.W, self.H, self.intrinsic, c2w[idx], index)
+            ray = np_wrapper(get_rays, self.W, self.H, self.intrinsic, c2w[idx], False, index)
             rays_o.append(ray[0])
             rays_d.append(ray[1])
         rays = (np.concatenate(rays_o, axis=0), np.concatenate(rays_d, axis=0))

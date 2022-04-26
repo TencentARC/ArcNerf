@@ -3,8 +3,9 @@
 import numpy as np
 
 from .base_3d_dataset import Base3dDataset
-from arcnerf.geometry.poses import center_poses
+from arcnerf.geometry.poses import center_poses, average_poses
 from arcnerf.geometry.ray import closest_point_to_rays
+from arcnerf.geometry.transformation import rotate_points
 from common.utils.torch_utils import np_wrapper
 
 
@@ -113,6 +114,20 @@ class Base3dPCDataset(Base3dDataset):
 
             # for point cloud adjustment
             self.point_cloud['pts'] *= (self.cfgs.scale_radius / (max_cam_norm_t * 1.05))
+
+    def align_cam_horizontal(self):
+        """Align all camera direction and position to up.
+        Use it only when camera are not horizontally around the object
+        """
+        c2ws = self.get_poses(torch_tensor=False, concat=True)
+        dtype = c2ws.dtype
+        avg_pose = average_poses(c2ws)
+        rot_mat = np.eye(4, dtype=dtype)
+        rot_mat[:3, :3] = np.linalg.inv(avg_pose)[:3, :3]
+        rot_mat_pts = rot_mat.copy().astype(self.point_cloud['pts'].dtype)[None]
+        for idx in range(len(self.cameras)):
+            self.cameras[idx].apply_transform(rot_mat)
+        self.point_cloud['pts'] = np_wrapper(rotate_points, self.point_cloud['pts'][None], rot_mat_pts)[0]
 
     def get_bounds_from_pc(self, extend_factor=0.05):
         """Get bounds from pc projected by each cam.

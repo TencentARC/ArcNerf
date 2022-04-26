@@ -82,7 +82,8 @@ class TestDict(unittest.TestCase):
             cls.render_radius = 3.0
             cls.render_u_start = 0.0
             cls.render_v_ratio = 0.0
-            cls.render_v_range = (-0.5, 0)
+            cls.render_v_range = (-0.5, 0.0)
+            cls.render_normal = (0.0, 1.0, 0.0)
             cls.render_n_rot = 3
             cls.render_fps = 5
 
@@ -105,7 +106,8 @@ class TestDict(unittest.TestCase):
         cls.render_radius = get_value_from_cfgs_field(render_cfgs, 'radius', 3.0)
         cls.render_u_start = get_value_from_cfgs_field(render_cfgs, 'u_start', 0.0)
         cls.render_v_ratio = get_value_from_cfgs_field(render_cfgs, 'v_ratio', 0.0)
-        cls.render_v_range = tuple(get_value_from_cfgs_field(render_cfgs, 'v_range', [-0.5, 0]))
+        cls.render_v_range = tuple(get_value_from_cfgs_field(render_cfgs, 'v_range', [-0.5, 0.0]))
+        cls.render_normal = tuple(get_value_from_cfgs_field(render_cfgs, 'normal', [0, 1.0, 0.0]))
         cls.render_n_rot = get_value_from_cfgs_field(render_cfgs, 'n_rot', 3)
         cls.render_fps = get_value_from_cfgs_field(render_cfgs, 'fps', 5)
 
@@ -146,6 +148,8 @@ class TestDict(unittest.TestCase):
             sphere_origin=origin,
             title='{} Cam position'.format(self.dataset_type),
             save_path=file_path,
+            plotly=True,
+            plotly_html=True,
         )
 
     def tests_create_infer_cam_path(self):
@@ -162,6 +166,7 @@ class TestDict(unittest.TestCase):
                 v_ratio=self.render_v_ratio,
                 v_range=self.render_v_range,
                 origin=origin,
+                normal=self.render_normal,
                 n_rot=self.render_n_rot,
                 close=False  # just for test, should be true for actual visual
             )
@@ -181,7 +186,9 @@ class TestDict(unittest.TestCase):
                 sphere_origin=origin,
                 lines=[cam_loc[:self.render_n_cam[idx]]],
                 title='Cam pos on sphere. Mode: {}'.format(mode),
-                save_path=file_path
+                save_path=file_path,
+                plotly=True,
+                plotly_html=True
             )
 
     def tests_ray_points(self):
@@ -202,9 +209,9 @@ class TestDict(unittest.TestCase):
         rays_d = []
         bounds = []
         for idx in range(self.n_cam):
-            ray_bundle = np_wrapper(get_rays, self.W, self.H, self.intrinsic, self.c2w[idx], index)[:2]  # (n_rays, 3)
-            rays_o.append(ray_bundle[0])
-            rays_d.append(ray_bundle[1])
+            ray_bundle = np_wrapper(get_rays, self.W, self.H, self.intrinsic, self.c2w[idx], False, index)[:2]
+            rays_o.append(ray_bundle[0])  # (n_rays, 3)
+            rays_d.append(ray_bundle[1])  # (n_rays, 3)
             if 'bounds' in self.dataset[idx]:  # (n_rays, 2)
                 bounds.append(self.dataset[idx]['bounds'][:n_rays])
 
@@ -296,7 +303,6 @@ class TestDict(unittest.TestCase):
             pts_pixels = np_wrapper(self.cameras[idx].proj_world_to_pixel, pts)
             pts_vis_cam = pts_vis[idx, :]
             pts_pixels = pts_pixels if pts_vis is None else pts_pixels[pts_vis_cam == 1, :]
-
             proj_imgs.append(draw_vert_on_img(self.images[idx], pts_pixels, color='green'))
 
         video_path = osp.join(self.spec_result_dir, 'reproj_pc.mp4')

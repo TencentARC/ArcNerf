@@ -4,8 +4,9 @@ import numpy as np
 import torch
 
 from .sphere import uv_to_sphere_point, get_sphere_line, get_spiral_line, get_regular_sphere_line
-from .transformation import normalize
+from .transformation import normalize, get_rotate_matrix_from_vec, rotate_points
 from .triangle import circumcircle_from_triangle
+from common.utils.torch_utils import np_wrapper
 
 
 def invert_poses(poses):
@@ -17,7 +18,7 @@ def invert_poses(poses):
     Returns:
         poses: (N, 4, 4)
     """
-    if isinstance(poses, torch.FloatTensor):
+    if isinstance(poses, torch.Tensor):
         return torch.inverse(poses.clone())
     elif isinstance(poses, np.ndarray):
         return np.linalg.inv(poses.copy())
@@ -89,7 +90,8 @@ def average_poses(poses):
     y = np.cross(z, x)
 
     pose_avg = np.stack([x, y, z, center], 1)
-    homo = np.ones(shape=(1, 4), dtype=pose_avg.dtype)
+    homo = np.zeros(shape=(1, 4), dtype=pose_avg.dtype)
+    homo[0, -1] = 1.0
     pose_avg = np.concatenate([pose_avg, homo], axis=0)
 
     return pose_avg
@@ -148,6 +150,7 @@ def generate_cam_pose_on_sphere(
     upper=None,
     close=False,
     origin=(0, 0, 0),
+    normal=(0.0, 1.0, 0.0),
     look_at_point=np.array([0, 0, 0])
 ):
     """Get custom camera poses on sphere, looking at origin
@@ -168,6 +171,7 @@ def generate_cam_pose_on_sphere(
         upper: Control camera postion for get_regular_sphere_line
         close: if true, first one will be the same as last(for circle and regular)
         origin: origin of sphere, tuple of 3
+        normal: normal of the sphere, tuple of 3. If not (0, 1, 0), rotate the points.
         look_at_point: the point camera looked at, np(3,)
 
     Returns:
@@ -187,6 +191,15 @@ def generate_cam_pose_on_sphere(
         xyz = get_sphere_line(radius, u_start, v_ratio, origin, n_pts=n_cam, close=close)
     elif mode == 'spiral':
         xyz = get_spiral_line(radius, u_start, v_range, origin, n_rot, n_pts=n_cam)
+
+    # rotate the positions, from fix up dir to normal
+    up = np.array([0.0, 1.0, 0.0], dtype=xyz.dtype)[None]  # (1, 3)
+    normal = np.array(normal, dtype=up.dtype)[None]  # (1, 3)
+    rotate_mat = np_wrapper(get_rotate_matrix_from_vec, up, normal)  # (1, 3, 3)
+    offset = np.array(origin, dtype=up.dtype)[None]  # (1, 3)
+    xyz -= offset
+    xyz = np_wrapper(rotate_points, xyz[:, None, :], rotate_mat, True)[:, 0, :]  # (n_cam, 3)
+    xyz += offset
 
     for idx in range(xyz.shape[0]):
         cam_loc = xyz[idx]

@@ -150,6 +150,18 @@ class Base3dDataset(BaseDataset):
         for idx in range(len(self.cameras)):
             self.cameras[idx].reset_pose(center_c2w[idx])
 
+    def align_cam_horizontal(self):
+        """Align all camera direction and position to up.
+        Use it only when camera are not horizontally around the object
+        """
+        c2ws = self.get_poses(torch_tensor=False, concat=True)
+        dtype = c2ws.dtype
+        avg_pose = average_poses(c2ws)
+        rot_mat = np.eye(4, dtype=dtype)
+        rot_mat[:3, :3] = np.linalg.inv(avg_pose)[:3, :3]
+        for idx in range(len(self.cameras)):
+            self.cameras[idx].apply_transform(rot_mat)
+
     def precache_ray(self):
         """Precache all the rays for all images first"""
         if self.ray_bundles is None:

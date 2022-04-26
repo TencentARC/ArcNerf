@@ -94,6 +94,40 @@ class TestDict(TestGeomDict):
                 save_path=file_path
             )
 
+    def tests_generate_cam_pose_on_sphere_with_normal(self):
+        u_start = 0  # (0, 1)
+        v_ratio = 0.5  # (-1, 1)
+        look_at_point = np.array([1.0, 1.0, 0.0])  # (3, )
+        origin = (1.0, 1.0, 0)
+        normal = (1.0, 1.0, 0)
+
+        modes = ['circle', 'spiral']
+        for mode in modes:
+            file_path = osp.join(RESULT_DIR, 'cam_path_with_normal_mode_{}.png'.format(mode))
+            c2w = generate_cam_pose_on_sphere(
+                mode,
+                self.radius,
+                self.n_cam,
+                u_start=u_start,
+                v_ratio=v_ratio,
+                origin=origin,
+                normal=normal,
+                look_at_point=look_at_point
+            )
+            cam_loc = c2w[:, :3, 3]  # (n, 3)
+            rays_d = normalize(look_at_point[None, :] - cam_loc)  # (n, 3)
+            track = [cam_loc] if mode != 'random' else []
+            draw_3d_components(
+                c2w,
+                points=look_at_point[None, :],
+                rays=(cam_loc, rays_d),
+                sphere_radius=self.radius,
+                sphere_origin=origin,
+                lines=track,
+                title='Cam pos on sphere. With normal {}. Mode: {}'.format(normal, mode),
+                save_path=file_path
+            )
+
     def tests_regular_center_poses(self):
         n_cam = 12
         n_rot = 3

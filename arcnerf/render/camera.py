@@ -66,6 +66,10 @@ class PerspectiveCamera(object):
         """reset_pose the intrinsic (3, 3)"""
         self.intrinsic = intrinsic.copy()
 
+    def apply_transform(self, rot):
+        """Rotate a pose by rot (4, 4)"""
+        self.c2w = np.matmul(rot, self.c2w)
+
     def get_pose(self, torch_tensor=True, w2c=False):
         """Get pose, return numpy array by default. Support w2c transformation"""
         pose = self.c2w.copy()

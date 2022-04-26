@@ -24,7 +24,7 @@ class DenseLayer(nn.Linear):
         super().__init__(input_dim, out_dim, *args, **kwargs)
         self.activation = activation
 
-    def forward(self, x: torch.FloatTensor):
+    def forward(self, x: torch.Tensor):
         out = super().forward(x)
         out = self.activation(out)
 
@@ -62,7 +62,7 @@ class SirenLayer(nn.Linear):
             w_std = (1 / dim) if self.is_first else (math.sqrt(self.c / dim) / self.w0)
             self.weight.uniform_(-w_std, w_std)
 
-    def forward(self, x: torch.FloatTensor):
+    def forward(self, x: torch.Tensor):
         out = super().forward(x)
         out = self.activation(out)
 

@@ -75,6 +75,7 @@ def set_inference_data(cfgs, intrinsic, wh: tuple, dtype=torch.float32):
                 u_start=render_cfgs['u_start'],
                 v_ratio=render_cfgs['v_ratio'],
                 v_range=render_cfgs['v_range'],
+                normal=render_cfgs['normal'],
                 n_rot=render_cfgs['n_rot'],
                 close=True
             )  # (n_cam, 4, 4), np array
@@ -128,12 +129,14 @@ def parse_render(cfgs):
             'u_start': get_value_from_cfgs_field(cfgs.render, 'u_start', 0.0),
             'v_ratio': get_value_from_cfgs_field(cfgs.render, 'v_ratio', 0.0),
             'v_range': tuple(get_value_from_cfgs_field(cfgs.render, 'v_range', [-0.5, 0])),
+            'normal': tuple(get_value_from_cfgs_field(cfgs.render, 'normal', [0.0, 1.0, 0.0])),
             'n_rot': get_value_from_cfgs_field(cfgs.render, 'n_rot', 3),
             'fps': get_value_from_cfgs_field(cfgs.render, 'fps', 5)
         }
 
         assert len(render_cfgs['type']) == len(render_cfgs['n_cam']), 'Inconsistent mode and n_cam num'
         assert len(render_cfgs['v_range']) == 2, 'Please input v_range as list of 2'
+        assert len(render_cfgs['normal']) == 3, 'Please input normal as list of 3'
 
     return render_cfgs
 

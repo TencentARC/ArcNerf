@@ -2,11 +2,11 @@
 
 name: eval
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_nerf/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_nerf/checkpoints/final.pt.tar'
 
 dir:
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_nerf'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_nerf'
 
 gpu_ids: -1                   # -1 for cpu, 0/1/2 for gpu. Do not use multiple gpu
 
@@ -24,10 +24,11 @@ dataset:
     eval:
         eval_batch_size: 1
         eval_max_sample: 3
-        type: DTU
-        scan_id: 65
+        type: Capture
+        scene_name: qqtiger
         img_scale: 1.0
         scale_radius: 3.0
+        pc_radius: 2.0
         precache: True
 
 model:

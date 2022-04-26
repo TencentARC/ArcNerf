@@ -37,6 +37,7 @@ class DTU(Base3dDataset):
 
         # norm camera_pose
         self.norm_cam_pose()
+        self.align_cam_horizontal()
 
         # rescale image, call from parent class
         self.rescale_img_and_pose()

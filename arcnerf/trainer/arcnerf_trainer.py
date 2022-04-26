@@ -151,7 +151,7 @@ class ArcNerfTrainer(BasicTrainer):
                     concat_data[key] = torch.cat([concat_data[key], all_item[idx][key]], dim=0)
 
         for k, v in concat_data.items():
-            if isinstance(v, torch.FloatTensor):
+            if isinstance(v, torch.Tensor):
                 v_shape = v.shape
                 if self.total_samples is None:
                     self.total_samples = v_shape[0] * v_shape[1]
@@ -168,7 +168,7 @@ class ArcNerfTrainer(BasicTrainer):
         self.logger.add_log('Shuffling training samples... ')
         random_idx = torch.randint(0, self.total_samples, size=[self.total_samples])
         for k, v in self.data['train'].items():
-            if isinstance(v, torch.FloatTensor):
+            if isinstance(v, torch.Tensor):
                 self.data['train'][k] = self.data['train'][k][:, random_idx, ...]
 
         self.logger.add_log(
@@ -181,7 +181,7 @@ class ArcNerfTrainer(BasicTrainer):
 
         data_batch = {}
         for k, v in self.data['train'].items():
-            if isinstance(v, torch.FloatTensor):
+            if isinstance(v, torch.Tensor):
                 data_batch[k] = v[:, self.train_count:self.train_count + self.n_rays, ...]
             else:
                 data_batch[k] = v
@@ -418,6 +418,7 @@ class ArcNerfTrainer(BasicTrainer):
         then sample n_rays as the batch to the model. reset_sampler until all rays have been selected.
         """
         self.logger.add_log('-' * 60)
+        self.logger.add_log('Total num of epoch: {}'.format(self.cfgs.progress.epoch))
         if self.cfgs.progress.init_eval and self.data['eval'] is not None:
             self.eval_epoch(self.cfgs.progress.start_epoch)
         if self.cfgs.progress.init_eval and self.data['inference'] is not None:

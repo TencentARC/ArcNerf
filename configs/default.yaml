@@ -12,13 +12,13 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'      # It is the main dataset address containing all dataset
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_nerf'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_nerf'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_nerf/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_nerf/checkpoints/final.pt.tar'
 
 data:
     video_path: '/group/30042/leoyluo/Immerse/data/Capture/qq_tiger.MOV'
-    scene_name: qq_tiger
+    scene_name: qqtiger
     video_downsample: 15            # fps downsample ratio, default 15 (fps=30, each second 2 image)
     image_downsample: 4             # image rescale downsample ratio, default 4 (each length 1/4)
     colmap:
@@ -78,28 +78,31 @@ progress:
 
 dataset:
     train:
-        type: DTU
-        scan_id: 65
-        img_scale: 1.0              # scale image and intrinsic, < 1 means scale_down
-        scale_radius: 3.0           # norm the camera within a sphere with such radius(actual radius litter smaller)
-        precache: True              # precache all the rays at once
+        type: Capture
+        scene_name: qqtiger
+        img_scale: 1.0               # scale image and intrinsic, < 1 means scale_down
+        scale_radius: 3.0            # norm the camera within a sphere with such radius(actual radius litter smaller)
+        pc_radius: 2.0               # only keep point cloud in a fix radius ball, scale after cam norm
+        precache: True               # precache all the rays at once
         augmentation:
             shuffle: True
 
     val:
-        type: DTU
-        scan_id: 65
-        img_scale: 0.25
+        type: Capture
+        scene_name: qqtiger
+        img_scale: 0.5
         scale_radius: 3.0
+        pc_radius: 2.0
         precache: False
 
     eval:
         eval_batch_size: 1
         eval_max_sample: 3
-        type: DTU
-        scan_id: 65
+        type: Capture
+        scene_name: qqtiger
         img_scale: 1.0
         scale_radius: 3.0
+        pc_radius: 2.0
         precache: True
 
 inference:
@@ -110,12 +113,13 @@ inference:
         u_start: 0.0                # for start pos u in (0~1)
         v_ratio: 0.0                # for circle path, vertical position
         v_range: [-0.5, 0]          # for spiral path, vertical pos range
+        normal: [0.0, 1.0, 0.0]     # for cam path rotation, (0,1,0) is horizontal without rotation
         n_rot: 3                    # n_rot of camera path
         fps: 5                      # render video fps
 
     volume:                         # volume params
         origin: (0.0, 0.0, 0.0)     # volume center
-        n_grid: 256                 # n_grid is the num of voxel in each dim. For visual set a small num only
+        n_grid: 512                 # n_grid is the num of voxel in each dim. For visual set a small num only
         side: 1.5                   # if set, all len at each dim will be side
         xlen: 1.5                   # x-dim length, only when side is None
         ylen: 1.5                   # y-dim length, only when side is None
@@ -157,5 +161,5 @@ loss:
         weight: 1.0
 
 metric:
-    # PSNRCoarse:
+    # PSNRCoarse:                    # inference_only give only one rgb result
     PSNRFine:

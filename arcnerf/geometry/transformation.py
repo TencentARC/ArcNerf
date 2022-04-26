@@ -17,7 +17,7 @@ def normalize(vec):
     Returns:
         vec: (B, N, 3) or (B, 3)
     """
-    if isinstance(vec, torch.FloatTensor):
+    if isinstance(vec, torch.Tensor):
         vec = vec / (torch.norm(vec, dim=-1).unsqueeze(-1) + 1e-8)
     elif isinstance(vec, np.ndarray):
         vec = vec / (np.linalg.norm(vec, axis=-1)[..., None] + 1e-8)
@@ -41,16 +41,21 @@ def batch_dot_product(a: torch.Tensor, b: torch.Tensor):
     return dot_prod
 
 
-def rotate_points(points: torch.Tensor, rot: torch.Tensor):
+def rotate_points(points: torch.Tensor, rot: torch.Tensor, rotate_only=False):
     """Rotate points by a rot
 
     Args:
         points: points, torch.tensor(B, N, 3)
-        rot: rot matrix, torch.tensor(B, 4, 4)
+        rot: rot matrix, torch.tensor(B, 4, 4). If rotate_only, can be (B, 3, 3)
+        rotate_only: If True, only do the rotation using rot (B, 3, 3)
 
     Returns:
         rotated points in (B, N, 3)
     """
+    if rotate_only:
+        proj_points = torch.einsum('bki,bji->bjk', rot[:, :3, :3], points)
+        return proj_points
+
     # convert points to home
     homo_coord = torch.ones(list(points.shape)[:-1] + [1], dtype=points.dtype, device=points.device)
     points_h = torch.cat([points, homo_coord], dim=-1)
@@ -74,6 +79,51 @@ def rotate_matrix(rot: torch.Tensor, source: torch.Tensor):
     rot_mat = torch.einsum('bki,bij->bkj', rot, source)
 
     return rot_mat
+
+
+def get_rotate_matrix_from_vec(vec_a: torch.Tensor, vec_b: torch.Tensor, eps=1e-5):
+    """Get the rotation matrix from vec_a to vec_b
+    Consider the case of same dir and reverse dir.
+
+    Args:
+        vec_a: the start in (B, 3)
+        vec_b: the end vec in (B, 3)
+        eps: threshold for comparing dot value, bt default 1e-5
+
+    Returns:
+        rotated matrix in (B, 3, 3)
+    """
+    assert vec_a.shape[1] == 3 and vec_b.shape[1] == 3, 'Please input vecs with (b, 3) dim'
+    vec_a_norm = normalize(vec_a)  # do not change to original value
+    vec_b_norm = normalize(vec_b)
+
+    # consider the special case
+    vec_dot = batch_dot_product(vec_a_norm, vec_b_norm)
+    invalid_pos = torch.abs(vec_dot - 1.0) < eps
+    invalid_neg = torch.abs(vec_dot + 1.0) < eps
+    valid = ~torch.logical_or(invalid_pos, invalid_neg)
+
+    n = torch.cross(vec_a_norm, vec_b_norm, dim=-1)
+    n = normalize(n)  # (B, 3)
+
+    base_a = torch.cat([vec_a_norm.unsqueeze(1),
+                        torch.cross(n, vec_a_norm, dim=-1).unsqueeze(1),
+                        n.unsqueeze(1)],
+                       dim=1)  # (B, 3, 3)
+    base_b = torch.cat([vec_b_norm.unsqueeze(1),
+                        torch.cross(n, vec_b_norm, dim=-1).unsqueeze(1),
+                        n.unsqueeze(1)],
+                       dim=1)  # (B, 3, 3)
+
+    matrix_valid = torch.matmul(base_b[valid], torch.inverse(base_a[valid]))
+
+    # get full matrix
+    matrix = torch.eye(3, dtype=vec_a.dtype).to(vec_a.device).unsqueeze(0)
+    matrix = torch.repeat_interleave(matrix, vec_a.shape[0], dim=0)
+    matrix[valid] = matrix_valid
+    matrix[invalid_neg] = -1.0 * matrix[invalid_neg]
+
+    return matrix
 
 
 def axis_angle_to_rot_6d(axis_angle):

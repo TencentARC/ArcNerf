@@ -7,7 +7,7 @@ dataset:
         scan_id: 65
         img_scale: 1.0
         scale_radius: 3.0
-        precache: True
+        precache: False
 
 model:
     rays:
@@ -26,9 +26,9 @@ inference:
         type: [circle, spiral]
         n_cam: [30, 60]
         radius: 3.0
-        u_start: 0.9
+        u_start: 0.75
         v_ratio: 0.0
-        v_range: [-0.5, 0]
+        v_range: [-0.25, 0.25]
         n_rot: 3
         fps: 5
 

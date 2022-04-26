@@ -8,7 +8,7 @@ dataset:
         img_scale: 1.0               # scale image and intrinsic, < 1 means scale_down
         scale_radius: 3.0            # norm the camera within a sphere with such radius(actual radius litter smaller)
         pc_radius: 2.0               # only keep point cloud in a fix radius ball, scale after cam norm
-        precache: True               # precache all the rays at once
+        precache: False              # precache all the rays at once
 
 model:
     rays:
@@ -26,8 +26,8 @@ inference:
         type: [circle, spiral]
         n_cam: [30, 60]
         radius: 3.0
-        u_start: 0.8
-        v_ratio: 0.0
+        u_start: 0.75
+        v_ratio: -0.2
         v_range: [-0.5, 0]
         n_rot: 3
         fps: 5
