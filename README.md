@@ -2,9 +2,7 @@
 
 
 # TODO:
-- shpere tracing(sdf, density)
-- 可视化
-  - ray上的sampler变化（2d， 3d）
+- shpere tracing(sdf, density), surface类方法
 - cuda实现的geometry函数和数据结构
 - tetrahedra相关
 

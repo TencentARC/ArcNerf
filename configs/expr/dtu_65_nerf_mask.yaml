@@ -1,18 +1,18 @@
-name: dtu_65_nerf
+name: dtu_65_nerf_mask
 
 resume: None
 
 debug:
     debug_mode: False
     print_all_grad: False
-    get_progress: False
+    get_progress: True      # show some progress about the rays
 
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_65_nerf'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_65_nerf_mask'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_65_nerf/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_65_nerf_mask/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -48,7 +48,7 @@ progress:
 
     epoch_loss: 100
     iter_loss: 1
-    save_progress: False
+    save_progress: True
     epoch_save_progress: 10000
     iter_save_progress: 1
 
@@ -57,7 +57,7 @@ progress:
     max_samples_val: 1
 
     epoch_save_checkpoint: 100000
-    local_progress: False
+    local_progress: True
 
     init_eval: False
     epoch_eval: 100000
@@ -113,7 +113,7 @@ model:
     rays:
         bounding_radius: 3.0
         near: 1.0
-        far: 8.0
+        # far: 8.0        object only, do not need to sample in the far distance.
         n_sample: 64
         n_importance: 128
         inverse_linear: False
@@ -140,8 +140,10 @@ model:
         W_feat_in: 256
 
 loss:
-    ImgCFLoss:
+    ImgCFMaskLoss:
+        weight: 1.0
+    MaskCFLoss:
         weight: 1.0
 
 metric:
-    PSNRFine:
+    MaskPSNRFine:

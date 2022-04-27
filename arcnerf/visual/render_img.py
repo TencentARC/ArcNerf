@@ -78,9 +78,11 @@ def get_render_imgs(inputs, output):
         if pred_name in output:
             pred_mask = torch_to_np(output[pred_name][idx]).copy().reshape(h, w)  # (H, W), 0~1, obj area with 1
             pred_mask = (255.0 * pred_mask).astype(np.uint8)[..., None].repeat(3, axis=-1)  # (H, W, 3), 0~255
-            mask_img = (255 - pred_mask) + img  # (H, W, 3), white bkg
+            mask_img = 255 - pred_mask.copy().astype(np.uint16) + img.copy().astype(np.uint16)  # overflow
+            mask_img = np.clip(mask_img, 0, 255).astype(np.uint8)  # (H, W, 3), white bkg
             if mask is not None:
                 error_map = (255.0 * np.abs(pred_mask - mask)).astype(np.uint8)  # (H, W, 3), 0~255
+                error_map = cv2.applyColorMap(cv2.cvtColor(error_map, cv2.COLOR_BGR2GRAY), cv2.COLORMAP_JET)
                 pred_cat = np.concatenate([mask_img, pred_mask, error_map], axis=1)  # (H, 3W, 3)
             else:
                 pred_cat = np.concatenate([mask_img, pred_mask], axis=1)  # (H, 2W, 3)
@@ -137,18 +139,18 @@ def get_sample_ray_imgs(inputs, output, train=False, sample_num=16):
         if key != 'index' and key != 'id':
             sample_dict[key] = np.concatenate(sample_dict[key], axis=0)  # (n_idx, 3/n_pts)
 
-    # normal sigma to (0, 1) for visual 3d
+    # normal pts_size from all sigma to (0, 1) for visual 3d
     pts_size = None
     if 'sigma' in sample_dict.keys():
         sigma = sample_dict['sigma'].copy()  # (n_idx, n_pts)
-        pts_size = (sigma - sigma.min(1)[:, None]) / (sigma.max(1)[:, None] - sigma.min(1)[:, None])
+        pts_size = (sigma - sigma.min()) / (sigma.max() - sigma.min())
         pts_size *= 50.0
 
     # output
     ray_dict = {}
     # 3d ray status, draw all the rays with point together
     pts = np_wrapper(get_ray_points_by_zvals, sample_dict['rays_o'], sample_dict['rays_d'],
-                     sample_dict['zvals']).reshape(-1, 3)  # (n_id, n_pts, 3)
+                     sample_dict['zvals']).reshape(-1, 3)  # (n_id * n_pts, 3)
     ray_dict['3d'] = {
         'points': pts,  # (n_id * n_pts)
         'point_size': pts_size.reshape(-1) if pts_size is not None else None,  # (n_id * n_pts)

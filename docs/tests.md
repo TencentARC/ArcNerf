@@ -39,8 +39,10 @@ back to pixels. Check the difference.
 Test function in transform, like normalization, rotation
 #### tests_triangle
 Test function in triangle, like getting norm, getting circumcircle, etc.
-#### tests_rays
+#### tests_ray
 Test function in ray, like getting sphere-ray-intersection, point-ray distance, etc.
+#### tests_volume
+Test function in volume, like volume pts/line/faces generation and visualization.
 
 
 ### tests_render
@@ -55,3 +57,11 @@ Test func for ray sampling, resample cdf/pdf, etc.
 Test embedder, implicit function, radiance function, with correct input/output.
 #### tests_nerf
 Test NeRF model and NeRFFull Model
+
+
+### tests_loss
+Tests for loss functions.
+
+### tests_metric
+Tests for eval metric functions.
+go

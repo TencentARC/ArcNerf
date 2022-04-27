@@ -42,25 +42,32 @@ The dataset only provides `rays_o` and `rays_d`, but the actual sampling procedu
 - far: Hard reset the far zvals for all rays
 - bounding_radius: If not None, will use to calculate near/far in the sphere.
 But it could be overwrite by hardcode near/far.
-- bounds: If bounds is provided in dataset, use it instead of bounding radus.
-But it could be overwrite by hardcode near/far.
+- bounds: If bounds is provided in dataset, use it instead of bounding radius.
+- But it could be overwrite by hardcode near/far.
+
+For point sampling:
 - n_sample: Init sample point.
 - n_importance: Point sampled from hierarchical sampling
+- perturb: perturb zvals during training.
+- inverse_linear: If True, more points are sampled closer to near zvals.
+
+For ray marching(color blending):
 - add_inf_z: When True, will use inf_z at last for raymarching, needed for rays including background range.
     - If you add a separate background model, you should not use it, so that ray inside the sphere focus on the object.
 - noise_std: if >0.0, add to sigma when ray marching. good for training.
-- perturb: perturb zvals during training.
-- inverse_linear: If True, more points are sampled closer to near zvals.
+- white_bkg: If True, will make the rays with mask = 0 as rgb = 1.0
 
 ## background
 There are three ways to handle background
 - (1) Set a far zvals in rays for sampling. It will combine obj+background together for rendering.
 `ImgLoss` can be applied on the whole image for optimization.
-- (2) Constrain the far zvals by bounds or bounding_radius. Use `white_bkg`, then all the background will be in white.
-`MaskImgLoss` needs to be applied to get obj area optimized. `MaskLoss` can also be applied for geometry.
-- (3) Use a separate background model(nerf++), restrict the inner rays in sphere. Combine the inner and background model
-For color.
-`ImgLoss` and be applied on the combined image. `MaskLoss` and `MaskImageLoss` can be applied on obj image.
+  - background will be noisy and hard to model.
+- (2) Constrain the far zvals by bounds or bounding_radius. `MaskImgLoss` needs to be applied to get obj area optimized.
+`MaskLoss` should also be applied for geometry.
+- (3) If the obj does not have mask, but it is with white background(like nerf `lego`  dataset`).
+Set `white_bkg` in the rays, and sample in the ball. Directly compare the image and output rgb.
+- (4) Use a separate background model(nerf++), restrict the inner rays in sphere. Combine the inner and background model
+For color. `ImgLoss` and be applied on the combined image. `MaskLoss` and `MaskImageLoss` can be applied on obj image.
 
 ## Nerf
 Nerf model with single forward(NeRF), and hierarchical sampling(NeRFFull).

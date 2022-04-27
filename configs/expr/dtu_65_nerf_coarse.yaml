@@ -46,10 +46,10 @@ progress:
     epoch: 300000
     save_time: 1800
 
-    epoch_loss: 10
+    epoch_loss: 100
     iter_loss: 1
     save_progress: False
-    epoch_save_progress: 10
+    epoch_save_progress: 1000
     iter_save_progress: 5
 
     epoch_val: 10000
@@ -120,6 +120,7 @@ model:
         perturb: True
         add_inf_z: True
         noise_std: 1.0
+        white_bkg: False
     chunk_rays: 32768
     chunk_pts: 131072
     geometry:

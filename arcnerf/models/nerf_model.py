@@ -98,7 +98,8 @@ class NeRF(Base3dModel):
             zvals,
             self.rays_cfgs['add_inf_z'],
             self.rays_cfgs['noise_std'] if not inference_only else 0.0,
-            weights_only=weights_only
+            weights_only=weights_only,
+            white_bkg=self.rays_cfgs['white_bkg']
         )
         if not weights_only:
             output['rgb_coarse'] = output_coarse['rgb']  # (B, 3)
@@ -133,8 +134,12 @@ class NeRF(Base3dModel):
             radiance = radiance.view(-1, n_total, 3)  # (B, n_total, 3)
 
             output_fine = ray_marching(
-                sigma, radiance, zvals, self.rays_cfgs['add_inf_z'],
-                self.rays_cfgs['noise_std'] if not inference_only else 0.0
+                sigma,
+                radiance,
+                zvals,
+                self.rays_cfgs['add_inf_z'],
+                self.rays_cfgs['noise_std'] if not inference_only else 0.0,
+                white_bkg=self.rays_cfgs['white_bkg']
             )
 
             output['rgb_fine'] = output_fine['rgb']  # (B, 3)

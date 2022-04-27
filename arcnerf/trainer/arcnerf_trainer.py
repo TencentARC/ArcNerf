@@ -264,8 +264,8 @@ class ArcNerfTrainer(BasicTrainer):
         loss_summary = LossDictCounter()
         count = 0
         global_step = (epoch + 1) * step_in_epoch
-        for step, inputs in enumerate(self.data['val']):
-            with torch.no_grad():
+        with torch.no_grad():
+            for step, inputs in enumerate(self.data['val']):
                 feed_in, batch_size = self.get_model_feed_in(inputs, self.device)
                 time0 = time.time()
                 output = self.model(feed_in, get_progress=self.get_progress)
@@ -275,13 +275,13 @@ class ArcNerfTrainer(BasicTrainer):
                         time.time() - time0
                     )
                 )
-            if self.cfgs.progress.save_progress_val and step < self.cfgs.progress.max_samples_val:  # Just some samples
-                self.save_progress(epoch, 0, global_step, inputs, output, mode='val')
+                if self.cfgs.progress.save_progress_val and step < self.cfgs.progress.max_samples_val:
+                    self.save_progress(epoch, 0, global_step, inputs, output, mode='val')
 
-            count += batch_size
-            loss = self.calculate_loss(inputs, output)
-            loss_summary(loss, batch_size)
-            break  # only one batch per val epoch
+                count += batch_size
+                loss = self.calculate_loss(inputs, output)
+                loss_summary(loss, batch_size)
+                break  # only one batch per val epoch
 
         if count == 0:
             self.logger.add_log('Not batch was sent to valid...')
@@ -351,11 +351,8 @@ class ArcNerfTrainer(BasicTrainer):
                     self.monitor.add_fig(name, fig, global_step, mode=mode)
 
             if '3d' in files['rays']:
-                param = files['rays']['3d']
-                if 'point_size' in param:
-                    param['point_size'] = param['point_size'] / 5.0 if param['point_size'] is not None else None
                 img = draw_3d_components(
-                    **param,
+                    **files['rays']['3d'],
                     sphere_radius=self.radius,
                     volume=self.volume_dict,
                     title='3d rays. pts size proportional to sigma',

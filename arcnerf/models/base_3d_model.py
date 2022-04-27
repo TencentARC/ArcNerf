@@ -28,6 +28,7 @@ class Base3dModel(BaseModel):
             'perturb': get_value_from_cfgs_field(self.cfgs.model.rays, 'perturb', False),
             'add_inf_z': get_value_from_cfgs_field(self.cfgs.model.rays, 'add_inf_z', False),
             'noise_std': get_value_from_cfgs_field(self.cfgs.model.rays, 'noise_std', False),
+            'white_bkg': get_value_from_cfgs_field(self.cfgs.model.rays, 'white_bkg', False),
         }
         return ray_cfgs
 

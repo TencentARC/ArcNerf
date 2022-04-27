@@ -12,8 +12,7 @@ For general image, with mask
 For coarse image, with mask
 ### MaskPSNRFine
 For fine image, with mask
+
 ## SSIM
-
-
 
 ## MaskSSIM

@@ -12,6 +12,7 @@ model:
         perturb: True                 # perturb zvals interval
         add_inf_z: True               # Add inf zval for ray marching
         noise_std: 0.1                # noise for sigma in training
+        white_bkg: False              # cast the background as white
     chunk_rays: 32768                 # each chunk to process 1024*32(ray), enough for 32 GB
     chunk_pts: 786432                 # each chunk to progress 4096*192(pts), for model forward
     geometry:

@@ -224,7 +224,7 @@ def run_infer_render(data, get_model_feed_in, model, device, logger):
         render_out.append(images)
 
         logger.add_log(
-            '    Render {} image, each hW({}/{}) total time {:.2f}s'.format(
+            '    Render {} image, each hw({}/{}) total time {:.2f}s'.format(
                 len(input), img_h, img_w, total_forward_time
             )
         )

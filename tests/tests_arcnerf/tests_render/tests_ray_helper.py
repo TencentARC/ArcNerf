@@ -78,6 +78,7 @@ class TestDict(unittest.TestCase):
         return sigma, zvals
 
     def tests_ray_marching(self):
+        # all positive
         sigma, zvals = self.create_systhesis_ray_input()
         output = np_wrapper(ray_marching, sigma, None, zvals)
         self.assertIsNone(output['rgb'])
@@ -92,14 +93,52 @@ class TestDict(unittest.TestCase):
         visual_list, _ = sample_ray_marching_output_by_index(output)
         visual_list = visual_list[0]
 
-        file_path = osp.join(RESULT_DIR, 'ray_marching.png')
+        file_path = osp.join(RESULT_DIR, 'ray_marching_all_pos.png')
         draw_2d_components(
             points=visual_list['points'],
             lines=visual_list['lines'],
             legends=visual_list['legends'],
             xlabel='zvals',
             ylabel='',
-            title='ray marching from synthesis input',
+            title='ray marching from synthesis input(all positive value)',
+            save_path=file_path
+        )
+
+        # all negative
+        sigma, zvals = self.create_systhesis_ray_input()
+        sigma -= (sigma.max(1) + 20.0)
+        output = np_wrapper(ray_marching, sigma, None, zvals)
+
+        visual_list, _ = sample_ray_marching_output_by_index(output)
+        visual_list = visual_list[0]
+
+        file_path = osp.join(RESULT_DIR, 'ray_marching_all_neg.png')
+        draw_2d_components(
+            points=visual_list['points'],
+            lines=visual_list['lines'],
+            legends=visual_list['legends'],
+            xlabel='zvals',
+            ylabel='',
+            title='ray marching from synthesis input(all negative value)',
+            save_path=file_path
+        )
+
+        # some negative
+        sigma, zvals = self.create_systhesis_ray_input()
+        sigma -= (sigma.max(1) / 2.0)
+        output = np_wrapper(ray_marching, sigma, None, zvals)
+
+        visual_list, _ = sample_ray_marching_output_by_index(output)
+        visual_list = visual_list[0]
+
+        file_path = osp.join(RESULT_DIR, 'ray_marching_pos_neg.png')
+        draw_2d_components(
+            points=visual_list['points'],
+            lines=visual_list['lines'],
+            legends=visual_list['legends'],
+            xlabel='zvals',
+            ylabel='',
+            title='ray marching from synthesis input(both pos and neg value)',
             save_path=file_path
         )
 

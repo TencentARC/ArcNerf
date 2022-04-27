@@ -253,7 +253,8 @@ def ray_marching(
     zvals: torch.Tensor,
     add_inf_z=False,
     noise_std=0.0,
-    weights_only=False
+    weights_only=False,
+    white_bkg=False
 ):
     """Ray marching and get color for each ray, get weight for each ray
         For p_i, the delta_i is p_i -> p_i+1 on the right side
@@ -276,6 +277,7 @@ def ray_marching(
         add_inf_z: If True, add inf zvals(1e10) for calculation. If False, ignore last point for rgb/depth calculation
         noise_std: noise level add to density if noise > 0, used for training. By default 0.0.
         weights_only: If True, return weights only, used in inference time for hierarchical sampling
+        white_bkg: If True, make the accum weight=0 rays as 1.
 
     Returns:
         output a dict with following keys:
@@ -330,6 +332,8 @@ def ray_marching(
     # rgb = sum(weight_i * radiance_i)
     if _radiance is not None:
         rgb = torch.sum(weights.unsqueeze(-1) * _radiance, -2)  # (N_rays, 3)
+        if white_bkg:  # where mask = 0, rgb = 1
+            rgb = torch.clamp_max(rgb + (1.0 - mask[:, None]), 1.0)
     else:
         rgb = None
 
@@ -355,7 +359,7 @@ def sample_ray_marching_output_by_index(output, index=None, n_rays=1, sigma_scal
                 each is torch.tensor or np array
         index: a list of index to select. If None, use n_rays to sample.
         n_rays: num of sampled rays, by default, 1
-        sigma_scale: used to scale sigma value up by this value for visual consistency. By default 2.0
+        sigma_scale: used to scale pos sigma value up by this value for visual consistency. By default 2.0
 
     Returns:
         out_list: a list contain dicts for each ray sample
@@ -376,13 +380,17 @@ def sample_ray_marching_output_by_index(output, index=None, n_rays=1, sigma_scal
         # zvals as x
         x = torch_to_np(output['zvals'][idx]).tolist()
         res['points'].append([x, [-1] * n_pts_per_ray])
-        # sigma
+        # sigma, pos will be norm to (0-scale), neg will be norm to (-1, 0)
         sigma = torch_to_np(output['sigma'][idx]).copy()
-        sigm_max = float(sigma.max())
-        sigma = sigma / sigma.max() * sigma_scale
+        sigma_max = float(sigma.max())
+        sigma_min = float(sigma.min())
+        if sigma_max > 0:
+            sigma[sigma > 0] = sigma[sigma > 0] / sigma_max * sigma_scale
+        if sigma_min < 0:
+            sigma[sigma < 0] = sigma[sigma < 0] / (np.abs(sigma_min) * 1.2)
         sigma = sigma.tolist()
         res['lines'].append([x, sigma])
-        res['legends'].append('sigma(max={:.1f})'.format(sigm_max))
+        res['legends'].append('sigma(max={:.1f})'.format(sigma_max))
         # alpha
         alpha = torch_to_np(output['alpha'][idx]).tolist()
         res['lines'].append([x, alpha])

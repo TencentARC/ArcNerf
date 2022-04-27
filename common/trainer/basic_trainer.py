@@ -314,6 +314,27 @@ class BasicTrainer(object):
         self.logger.add_log(loss_msg)
 
     @master_only
+    def save_progress(self, epoch, step, global_step, inputs, output, mode='train'):
+        """Save progress img for tracking. For both training and val. By default write to monitor.
+            You are allowed to send a list of imgs to write for each iteration.
+        """
+        files = self.render_progress_imgs(inputs, output)
+        if files is None:
+            return
+
+        # only add the images from file. Other like figs, etc are not support for monitor. You need to overwrite it.
+        if 'imgs' in files:
+            for name, img in zip(files['imgs']['names'], files['imgs']['imgs']):
+                self.monitor.add_img(name, img, global_step, mode=mode)
+
+        if self.cfgs.progress.local_progress:
+            progress_dir = osp.join(self.cfgs.dir.expr_spec_dir, 'progress')
+            os.makedirs(progress_dir, exist_ok=True)
+            progress_mode_dir = osp.join(progress_dir, mode)
+            os.makedirs(progress_mode_dir, exist_ok=True)
+            self.write_progress_imgs([files], progress_mode_dir, epoch, step, global_step, eval=False)
+
+    @master_only
     def train_step_writer(self, epoch, step, step_in_epoch, loss, learning_rate, global_step, inputs, output, **kwargs):
         """Write to monitor for saving"""
         self.monitor.add_loss(loss, global_step, mode='train')
@@ -442,16 +463,16 @@ class BasicTrainer(object):
         loss_summary = LossDictCounter()
         count = 0
         global_step = (epoch + 1) * step_in_epoch
-        for step, inputs in enumerate(self.data['val']):
-            with torch.no_grad():
+        with torch.no_grad():
+            for step, inputs in enumerate(self.data['val']):
                 feed_in, batch_size = self.get_model_feed_in(inputs, self.device)
                 output = self.model(feed_in)
-            if self.cfgs.progress.save_progress_val and step < self.cfgs.progress.max_samples_val:  # Just some samples
-                self.save_progress(epoch, 0, global_step, inputs, output, mode='val')
+                if self.cfgs.progress.save_progress_val and step < self.cfgs.progress.max_samples_val:
+                    self.save_progress(epoch, 0, global_step, inputs, output, mode='val')
 
-            count += batch_size
-            loss = self.calculate_loss(inputs, output)
-            loss_summary(loss, batch_size)
+                count += batch_size
+                loss = self.calculate_loss(inputs, output)
+                loss_summary(loss, batch_size)
 
         if count == 0:
             self.logger.add_log('No batch was sent to valid...')
