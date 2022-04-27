@@ -52,7 +52,7 @@ progress:
     epoch_save_progress: 10
     iter_save_progress: 10
 
-    epoch_val: 1000
+    epoch_val: 10000
     save_progress_val: True
     max_samples_val: 1
 
@@ -69,6 +69,7 @@ dataset:
         scan_id: 65
         img_scale: 1.0
         scale_radius: 3.0
+        align_cam: True
         precache: True
         augmentation:
             shuffle: True
@@ -78,6 +79,7 @@ dataset:
         scan_id: 65
         img_scale: 0.25
         scale_radius: 3.0
+        align_cam: True
         precache: False
 
     eval:
@@ -87,6 +89,7 @@ dataset:
         scan_id: 65
         img_scale: 1.0
         scale_radius: 3.0
+        align_cam: True
         precache: True
 
 inference:

@@ -46,6 +46,8 @@ class Capture(Base3dPCDataset):
         self.center_cam_poses_by_pc_mean()
         # re-norm again
         self.norm_cam_pose()
+        # align if required
+        self.align_cam_horizontal()
 
         # rescale image, call from parent class
         self.rescale_img_and_pose()

@@ -3,9 +3,9 @@
 import numpy as np
 
 from .base_3d_dataset import Base3dDataset
-from arcnerf.geometry.poses import center_poses, average_poses
-from arcnerf.geometry.ray import closest_point_to_rays
+from arcnerf.geometry.poses import center_poses
 from arcnerf.geometry.transformation import rotate_points
+from common.utils.cfgs_utils import valid_key_in_cfgs
 from common.utils.torch_utils import np_wrapper
 
 
@@ -39,21 +39,15 @@ class Base3dPCDataset(Base3dDataset):
         """For eval model, only keep a small number of samples. Which are closer to the avg pose
          It should be done before precache_rays in child class to avoid full precache.
          """
-        if self.eval_max_sample is not None:
-            n_imgs = min(self.eval_max_sample, self.n_imgs)
-            self.n_imgs = n_imgs
-            ind = self.find_closest_cam_ind(n_imgs)
-            self.images = [self.images[i] for i in ind]
-            self.cameras = [self.cameras[i] for i in ind]
-            self.masks = [self.masks[i] for i in ind] if len(self.masks) > 0 else []
-            self.bounds = [self.bounds[i] for i in ind] if len(self.bounds) > 0 else []
+        ind = super().keep_eval_samples()
+        if ind is not None:
             if 'vis' in self.point_cloud:
                 self.point_cloud['vis'] = self.point_cloud['vis'][ind, :]
 
     def filter_point_cloud(self):
         """Filter point cloud in pc_radius, it is in scale after cam normalization """
         # TODO: Better filter to remove outlier points should be applied
-        if hasattr(self.cfgs, 'pc_radius') and self.cfgs.pc_radius > 0:
+        if valid_key_in_cfgs(self.cfgs, 'pc_radius') and self.cfgs.pc_radius > 0:
             pts_valid = np.linalg.norm(self.point_cloud['pts'], axis=-1) < (self.cfgs.pc_radius / 1.05)
             self.point_cloud['pts'] = self.point_cloud['pts'][pts_valid, :]
 
@@ -80,54 +74,24 @@ class Base3dPCDataset(Base3dDataset):
         """Recenter camera pose by setting the common view point center at (0,0,0)
         The common view point is the closest point to all rays.
         """
-        assert len(self.cameras) > 0, 'Not camera in dataset, do not use this func'
-        c2ws = self.get_poses(torch_tensor=False, concat=True)
-        # use ray from image center to represent cam view dir
-        center_idx = np.array([[int(self.W / 2.0), int(self.H / 2.0)]])
-        rays_o = []
-        rays_d = []
-        for idx in range(len(self.cameras)):
-            ray = self.cameras[idx].get_rays(index=center_idx, to_np=True)
-            rays_o.append(ray[0])
-            rays_d.append(ray[1])
-        rays = (np.concatenate(rays_o, axis=0), np.concatenate(rays_d, axis=0))
-        # calculate mean view point
-        view_point_mean, _, _ = np_wrapper(closest_point_to_rays, rays[0], rays[1])  # (1, 3)
-        center_c2w = center_poses(c2ws, view_point_mean[0])
-        for idx in range(len(self.cameras)):
-            self.cameras[idx].reset_pose(center_c2w[idx])
-
-        # if point cloud exist, also adjust it
-        self.point_cloud['pts'] -= view_point_mean
+        view_point_mean = super().center_cam_poses_by_view_dir()
+        if view_point_mean is not None:
+            self.point_cloud['pts'] -= view_point_mean
 
     def norm_cam_pose(self):
         """Normalize camera pose by scale_radius, point cloud as well"""
-        assert len(self.cameras) > 0, 'Not camera in dataset, do not use this func'
-        if hasattr(self.cfgs, 'scale_radius') and self.cfgs.scale_radius > 0:
-            cam_norm_t = []
-            for camera in self.cameras:
-                cam_norm_t.append(camera.get_cam_pose_norm())
-            max_cam_norm_t = max(cam_norm_t)
-
-            for camera in self.cameras:
-                camera.rescale_pose(scale=self.cfgs.scale_radius / (max_cam_norm_t * 1.05))
-
-            # for point cloud adjustment
-            self.point_cloud['pts'] *= (self.cfgs.scale_radius / (max_cam_norm_t * 1.05))
+        max_cam_norm_t = super().norm_cam_pose()
+        # for point cloud adjustment
+        self.point_cloud['pts'] *= (self.cfgs.scale_radius / (max_cam_norm_t * 1.05))
 
     def align_cam_horizontal(self):
         """Align all camera direction and position to up.
         Use it only when camera are not horizontally around the object
         """
-        c2ws = self.get_poses(torch_tensor=False, concat=True)
-        dtype = c2ws.dtype
-        avg_pose = average_poses(c2ws)
-        rot_mat = np.eye(4, dtype=dtype)
-        rot_mat[:3, :3] = np.linalg.inv(avg_pose)[:3, :3]
-        rot_mat_pts = rot_mat.copy().astype(self.point_cloud['pts'].dtype)[None]
-        for idx in range(len(self.cameras)):
-            self.cameras[idx].apply_transform(rot_mat)
-        self.point_cloud['pts'] = np_wrapper(rotate_points, self.point_cloud['pts'][None], rot_mat_pts)[0]
+        rot_mat = super().align_cam_horizontal()
+        if rot_mat is not None:
+            rot_mat_pts = rot_mat.copy().astype(self.point_cloud['pts'].dtype)[None]
+            self.point_cloud['pts'] = np_wrapper(rotate_points, self.point_cloud['pts'][None], rot_mat_pts)[0]
 
     def get_bounds_from_pc(self, extend_factor=0.05):
         """Get bounds from pc projected by each cam.

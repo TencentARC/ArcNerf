@@ -29,6 +29,7 @@ dataset:
         img_scale: 1.0
         scale_radius: 3.0
         pc_radius: 2.0
+        align_cam: False
         precache: True
 
 model:

@@ -65,7 +65,7 @@ progress:
     epoch_save_progress: 100        # Num of epoch for saving progress
     iter_save_progress: 10          # Num of iteration for saving progress
 
-    epoch_val: 1000                  # Num of epoch for validation. -1 means not validation
+    epoch_val: 10000                # Num of epoch for validation. -1 means not validation
     save_progress_val: True         # Whether to save progress during validation
     max_samples_val: 1              # Max num of sample to write into image in valid
 
@@ -83,6 +83,7 @@ dataset:
         img_scale: 1.0               # scale image and intrinsic, < 1 means scale_down
         scale_radius: 3.0            # norm the camera within a sphere with such radius(actual radius litter smaller)
         pc_radius: 2.0               # only keep point cloud in a fix radius ball, scale after cam norm
+        align_cam: False             # whether to use avg pose to adjust cam rotation. Only for cam that are not horizontally distributed.
         precache: True               # precache all the rays at once
         augmentation:
             shuffle: True
@@ -93,6 +94,7 @@ dataset:
         img_scale: 0.5
         scale_radius: 3.0
         pc_radius: 2.0
+        align_cam: False
         precache: False
 
     eval:
@@ -102,6 +104,7 @@ dataset:
         scene_name: qqtiger
         img_scale: 1.0
         scale_radius: 3.0
+        align_cam: False
         pc_radius: 2.0
         precache: True
 

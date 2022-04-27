@@ -44,6 +44,7 @@ class Base3dDataset(BaseDataset):
         """For eval model, only keep a small number of samples. Which are closer to the avg pose
          It should be done before precache_rays in child class to avoid full precache.
          """
+        ind = None
         if self.eval_max_sample is not None:
             n_imgs = min(self.eval_max_sample, self.n_imgs)
             self.n_imgs = n_imgs
@@ -52,6 +53,8 @@ class Base3dDataset(BaseDataset):
             self.cameras = [self.cameras[i] for i in ind]
             self.masks = [self.masks[i] for i in ind] if len(self.masks) > 0 else []
             self.bounds = [self.bounds[i] for i in ind] if len(self.bounds) > 0 else []
+
+        return ind
 
     def find_closest_cam_ind(self, n_close):
         """Find the closest cam ind to the avg pose, return a list of index"""
@@ -119,8 +122,9 @@ class Base3dDataset(BaseDataset):
 
     def norm_cam_pose(self):
         """Normalize camera pose by scale_radius, place camera near a sphere surface. It affects extrinsic"""
+        max_cam_norm_t = None
         assert len(self.cameras) > 0, 'Not camera in dataset, do not use this func'
-        if hasattr(self.cfgs, 'scale_radius') and self.cfgs.scale_radius > 0:
+        if valid_key_in_cfgs(self.cfgs, 'scale_radius') and self.cfgs.scale_radius > 0:
             cam_norm_t = []
             for camera in self.cameras:
                 cam_norm_t.append(camera.get_cam_pose_norm())
@@ -129,10 +133,13 @@ class Base3dDataset(BaseDataset):
             for camera in self.cameras:
                 camera.rescale_pose(scale=self.cfgs.scale_radius / (max_cam_norm_t * 1.05))
 
+        return max_cam_norm_t
+
     def center_cam_poses_by_view_dir(self):
         """Recenter camera pose by setting the common view point center at (0,0,0)
         The common view point is the closest point to all rays.
         """
+        view_point_mean = None
         assert len(self.cameras) > 0, 'Not camera in dataset, do not use this func'
         c2ws = self.get_poses(torch_tensor=False, concat=True)
         # use ray from image center to represent cam view dir
@@ -150,17 +157,23 @@ class Base3dDataset(BaseDataset):
         for idx in range(len(self.cameras)):
             self.cameras[idx].reset_pose(center_c2w[idx])
 
+        return view_point_mean
+
     def align_cam_horizontal(self):
         """Align all camera direction and position to up.
         Use it only when camera are not horizontally around the object
         """
-        c2ws = self.get_poses(torch_tensor=False, concat=True)
-        dtype = c2ws.dtype
-        avg_pose = average_poses(c2ws)
-        rot_mat = np.eye(4, dtype=dtype)
-        rot_mat[:3, :3] = np.linalg.inv(avg_pose)[:3, :3]
-        for idx in range(len(self.cameras)):
-            self.cameras[idx].apply_transform(rot_mat)
+        rot_mat = None
+        if valid_key_in_cfgs(self.cfgs, 'align_cam') and self.cfgs.align_cam is True:
+            c2ws = self.get_poses(torch_tensor=False, concat=True)
+            dtype = c2ws.dtype
+            avg_pose = average_poses(c2ws)
+            rot_mat = np.eye(4, dtype=dtype)
+            rot_mat[:3, :3] = np.linalg.inv(avg_pose)[:3, :3]
+            for idx in range(len(self.cameras)):
+                self.cameras[idx].apply_transform(rot_mat)
+
+        return rot_mat
 
     def precache_ray(self):
         """Precache all the rays for all images first"""
