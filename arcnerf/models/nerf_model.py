@@ -33,11 +33,11 @@ class NeRF(Base3dModel):
         """
         All the tensor are in chunk. B is total num of rays by grouping different samples in batch
         Args:
-            inputs['rays_o']: torch.tensor (B, 3), cam_loc/ray_start position
-            inputs['rays_d']: torch.tensor (B, 3), view dir(assume normed)
-            inputs['img']: torch.tensor (B, 3), rgb value in 0-1, optional
-            inputs['mask']: torch.tensor (B,), mask value in {0, 1}. optional
-            inputs['bounds']: torch.tensor (B, 2)
+            inputs: a dict of torch tensor:
+                inputs['rays_o']: torch.tensor (B, 3), cam_loc/ray_start position
+                inputs['rays_d']: torch.tensor (B, 3), view dir(assume normed)
+                inputs['mask']: torch.tensor (B,), mask value in {0, 1}. optional
+                inputs['bounds']: torch.tensor (B, 2)
             inference_only: If True, will not output coarse results. By default False
             get_progress: If True, output some progress for recording, can not used in inference only mode.
                           By default False
@@ -102,11 +102,18 @@ class NeRF(Base3dModel):
             white_bkg=self.rays_cfgs['white_bkg']
         )
         if not weights_only:
+            # blend fg + bkg for rgb and depth. mask is still for foreground only
+            if self.bkg_model is not None:
+                output_bkg = self.bkg_model._forward(inputs, inference_only=True)  # not need sigma
+                bkg_lamba = output_coarse['trans_shift'][:, -1]  # (B,) prob that light passed through foreground field
+                output_coarse['rgb'] = output_coarse['rgb'] + bkg_lamba[:, None] * output_bkg['rgb']
+                output_coarse['depth'] = output_coarse['depth'] + bkg_lamba * output_bkg['depth']
+
             output['rgb_coarse'] = output_coarse['rgb']  # (B, 3)
             output['depth_coarse'] = output_coarse['depth']  # (B,)
             output['mask_coarse'] = output_coarse['mask']  # (B,)
 
-        if get_progress:
+        if get_progress:  # this save the sigma with out blending bkg, only in foreground
             for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
                 output['progress_{}'.format(key)] = output_coarse[key].detach()  # (B, N_sample(-1))
 
@@ -142,11 +149,18 @@ class NeRF(Base3dModel):
                 white_bkg=self.rays_cfgs['white_bkg']
             )
 
+            # blend fg + bkg for rgb and depth. mask is still for foreground only
+            if self.bkg_model is not None:
+                output_bkg = self.bkg_model._forward(inputs, inference_only=True)  # not need sigma
+                bkg_lamba = output_fine['trans_shift'][:, -1]  # (B,) prob that light passed through foreground field
+                output_fine['rgb'] = output_fine['rgb'] + bkg_lamba[:, None] * output_bkg['rgb']
+                output_fine['depth'] = output_fine['depth'] + bkg_lamba * output_bkg['depth']
+
             output['rgb_fine'] = output_fine['rgb']  # (B, 3)
             output['depth_fine'] = output_fine['depth']  # (B,)
             output['mask_fine'] = output_fine['mask']  # (B,)
 
-            if get_progress:  # replace with fine
+            if get_progress:  # replace with fine, in foreground only
                 for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
                     output['progress_{}'.format(key)] = output_fine[key].detach()  # (B, N_sample(-1))
 

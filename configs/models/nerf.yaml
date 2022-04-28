@@ -1,4 +1,4 @@
-# The nerf model with only one pass
+# The nerf model with two pass
 
 model:
     type: NeRF
@@ -11,10 +11,10 @@ model:
         inverse_linear: False         # inverse_linear make zvals close to near
         perturb: True                 # perturb zvals interval
         add_inf_z: True               # Add inf zval for ray marching
-        noise_std: 0.1                # noise for sigma in training
+        noise_std: 1.0                # noise for sigma in training
         white_bkg: False              # cast the background as white
     chunk_rays: 32768                 # each chunk to process 1024*32(ray), enough for 32 GB
-    chunk_pts: 786432                 # each chunk to progress 4096*192(pts), for model forward
+    chunk_pts: 131072                 # each chunk to progress 4096*32(pts), for model forward
     geometry:
         W: 256                        # linear hidden neuron
         D: 8                          # num of linear, not include final

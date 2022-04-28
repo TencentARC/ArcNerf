@@ -8,9 +8,13 @@ import unittest
 import numpy as np
 import torch
 
+from arcnerf.geometry.ray import get_ray_points_by_zvals
+from arcnerf.geometry.transformation import normalize
 from arcnerf.render.ray_helper import (
-    get_zvals_from_near_far, sample_pdf, sample_cdf, sample_ray_marching_output_by_index, ray_marching
+    get_zvals_from_near_far, get_zvals_outside_sphere, ray_marching, sample_cdf, sample_pdf,
+    sample_ray_marching_output_by_index
 )
+from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.torch_utils import np_wrapper, torch_to_np
 from common.visual.plot_2d import draw_2d_components
 
@@ -76,6 +80,36 @@ class TestDict(unittest.TestCase):
         zvals = np.linspace(self.near, self.far, self.n_pts)[None, :]
 
         return sigma, zvals
+
+    def tests_get_points(self):
+        rays_o = np.array([[-2.12, -2.12, 0]])  # (1, 3)
+        rays_d = np.array([[1.0, 1.0, 0]])  # (1, 3)
+        rays_d = normalize(rays_d)
+        near = np.ones((1, 1)) * self.near
+        far = np.ones((1, 1)) * self.far
+        zvals = np_wrapper(get_zvals_from_near_far, near, far, 8)  # (1, 8)
+        pts = np_wrapper(get_ray_points_by_zvals, rays_o, rays_d, zvals).reshape(-1, 3)  # (n_pts, 3)
+
+        file_path = osp.join(RESULT_DIR, 'pts_from_near_far.png')
+        draw_3d_components(
+            points=pts,
+            rays=(rays_o, rays_d * zvals.max(1) * 1.2),
+            sphere_radius=3.0,
+            title='get points from near({})-far({})'.format(self.near, self.far),
+            save_path=file_path
+        )
+
+        zvals, radius = np_wrapper(get_zvals_outside_sphere, rays_o, rays_d, 8, 3.0)  # (1, 8)
+        pts = np_wrapper(get_ray_points_by_zvals, rays_o, rays_d, zvals).reshape(-1, 3)  # (n_pts, 3)
+
+        file_path = osp.join(RESULT_DIR, 'pts_outside_radius.png')
+        draw_3d_components(
+            points=pts,
+            rays=(rays_o, rays_d * zvals.max(1) * 1.2),
+            sphere_radius=[3] + radius.tolist(),
+            title='get points outside sphere with r=3',
+            save_path=file_path
+        )
 
     def tests_ray_marching(self):
         # all positive

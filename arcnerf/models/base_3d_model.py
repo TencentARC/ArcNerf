@@ -2,8 +2,9 @@
 
 import torch
 
+from .bkg_model import NeRFPP
 from common.models.base_model import BaseModel
-from common.utils.cfgs_utils import get_value_from_cfgs_field
+from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field, dict_to_obj, obj_to_dict
 from common.utils.torch_utils import chunk_processing
 
 
@@ -16,6 +17,12 @@ class Base3dModel(BaseModel):
         self.rays_cfgs = self.read_ray_cfgs()
         self.chunk_rays = self.cfgs.model.chunk_rays  # for n_rays together, do not consider n_pts on ray
         self.chunk_pts = self.cfgs.model.chunk_pts  # for n_pts together, only for model forward
+        # background model
+        self.bkg_cfgs = self.read_bkg_cfgs()
+        self.bkg_model = None
+        if self.bkg_cfgs is not None:
+            self.bkg_model = self.setup_bkg_model()
+            self.check_bkg_cfgs()
 
     def read_ray_cfgs(self):
         """Read cfgs for ray, common case"""
@@ -32,6 +39,15 @@ class Base3dModel(BaseModel):
         }
         return ray_cfgs
 
+    def check_bkg_cfgs(self):
+        """If bkg model is used, check for invalid cfgs"""
+        # foreground model should not add add_inf_z
+        assert self.rays_cfgs['add_inf_z'] is False, 'Do not add_inf_z for foreground'
+        # far distance should not exceed 2*bkg_bounding_radius
+        max_far = 2.0 * self.bkg_cfgs.rays.bounding_radius
+        assert self.rays_cfgs['far'] is None or self.rays_cfgs['far'] <= max_far,\
+            'Do not set far exceed {}'.format(max_far)
+
     def get_chunk_rays(self):
         """Get the chunk rays num"""
         return self.chunk_rays
@@ -40,17 +56,35 @@ class Base3dModel(BaseModel):
         """Get the chunk pts num"""
         return self.chunk_pts
 
+    def read_bkg_cfgs(self):
+        """Read cfgs for background. Return None if did not use."""
+        if valid_key_in_cfgs(self.cfgs.model, 'background'):
+            return self.cfgs.model.background
+
+        return None
+
+    def setup_bkg_model(self):
+        """Set up a background model"""
+        assert valid_key_in_cfgs(self.bkg_cfgs, 'type'), 'You did not specify the bkg model type...'
+        bkg_model_cfgs = dict_to_obj({'model': obj_to_dict(self.bkg_cfgs)})
+        if self.bkg_cfgs.type == 'NeRFPP':
+            bkg_model = NeRFPP(bkg_model_cfgs)
+        else:
+            raise NotImplementedError('Method {} for bkg not support yet...'.format(self.bkg_cfgs.type))
+
+        return bkg_model
+
     def forward(self, inputs, inference_only=False, get_progress=False):
-        """The forward function actually call chunk process func _forward
+        """The forward function actually call chunk process func ._forward()
         to avoid large memory at same time.
         Do not call this directly using chunk since the tensor are not flatten to represent batch of rays.
 
         Args:
-            inputs['rays_o']: torch.tensor (B, N, 3), cam_loc/ray_start position
-            inputs['rays_d']: torch.tensor (B, N, 3), view dir(assume normed)
-            inputs['img']: torch.tensor (B, N, 3), rgb value in 0-1, optional
-            inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
-            inputs['bounds']: torch.tensor (B, 2). optional
+            inputs: a dict of torch tensor:
+                inputs['rays_o']: torch.tensor (B, N, 3), cam_loc/ray_start position
+                inputs['rays_d']: torch.tensor (B, N, 3), view dir(assume normed)
+                inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
+                inputs['bounds']: torch.tensor (B, 2). optional
             inference_only: If True, only return the final results(not coarse). By default False
             get_progress: If True, output some progress for recording, can not used in inference only mode.
                           By default False
@@ -68,20 +102,15 @@ class Base3dModel(BaseModel):
         flat_inputs['rays_d'] = rays_d
 
         # optional inputs
-        img = None
-        if 'img' in inputs:
-            img = inputs['img'].view(-1, 3)  # (BN, 3)
-        flat_inputs['img'] = img
-
         bounds = None
         if 'bounds' in inputs:
             bounds = inputs['bounds'].view(-1, 2)  # (BN, 3)
         flat_inputs['bounds'] = bounds
 
-        masks = None
-        if 'masks' in inputs:
-            masks = inputs['masks'].view(-1)  # (BN,)
-        flat_inputs['masks'] = masks
+        mask = None
+        if 'mask' in inputs:
+            mask = inputs['mask'].view(-1)  # (BN,)
+        flat_inputs['mask'] = mask
 
         # all output tensor in (B*N, ...), reshape to (B, N, ...)
         output = chunk_processing(self._forward, self.chunk_rays, flat_inputs, inference_only, get_progress)

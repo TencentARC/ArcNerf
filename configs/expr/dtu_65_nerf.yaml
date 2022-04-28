@@ -145,3 +145,4 @@ loss:
 
 metric:
     PSNRFine:
+    MaskPSNRFine:

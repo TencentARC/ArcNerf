@@ -128,7 +128,8 @@ def get_near_far_from_rays(
             raise NotImplementedError('You must specify near/far in some place...')
 
         if bounds is None:
-            near, far, _, mask = sphere_ray_intersection(rays_o, rays_d, radius=bounding_radius)  # (BN, 1)
+            radius = torch.tensor([bounding_radius], dtype=dtype).to(device)
+            near, far, _, mask = sphere_ray_intersection(rays_o, rays_d, radius=radius)  # (BN, 1)
         else:
             near, far = bounds[:, 0:1], bounds[:, 1:2]
 
@@ -175,13 +176,71 @@ def get_zvals_from_near_far(
         zvals = near * (1 - t_vals) + far * t_vals
 
     if perturb:
-        _mids = .5 * (zvals[..., 1:] + zvals[..., :-1])
-        _upper = torch.cat([_mids, zvals[..., -1:]], -1)
-        _lower = torch.cat([zvals[..., :1], _mids], -1)
-        _z_rand = torch.rand(size=_upper.shape, dtype=dtype).to(device)
-        zvals = _lower + (_upper - _lower) * _z_rand  # (N_rays, N_pts)
+        zvals = perturb_interval(zvals)  # (N_rays, N_pts)
 
     return zvals
+
+
+def get_zvals_outside_sphere(rays_o: torch.Tensor, rays_d: torch.Tensor, n_pts, radius, perturb=False):
+    """Get zvals outside a bounding radius
+
+    Args:
+        rays_o: tensor(N_rays, 3), ray origin
+        rays_d: tensor(N_rays, 3), ray direction
+        n_pts: num of point to sample
+        radius: float value of the bounding sphere radius
+        perturb: If True, disturb sampling in all segment. By default False.
+
+    Returns:
+        zvals: (N_rays, N_pts), each ray samples n_pts points
+        sphere_radius: (N_pts, ) radius of the ball
+    """
+    device = rays_o.device
+    dtype = rays_o.dtype
+
+    t_vals = torch.linspace(0.0, 1.0, n_pts + 2, dtype=dtype)[1:-1].to(device)  # (N_pts,)
+    sphere_radius = radius / torch.flip(t_vals, dims=[-1])  # (N_pts,), extend from radius -> inf
+    if perturb:
+        sphere_radius = perturb_interval(sphere_radius[None])[0]  # (N_pts, )
+    zvals = get_zvals_from_sphere_radius(rays_o, rays_d, sphere_radius)  # (N_rays, N_pts)
+
+    return zvals, sphere_radius
+
+
+def get_zvals_from_sphere_radius(rays_o: torch.Tensor, rays_d: torch.Tensor, sphere_radius: torch.Tensor):
+    """Get zvals from sphere radius
+
+    Args:
+        rays_o: tensor(N_rays, 3), ray origin
+        rays_d: tensor(N_rays, 3), ray direction
+        sphere_radius: tensor(N, ), multiple sphere layers radius
+
+    Returns:
+        zvals: (N_rays, N), each ray samples n_pts points.
+              If points do not intersect, will use 0 for it.
+    """
+    _, zvals, _, mask = sphere_ray_intersection(rays_o, rays_d, sphere_radius)
+    return zvals
+
+
+def perturb_interval(vals: torch.Tensor):
+    """Perturb sampling in the intervals
+
+    Args:
+        vals: tensor (B, N), sampling in N pts.
+
+    Return:
+        vals: pertube sampling (B, N)
+    """
+    dtype = vals.dtype
+    device = vals.device
+    _mids = .5 * (vals[..., 1:] + vals[..., :-1])  # (N_rays, N_pts-1)
+    _upper = torch.cat([_mids, vals[..., -1:]], -1)  # (N_rays, N_pts)
+    _lower = torch.cat([vals[..., :1], _mids], -1)  # (N_rays, N_pts)
+    _z_rand = torch.rand(size=_upper.shape, dtype=dtype).to(device)
+    vals = _lower + (_upper - _lower) * _z_rand  # (N_rays, N_pts)
+
+    return vals
 
 
 def sample_pdf(bins: torch.Tensor, weights: torch.Tensor, n_sample, det=False, eps=1e-5):

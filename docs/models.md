@@ -68,6 +68,16 @@ There are three ways to handle background
 Set `white_bkg` in the rays, and sample in the ball. Directly compare the image and output rgb.
 - (4) Use a separate background model(nerf++), restrict the inner rays in sphere. Combine the inner and background model
 For color. `ImgLoss` and be applied on the combined image. `MaskLoss` and `MaskImageLoss` can be applied on obj image.
+### bkg_model
+- bkg_model are not child class of `base_3d_model` to avoid circular import. All background models are directly added in
+`base_3d_model` to be used to add the background output to main object view.
+- Background model are similar to the `base_3d_model` and can be call directly from model cfgs yaml.
+They can also be embraced locally in a `base_3d_model` class.
+#### NeRFPP(nerf++)
+The nerf++ model use same structure of one stage NeRF model to model the background in Multi-Sphere Image(MSI),
+and change input to `(x/r, y/r, z/r, 1/r)` for different radius.
+
+
 
 ## Nerf
 Nerf model with single forward(NeRF), and hierarchical sampling(NeRFFull).

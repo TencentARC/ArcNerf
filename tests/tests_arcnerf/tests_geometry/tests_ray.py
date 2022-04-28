@@ -266,7 +266,7 @@ class TestDict(unittest.TestCase):
     def tests_sphere_ray_intersection(self):
         # set sphere
         origin = (1, 1, 0)
-        radius = 1.0
+        radius = np.array([1.0, 2.0])
 
         # set rays
         rays_o = np.array([
@@ -280,21 +280,26 @@ class TestDict(unittest.TestCase):
             [0, 1, 0]
         ])
         rays_d = np.array([
-            [1, 0, 0],  # 1 intersection, OC*D < 0
+            [1.0, 0, 0],  # 1 intersection, OC*D < 0
             [1, 0, 0],  # 1 intersection, OC*D > 0
             [1, 0, 0],  # 1 intersection(tangent）
             [1, 0.1, 0],  # 2 intersection
             [0, 1, 0],  # no intersection, similar direction to origin
             [-1, -1, 0],  # no intersection, opposition direction to origin
-            [-1, 0, 0],  # one intersection, on surface outter ray
+            [-1, 0, 0],  # one intersection, on surface outer ray
             [1, 10, 0]
         ])  # two intersection, on surface inner ray
         rays_d = normalize(rays_d)
-        # get intersection
-        near, far, pts, mask = np_wrapper(sphere_ray_intersection, rays_o, rays_d, origin, radius)
+        # get intersection. (n_rays, n_r) * 2, (n_rays, n_r, 2, 3), (n_rays, n_r)
+        near, far, pts, mask = np_wrapper(sphere_ray_intersection, rays_o, rays_d, radius, origin)
         pts = pts[mask, :].reshape(-1, 3)  # (n_valid_ray * 2, 3)
 
-        rays_d[mask, :] *= far[mask, :] * 1.2
+        # repeat rays and extend valid rays
+        rays_o = rays_o[:, None, :].repeat(radius.shape[0], 1).reshape(-1, 3)
+        rays_d = rays_d[:, None, :].repeat(radius.shape[0], 1).reshape(-1, 3)
+        mask = mask.reshape(-1)
+        far = far.reshape(-1)
+        rays_d[mask] *= far[mask][:, None] * 1.2
 
         blue_color = get_combine_colors(['blue'], [1])
         ray_colors = get_combine_colors(['red'], [rays_o.shape[0]])
@@ -307,9 +312,11 @@ class TestDict(unittest.TestCase):
             ray_linewidth=0.5,
             ray_colors=ray_colors,
             sphere_origin=origin,
-            sphere_radius=radius,
+            sphere_radius=radius.tolist(),
             title='sphere ray intersection(ray in red no intersection)',
-            save_path=file_path
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True
         )
 
     @staticmethod

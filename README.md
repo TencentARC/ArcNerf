@@ -13,14 +13,13 @@
 
 - 参考框架
   - nerf(nerfpl) - DONE
-  - nerf++
-  - unisurf/neus/volsdf - neurcon
+  - nerf++ - Done
+  - unisurf/neus/volsdf (sdf/occpancy) - neurcon
   - neuraltex
   - nerfFactor/nerd
   - mip-nerf
   - nsvf/plenoxel/plenoctree + instangp
   - marching/deftet, demtet
   - dynamic
-  - sdf/occpancy
   - neural volume
   - nex (mpi, msi, etc)

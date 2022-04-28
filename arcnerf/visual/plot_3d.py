@@ -221,32 +221,36 @@ def draw_rays(ax, rays, ray_colors, ray_linewidth, min_values, max_values, plotl
 
 def draw_sphere(ax, radius, origin, min_values, max_values, plotly, color=None, alpha=0.1):
     """Draw transparent sphere"""
-    x, y, z = get_sphere_surface(radius, origin)
-    # change coordinate
-    xyz = np.concatenate([x[..., None], y[..., None], z[..., None]], axis=-1).reshape(-1, 3)
-    xyz_plt = transform_plt_space(xyz, xyz_axis=1).reshape(x.shape[0], x.shape[1], -1)
-    x_plt, y_plt, z_plt = xyz_plt[..., 0], xyz_plt[..., 1], xyz_plt[..., 2]
-    if plotly:
-        color = color if color is not None else 'dark'
-        rgb = colorize_np(get_colors(color, to_int=False, to_np=True))
-        colorscale = [[0, rgb], [1, rgb]]
-        ax.append(
-            go.Surface(
-                x=x_plt,
-                y=y_plt,
-                z=z_plt,
-                surfacecolor=np.zeros_like(x_plt),
-                opacity=alpha,
-                showscale=False,
-                colorscale=colorscale,
-                name='sphere'
+    if isinstance(radius, int) or isinstance(radius, float):
+        radius = [radius]
+
+    for r in radius:
+        x, y, z = get_sphere_surface(r, origin)
+        # change coordinate
+        xyz = np.concatenate([x[..., None], y[..., None], z[..., None]], axis=-1).reshape(-1, 3)
+        xyz_plt = transform_plt_space(xyz, xyz_axis=1).reshape(x.shape[0], x.shape[1], -1)
+        x_plt, y_plt, z_plt = xyz_plt[..., 0], xyz_plt[..., 1], xyz_plt[..., 2]
+        if plotly:
+            color = color if color is not None else 'dark'
+            rgb = colorize_np(get_colors(color, to_int=False, to_np=True))
+            colorscale = [[0, rgb], [1, rgb]]
+            ax.append(
+                go.Surface(
+                    x=x_plt,
+                    y=y_plt,
+                    z=z_plt,
+                    surfacecolor=np.zeros_like(x_plt),
+                    opacity=alpha,
+                    showscale=False,
+                    colorscale=colorscale,
+                    name='sphere'
+                )
             )
-        )
-    else:
-        color = color if color is not None else 'grey'
-        ax.plot_surface(x_plt, y_plt, z_plt, rstride=4, cstride=4, color=color, linewidth=0, alpha=alpha)
-    min_values = np.minimum(min_values, np.array([x_plt.min(0).min(0), y_plt.min(0).min(0), z_plt.min(0).min(0)]))
-    max_values = np.maximum(max_values, np.array([x_plt.max(0).max(0), y_plt.max(0).max(0), z_plt.max(0).max(0)]))
+        else:
+            color = color if color is not None else 'grey'
+            ax.plot_surface(x_plt, y_plt, z_plt, rstride=4, cstride=4, color=color, linewidth=0, alpha=alpha)
+        min_values = np.minimum(min_values, np.array([x_plt.min(0).min(0), y_plt.min(0).min(0), z_plt.min(0).min(0)]))
+        max_values = np.maximum(max_values, np.array([x_plt.max(0).max(0), y_plt.max(0).max(0), z_plt.max(0).max(0)]))
 
     return min_values, max_values
 
@@ -414,7 +418,7 @@ def draw_3d_components(
         mesh_colors: color in (N_m, 3) or (3,), applied for each or all mesh
         face_colors: list of color in (N_tri, 3), len is N_m, applied for each face in each mesh
         volume: a volume dict containing `grid_pts`, `volume_pts`, `lines`, `faces`
-        sphere_radius: if not None, draw a sphere with such radius
+        sphere_radius: if not None, draw a sphere with such radius. It can be a float num or a list of float num
         sphere_origin: the origin of sphere, by default is (0, 0, 0)
         title: a string of figure title
         save_path: path to save the fig. None will only show fig

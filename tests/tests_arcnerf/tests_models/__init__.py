@@ -3,6 +3,7 @@
 from thop import profile
 
 from common.utils.cfgs_utils import obj_to_dict
+from common.utils.logger import log_nested_dict
 
 
 def log_model_info(logger, model, feed_in, cfgs, batch_size, n_rays):
@@ -28,11 +29,3 @@ def log_model_info(logger, model, feed_in, cfgs, batch_size, n_rays):
         flops, unit = flops / (1024.0**2), 'M'
     logger.add_log('   Flops: {:.2f}{}'.format(flops, unit))
     logger.add_log('   Params: {:.2f}M'.format(params / (1024.0**2)))
-
-
-def log_nested_dict(logger, nested_dict, extra=''):
-    for k in nested_dict.keys():
-        if isinstance(nested_dict[k], dict):
-            log_nested_dict(logger, nested_dict[k], extra=extra + '    ')
-        else:
-            logger.add_log(extra + '{}: {}'.format(k, nested_dict[k]))

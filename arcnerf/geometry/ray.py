@@ -176,7 +176,7 @@ def closest_distance_of_two_rays(rays_o: torch.Tensor, rays_d: torch.Tensor):
     return distance
 
 
-def sphere_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, origin=(0, 0, 0), radius=1.0):
+def sphere_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, radius: torch.Tensor, origin=(0, 0, 0)):
     """Get intersection of ray with sphere surface and the near/far zvals.
     This will be 4 cases: (1)outside no intersection -> near/far: 0, mask = 0
                           (2)outside 1 intersection  -> near = far, mask = 1
@@ -188,39 +188,49 @@ def sphere_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, origin=(
      Args:
         rays_o: ray origin, (N_rays, 3)
         rays_d: ray direction, assume normalized, (N_rays, 3)
-        origin: sphere origin, by default (0, 0, 0)
-        radius: sphere radius, by default 1.0
+        radius: sphere radius in (N_r, ) or a single value.
+        origin: sphere origin, by default (0, 0, 0). Support only one origin now
 
     Returns:
-        near: near intersection zvals. (N_rays, 1)
+        near: near intersection zvals. (N_rays, N_r)
               If only 1 intersection: if not tangent, same as far; else 0. clip by 0.
-        far:  far intersection zvals. (N_rays, 1)
+        far:  far intersection zvals. (N_rays, N_r)
               If only 1 intersection: if not tangent, same as far; else 0.
-        pts: (N_rays, 2, 3), each ray has near/far two points, if nan, means no intersection at this ray
-        mask: (N_rays,), show whether each ray has intersection with the sphere, BoolTensor
+        pts: (N_rays, N_r, 2, 3), each ray has near/far two points with each sphere.
+                                  if nan, means no intersection at this ray
+        mask: (N_rays, N_r), show whether each ray has intersection with the sphere, BoolTensor
      """
     device = rays_o.device
     dtype = rays_o.dtype
     n_rays = rays_o.shape[0]
+    # read radius
+    if not isinstance(radius, torch.Tensor):
+        assert isinstance(radius, float) or isinstance(radius, int), 'Invalid type'
+        radius = torch.tensor([radius], dtype=dtype).to(device)
+    n_sphere = radius.shape[0]
 
-    mask = torch.ones(size=(n_rays, 1)).type(torch.BoolTensor).to(device)
+    rays_o_repeat = torch.repeat_interleave(rays_o, n_sphere, 0)  # (N_rays*N_r, 3)
+    rays_d_repeat = torch.repeat_interleave(rays_d, n_sphere, 0)  # (N_rays*N_r, 3)
+    r = torch.repeat_interleave(radius.unsqueeze(0), n_rays, 0).view(-1, 1)  # (N_rays*N_r, 3)
+
+    mask = torch.ones(size=(n_rays * n_sphere, 1)).type(torch.BoolTensor).to(device)
 
     C = torch.tensor([origin], dtype=dtype).to(device)  # (1, 3)
-    r = torch.tensor([radius], dtype=dtype).to(device)  # (1, )
+    C = torch.repeat_interleave(C, n_rays * n_sphere, 0)  # (N_rays*N_r, 3)
 
-    OC = C - rays_o  # (N_rays, 3)
-    z_half = batch_dot_product(OC, rays_d).unsqueeze(1)  # (N_rays, 1)
+    OC = C - rays_o_repeat  # (N_rays*N_r, 3)
+    z_half = batch_dot_product(OC, rays_d_repeat).unsqueeze(1)  # (N_rays*N_r, 1)
     z_half = set_tensor_to_zeros(z_half)
-    rays_o_in_sphere = torch.norm(OC, dim=-1) <= radius
-    rays_o_in_sphere = rays_o_in_sphere.unsqueeze(-1)  # (N_rays, 1)
-    mask = torch.logical_and(mask, torch.logical_or(z_half > 0, rays_o_in_sphere))
+    rays_o_in_sphere = torch.norm(OC, dim=-1) <= r[:, 0]  # (N_rays*N_r, )
+    rays_o_in_sphere = rays_o_in_sphere.unsqueeze(1)  # (N_rays*N_r, 1)
+    mask = torch.logical_and(mask, torch.logical_or(z_half > 0, rays_o_in_sphere))  # (N_rays*N_r, 1)
 
-    d_2 = batch_dot_product(OC, OC) - batch_dot_product(z_half, z_half)
-    d_2 = d_2.unsqueeze(1)  # (N_rays, 1)
-    d_2 = set_tensor_to_zeros(d_2)
-    mask = torch.logical_and(mask, (d_2 >= 0))
+    d_2 = batch_dot_product(OC, OC) - batch_dot_product(z_half, z_half)  # (N_rays*N_r,)
+    d_2 = d_2.unsqueeze(1)
+    d_2 = set_tensor_to_zeros(d_2)  # (N_rays*N_r, 1)
+    mask = torch.logical_and(mask, (d_2 >= 0))  # (N_rays*N_r, 1)
 
-    z_offset = r**2 - d_2  # (N_rays, 1)
+    z_offset = r**2 - d_2  # (N_rays*N_r, 1)
     z_offset = set_tensor_to_zeros(z_offset)
     mask = torch.logical_and(mask, (z_offset >= 0))
     z_offset = torch.sqrt(z_offset)
@@ -229,9 +239,15 @@ def sphere_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, origin=(
     near = torch.clamp_min(near, 0.0)
     far = z_half + z_offset
     far = torch.clamp_min(far, 0.0)
-    near[~mask], far[~mask] = 0.0, 0.0
+    near[~mask], far[~mask] = 0.0, 0.0  # (N_rays*N_r, 1) * 2
 
-    zvals = torch.cat([near, far], dim=1)  # (N_rays, 2)
-    pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)
+    zvals = torch.cat([near, far], dim=1)  # (N_rays*N_r, 2)
+    pts = get_ray_points_by_zvals(rays_o_repeat, rays_d_repeat, zvals)  # (N_rays*N_r, 2, 3)
 
-    return near, far, pts, mask[:, 0]
+    # reshape
+    near = near.contiguous().view(n_rays, n_sphere)
+    far = far.contiguous().view(n_rays, n_sphere)
+    mask = mask.contiguous().view(n_rays, n_sphere)
+    pts = pts.contiguous().view(n_rays, n_sphere, 2, 3)
+
+    return near, far, pts, mask

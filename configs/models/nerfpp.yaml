@@ -1,0 +1,58 @@
+# The nerf model with two pass, background in nerf++
+
+model:
+    type: NeRF
+    rays:
+        bounding_radius: 3.0          # bounding ray sampling region
+        near: 2.0                     # hardcode near zvals
+        # far: 4.0                    # should not set far if background model here
+        n_sample: 64                  # n_sample for zvals sampling
+        n_importance: 128             # n_importance for zvals for hierarchical sampling
+        inverse_linear: False         # inverse_linear make zvals close to near
+        perturb: True                 # perturb zvals interval
+        # add_inf_z: False            # If you use bkg model, do not add_inf_z in fg
+        noise_std: 1.0                # noise for sigma in training
+        white_bkg: False              # cast the background as white
+    chunk_rays: 32768                 # each chunk to process 1024*32(ray), enough for 32 GB
+    chunk_pts: 131072                 # each chunk to progress 4096*32(pts), for model forward
+    geometry:
+        W: 256                        # linear hidden neuron
+        D: 8                          # num of linear, not include final
+        skips: [4]                    # pos to add input embedding
+        input_ch: 3                   # xyz input channel
+        embed_freq: 10                # xyz embed freq
+        W_feat: 256                   # extra feature output
+        geometric_init: False         # whether to use geometric init. need radius_init
+    radiance:
+        mode: 'vf'                    # view_dir and feature only
+        W: 128                        # linear hidden dim
+        D: 1                          # num of linear, not include final
+        input_ch_view: 3              # view input channel
+        embed_freq_view: 4            # view embed freq
+        W_feat_in: 256                # dim for feature from geometry
+    background:
+        type: NeRFPP                  # background model type, ['nerf_pp']
+        rays:
+            bounding_radius: 3.0          # bounding for outside range
+            n_sample: 32                  # n_sample for zvals sampling
+            perturb: True                 # perturb zvals interval
+            add_inf_z: True               # when in background
+            noise_std: 1.0                # noise for sigma in training
+            white_bkg: False              # cast the background as white
+        chunk_rays: 32768                 # each chunk to process 1024*32(ray), enough for 32 GB
+        chunk_pts: 131072                 # each chunk to progress 4096*32(pts), for model forward
+        geometry:
+            W: 256                        # linear hidden neuron
+            D: 8                          # num of linear, not include final
+            skips: [4]                    # pos to add input embedding
+            input_ch: 4                   # xyz+1/r input channel
+            embed_freq: 10                # xyz embed freq
+            W_feat: 256                   # extra feature output
+            geometric_init: False         # whether to use geometric init. need radius_init
+        radiance:
+            mode: 'vf'                    # view_dir and feature only
+            W: 128                        # linear hidden dim
+            D: 1                          # num of linear, not include final
+            input_ch_view: 3              # view input channel
+            embed_freq_view: 4            # view embed freq
+            W_feat_in: 256                # dim for feature from geometry

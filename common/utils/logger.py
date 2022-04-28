@@ -38,3 +38,13 @@ class Logger(object):
             logger.warning(msg)
         elif level.lower() == 'error':
             logger.error(msg)
+
+
+def log_nested_dict(logger, nested_dict, extra=''):
+    """Logger add_log for nested dict"""
+    for k in nested_dict.keys():
+        if isinstance(nested_dict[k], dict):
+            logger.add_log(extra + '{}:'.format(k))
+            log_nested_dict(logger, nested_dict[k], extra=extra + '    ')
+        else:
+            logger.add_log(extra + '{}: {}'.format(k, nested_dict[k]))
