@@ -269,8 +269,8 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
         volume_out['pc'] = {}
         valid_pts = torch_to_np(volume_pts)[valid_sigma]  # (n_valid, 3)
         valid_rgb = rgb[valid_sigma]  # (n_valid, 3)
-        logger.add_log('    Getting {} valid pts'.format(valid_pts.shape[0]))
         n_pts = valid_pts.shape[0]
+        logger.add_log('    Getting {} valid pts'.format(n_pts))
         volume_out['pc']['full'] = {'pts': valid_pts.copy(), 'color': valid_rgb.copy()}
         # sample for plot
         if n_pts > max_pts:
@@ -432,6 +432,7 @@ def write_infer_files(files, folder, data, logger):
             draw_3d_components(
                 points=pts,
                 point_colors=pts_colors,
+                point_size=10,
                 volume=volume_dict,
                 title='valid pts({}) from volume'.format(pts.shape[0]),
                 save_path=file_path,

@@ -79,7 +79,7 @@ def get_colors_from_cm(num, cm_func=cm.jet, opa=None, to_np=False):
     return colors
 
 
-def get_combine_colors(colors, n_samples, to_int=True, opa=None):
+def get_combine_colors(colors, n_samples, to_int=False, opa=None):
     """Get combined colors from colors list and n_samples list
 
     Args:
@@ -93,7 +93,7 @@ def get_combine_colors(colors, n_samples, to_int=True, opa=None):
     """
     color_list = []
     for c, n in zip(colors, n_samples):
-        color = np.repeat(get_colors(c, to_int=False, to_np=True)[None, :], n, axis=0)
+        color = np.repeat(get_colors(c, to_int=to_int, to_np=True, opa=opa)[None, :], n, axis=0)
         color_list.append(color)
     colors = np.concatenate(color_list, axis=0)
 

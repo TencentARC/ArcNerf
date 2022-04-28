@@ -4,6 +4,8 @@ import os.path as osp
 
 import torch
 
+from .cfgs_utils import valid_key_in_cfgs
+
 
 def load_model(logger, model, optimizer, path, cfgs, strict=False):
     """Load model from resume path. For distributed-gpu, it will have `module.` at the start of name"""
@@ -40,7 +42,7 @@ def load_model(logger, model, optimizer, path, cfgs, strict=False):
 
     # resume mode will start from current epoch. fine-tune will start from 0 or specify mode.
     keep_train = 'Load model only...'
-    if hasattr(cfgs.progress, 'start_epoch'):
+    if valid_key_in_cfgs(cfgs, 'progress') and valid_key_in_cfgs(cfgs.progress, 'start_epoch'):
         keep_train = 'False(Start from {})'.format(cfgs.progress.start_epoch)
         if cfgs.progress.start_epoch < 0:
             cfgs.progress.start_epoch = max(0, checkpoint['epoch'])
