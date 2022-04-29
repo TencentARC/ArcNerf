@@ -8,7 +8,7 @@ import trimesh
 from arcnerf.geometry.transformation import normalize
 
 
-def extract_mesh(sigma, level, volume_size, volume_len):
+def extract_mesh(sigma, level, volume_size, volume_len, grad_dir='descent'):
     """Extracting mesh from sigma level sets. It has the same coord system with world coord.
     Currently this is only a cpu implementation. In the future may support cpu
 
@@ -17,13 +17,18 @@ def extract_mesh(sigma, level, volume_size, volume_len):
         level: isosurface value. For nerf is around 50.0, for sdf-methods is 0.0.
         volume_size: tuple of 3, each small volume size
         volume_len: tuple of 3, each axis len
+        grad_dir: if 'descent': object sigma is large than level (NeRF: Sigma is density)
+                  if 'ascent': object sigma is smaller than level (volsdf: sdf is <0 inside)
 
     Returns:
         verts: (V, 3) np array, verts adjusted by volume offset
         faces: (F, 3) np array, faces
         vert_normals: (V, 3) np array, normal of each vert, pointing outside
     """
-    verts, faces, vert_normals, _ = skimage.measure.marching_cubes(sigma, level=level, spacing=volume_size)
+    assert grad_dir in ['descent', 'ascent'], 'Invalid grad_dir, only descent/ascent'
+    verts, faces, vert_normals, _ = skimage.measure.marching_cubes(
+        sigma, level=level, spacing=volume_size, gradient_direction=grad_dir
+    )
 
     # adjust offset by whole large and small volume size
     volume_offset = ((volume_len[0] - volume_size[0]) / 2.0, (volume_len[1] - volume_size[1]) / 2.0,
@@ -38,7 +43,9 @@ def extract_mesh(sigma, level, volume_size, volume_len):
     return verts, faces, vert_normals
 
 
-def save_meshes(mesh_file, verts, faces, vert_colors=None, face_colors=None, vert_normals=None, face_normals=None):
+def save_meshes(
+    mesh_file, verts, faces, vert_colors=None, face_colors=None, vert_normals=None, face_normals=None, geo_only=False
+):
     """Export mesh to .ply file
 
     Args:
@@ -49,18 +56,28 @@ def save_meshes(mesh_file, verts, faces, vert_colors=None, face_colors=None, ver
         face_colors: (F, 3) np array, rgb color in (0~1). optional
         vert_normals: (V, 3) np array. normal of each vert, pointing outside, optional
         face_normals: (F, 3) np array. normal of each face, pointing outside, optional
+        geo_only: If true, save verts/faces without color and normal. By default False
     """
-    vert_colors_uint8 = (255.0 * vert_colors.copy()).astype(np.uint8) if vert_colors is not None else None
-    face_colors_uint8 = (255.0 * face_colors.copy()).astype(np.uint8) if face_colors is not None else None
-    mesh_ply = trimesh.Trimesh(
-        vertices=verts,
-        faces=faces,
-        vertex_normals=-vert_normals if vert_normals is not None else None,
-        face_normals=-face_normals if face_normals is not None else None,
-        vert_colors=vert_colors_uint8,
-        face_colors=face_colors_uint8
-    )
-    mesh_ply.export(mesh_file)
+    if geo_only:
+        mesh_ply = trimesh.Trimesh(
+            vertices=verts,
+            faces=faces,
+            vertex_normals=-vert_normals if vert_normals is not None else None,
+            face_normals=-face_normals if face_normals is not None else None,
+        )
+        mesh_ply.export(mesh_file)
+    else:
+        vert_colors_uint8 = (255.0 * vert_colors.copy()).astype(np.uint8) if vert_colors is not None else None
+        face_colors_uint8 = (255.0 * face_colors.copy()).astype(np.uint8) if face_colors is not None else None
+        mesh_ply = trimesh.Trimesh(
+            vertices=verts,
+            faces=faces,
+            vertex_normals=-vert_normals if vert_normals is not None else None,
+            face_normals=-face_normals if face_normals is not None else None,
+            vert_colors=vert_colors_uint8,
+            face_colors=face_colors_uint8
+        )
+        mesh_ply.export(mesh_file)
 
 
 def get_normals(verts, faces):

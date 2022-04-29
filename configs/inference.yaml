@@ -48,6 +48,7 @@ inference:
         ylen: 1.5                   # y-dim length, only when side is None
         zlen: 1.5                   # z-dim length, only when side is None
         level: 50.0                 # level set for mesh extracting. For sigma is around 50. For sdf is 0.
+        grad_dir: descent           # if 'descent', sigma is larger than level in obj(NeRF), if 'ascent' is smaller(SDF)
 
 model:
     type: NeRF

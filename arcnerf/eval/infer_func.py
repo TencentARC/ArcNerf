@@ -152,7 +152,8 @@ def parse_volume(cfgs):
             'xlen': get_value_from_cfgs_field(cfgs.volume, 'xlen', None),
             'ylen': get_value_from_cfgs_field(cfgs.volume, 'ylen', None),
             'zlen': get_value_from_cfgs_field(cfgs.volume, 'zlen', None),
-            'level': get_value_from_cfgs_field(cfgs.volume, 'level', 50.0)
+            'level': get_value_from_cfgs_field(cfgs.volume, 'level', 50.0),
+            'grad_dir': get_value_from_cfgs_field(cfgs.volume, 'grad_dir', 'descent')
         }
         if any([length is None for length in [volume_cfgs['xlen'], volume_cfgs['ylen'], volume_cfgs['zlen']]]):
             volume_cfgs['side'] = get_value_from_cfgs_field(volume_cfgs, 'side', 1.5)  # make sure volume exist
@@ -244,6 +245,7 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
     volume = data['Vol']
     n_grid = data['cfgs']['n_grid']
     level = data['cfgs']['level']
+    grad_dir = data['cfgs']['grad_dir']
     volume_pts = volume.get_volume_pts()  # (n_grid^3, 3) pts in torch
     volume_size = volume.get_volume_size()  # (3,) tuple
     volume_len = volume.get_len()  # (3,) tuple
@@ -286,7 +288,7 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
         try:
             # full mesh
             time0 = time.time()
-            verts, faces, _ = extract_mesh(sigma.copy(), level, volume_size, volume_len)
+            verts, faces, _ = extract_mesh(sigma.copy(), level, volume_size, volume_len, grad_dir)
             logger.add_log('    Extract mesh time {:.2f}s'.format(time.time() - time0))
             logger.add_log('    Extract {} verts, {} faces'.format(verts.shape[0], faces.shape[0]))
 
@@ -444,12 +446,14 @@ def write_infer_files(files, folder, data, logger):
         if 'mesh' in files['volume']:
             mesh = files['volume']['mesh']
 
-            # save full mesh as .ply file
+            # save full mesh as .ply file, save verts/faces only
             mesh_file = osp.join(folder, 'mesh_extract.ply')
             save_meshes(
                 mesh_file, mesh['full']['verts'], mesh['full']['faces'], mesh['full']['vert_colors'],
                 mesh['full']['face_colors'], mesh['full']['vert_normals'], mesh['full']['face_normals']
             )
+            mesh_geo_file = osp.join(folder, 'mesh_extract_geo.ply')
+            save_meshes(mesh_geo_file, mesh['full']['verts'], mesh['full']['faces'], geo_only=True)
 
             # draw simplified in plotly
             verts_sim, faces_sim = mesh['simplify']['verts'], mesh['simplify']['faces']

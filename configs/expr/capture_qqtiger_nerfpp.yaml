@@ -5,7 +5,7 @@ resume: None
 debug:
     debug_mode: False
     print_all_grad: False
-    get_progress: False
+    get_progress: True
 
 dir:
     expr_dir: None

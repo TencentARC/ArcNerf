@@ -30,7 +30,7 @@ class TestDict(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.side = 1.5
-        cls.n_grid = [256]
+        cls.n_grid = 256
         cls.radius = 0.5
         cls.hourglass_h = 1.0
         cls.level = 0
@@ -75,65 +75,60 @@ class TestDict(unittest.TestCase):
         object_dir = osp.join(RESULT_DIR, type)
         os.makedirs(object_dir, exist_ok=True)
 
-        for n_grid in self.n_grid:
-            grid_dir = osp.join(object_dir, 'ngrid{}'.format(n_grid))
-            os.makedirs(grid_dir, exist_ok=True)
+        volume = Volume(n_grid=self.n_grid, side=self.side)
+        volume_pts = torch_to_np(volume.get_volume_pts())  # (n^3, 3)
+        volume_size = volume.get_volume_size()
+        volume_len = volume.get_len()
+        volume_dict = {
+            'grid_pts': torch_to_np(volume.get_corner()),
+            'lines': volume.get_bound_lines(),
+            'faces': volume.get_bound_faces()
+        }
 
-            volume = Volume(n_grid=n_grid, side=self.side)
-            volume_pts = torch_to_np(volume.get_volume_pts())  # (n^3, 3)
-            volume_size = volume.get_volume_size()
-            volume_len = volume.get_len()
-            volume_dict = {
-                'grid_pts': torch_to_np(volume.get_corner()),
-                'lines': volume.get_bound_lines(),
-                'faces': volume.get_bound_faces()
-            }
+        # simulate a object sdf
+        if type == 'sphere':
+            sigma = self.make_sphere_sdf(volume_pts)  # (n^3, )
+        else:
+            sigma = self.make_hourglass_sdf(volume_pts, self.n_grid)  # (n^3, )
 
-            # simulate a object sdf
-            if type == 'sphere':
-                sigma = self.make_sphere_sdf(volume_pts)  # (n^3, )
-            else:
-                sigma = self.make_hourglass_sdf(volume_pts, n_grid)  # (n^3, )
+        # get full mesh
+        sigma = sigma.reshape((self.n_grid, self.n_grid, self.n_grid))
+        verts, faces, vert_normals_ = extract_mesh(sigma.copy(), self.level, volume_size, volume_len)
+        face_centers, vert_normals, face_normals, vert_colors, face_colors = self.get_mesh_components(verts, faces)
 
-            # get full mesh
-            sigma = sigma.reshape((n_grid, n_grid, n_grid))
-            verts, faces, vert_normals_ = extract_mesh(sigma.copy(), self.level, volume_size, volume_len)
-            face_centers, vert_normals, face_normals, vert_colors, face_colors = self.get_mesh_components(verts, faces)
+        # save ply
+        mesh_file = osp.join(object_dir, 'full_mesh_ngrid{}.ply'.format(self.n_grid))
+        save_meshes(mesh_file, verts, faces, vert_colors, face_colors, vert_normals, face_normals)
 
-            # save ply
-            mesh_file = osp.join(grid_dir, 'full_mesh_ngrid{}.ply'.format(n_grid))
-            save_meshes(mesh_file, verts, faces, vert_colors, face_colors, vert_normals, face_normals)
+        # get simplified mesh
+        verts, faces = simplify_mesh(verts, faces, self.max_faces)
+        self.assertLessEqual(faces.shape[0], self.max_faces)
+        face_centers, vert_normals, face_normals, vert_colors, face_colors = self.get_mesh_components(verts, faces)
+        n_verts, n_faces = verts.shape[0], faces.shape[0]
+        ray_colors = get_combine_colors(['blue', 'green'], [n_verts, n_faces])
+        rays = (
+            np.concatenate([verts, face_centers], axis=0), np.concatenate([vert_normals, face_normals], axis=0) / 20.0
+        )  # factor
+        self.assertEqual(rays[0].shape, (n_verts + n_faces, 3))
+        self.assertEqual(rays[1].shape, (n_verts + n_faces, 3))
+        # get verts and rays for 3d visual
+        verts_by_faces, mean_face_colors = get_verts_by_faces(verts, faces, vert_colors)
+        self.assertEqual(verts_by_faces.shape, (n_faces, 3, 3))
+        self.assertEqual(mean_face_colors.shape, (n_faces, 3))
 
-            # get simplified mesh
-            verts, faces = simplify_mesh(verts, faces, self.max_faces)
-            self.assertLessEqual(faces.shape[0], self.max_faces)
-            face_centers, vert_normals, face_normals, vert_colors, face_colors = self.get_mesh_components(verts, faces)
-            n_verts, n_faces = verts.shape[0], faces.shape[0]
-            ray_colors = get_combine_colors(['blue', 'green'], [n_verts, n_faces])
-            rays = (
-                np.concatenate([verts, face_centers],
-                               axis=0), np.concatenate([vert_normals, face_normals], axis=0) / 20.0
-            )  # factor
-            self.assertEqual(rays[0].shape, (n_verts + n_faces, 3))
-            self.assertEqual(rays[1].shape, (n_verts + n_faces, 3))
-            # get verts and rays for 3d visual
-            verts_by_faces, mean_face_colors = get_verts_by_faces(verts, faces, vert_colors)
-            self.assertEqual(verts_by_faces.shape, (n_faces, 3, 3))
-            self.assertEqual(mean_face_colors.shape, (n_faces, 3))
-
-            # draw mesh in plotly
-            file_path = osp.join(grid_dir, 'simplify_mesh_ngrid{}.png'.format(n_grid))
-            draw_3d_components(
-                volume=volume_dict,
-                rays=rays,
-                ray_colors=ray_colors,
-                meshes=[verts_by_faces],
-                face_colors=[face_colors],
-                title='Meshes extract from volume v{}/f{}'.format(n_verts, n_faces),
-                save_path=file_path,
-                plotly=True,
-                plotly_html=True
-            )
+        # draw mesh in plotly
+        file_path = osp.join(object_dir, 'simplify_mesh_ngrid{}.png'.format(self.n_grid))
+        draw_3d_components(
+            volume=volume_dict,
+            rays=rays,
+            ray_colors=ray_colors,
+            meshes=[verts_by_faces],
+            face_colors=[face_colors],
+            title='Meshes extract from volume v{}/f{}'.format(n_verts, n_faces),
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True
+        )
 
     def tests_mesh_sphere(self):
         self.run_mesh('sphere')
