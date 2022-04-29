@@ -220,6 +220,7 @@ def get_zvals_from_sphere_radius(rays_o: torch.Tensor, rays_d: torch.Tensor, sph
               If points do not intersect, will use 0 for it.
     """
     _, zvals, _, mask = sphere_ray_intersection(rays_o, rays_d, sphere_radius)
+
     return zvals
 
 
@@ -401,6 +402,7 @@ def ray_marching(
         'depth': depth,  # (N_rays)
         'mask': mask,  # (N_rays)
         'sigma': _sigma,  # (N_rays, N_pts/N_pts-1)
+        'radiance': _radiance,  # (N_rays, N_pts/N_pts-1)
         'zvals': _zvals,  # (N_rays, N_pts/N_pts-1)
         'alpha': alpha,  # (N_rays, N_pts/N_pts-1)
         'trans_shift': trans_shift,  # (N_rays, N_pts/N_pts-1)

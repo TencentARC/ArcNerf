@@ -197,8 +197,8 @@ class NeRFPP(BkgModel):
             white_bkg=self.rays_cfgs['white_bkg']
         )
 
-        if get_progress:  # this save the sigma with out blending bkg
-            for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
+        if get_progress:  # this save the sigma/radiance with out blending bkg
+            for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights', 'radiance']:
                 output['progress_{}'.format(key)] = output[key].detach()  # (B, N_sample-1)
 
         output['rgb'] = output['rgb']  # (B, 3)

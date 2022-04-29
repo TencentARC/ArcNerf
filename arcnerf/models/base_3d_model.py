@@ -21,6 +21,9 @@ class Base3dModel(BaseModel):
         self.bkg_cfgs = self.read_bkg_cfgs()
         self.bkg_model = None
         if self.bkg_cfgs is not None:
+            # bkg_blend type, 'rgb' or 'sigma
+            self.bkg_blend = get_value_from_cfgs_field(self.bkg_cfgs, 'bkg_blend', 'rgb')
+            self.bkg_add_inf_z = get_value_from_cfgs_field(self.bkg_cfgs.rays, 'add_inf_z', 'False')
             self.bkg_model = self.setup_bkg_model()
             self.check_bkg_cfgs()
 
@@ -41,8 +44,15 @@ class Base3dModel(BaseModel):
 
     def check_bkg_cfgs(self):
         """If bkg model is used, check for invalid cfgs"""
-        # foreground model should not add add_inf_z
-        assert self.rays_cfgs['add_inf_z'] is False, 'Do not add_inf_z for foreground'
+        # foreground model should not add add_inf_z if bkg_blend == 'rgb',
+        if self.bkg_blend == 'rgb':
+            assert self.rays_cfgs['add_inf_z'] is False, 'Do not add_inf_z for foreground'
+            assert self.bkg_add_inf_z is True, 'Must use add_inf_z for background in rgb blending mode'
+        elif self.bkg_blend == 'sigma':
+            assert self.bkg_add_inf_z is False, 'Do not add_inf_z for background in sigma blending mode'
+        else:
+            raise NotImplementedError('Invalid bkg_blend type {}'.format(self.bkg_blend))
+
         # far distance should not exceed 2*bkg_bounding_radius
         max_far = 2.0 * self.bkg_cfgs.rays.bounding_radius
         assert self.rays_cfgs['far'] is None or self.rays_cfgs['far'] <= max_far,\
@@ -122,6 +132,44 @@ class Base3dModel(BaseModel):
                 output[k] = v
 
         return output
+
+    def _merge_bkg_sigma(self, inputs, sigma, radiance, zvals, inference_only):
+        """merge sigma and get inputs for ray marching together. Only for sigma blending mode
+        inference_only helps to sample different zvals during training.
+        All inputs flatten in (B, x) dim
+        """
+        sigma_all, radiance_all, zvals_all = sigma, radiance, zvals
+        if self.bkg_model is not None and self.bkg_blend == 'sigma':
+            output_bkg = self.bkg_model._forward(inputs, inference_only=inference_only, get_progress=True)
+            sigma_bkg = output_bkg['progress_sigma']  # (B, n_bkg(-1))
+            radiance_bkg = output_bkg['progress_radiance']  # (B, n_bkg(-1))
+            zvals_bkg = output_bkg['progress_zvals']  # (B, n_bkg(-1))
+            sigma_all = torch.cat([sigma, sigma_bkg], 1)  # (B, n_fg + n_bkg(-1)), already sorted
+            radiance_all = torch.cat([radiance, radiance_bkg], 1)  # (B, n_fg + n_bkg(-1), 3), already sorted
+            zvals_all = torch.cat([zvals, zvals_bkg], 1)  # (B, n_fg + n_bkg(-1)), already sorted
+
+        return sigma_all, radiance_all, zvals_all
+
+    def _merge_bkg_rgb(self, inputs, output, inference_only):
+        """ blend fg + bkg for rgb and depth. mask is still for foreground only. Only for rgb blending mode
+        inference_only helps to sample different zvals during training.
+        All inputs flatten in (B, x) dim
+        """
+        if self.bkg_model is not None and self.bkg_blend == 'rgb':
+            output_bkg = self.bkg_model._forward(inputs, inference_only=inference_only)  # not need sigma
+            bkg_lamba = output['trans_shift'][:, -1]  # (B,) prob that light passed through foreground field
+            output['rgb'] = output['rgb'] + bkg_lamba[:, None] * output_bkg['rgb']
+            output['depth'] = output['depth'] + bkg_lamba * output_bkg['depth']
+
+        return output
+
+    def _get_n_fg(self, sigma):
+        """Get the num of foreground pts. sigma is (B, n_sample/n_total) """
+        n_fg = sigma.shape[1]
+        if self.bkg_blend == 'rgb' and self.rays_cfgs['add_inf_z'] is False:
+            n_fg -= 1
+
+        return n_fg
 
     def _forward(self, inputs, inference_only=False, get_progress=False):
         """The core forward function, each process a chunk of rays with components in (B, x)"""

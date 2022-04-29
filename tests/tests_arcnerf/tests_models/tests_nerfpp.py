@@ -9,7 +9,7 @@ import torch
 
 from . import log_model_info
 from arcnerf.models import build_model
-from common.utils.cfgs_utils import load_configs
+from common.utils.cfgs_utils import load_configs, get_value_from_cfgs_field
 from common.utils.logger import Logger
 
 CONFIG = osp.abspath(osp.join(__file__, '../../../..', 'configs', 'models', 'nerfpp.yaml'))
@@ -53,10 +53,15 @@ class TestDict(unittest.TestCase):
         n_sample = self.cfgs.model.rays.n_sample
         n_importance = self.cfgs.model.rays.n_importance
         n_total = n_sample + n_importance
+        remove_last = 0
+        if self.cfgs.model.background.bkg_blend == 'rgb':
+            if get_value_from_cfgs_field(self.cfgs.model.rays, 'add_inf_z', False) is False:
+                remove_last = 1
+
         if n_importance > 0:
-            gt_shape = (self.batch_size, self.n_rays, n_total - 1)
+            gt_shape = (self.batch_size, self.n_rays, n_total - remove_last)
         else:
-            gt_shape = (self.batch_size, self.n_rays, n_sample - 1)
+            gt_shape = (self.batch_size, self.n_rays, n_sample - remove_last)
         for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
             self.assertEqual(output['progress_{}'.format(key)].shape, gt_shape)
 

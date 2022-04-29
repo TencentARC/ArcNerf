@@ -90,24 +90,23 @@ class NeRF(Base3dModel):
         sigma = sigma.view(-1, self.rays_cfgs['n_sample'], 1)[..., 0]  # (B, N_sample)
         radiance = radiance.view(-1, self.rays_cfgs['n_sample'], 3)  # (B, N_sample, 3)
 
+        # merge sigma from background and get result together
+        sigma_all, radiance_all, zvals_all = self._merge_bkg_sigma(inputs, sigma, radiance, zvals, inference_only)
+
         # ray marching. If two stage and inference only, get weights from single stage.
         weights_only = inference_only and self.rays_cfgs['n_importance'] > 0
         output_coarse = ray_marching(
-            sigma,
-            radiance,
-            zvals,
-            self.rays_cfgs['add_inf_z'],
+            sigma_all,
+            radiance_all,
+            zvals_all,
+            self.rays_cfgs['add_inf_z'],  # rgb mode should be False, sigma mode should True
             self.rays_cfgs['noise_std'] if not inference_only else 0.0,
             weights_only=weights_only,
             white_bkg=self.rays_cfgs['white_bkg']
         )
         if not weights_only:
-            # blend fg + bkg for rgb and depth. mask is still for foreground only
-            if self.bkg_model is not None:
-                output_bkg = self.bkg_model._forward(inputs, inference_only=True)  # not need sigma
-                bkg_lamba = output_coarse['trans_shift'][:, -1]  # (B,) prob that light passed through foreground field
-                output_coarse['rgb'] = output_coarse['rgb'] + bkg_lamba[:, None] * output_bkg['rgb']
-                output_coarse['depth'] = output_coarse['depth'] + bkg_lamba * output_bkg['depth']
+            # merge rgb with background
+            output_coarse = self._merge_bkg_rgb(inputs, output_coarse, inference_only)
 
             output['rgb_coarse'] = output_coarse['rgb']  # (B, 3)
             output['depth_coarse'] = output_coarse['depth']  # (B,)
@@ -115,9 +114,10 @@ class NeRF(Base3dModel):
 
         if get_progress:  # this save the sigma with out blending bkg, only in foreground
             for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
-                output['progress_{}'.format(key)] = output_coarse[key].detach()  # (B, N_sample(-1))
+                n_fg = self._get_n_fg(sigma)
+                output['progress_{}'.format(key)] = output_coarse[key][:, :n_fg].detach()  # (B, N_sample(-1))
 
-        # fine model
+        # fine model. resample is only performed in foreground zvals
         if self.rays_cfgs['n_importance'] > 0:
             weights_coarse = output_coarse['weights'][:, :self.rays_cfgs['n_sample'] - 2]  # (B, N_sample-2)
             zvals_mid = 0.5 * (zvals[..., 1:] + zvals[..., :-1])  # (B, N_sample-1)
@@ -140,21 +140,20 @@ class NeRF(Base3dModel):
             sigma = sigma.view(-1, n_total, 1)[..., 0]  # (B, n_total)
             radiance = radiance.view(-1, n_total, 3)  # (B, n_total, 3)
 
+            # merge sigma from background and get result together
+            sigma_all, radiance_all, zvals_all = self._merge_bkg_sigma(inputs, sigma, radiance, zvals, inference_only)
+
             output_fine = ray_marching(
-                sigma,
-                radiance,
-                zvals,
-                self.rays_cfgs['add_inf_z'],
+                sigma_all,
+                radiance_all,
+                zvals_all,
+                self.rays_cfgs['add_inf_z'],  # rgb mode should be False, sigma mode should True
                 self.rays_cfgs['noise_std'] if not inference_only else 0.0,
                 white_bkg=self.rays_cfgs['white_bkg']
             )
 
-            # blend fg + bkg for rgb and depth. mask is still for foreground only
-            if self.bkg_model is not None:
-                output_bkg = self.bkg_model._forward(inputs, inference_only=True)  # not need sigma
-                bkg_lamba = output_fine['trans_shift'][:, -1]  # (B,) prob that light passed through foreground field
-                output_fine['rgb'] = output_fine['rgb'] + bkg_lamba[:, None] * output_bkg['rgb']
-                output_fine['depth'] = output_fine['depth'] + bkg_lamba * output_bkg['depth']
+            # merge rgb with background
+            output_fine = self._merge_bkg_rgb(inputs, output_fine, inference_only)
 
             output['rgb_fine'] = output_fine['rgb']  # (B, 3)
             output['depth_fine'] = output_fine['depth']  # (B,)
@@ -162,7 +161,8 @@ class NeRF(Base3dModel):
 
             if get_progress:  # replace with fine, in foreground only
                 for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
-                    output['progress_{}'.format(key)] = output_fine[key].detach()  # (B, N_sample(-1))
+                    n_fg = self._get_n_fg(sigma)
+                    output['progress_{}'.format(key)] = output_fine[key][:, :n_fg].detach()  # (B, N_sample(-1))
 
         return output
 

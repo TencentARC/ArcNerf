@@ -73,6 +73,14 @@ For color. `ImgLoss` and be applied on the combined image. `MaskLoss` and `MaskI
 `base_3d_model` to be used to add the background output to main object view.
 - Background model are similar to the `base_3d_model` and can be call directly from model cfgs yaml.
 They can also be embraced locally in a `base_3d_model` class.
+### bkg_blend
+Method two merge bkg mode.
+- If `rgb`, get fg and bkg rgb separately, then use fg_weight factor to mix bkg color.
+  - In this mode, `add_inf_z` in `background.rays` should be True to get inf zvals.
+  `add_inf_z` in `model.rays` must be False to avoid inf zvals in fg color computation.
+- If `sigma`, merge all sigma from fg and bg together and do ray marching for val.
+  - In this mode `add_inf_z` in `background.rays` must be False to get correct zvals to merge.
+  `add_inf_z` in `model.rays` is suggested be True to avoid merge inf zvals for color computation.
 #### NeRFPP(nerf++)
 The nerf++ model use same structure of one stage NeRF model to model the background in Multi-Sphere Image(MSI),
 and change input to `(x/r, y/r, z/r, 1/r)` for different radius.

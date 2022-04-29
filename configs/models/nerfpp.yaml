@@ -10,7 +10,7 @@ model:
         n_importance: 128             # n_importance for zvals for hierarchical sampling
         inverse_linear: False         # inverse_linear make zvals close to near
         perturb: True                 # perturb zvals interval
-        # add_inf_z: False            # If you use bkg model, do not add_inf_z in fg
+        add_inf_z: False              # rgb mode must be False, sigma mode suggest True
         noise_std: 1.0                # noise for sigma in training
         white_bkg: False              # cast the background as white
     chunk_rays: 32768                 # each chunk to process 1024*32(ray), enough for 32 GB
@@ -31,12 +31,13 @@ model:
         embed_freq_view: 4            # view embed freq
         W_feat_in: 256                # dim for feature from geometry
     background:
-        type: NeRFPP                  # background model type, ['nerf_pp']
+        type: NeRFPP                      # background model type, ['nerf_pp']
+        bkg_blend: 'rgb'                  # how to blend bkg color. 'rgb' blend rgb directly. 'sigma' merge all sigma first
         rays:
             bounding_radius: 3.0          # bounding for outside range
             n_sample: 32                  # n_sample for zvals sampling
             perturb: True                 # perturb zvals interval
-            add_inf_z: True               # when in background
+            add_inf_z: True               # rgb mode, should use True, sigma mode should use False
             noise_std: 1.0                # noise for sigma in training
             white_bkg: False              # cast the background as white
         chunk_rays: 32768                 # each chunk to process 1024*32(ray), enough for 32 GB
