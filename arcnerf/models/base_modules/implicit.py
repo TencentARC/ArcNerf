@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import math
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -48,7 +50,7 @@ class GeoNet(nn.Module):
                         Nerf do not use it. Only for surface modeling methods(idr/neus/volsdf/unisurf)
             act_cfg: cfg obj for selecting activation. None for relu.
                      For surface modeling, usually use SoftPlus(beta=100)
-            geometric_init: If True, init params by using geometric rule. For DenseLayer only.
+            geometric_init: If True, init params by using geometric rule. For DenseLayer only. Siren needs pretrain.
                             Nerf do not use it. Only for surface modeling methods(idr/neus/volsdf/unisurf)
                             ref: https://github.com/matanatz/SAL
             radius_init: radius of sphere used for geometric_init. Output sdf can be init like sphere. By fault 1.
@@ -62,6 +64,10 @@ class GeoNet(nn.Module):
         self.D = D
         self.W_feat = W_feat
         self.skips = skips
+        self.is_pretrained = False
+        self.radius_init = radius_init
+        self.geometric_init = geometric_init
+        self.use_siren = use_siren
         if use_siren:
             assert len(skips) == 0, 'do not use skips for siren'
         self.norm_skip = norm_skip
@@ -101,14 +107,14 @@ class GeoNet(nn.Module):
             # geo_init for denseLayer. For any layer inputs, it should be [feature, x, embed_x]
             if geometric_init and not use_siren:
                 if i == D:  # last layer
-                    nn.init.normal_(layer.weight, mean=np.sqrt(np.pi) / np.sqrt(W), std=0.0001)
+                    nn.init.normal_(layer.weight, mean=np.sqrt(np.pi) / np.sqrt(in_dim), std=0.0001)
                     nn.init.constant_(layer.bias[:1], -radius_init)  # bias only for geo value
                 elif embed_freq > 0:
                     torch.nn.init.constant_(layer.bias, 0.0)
                     if i == 0:  # first layer, [x, embed_x], do not init for embed_x
                         torch.nn.init.constant_(layer.weight[:, input_ch:], 0.0)
                         torch.nn.init.normal_(layer.weight[:, :input_ch], 0.0, np.sqrt(2) / np.sqrt(out_dim))
-                    if i in skips:  # skip layer, [feature, x, embed_x], do not init for embed_x
+                    elif i in skips:  # skip layer, [feature, x, embed_x], do not init for embed_x
                         torch.nn.init.normal_(layer.weight, 0.0, np.sqrt(2) / np.sqrt(out_dim))
                         torch.nn.init.constant_(layer.weight[:, -(embed_dim - input_ch):], 0.0)
                     else:
@@ -125,9 +131,12 @@ class GeoNet(nn.Module):
 
         self.layers = nn.ModuleList(layers)
 
-    def pretrain_siren(self):
-        # TODO: Implement and visual check it
-        pass
+    def pretrain_siren(self, n_iter=5000, lr=1e-4, thres=0.01, n_pts=5000):
+        """Pretrain the siren params."""
+        if self.geometric_init and self.use_siren and not self.is_pretrained:
+            sample_radius = self.radius_init * 2.0  # larger sample sphere
+            pretrain_siren(self, self.radius_init, sample_radius, n_iter, lr, thres, n_pts)
+            self.is_pretrained = True
 
     def forward(self, x: torch.Tensor):
         """
@@ -145,7 +154,7 @@ class GeoNet(nn.Module):
             if i in self.skips:
                 out = torch.cat([out, x], dim=-1)  # cat at last
                 if self.norm_skip:
-                    out = out / torch.sqrt(2)
+                    out = out / math.sqrt(2)
             out = self.layers[i](out)
 
         if self.W_feat <= 0:  # (B, 1), None
@@ -172,6 +181,39 @@ class GeoNet(nn.Module):
             )[0]
 
         return geo_value, h, grad
+
+
+def pretrain_siren(model, radius_init, sample_radius, n_iter=5000, lr=1e-4, thres=0.01, n_pts=5000):
+    """Pretrain the siren params. Radius_init is not allowed to be too large
+    If you init larger sphere, you need to sample more pts to it for better result
+
+    Args:
+        model: implicit geometry model to process the pts
+        radius_init: radius of the inner sphere
+        sample_radius: radius of the sampling sphere space
+        n_iter: num of total iteration. By default 5000.
+        lr: learning rate. By default 1e-4(using adam)
+        thres: thres to stop the training, should be proportional to sphere radius. By default 0.01.
+        n_pts: num of pts sample. By default 5k for radius in 1.0.
+    """
+    assert radius_init <= 5.0, 'To large sphere, does not accept'
+    assert radius_init < sample_radius, 'Sample space does not fully cover the sphere'
+
+    device = next(model.parameters()).device
+    dtype = next(model.parameters()).dtype
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    l1loss = nn.L1Loss(reduction='mean')
+    for _ in range(n_iter):
+        pts = torch.empty([n_pts, 3], dtype=dtype).uniform_(-sample_radius, sample_radius).to(device)
+        sdf_gt = pts.norm(dim=-1) - radius_init  # inside -/outside +
+        sdf_pred = model(pts)[0]
+        loss = l1loss(sdf_pred, sdf_gt[:, None])
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if loss < thres:
+            break
 
 
 class RadianceNet(nn.Module):

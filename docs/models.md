@@ -14,6 +14,8 @@ Embed inputs like xyz/view_dir into higher dimension using periodic funcs(sin, c
 implicit network for mapping xyz -> sigma/sdf/rgb, etc.
 ### GeoNet
 Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
+- geometric_init: If True, init the geonet such that represent a sdf of sphere with radius_init(inner sdf < 0).
+siren layer will use pretrain, dense layer will use weight/bias init(But like an oval than sphere).
 ### RadianceNet
 Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
 
