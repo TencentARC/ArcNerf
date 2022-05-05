@@ -23,7 +23,7 @@ class TestDict(unittest.TestCase):
         cls.cfgs = setup_test_config()
 
     def tests_lr_scheduler(self):
-        lr_scheduler_type = ['MultiStepLR', 'ExponentialLR', 'PolyLR', 'CosineAnnealingLR']
+        lr_scheduler_type = ['MultiStepLR', 'ExponentialLR', 'PolyLR', 'CosineAnnealingLR', 'WarmUpCosineLR']
         model = AlexNet(num_classes=1)
         lr = self.cfgs.optim.lr
         optimizer = torch.optim.Adam([{'params': model.parameters(), 'initial_lr': lr}], lr=lr)

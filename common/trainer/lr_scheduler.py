@@ -7,9 +7,19 @@ import torch
 
 
 def get_learning_rate_scheduler(
-    optimizer, last_epoch=-1, total_epoch=100, type='MultiStepLR', lr_gamma=0.1, lr_steps=[], tmax=20, **kwargs
+    optimizer,
+    last_epoch=-1,
+    total_epoch=100,
+    type='MultiStepLR',
+    lr_gamma=0.1,
+    lr_steps=[],
+    tmax=20,
+    min_factor=0.1,
+    **kwargs
 ):
-    """Setup learning rate scheduler. Now support [MultiStepLR, ExponentialLR, PolyLR, CosineAnnealingLR]. """
+    """Setup learning rate scheduler.
+       Now support [MultiStepLR, ExponentialLR, PolyLR, CosineAnnealingLR, WarmUpCosineLR].
+    """
     if type == 'ExponentialLR':
         lr_gamma_step = lr_gamma**(1.0 / lr_steps[0])
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, lr_gamma_step, last_epoch=last_epoch)
@@ -29,6 +39,17 @@ def get_learning_rate_scheduler(
         lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_map, last_epoch=last_epoch)
     elif type == 'CosineAnnealingLR':
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=tmax, last_epoch=last_epoch)
+    elif type == 'WarmUpCosineLR':
+
+        def lambda_map(epoch_index):
+            if epoch_index < lr_steps[0]:
+                learning_factor = epoch_index / lr_steps[0]
+            else:
+                progress = (epoch_index - lr_steps[0]) / (total_epoch - lr_steps[0])
+                learning_factor = (np.cos(np.pi * progress) + 1.0) * 0.5 * (1 - min_factor) + min_factor
+            return learning_factor
+
+        lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_map, last_epoch=last_epoch)
     else:
         raise NameError('Unknown {} learning rate scheduler'.format(type))
 

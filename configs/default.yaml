@@ -45,10 +45,11 @@ optim:
     weight_decay: 0.0
     maxiters: 5                     # for lbfgs only
     lr_scheduler:
-        type: ExponentialLR         # [MultiStepLR, ExponentialLR, PolyLR, CosineAnnealingLR]
+        type: ExponentialLR         # [MultiStepLR, ExponentialLR, PolyLR, CosineAnnealingLR, WarmUpCosineLR]
         lr_gamma: 0.1               # for ExponentialLR, MultiStepLR, PolyLR
         lr_steps: [200000]          # for ExponentialLR(Use first), MultiStepLR(Use all), PolyLR(Use all)
         tmax: 20                    # for CosineAnnealingLR
+        min_factor: 0.1             # for WarmUpCosineLR
 
     clip_gradients: 0.0             # grad clipping set for init
     clip_warmup: -1                 # warmup epoches. -1 mean not change after warmup
