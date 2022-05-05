@@ -81,10 +81,12 @@ class TestDict(unittest.TestCase):
             cls.render_n_cam = [30, 60]
             cls.render_radius = 3.0
             cls.render_u_start = 0.0
+            cls.render_u_range = (0, 0.5)
             cls.render_v_ratio = 0.0
             cls.render_v_range = (-0.5, 0.0)
             cls.render_normal = (0.0, 1.0, 0.0)
             cls.render_n_rot = 3
+            cls.render_reverse = False
             cls.render_fps = 5
 
         if infer_cfgs is not None and valid_key_in_cfgs(infer_cfgs, 'volume'):
@@ -105,10 +107,12 @@ class TestDict(unittest.TestCase):
         cls.render_n_cam = get_value_from_cfgs_field(render_cfgs, 'n_cam', [30, 60])
         cls.render_radius = get_value_from_cfgs_field(render_cfgs, 'radius', 3.0)
         cls.render_u_start = get_value_from_cfgs_field(render_cfgs, 'u_start', 0.0)
+        cls.render_u_range = tuple(get_value_from_cfgs_field(render_cfgs, 'u_range', [0, 0.5]))
         cls.render_v_ratio = get_value_from_cfgs_field(render_cfgs, 'v_ratio', 0.0)
         cls.render_v_range = tuple(get_value_from_cfgs_field(render_cfgs, 'v_range', [-0.5, 0.0]))
         cls.render_normal = tuple(get_value_from_cfgs_field(render_cfgs, 'normal', [0, 1.0, 0.0]))
         cls.render_n_rot = get_value_from_cfgs_field(render_cfgs, 'n_rot', 3)
+        cls.render_reverse = get_value_from_cfgs_field(render_cfgs, 'reverse', False)
         cls.render_fps = get_value_from_cfgs_field(render_cfgs, 'fps', 5)
 
     @classmethod
@@ -163,11 +167,13 @@ class TestDict(unittest.TestCase):
                 self.render_radius,
                 self.render_n_cam[idx],
                 u_start=self.render_u_start,
+                u_range=self.render_u_range,
                 v_ratio=self.render_v_ratio,
                 v_range=self.render_v_range,
                 origin=origin,
                 normal=self.render_normal,
                 n_rot=self.render_n_rot,
+                reverse=self.render_reverse,
                 close=False  # just for test, should be true for actual visual
             )
             c2w = np.concatenate([c2w_test, avg_pose], axis=0)  # (n+1, 4, 4)

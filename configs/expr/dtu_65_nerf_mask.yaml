@@ -49,10 +49,10 @@ progress:
     epoch_loss: 100
     iter_loss: 1
     save_progress: True
-    epoch_save_progress: 10000
+    epoch_save_progress: 50000
     iter_save_progress: 1
 
-    epoch_val: 10000
+    epoch_val: 50000
     save_progress_val: True
     max_samples_val: 1
 
@@ -94,11 +94,10 @@ dataset:
 
 inference:
     render:
-        type: [circle, spiral]
-        n_cam: [30, 60]
+        type: [swing]
+        n_cam: [30]
         radius: 3.0
-        u_start: 0.75
-        v_ratio: 0.0
+        u_range: [0.65, 0.85]
         v_range: [-0.25, 0.25]
         n_rot: 3
         fps: 5

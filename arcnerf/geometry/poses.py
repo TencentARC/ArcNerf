@@ -3,7 +3,7 @@
 import numpy as np
 import torch
 
-from .sphere import uv_to_sphere_point, get_sphere_line, get_spiral_line, get_regular_sphere_line
+from .sphere import uv_to_sphere_point, get_sphere_line, get_spiral_line, get_regular_sphere_line, get_swing_line
 from .transformation import normalize, get_rotate_matrix_from_vec, rotate_points
 from .triangle import circumcircle_from_triangle
 from common.utils.torch_utils import np_wrapper
@@ -99,7 +99,7 @@ def average_poses(poses):
 
 def view_matrix(forward, cam_loc, up=np.array([0.0, 1.0, 0.0])):
     """Get view matrix(c2w matrix) given forward/up dir and cam_loc.
-    TODO: The up direction is y+, but (0,0) ray is down-ward. It is consistent with c2w from dataset but strange
+    Notice: The up direction is y+, but (0,0) ray is down-ward. It is consistent with c2w from dataset but strange
 
     Args:
         forward: direction of view. np(3, )
@@ -144,9 +144,11 @@ def generate_cam_pose_on_sphere(
     radius,
     n_cam,
     u_start=0,
+    u_range=(0, 0.5),
     v_ratio=0,
     v_range=(1, 0),
     n_rot=3,
+    reverse=False,
     upper=None,
     close=False,
     origin=(0, 0, 0),
@@ -164,10 +166,16 @@ def generate_cam_pose_on_sphere(
         radius: sphere radius
         n_cam: num of cam selected
         u_start: start u in (0, 1), counter-clockwise direction, 0 is x-> direction
+        u_range: a tuple of u (u_start, u_end), start and end u pos of line
+                    horizontal pos, in (0, 1), counter-clockwise direction, 0 is x-> direction
         v_ratio: vertical lift ratio, in (-1, 1). 0 is largest, pos is on above.
         v_range: a tuple of v (v_start, v_end), start and end v ratio of spiral line
                     vertical lift angle, in (-1, 0). 0 is largest circle level, pos is on above.
         n_rot: num of full rotation, by default 3
+        reverse:  For swing mode only. By default False
+                  If False, from u_start -> u_end -> u_start.
+                  If True, u is swing in clockwise, (u 0-1 is counter-clockwise in fact). Will be
+                        u_end -> 1 -> u_start -> 1 -> u_end
         upper: Control camera postion for get_regular_sphere_line
         close: if true, first one will be the same as last(for circle and regular)
         origin: origin of sphere, tuple of 3
@@ -177,7 +185,8 @@ def generate_cam_pose_on_sphere(
     Returns:
         c2w: np(n_cam, 4, 4) matrix of cam position, in order
     """
-    assert mode in ['random', 'regular', 'circle', 'spiral'], 'Invalid mode, only random/circle/spiral'
+    assert mode in ['random', 'regular', 'circle', 'spiral', 'swing'],\
+        'Invalid mode, only random/regular/circle/spiral/swing'
 
     cam_poses = []
     xyz = None
@@ -185,12 +194,16 @@ def generate_cam_pose_on_sphere(
         u = np.random.rand(n_cam) * np.pi * 2
         v = np.random.rand(n_cam) * np.pi
         xyz = uv_to_sphere_point(u, v, radius, origin)  # (n_cam, 3)
-    if mode == 'regular':
+    elif mode == 'regular':
         xyz = get_regular_sphere_line(radius, u_start, origin, n_rot, n_pts=n_cam, upper=upper, close=close)
     elif mode == 'circle':
         xyz = get_sphere_line(radius, u_start, v_ratio, origin, n_pts=n_cam, close=close)
     elif mode == 'spiral':
         xyz = get_spiral_line(radius, u_start, v_range, origin, n_rot, n_pts=n_cam)
+    elif mode == 'swing':
+        xyz = get_swing_line(radius, u_range, v_range, origin, n_rot, n_pts=n_cam, reverse=reverse)
+    else:
+        raise NotImplementedError('Not support cam generation mode {}'.format(mode))
 
     # rotate the positions, from fix up dir to normal
     up = np.array([0.0, 1.0, 0.0], dtype=xyz.dtype)[None]  # (1, 3)

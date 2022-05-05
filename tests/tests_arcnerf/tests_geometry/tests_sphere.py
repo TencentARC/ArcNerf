@@ -7,7 +7,9 @@ import unittest
 
 import numpy as np
 
-from arcnerf.geometry.sphere import get_regular_sphere_line, get_sphere_line, get_spiral_line, get_uv_from_pos
+from arcnerf.geometry.sphere import (
+    get_regular_sphere_line, get_sphere_line, get_spiral_line, get_swing_line, get_uv_from_pos
+)
 from arcnerf.visual.plot_3d import draw_3d_components
 from tests.tests_arcnerf.tests_geometry import TestGeomDict
 
@@ -57,6 +59,33 @@ class TestDict(TestGeomDict):
             sphere_origin=origin,
             lines=spiral_lines,
             title='spiral_lines_ustart_0.25_vrange(0.75, -0.25)_origin(5,5,0)',
+            save_path=file_path
+        )
+
+    def tests_swing_line(self):
+        file_path = osp.join(RESULT_DIR, 'swing_lines_reverse.png')
+        origin = (5, 5, 0)
+        swing_lines = [
+            get_swing_line(
+                self.radius, u_range=(0.25, 0.75), v_range=(-0.5, 0.25), n_rot=5, origin=origin, reverse=True
+            )
+        ]
+        draw_3d_components(
+            sphere_radius=self.radius,
+            sphere_origin=origin,
+            lines=swing_lines,
+            title='swing_lines_urange(0.25, 0.75)_vrange(-0.5, 0.25)_origin(5,5,0)_reverse_urange',
+            save_path=file_path
+        )
+
+        file_path = osp.join(RESULT_DIR, 'swing_lines.png')
+        origin = (5, 5, 0)
+        swing_lines = [get_swing_line(self.radius, u_range=(0.25, 0.75), v_range=(-0.5, 0.25), n_rot=5, origin=origin)]
+        draw_3d_components(
+            sphere_radius=self.radius,
+            sphere_origin=origin,
+            lines=swing_lines,
+            title='swing_lines_urange(0.25, 0.75)_vrange(-0.5, 0.25)_origin(5,5,0)',
             save_path=file_path
         )
 

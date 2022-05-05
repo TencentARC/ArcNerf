@@ -49,10 +49,10 @@ progress:
     epoch_loss: 100
     iter_loss: 1
     save_progress: False
-    epoch_save_progress: 10000
+    epoch_save_progress: 50000
     iter_save_progress: 1
 
-    epoch_val: 10000
+    epoch_val: 50000
     save_progress_val: True
     max_samples_val: 1
 

@@ -62,10 +62,10 @@ progress:
     epoch_loss: 100                 # Num of epoch to display loss
     iter_loss: 1                    # Num of iteration to display loss
     save_progress: False            # Whether to save progress during training
-    epoch_save_progress: 10000      # Num of epoch for saving progress
+    epoch_save_progress: 50000      # Num of epoch for saving progress
     iter_save_progress: 1           # Num of iteration for saving progress
 
-    epoch_val: 10000                # Num of epoch for validation. -1 means not validation
+    epoch_val: 50000                # Num of epoch for validation. -1 means not validation
     save_progress_val: True         # Whether to save progress during validation
     max_samples_val: 1              # Max num of sample to write into image in valid
 
@@ -114,10 +114,12 @@ inference:
         n_cam: [30, 60]             # each render type num of cam
         radius: 3.0                 # sphere radius
         u_start: 0.0                # for start pos u in (0~1)
+        u_range: [0.0, 0.5]         # u in (0~1) for swing mode only
         v_ratio: 0.0                # for circle path, vertical position
         v_range: [-0.5, 0]          # for spiral path, vertical pos range
         normal: [0.0, 1.0, 0.0]     # for cam path rotation, (0,1,0) is horizontal without rotation
         n_rot: 3                    # n_rot of camera path
+        reverse: False              # reverse u range for swing mode only
         fps: 5                      # render video fps
 
     volume:                         # volume params

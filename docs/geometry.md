@@ -17,6 +17,7 @@ Functions for create/modify cam poses
 - invert pose: c2w <-> w2c transfer
 - look_at/view_matrix: generate c2w
 - average/center poses: get avg pose and recenter all poses
+- get cam on sphere by different mode
 
 # sphere
 Many function about sphere is provided, including:

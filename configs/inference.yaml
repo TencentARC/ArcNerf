@@ -33,10 +33,12 @@ inference:
         n_cam: [30, 60]             # each render type num of cam
         radius: 3.0                 # sphere radius
         u_start: 0.0                # for start pos u in (0~1)
+        u_range: [0.0, 0.5]         # u in (0~1) for swing mode only
         v_ratio: 0.0                # for circle path, vertical position
         v_range: [-0.5, 0]          # for spiral path, vertical pos range
         normal: [0.0, 1.0, 0.0]     # for cam path rotation, (0,1,0) is horizontal without rotation
         n_rot: 3                    # n_rot of camera path
+        reverse: False              # reverse u range for swing mode only
         fps: 5                      # render video fps
 
     # set volume if you want to extract mesh

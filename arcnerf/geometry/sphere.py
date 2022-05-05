@@ -63,6 +63,7 @@ def get_circle(origin, radius, normal, n_pts=100, close=True):
         radius: radius of circle
         n_pts: num of sampled points
         close: if true, first one will be the same as last
+
     Returns:
         line: np.array(n_pts, 3)
     """
@@ -206,13 +207,53 @@ def get_spiral_line(radius, u_start=0, v_range=(-1, 0), origin=(0, 0, 0), n_rot=
         line: np.array(n_pts, 3)
     """
     assert 0 <= u_start <= 1, 'Invalid u_start, (0, 1) only'
-    assert -1 <= v_range[0] <= 1 and -1 <= v_range[0] <= 1,\
-        'Invalid v range, start and end all in (-1, 1) only'
+    assert -1 <= v_range[0] <= 1 and -1 <= v_range[0] <= 1, 'Invalid v range, start and end all in (-1, 1) only'
     n_pts_per_rot = math.ceil(float(n_pts) / float(n_rot))
     u = np.linspace(0, 1, n_pts_per_rot) + u_start
     u[u > 1.0] -= 1.0
     u *= (2 * np.pi)
     u = np.concatenate([u] * n_rot)[:n_pts]
+    v = np.linspace((1 - v_range[0]), (1 - v_range[1]), n_pts) * np.pi / 2.0
+
+    line = uv_to_sphere_point(u, v, radius, origin)
+
+    return line
+
+
+def get_swing_line(radius, u_range=(0, 0.5), v_range=(-1, 0), origin=(0, 0, 0), n_rot=3, n_pts=100, reverse=False):
+    """Get swing surface line, always in counter-clockwise then clockwise order (top-down look)
+
+    Args:
+        radius: radius fo sphere
+        u_range: a tuple of u (u_start, u_end), start and end u pos of line
+                    horizontal pos, in (0, 1), counter-clockwise direction, 0 is x-> direction
+        v_range: a tuple of v (v_start, v_end), start and end v ratio of spiral line
+                    vertical lift angle, in (-1, 1). 0 is largest circle level, pos is on below part.
+        origin: origin of sphere, tuple of 3
+        n_rot: num of swing repeat, by default 3
+        n_pts: num of point on line, by default 100.
+        reverse: If False, from u_start -> u_end -> u_start.
+                  If True, u is swing in clockwise, (u 0-1 is counter-clockwise in fact). Will be
+                        u_end -> 1 -> u_start -> 1 -> u_end
+
+
+    Returns:
+        line: np.array(n_pts, 3)
+    """
+    assert 0 <= u_range[0] <= u_range[1] <= 1, 'Invalid u_range, in (0, 1) in order only'
+    assert -1 <= v_range[0] <= 1 and -1 <= v_range[0] <= 1, 'Invalid v range, start and end all in (-1, 1) only'
+    n_pts_per_rot_half = math.floor(float(n_pts) / float(n_rot) / 2.0 + 1)
+
+    if reverse:
+        u = np.linspace(u_range[1], 1 + u_range[0], n_pts_per_rot_half)
+        u[u > 1.0] -= 1.0
+        u = np.concatenate([u, np.flip(u)[1:-1]])
+    else:
+        u = np.linspace(u_range[0], u_range[1], n_pts_per_rot_half)
+        u = np.concatenate([u, np.flip(u)[1:-1]])
+
+    u *= (2 * np.pi)
+    u = np.concatenate([u] * (n_rot + 1))[:n_pts]
     v = np.linspace((1 - v_range[0]), (1 - v_range[1]), n_pts) * np.pi / 2.0
 
     line = uv_to_sphere_point(u, v, radius, origin)

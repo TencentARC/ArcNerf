@@ -61,6 +61,9 @@ class TestDict(TestGeomDict):
     def tests_generate_cam_pose_on_sphere(self):
         u_start = 0  # (0, 1)
         v_ratio = 0.5  # (-1, 1)
+        u_range = (0, 0.5)
+        v_range = (-0.25, 0.25)
+        n_rot = 3
         # custom case
         # look_at_point = np.array([1.0, 1.0, 0.0])  # (3, )
         # origin = (5, 5, 0)
@@ -68,7 +71,7 @@ class TestDict(TestGeomDict):
         look_at_point = np.array([0.0, 0.0, 0.0])  # (3, )
         origin = (0, 0, 0)
 
-        modes = ['random', 'regular', 'circle', 'spiral']
+        modes = ['random', 'regular', 'circle', 'spiral', 'swing']
         for mode in modes:
             file_path = osp.join(RESULT_DIR, 'cam_path_mode_{}.png'.format(mode))
             c2w = generate_cam_pose_on_sphere(
@@ -76,7 +79,10 @@ class TestDict(TestGeomDict):
                 self.radius,
                 self.n_cam,
                 u_start=u_start,
+                u_range=u_range,
                 v_ratio=v_ratio,
+                v_range=v_range,
+                n_rot=n_rot,
                 origin=origin,
                 look_at_point=look_at_point
             )
