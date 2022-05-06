@@ -25,7 +25,7 @@ dist:
     slurm: False
 
 batch_size: 2
-n_rays: 4096
+n_rays: 512     # follow original repo
 worker: 4
 
 optim:
