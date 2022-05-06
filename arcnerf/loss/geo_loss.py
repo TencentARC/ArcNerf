@@ -21,7 +21,7 @@ class EikonalLoss(nn.Module):
     def forward(self, data, output):
         """
         Args:
-            output['normal'/'normal_pts']: (B, N_rays, 3). normal output
+            output['normal'/'normal_pts']: (B, N_rays, (N_pts), 3). normal output
             data['mask']: (B, N_rays), only if used mask
 
         Returns:
@@ -37,7 +37,7 @@ class EikonalLoss(nn.Module):
 
         loss = self.loss(norm, norm_ones)
         if self.use_mask:
-            if self.pts:
+            if self.pts:  # expand for pts-dim
                 mask = torch.repeat_interleave(mask.unsqueeze(-1), loss.shape[-1], -1)
             loss = mean_tensor_by_mask(loss, mask)
         else:

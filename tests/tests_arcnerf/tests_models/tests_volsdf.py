@@ -26,7 +26,7 @@ class TestDict(unittest.TestCase):
         cls.cfgs = load_configs(osp.join(CONFIG), None)
         cls.logger = Logger(path=osp.join(RESULT_DIR, 'neus.txt'), keep_console=False)
 
-    def tests_neus_model(self):
+    def tests_nerf_model(self):
         model = build_model(self.cfgs, None)
         feed_in = {
             'img': torch.ones(self.batch_size, self.n_rays, 3),
@@ -43,7 +43,7 @@ class TestDict(unittest.TestCase):
         self.assertEqual(output['depth'].shape, (self.batch_size, self.n_rays))
         self.assertEqual(output['mask'].shape, (self.batch_size, self.n_rays))
         self.assertEqual(output['normal'].shape, (self.batch_size, self.n_rays, 3))
-        self.assertTrue('scale' in output['params'][0])
+        self.assertTrue('inv_s' in output['params'][0])
 
         # get progress
         output = model(feed_in, get_progress=True)
@@ -53,7 +53,6 @@ class TestDict(unittest.TestCase):
         gt_shape = (self.batch_size, self.n_rays, n_total - 1)
         for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
             self.assertEqual(output['progress_{}'.format(key)].shape, gt_shape)
-        self.assertTrue(output['sigma_reverse3d'][0])
 
         # direct inference
         pts = torch.ones(self.n_rays, 3)

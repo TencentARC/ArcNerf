@@ -72,7 +72,7 @@ class Neus(Base3dModel):
         )  # (B, N_sample)
 
         # up-sample zvals
-        zvals = self._upsample_zvals(rays_o, rays_d, zvals, inference_only)  # (B, N_total(N_sample+N_importance))
+        zvals = self._upsample_zvals(rays_o, rays_d, zvals, inference_only)  # (B, N_total(N_sample+N_importance), 3)
 
         # use mid pts in section for sdf
         mid_zvals = 0.5 * (zvals[..., 1:] + zvals[..., :-1])
@@ -110,11 +110,11 @@ class Neus(Base3dModel):
             alpha=alpha
         )
 
-        # add normal. For normal map, needs to normalize each pts
-        output['normal'] = torch.sum(output['weights'].unsqueeze(-1) * normalize(normal_pts), -2)  # (B, 3)
+        # add normal
+        output['normal'] = torch.sum(output['weights'].unsqueeze(-1) * normal_pts, -2)  # (B, 3)
         if not inference_only:
-            output['params'] = {'scale': float(self._forward_scale().clone())}
-            output['normal_pts'] = normal_pts  # (B, N_total-1, 3), do not normalize it
+            output['params'] = {'inv_s': float(self.inv_s.clone())}
+            output['normal_pts'] = normal_pts  # (B, N_total-1, 3)
 
         # merge rgb with background, only support this mode since sdf/sigma can not be blended toegther
         output = self._merge_bkg_rgb(inputs, output, inference_only)
@@ -123,7 +123,6 @@ class Neus(Base3dModel):
             for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
                 n_fg = self._get_n_fg(sdf)
                 output['progress_{}'.format(key)] = output[key][:, :n_fg].detach()  # (B, N_sample(-1))
-            output['sigma_reverse3d'] = True  # for rays 3d visual of sdf
 
         return output
 
@@ -148,8 +147,7 @@ class Neus(Base3dModel):
             zvals: tensor (B, N_sample), coarse zvals for all rays
             inference_only: affect the sample_pdf deterministic. By default False(For train)
             s: factor for up-sample. By default 32
-
-        Returns:
+        Args:
             zvals: tensor (B, N_sample + N_importance), up-sample zvals near the surface
         """
         if self.rays_cfgs['n_importance'] <= 0:

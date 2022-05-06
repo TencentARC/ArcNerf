@@ -1,0 +1,166 @@
+name: dtu_65_neus_mask_eiknomask
+
+resume: None
+
+debug:
+    debug_mode: False
+    print_all_grad: False
+    get_progress: True      # show some progress about the rays
+
+dir:
+    expr_dir: None
+    data_dir: '/group/30042/leoyluo/Immerse/data'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_65_neus_mask_eiknomask'
+
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_65_neus_mask_eiknomask/checkpoints/final.pt.tar'
+
+gpu_ids: -1
+
+dist:
+    local_rank: 0
+    rank: 0
+    world_size: 1
+    distributed_backend: nccl
+    random_seed: None
+    slurm: False
+
+batch_size: 2
+n_rays: 512     # follow original repo
+worker: 4
+
+optim:
+    lr: 5e-4
+    optim_type: adam
+    weight_decay: 0.0
+    lr_scheduler:
+        type: WarmUpCosineLR        # follow the original implementation
+        lr_steps: [5000]
+        min_factor: 0.05
+
+    clip_gradients: 0.0
+    clip_warmup: -1
+    clip_gradients_warmup: 0.0
+
+progress:
+    start_epoch: -1
+    epoch: 300000
+    save_time: 1800
+
+    epoch_loss: 100
+    iter_loss: 1
+    save_progress: True
+    epoch_save_progress: 50000
+    iter_save_progress: 1
+
+    epoch_val: 50000
+    save_progress_val: True
+    max_samples_val: 1
+
+    epoch_save_checkpoint: 100000
+    local_progress: True
+
+    init_eval: False
+    epoch_eval: 100000
+    max_samples_eval: 3
+
+dataset:
+    train:
+        type: DTU
+        scan_id: 65
+        img_scale: 1.0
+        scale_radius: 3.0
+        align_cam: True
+        precache: True
+        augmentation:
+            shuffle: True
+
+    val:
+        type: DTU
+        scan_id: 65
+        img_scale: 0.25
+        scale_radius: 3.0
+        align_cam: True
+        precache: False
+
+    eval:
+        eval_batch_size: 1
+        eval_max_sample: 3
+        type: DTU
+        scan_id: 65
+        img_scale: 1.0
+        scale_radius: 3.0
+        align_cam: True
+        precache: True
+
+inference:
+    render:
+        type: [swing]
+        n_cam: [30]
+        radius: 3.0
+        u_range: [0.65, 0.85]
+        v_range: [-0.25, 0.25]
+        n_rot: 3
+        fps: 5
+
+    volume:
+        n_grid: 512
+        side: 1.5
+        level: 50.0
+
+model:
+    type: Neus
+    rays:
+        bounding_radius: 3.0
+        near: 1.5
+        far: 4.5
+        n_sample: 64
+        n_importance: 64
+        n_iter: 4
+        inverse_linear: False
+        perturb: True
+        add_inf_z: False
+        noise_std: 1.0
+        white_bkg: False
+    params:
+        speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
+        init_var: 0.05                # init var, when it approaches 0, cdf more close
+        anneal_end: 50000             # for anneal param, only set during training. please
+    chunk_rays: 4096
+    chunk_pts: 32768
+    geometry:
+        W: 256
+        D: 8
+        skips: [4]
+        input_ch: 3
+        embed_freq: 6
+        W_feat: 256
+        geometric_init: True          # use geometric init. need radius_init
+        radius_init: 0.5              # geometric init sphere radius
+        weight_norm: True
+        skip_reduce_output: True
+        norm_skip: True
+        act_cfg:                      # activation function for dense layer
+            type: softplus
+            beta: 100
+    radiance:
+        mode: 'pvnf'
+        W: 128
+        D: 4
+        input_ch_pts: 3
+        embed_freq_pts: 0             # pts embed freq, not embedding performed
+        input_ch_view: 3
+        embed_freq_view: 4
+        W_feat_in: 256
+        weight_norm: True
+
+loss:
+    ImgMaskL1Loss:
+        weight: 1.0
+    MaskL1Loss:
+        weight: 1.0
+    EikonalPTLoss:
+        weight: 0.1
+
+metric:
+    PSNR:
+    MaskPSNR:

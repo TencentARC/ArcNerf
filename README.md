@@ -13,8 +13,8 @@
 
 - 参考框架
   - nerf(nerfpl) - DONE
-  - nerf++ - Done
-  - unisurf/neus/volsdf (sdf/occpancy) - neurcon
+  - nerf++ - DONE
+  - neus/volsdf (sdf/occpancy) - neurcon - DONE
   - neuraltex
   - nerfFactor/nerd
   - mip-nerf

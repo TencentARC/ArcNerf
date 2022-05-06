@@ -59,7 +59,7 @@ class NeRF(Base3dModel):
         pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (B, N_sample, 3)
         pts = pts.view(-1, 3)  # (B*N_sample, 3)
 
-        # get sigma and rgb,  expand rays_d to all pts. shape in (B*N_sample, dim)
+        # get sigma and rgb, expand rays_d to all pts. shape in (B*N_sample, dim)
         sigma, feature = chunk_processing(self.coarse_geo_net, self.chunk_pts, pts)
         rays_d_repeat = torch.repeat_interleave(rays_d, self.rays_cfgs['n_sample'], dim=0)
         radiance = chunk_processing(self.coarse_radiance_net, self.chunk_pts, pts, rays_d_repeat, None, feature)

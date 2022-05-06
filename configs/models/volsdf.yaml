@@ -1,0 +1,47 @@
+# The Neus model without background
+
+model:
+    type: Neus
+    rays:
+        bounding_radius: 3.0          # bounding ray sampling region
+        near: 1.5                     # hardcode near zvals
+        far: 4.5                      # hardcode far zvals
+        n_sample: 64                  # n_sample for zvals sampling
+        n_importance: 64              # n_importance for zvals for up-sample near surface
+        n_iter: 4                     # n_iter for zvals up-sample, each time sample (n_importance // n_iter)
+        inverse_linear: False         # inverse_linear make zvals close to near
+        perturb: True                 # perturb zvals interval
+        add_inf_z: False              # Add inf zval for ray marching
+        noise_std: 1.0                # noise for sigma in training
+        white_bkg: False              # cast the background as white
+    params:
+        speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
+        init_var: 0.05                # init var, when it approaches 0, cdf more close
+        anneal_end: 50000             # for anneal param, only set during training. please
+    chunk_rays: 4096                  # each chunk to process 1024*4(ray), enough for 32 GB
+    chunk_pts: 32768                  # each chunk to progress 4096*8(pts), for model forward
+    geometry:
+        W: 256                        # linear hidden neuron
+        D: 8                          # num of linear, not include final
+        skips: [4]                    # pos to add input embedding
+        input_ch: 3                   # xyz input channel
+        embed_freq: 6                 # xyz embed freq
+        W_feat: 256                   # extra feature output
+        geometric_init: True          # whether to use geometric init. need radius_init
+        radius_init: 0.75             # geometric init sphere radius
+        weight_norm: True             # normalize the weights
+        skip_reduce_output: True      # If True, reduce output-dim before skip instead of adding to skip directly
+        norm_skip: True               # normalize skip concat output
+        act_cfg:                      # activation function for dense layer
+            type: softplus
+            beta: 100
+    radiance:
+        mode: 'pvnf'                  # pts, view_dir, normal and feature
+        W: 128                        # linear hidden dim
+        D: 4                          # num of linear, not include final
+        input_ch_pts: 3               # pts input channel
+        embed_freq_pts: 0             # pts embed freq, not embedding performed
+        input_ch_view: 3              # view input channel
+        embed_freq_view: 4            # view embed freq
+        W_feat_in: 256                # dim for feature from geometry
+        weight_norm: True             # normalize the weights

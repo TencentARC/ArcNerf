@@ -94,9 +94,10 @@ def get_render_imgs(inputs, output):
     for pred_name in pred_normals:
         if pred_name in output:
             pred_normal = torch_to_np(output[pred_name][idx]).copy().reshape(h, w, 3).astype(np.uint16)  # (H, W, 3)
-            pred_normal = (127.0 * pred_normal + 127.0).astype(np.uint8)  # (H, W, 3), 0~255
+            pred_normal = (127.5 * pred_normal + 127.5).astype(np.uint8)  # (H, W, 3), 0~255, normal in (-1, 1)
+            pred_cat = np.concatenate([img, pred_normal], axis=1)  # (H, 2W, 3)
             names.append(pred_name)
-            images.append(pred_normal)
+            images.append(pred_cat)
 
     img_dict = {'names': names, 'imgs': images}
 
@@ -152,7 +153,11 @@ def get_sample_ray_imgs(inputs, output, train=False, sample_num=16):
     pts_size = None
     if 'sigma' in sample_dict.keys():
         sigma = sample_dict['sigma'].copy()  # (n_idx, n_pts)
-        pts_size = (sigma - sigma.min()) / (sigma.max() - sigma.min())
+        if 'sigma_reverse3d' in output.keys() and output['sigma_reverse3d'][idx] is True:  # do not touch 2d visual
+            sigma_3d = -1 * sigma  # make sdf like sigma pos in the object
+        else:
+            sigma_3d = sigma
+        pts_size = (sigma_3d - sigma_3d.min()) / (sigma_3d.max() - sigma_3d.min())
         pts_size *= 50.0
 
     # output
