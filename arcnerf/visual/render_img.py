@@ -53,8 +53,8 @@ def get_render_imgs(inputs, output):
     mask = (255.0 * mask).astype(np.uint8)[..., None].repeat(3, axis=-1) if mask is not None else None  # (H, W, 3)
 
     # pred rgb + img + error
-    pred_rgb = ['rgb_coarse', 'rgb_fine', 'rgb']
-    for pred_name in pred_rgb:
+    pred_rgbs = ['rgb_coarse', 'rgb_fine', 'rgb']
+    for pred_name in pred_rgbs:
         if pred_name in output:
             pred_img = img_to_uint8(torch_to_np(output[pred_name][idx]).copy().reshape(h, w, 3))  # (H, W, 3)
             error_map = cv2.applyColorMap(cv2.cvtColor(np.abs(img - pred_img), cv2.COLOR_BGR2GRAY), cv2.COLORMAP_JET)
@@ -63,8 +63,8 @@ def get_render_imgs(inputs, output):
             images.append(pred_cat)
 
     # depth, norm and put to uint8(0-255)
-    pred_depth = ['depth_coarse', 'depth_fine', 'depth']
-    for pred_name in pred_depth:
+    pred_depths = ['depth_coarse', 'depth_fine', 'depth']
+    for pred_name in pred_depths:
         if pred_name in output:
             pred_depth = torch_to_np(output[pred_name][idx]).copy().reshape(h, w)  # (H, W), 0~1
             pred_depth = (255.0 * pred_depth / (pred_depth.max() + 1e-8)).astype(np.uint8)
@@ -73,8 +73,8 @@ def get_render_imgs(inputs, output):
             images.append(pred_cat)
 
     # mask
-    pred_mask = ['mask_coarse', 'mask_fine', 'mask']
-    for pred_name in pred_mask:
+    pred_masks = ['mask_coarse', 'mask_fine', 'mask']
+    for pred_name in pred_masks:
         if pred_name in output:
             pred_mask = torch_to_np(output[pred_name][idx]).copy().reshape(h, w)  # (H, W), 0~1, obj area with 1
             pred_mask = (255.0 * pred_mask).astype(np.uint8)[..., None].repeat(3, axis=-1)  # (H, W, 3), 0~255
@@ -88,6 +88,15 @@ def get_render_imgs(inputs, output):
                 pred_cat = np.concatenate([mask_img, pred_mask], axis=1)  # (H, 2W, 3)
             names.append(pred_name)
             images.append(pred_cat)
+
+    # normal
+    pred_normals = ['normal_coarse', 'normal_fine', 'normal']
+    for pred_name in pred_normals:
+        if pred_name in output:
+            pred_normal = torch_to_np(output[pred_name][idx]).copy().reshape(h, w, 3).astype(np.uint16)  # (H, W, 3)
+            pred_normal = (127.0 * pred_normal + 127.0).astype(np.uint8)  # (H, W, 3), 0~255
+            names.append(pred_name)
+            images.append(pred_normal)
 
     img_dict = {'names': names, 'imgs': images}
 

@@ -3,6 +3,8 @@
 import torch
 
 from .bkg_model import NeRFPP
+from arcnerf.geometry.transformation import normalize
+from arcnerf.render.ray_helper import get_near_far_from_rays
 from common.models.base_model import BaseModel
 from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field, dict_to_obj, obj_to_dict
 from common.utils.torch_utils import chunk_processing
@@ -84,7 +86,13 @@ class Base3dModel(BaseModel):
 
         return bkg_model
 
-    def forward(self, inputs, inference_only=False, get_progress=False):
+    def pretrain_siren(self):
+        """Pretrain siren layer of implicit model"""
+        self.geo_net.pretrain_siren()
+        if self.bkg_model is not None:
+            self.bkg_model.pretrain_siren()
+
+    def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         """The forward function actually call chunk process func ._forward()
         to avoid large memory at same time.
         Do not call this directly using chunk since the tensor are not flatten to represent batch of rays.
@@ -98,6 +106,8 @@ class Base3dModel(BaseModel):
             inference_only: If True, only return the final results(not coarse). By default False
             get_progress: If True, output some progress for recording, can not used in inference only mode.
                           By default False
+            cur_epoch: current epoch, for training purpose only. By default 0.
+            total_epoch: total num of epoch, for training purpose only. By default 300k.
 
         Returns:
             output is a dict keys like (rgb, rgb_coarse, rgb_dense, depth, etc) based on the _forward function.
@@ -123,7 +133,9 @@ class Base3dModel(BaseModel):
         flat_inputs['mask'] = mask
 
         # all output tensor in (B*N, ...), reshape to (B, N, ...)
-        output = chunk_processing(self._forward, self.chunk_rays, flat_inputs, inference_only, get_progress)
+        output = chunk_processing(
+            self._forward, self.chunk_rays, flat_inputs, inference_only, get_progress, cur_epoch, total_epoch
+        )
         for k, v in output.items():
             if isinstance(v, torch.Tensor) and batch_size * n_rays_per_batch == v.shape[0]:
                 new_shape = tuple([batch_size, n_rays_per_batch] + list(v.shape)[1:])
@@ -166,18 +178,66 @@ class Base3dModel(BaseModel):
     def _get_n_fg(self, sigma):
         """Get the num of foreground pts. sigma is (B, n_sample/n_total) """
         n_fg = sigma.shape[1]
-        if self.bkg_blend == 'rgb' and self.rays_cfgs['add_inf_z'] is False:
+        if self.bkg_model is not None and self.bkg_blend == 'rgb' and self.rays_cfgs['add_inf_z'] is False:
             n_fg -= 1
 
         return n_fg
 
-    def _forward(self, inputs, inference_only=False, get_progress=False):
-        """The core forward function, each process a chunk of rays with components in (B, x)"""
+    def _get_near_far_from_rays(self, inputs):
+        """Get the near/far zvals from rays given settings
+
+        Args:
+            inputs: a dict of torch tensor:
+                rays_o: torch.tensor (B, 3), cam_loc/ray_start position
+                rays_d: torch.tensor (B, 3), view dir(assume normed)
+                bounds: torch.tensor (B, 2). optional
+            Returns:
+                near, far:  torch.tensor (B, 1) each
+        """
+        bounds = None
+        if 'bounds' in inputs:
+            bounds = inputs['bounds'] if 'bounds' in inputs else None
+        near, far = get_near_far_from_rays(
+            inputs['rays_o'], inputs['rays_d'], bounds, self.rays_cfgs['near'], self.rays_cfgs['far'],
+            self.rays_cfgs['bounding_radius']
+        )
+
+        return near, far
+
+    def _forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+        """
+        All the tensor are in chunk. B is total num of rays by grouping different samples in batch
+        Args:
+            inputs: a dict of torch tensor:
+                inputs['rays_o']: torch.tensor (B, 3), cam_loc/ray_start position
+                inputs['rays_d']: torch.tensor (B, 3), view dir(assume normed)
+                inputs['mask']: torch.tensor (B,), mask value in {0, 1}. optional
+                inputs['bounds']: torch.tensor (B, 2). optional
+            inference_only: If True, will not output coarse results. By default False
+            get_progress: If True, output some progress for recording, can not used in inference only mode.
+                          By default False
+            cur_epoch: current epoch, for training purpose only. By default 0.
+            total_epoch: total num of epoch, for training purpose only. By default 300k.
+
+        Returns:
+            output is a dict with following keys:
+                coarse_rgb: torch.tensor (B, 3), only if inference_only=False
+                coarse_depth: torch.tensor (B,), only if inference_only=False
+                coarse_mask: torch.tensor (B,), only if inference_only=False
+                Return bellow if inference_only
+                    fine_rgb: torch.tensor (B, 3)
+                    fine_depth: torch.tensor (B,)
+                    fine_mask: torch.tensor (B,)
+                If get_progress is True:
+                    sigma/zvals/alpha/trans_shift/weights: torch.tensor (B, n_pts)
+                    Use from fine stage if n_importance > 0
+        """
         raise NotImplementedError('Please implement the core forward function')
 
     @torch.no_grad()
     def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
         """This function forward pts and view dir directly, only for inference the geometry/color
+        Assert you only have geo_net and radiance_net
 
         Args:
             pts: torch.tensor (N_pts, 3), pts in world coord
@@ -188,11 +248,19 @@ class Base3dModel(BaseModel):
                 sigma/sdf: torch.tensor (N_pts), geometry value for each point
                 rgb: torch.tensor (N_pts, 3), color for each point
         """
-        raise NotImplementedError('Please implement the core forward_pts_dir function for simple extracting')
+        sigma, feature = chunk_processing(self.geo_net, self.chunk_pts, pts)
+        if view_dir is None:
+            rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
+        else:
+            rays_d = normalize(view_dir)  # norm view dir
+        rgb = chunk_processing(self.radiance_net, self.chunk_pts, pts, rays_d, None, feature)
+
+        return sigma[..., 0], rgb
 
     @torch.no_grad()
     def forward_pts(self, pts: torch.Tensor):
         """This function forward pts directly, only for inference the geometry
+        Assert you only have geo_net and radiance_net
 
         Args:
             pts: torch.tensor (N_pts, 3), pts in world coord
@@ -201,4 +269,6 @@ class Base3dModel(BaseModel):
             output is a dict with following keys:
                 sigma/sdf: torch.tensor (N_pts), geometry value for each point
         """
-        raise NotImplementedError('Please implement the core forward_pts function for getting sigma or sdf')
+        sigma, _ = chunk_processing(self.geo_net, self.chunk_pts, pts)
+
+        return sigma[..., 0]

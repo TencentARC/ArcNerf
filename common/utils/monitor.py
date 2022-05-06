@@ -22,9 +22,9 @@ class Monitor(object):
             self.monitor.add_scalar(loss_name, float(loss[name]), global_step)
         self.monitor.add_scalar('{}/loss_sum'.format(str(mode)), float(loss['sum']), global_step)
 
-    def add_scalar(self, key, value, global_step):
+    def add_scalar(self, key, value, global_step, mode='train'):
         """Add a scalar"""
-        self.monitor.add_scalar(key, float(value), global_step)
+        self.monitor.add_scalar('{}/{}'.format(str(mode), key), float(value), global_step)
 
     def add_img(self, filename, img, global_step, mode, bgr2rgb=True):
         """Add an image, color or grey scale are all allowed.

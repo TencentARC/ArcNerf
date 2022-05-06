@@ -314,7 +314,8 @@ def ray_marching(
     add_inf_z=False,
     noise_std=0.0,
     weights_only=False,
-    white_bkg=False
+    white_bkg=False,
+    alpha: torch.Tensor = None
 ):
     """Ray marching and get color for each ray, get weight for each ray
         For p_i, the delta_i is p_i -> p_i+1 on the right side
@@ -331,13 +332,14 @@ def ray_marching(
         - C_ray = sum_i_1_N(Ti * alpha_i * C_i): accumulated color at each point
 
     Args:
-        sigma: (N_rays, N_pts), density value
+        sigma: (N_rays, N_pts), density value, can use alpha directly. optional
         radiance: (N_rays, N_pts, 3), radiance value for each point. If none, will not cal rgb from weighted radiance
         zvals: (N_rays, N_pts), zvals for ray in unit-length
         add_inf_z: If True, add inf zvals(1e10) for calculation. If False, ignore last point for rgb/depth calculation
-        noise_std: noise level add to density if noise > 0, used for training. By default 0.0.
+        noise_std: noise level add to density if noise > 0, used for training and sigma mode. By default 0.0.
         weights_only: If True, return weights only, used in inference time for hierarchical sampling
         white_bkg: If True, make the accum weight=0 rays as 1.
+        alpha: (N_rays, N_pts), if provide, do not use sigma to calculate alpha, optional
 
     Returns:
         output a dict with following keys:
@@ -353,9 +355,11 @@ def ray_marching(
             trans_shift: (N_rays, N_pts/N_pts-1). prob pass all previous light
             weights: (N_rays, N_pts/N_pts-1). Use for weighting other values like normals.
     """
-    dtype = sigma.dtype
-    device = sigma.device
-    n_rays, n_pts = sigma.shape[:2]
+    dtype = zvals.dtype
+    device = zvals.device
+    n_rays, n_pts = zvals.shape[:2]
+
+    assert sigma is not None or alpha is not None, 'Can not be None for both alpha and sigma..'
 
     deltas = zvals[:, 1:] - zvals[:, :-1]  # (N_rays, N_pts-1)
     _sigma = sigma
@@ -364,22 +368,21 @@ def ray_marching(
     if add_inf_z:  # (N_rays, N_pts)
         deltas = torch.cat([deltas, 1e10 * torch.ones(size=(n_rays, 1), dtype=dtype).to(device)], dim=-1)
     else:
-        _sigma = sigma[:, :-1]  # (N_rays, N_pts-1)
-        _radiance = radiance[:, :-1, :] if radiance is not None else None  # (N_rays, N_pts-1, 3)
-        _zvals = zvals[:, :-1]  # (N_rays, N_pts-1)
+        if alpha is None:  # only do that if alpha is None
+            _sigma = sigma[:, :-1] if sigma is not None else None  # (N_rays, N_pts-1)
+            _radiance = radiance[:, :-1, :] if radiance is not None else None  # (N_rays, N_pts-1, 3)
+            _zvals = zvals[:, :-1]  # (N_rays, N_pts-1)
 
-    noise = 0.0
-    if noise_std > 0.0:
-        noise = torch.randn(_sigma.shape, dtype=dtype).to(device) * noise_std
+    if alpha is None:  # use sigma to get alpha
+        noise = 0.0
+        if noise_std > 0.0:
+            noise = torch.randn(_sigma.shape, dtype=dtype).to(device) * noise_std
 
-    # alpha_i = (1 - exp(- relu(sigma + noise) * delta_i)
-    alpha = 1 - torch.exp(-torch.relu(_sigma + noise) * deltas)  # (N_rays, N_p)
-    # Ti = mul_1_i-1(1 - alpha_i)
-    alpha_one = torch.ones_like(alpha[:, :1], dtype=dtype).to(device)
-    trans_shift = torch.cat([alpha_one, 1 - alpha + 1e-10], -1)  # (N_rays, N_p+1)
-    trans_shift = torch.cumprod(trans_shift, -1)[:, :-1]  # (N_rays, N_p)
-    # weight_i = Ti * alpha_i
-    weights = alpha * trans_shift  # (N_rays, N_p)
+        # alpha_i = (1 - exp(- relu(sigma + noise) * delta_i)
+        alpha = 1 - torch.exp(-torch.relu(_sigma + noise) * deltas)  # (N_rays, N_p)
+
+    trans_shift, weights = alpha_to_weights(alpha)  # (N_rays, N_p) * 2
+
     if weights_only:
         output = {'weights': weights}
         return output
@@ -410,6 +413,33 @@ def ray_marching(
     }
 
     return output
+
+
+def alpha_to_weights(alpha: torch.Tensor):
+    """Alpha to transmittance and weights
+    - trans_shift(Ti = mul_1_i-1(1 - alpha_i)): accumulated transmittance, prob light pass all previous points
+            - T0 = 1, pass previous prob is high at beginning
+            - Tn closer 0, prob light pass previous point gets lower
+    - weights(Ti * alpha_i): prob pass all previous point but stop at this
+            - at max when alpha_i get high
+
+    Args:
+        alpha: tensor (N_rays, N_p), prob not pass this point on ray
+
+    Returns:
+        trans_shift: tensor (N_rays, N_p), accumulated transmittance, prob light pass all previous points
+        weights: tensor (N_rays, N_p), prob pass all previous point but stop at this
+    """
+    dtype = alpha.dtype
+    device = alpha.device
+    # Ti = mul_1_i-1(1 - alpha_i)
+    alpha_one = torch.ones_like(alpha[:, :1], dtype=dtype).to(device)
+    trans_shift = torch.cat([alpha_one, 1 - alpha + 1e-10], -1)  # (N_rays, N_p+1)
+    trans_shift = torch.cumprod(trans_shift, -1)[:, :-1]  # (N_rays, N_p)
+    # weight_i = Ti * alpha_i
+    weights = alpha * trans_shift  # (N_rays, N_p)
+
+    return trans_shift, weights
 
 
 def sample_ray_marching_output_by_index(output, index=None, n_rays=1, sigma_scale=2.0):

@@ -44,12 +44,31 @@ class ImgCFLoss(nn.Module):
 
 
 @LOSS_REGISTRY.register()
+class ImgCFL1Loss(ImgCFLoss):
+    """L1 loss for image and coarse/fine output with mask. Use for two stage network"""
+
+    def __init__(self, cfgs=None):
+        super(ImgCFL1Loss, self).__init__()
+        self.loss = nn.L1Loss(reduction='none')
+
+
+@LOSS_REGISTRY.register()
 class ImgCFMaskLoss(ImgCFLoss):
     """MSE loss for image and coarse/fine output with mask. Use for two stage network"""
 
     def __init__(self, cfgs=None):
         super(ImgCFMaskLoss, self).__init__(cfgs)
         self.loss = nn.MSELoss(reduction='none')
+        self.use_mask = True
+
+
+@LOSS_REGISTRY.register()
+class ImgCFMaskL1Loss(ImgCFLoss):
+    """L1 loss for image and coarse/fine output with mask. Use for two stage network"""
+
+    def __init__(self, cfgs=None):
+        super(ImgCFMaskL1Loss, self).__init__(cfgs)
+        self.loss = nn.L1Loss(reduction='none')
         self.use_mask = True
 
 
@@ -87,10 +106,29 @@ class ImgLoss(nn.Module):
 
 
 @LOSS_REGISTRY.register()
+class ImgL1Loss(ImgLoss):
+    """Simple L1 loss for rgb"""
+
+    def __init__(self, cfgs=None):
+        super(ImgL1Loss, self).__init__()
+        self.loss = nn.L1Loss(reduction='none')
+
+
+@LOSS_REGISTRY.register()
 class ImgMaskLoss(ImgLoss):
     """Simple MSE loss for rgb with mask"""
 
     def __init__(self, cfgs=None):
         super(ImgMaskLoss, self).__init__(cfgs)
         self.loss = nn.MSELoss(reduction='none')
+        self.use_mask = True
+
+
+@LOSS_REGISTRY.register()
+class ImgMaskL1Loss(ImgLoss):
+    """Simple L1 loss for rgb with mask"""
+
+    def __init__(self, cfgs=None):
+        super(ImgMaskL1Loss, self).__init__(cfgs)
+        self.loss = nn.L1Loss(reduction='none')
         self.use_mask = True

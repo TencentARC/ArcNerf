@@ -5,7 +5,7 @@ import unittest
 
 import torch
 
-from arcnerf.loss.mask_loss import MaskLoss, MaskCFLoss
+from arcnerf.loss.mask_loss import (MaskLoss, MaskL1Loss, MaskBCELoss, MaskCFLoss, MaskCFL1Loss, MaskCFBCELoss)
 
 
 class TestDict(unittest.TestCase):
@@ -22,6 +22,12 @@ class TestDict(unittest.TestCase):
         loss = MaskLoss()
         res = loss(data, output)
         self.assertEqual(res.shape, ())
+        l1loss = MaskL1Loss()
+        res = l1loss(data, output)
+        self.assertEqual(res.shape, ())
+        bce_loss = MaskBCELoss()
+        res = bce_loss(data, output)
+        self.assertEqual(res.shape, ())
 
     def tests_maskcfloss(self):
         data = {'mask': self.bn_tensor.clone()}
@@ -29,7 +35,12 @@ class TestDict(unittest.TestCase):
         loss = MaskCFLoss()
         res = loss(data, output)
         self.assertEqual(res.shape, ())
-
         output['mask_fine'] = self.bn_tensor.clone()
         res = loss(data, output)
+        self.assertEqual(res.shape, ())
+        l1loss = MaskCFL1Loss()
+        res = l1loss(data, output)
+        self.assertEqual(res.shape, ())
+        bce_loss = MaskCFBCELoss()
+        res = bce_loss(data, output)
         self.assertEqual(res.shape, ())

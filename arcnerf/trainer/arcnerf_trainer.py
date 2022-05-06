@@ -31,6 +31,12 @@ class ArcNerfTrainer(BasicTrainer):
     def __init__(self, cfgs):
         super(ArcNerfTrainer, self).__init__(cfgs)
         self.get_progress = get_value_from_cfgs_field(self.cfgs.debug, 'get_progress', False)
+        self.total_epoch = self.cfgs.progress.epoch
+
+        # pretrain siren layer in implicit model
+        self.logger.add_log('-' * 60)
+        self.logger.add_log('Pretrain siren layers')
+        self.model.pretrain_siren()
 
     def get_model(self):
         """Get custom model"""
@@ -228,9 +234,21 @@ class ArcNerfTrainer(BasicTrainer):
         """Get the core model feed in and put it to the model's device"""
         return get_model_feed_in(inputs, device)
 
+    @master_only
+    def train_step_writer(self, epoch, step, step_in_epoch, loss, learning_rate, global_step, inputs, output, **kwargs):
+        """Write to monitor for saving, add params"""
+        super().train_step_writer(
+            epoch, step, step_in_epoch, loss, learning_rate, global_step, inputs, output, **kwargs
+        )
+
+        # write params
+        if 'params' in output:
+            for k, v in output['params'][0].items():
+                self.monitor.add_scalar(k, v, global_step, mode='train')
+
     def step_optimize(self, epoch, step, feed_in, inputs):
         """Set get progress for training"""
-        output = self.model(feed_in, get_progress=self.get_progress)
+        output = self.model(feed_in, get_progress=self.get_progress, cur_epoch=epoch, total_epoch=self.total_epoch)
         loss = self.calculate_loss(inputs, output)
 
         self.optimizer.zero_grad()

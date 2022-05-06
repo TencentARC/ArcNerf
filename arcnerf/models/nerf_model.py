@@ -6,7 +6,7 @@ from .base_3d_model import Base3dModel
 from .base_modules import GeoNet, RadianceNet
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.transformation import normalize
-from arcnerf.render.ray_helper import get_near_far_from_rays, get_zvals_from_near_far, ray_marching, sample_pdf
+from arcnerf.render.ray_helper import get_zvals_from_near_far, ray_marching, sample_pdf
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import MODEL_REGISTRY
 from common.utils.torch_utils import chunk_processing
@@ -29,43 +29,21 @@ class NeRF(Base3dModel):
             self.fine_geo_net = GeoNet(**self.cfgs.model.geometry.__dict__)
             self.fine_radiance_net = RadianceNet(**self.cfgs.model.radiance.__dict__)
 
-    def _forward(self, inputs, inference_only=False, get_progress=False):
-        """
-        All the tensor are in chunk. B is total num of rays by grouping different samples in batch
-        Args:
-            inputs: a dict of torch tensor:
-                inputs['rays_o']: torch.tensor (B, 3), cam_loc/ray_start position
-                inputs['rays_d']: torch.tensor (B, 3), view dir(assume normed)
-                inputs['mask']: torch.tensor (B,), mask value in {0, 1}. optional
-                inputs['bounds']: torch.tensor (B, 2)
-            inference_only: If True, will not output coarse results. By default False
-            get_progress: If True, output some progress for recording, can not used in inference only mode.
-                          By default False
+    def pretrain_siren(self):
+        """Pretrain siren layer of implicit model"""
+        self.coarse_geo_net.pretrain_siren()
+        if self.rays_cfgs['n_importance'] > 0:
+            self.fine_geo_net.pretrain_siren()
+        if self.bkg_model is not None:
+            self.bkg_model.pretrain_siren()
 
-        Returns:
-            output is a dict with following keys:
-                coarse_rgb: torch.tensor (B, 3), only if inference_only=False
-                coarse_depth: torch.tensor (B,), only if inference_only=False
-                coarse_mask: torch.tensor (B,), only if inference_only=False
-                Return bellow if inference_only
-                    fine_rgb: torch.tensor (B, 3)
-                    fine_depth: torch.tensor (B,)
-                    fine_mask: torch.tensor (B,)
-                If get_progress is True:
-                    sigma/zvals/alpha/trans_shift/weights: torch.tensor (B, n_pts)
-                    Use from fine stage if n_importance > 0
-        """
+    def _forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)
         output = {}
 
         # get bounds for object, (B, 1) * 2
-        bounds = None
-        if 'bounds' in inputs:
-            bounds = inputs['bounds'] if 'bounds' in inputs else None
-        near, far = get_near_far_from_rays(
-            rays_o, rays_d, bounds, self.rays_cfgs['near'], self.rays_cfgs['far'], self.rays_cfgs['bounding_radius']
-        )
+        near, far = self._get_near_far_from_rays(inputs)
 
         # coarse model
         # get zvals
@@ -168,17 +146,7 @@ class NeRF(Base3dModel):
 
     @torch.no_grad()
     def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
-        """This function forward pts and view dir directly, only for inference the geometry/color
-
-        Args:
-            pts: torch.tensor (N_pts, 3), pts in world coord
-            view_dir: torch.tensor (N_pts, 3) view dir associate with each point. It can be normal or others.
-                      If None, use (0, 0, 0) as the dir for each point.
-        Returns:
-            output is a dict with following keys:
-                sigma: torch.tensor (N_pts), density value for each point
-                rgb: torch.tensor (N_pts, 3), color for each point
-        """
+        """Rewrite for two stage implementation. """
         if self.rays_cfgs['n_importance'] > 0:
             geo_net = self.fine_geo_net
             radiance_net = self.fine_radiance_net
@@ -197,15 +165,7 @@ class NeRF(Base3dModel):
 
     @torch.no_grad()
     def forward_pts(self, pts: torch.Tensor):
-        """This function forward pts directly, only for inference the geometry
-
-        Args:
-            pts: torch.tensor (N_pts, 3), pts in world coord
-
-        Returns:
-            output is a dict with following keys:
-                sigma/sdf: torch.tensor (N_pts), geometry value for each point
-        """
+        """Rewrite for two stage implementation. """
         if self.rays_cfgs['n_importance'] > 0:
             geo_net = self.fine_geo_net
         else:

@@ -35,6 +35,24 @@ class MaskCFLoss(nn.Module):
 
 
 @LOSS_REGISTRY.register()
+class MaskCFL1Loss(MaskCFLoss):
+    """L1 loss for mask and coarse/fine output. Use for two stage network"""
+
+    def __init__(self, cfgs=None):
+        super(MaskCFL1Loss, self).__init__()
+        self.loss = nn.L1Loss(reduction='none')
+
+
+@LOSS_REGISTRY.register()
+class MaskCFBCELoss(MaskCFLoss):
+    """BCE loss for mask and coarse/fine output. Use for two stage network"""
+
+    def __init__(self, cfgs=None):
+        super(MaskCFBCELoss, self).__init__()
+        self.loss = nn.BCELoss(reduction='none')
+
+
+@LOSS_REGISTRY.register()
 class MaskLoss(nn.Module):
     """Simple MSE loss for Mask"""
 
@@ -58,3 +76,21 @@ class MaskLoss(nn.Module):
         loss = loss.mean()
 
         return loss
+
+
+@LOSS_REGISTRY.register()
+class MaskL1Loss(MaskLoss):
+    """L1 loss for mask and coarse/fine output. Use for two stage network"""
+
+    def __init__(self, cfgs=None):
+        super(MaskLoss, self).__init__()
+        self.loss = nn.L1Loss(reduction='none')
+
+
+@LOSS_REGISTRY.register()
+class MaskBCELoss(MaskLoss):
+    """BCE loss for mask and coarse/fine output. Use for two stage network"""
+
+    def __init__(self, cfgs=None):
+        super(MaskLoss, self).__init__()
+        self.loss = nn.BCELoss(reduction='none')

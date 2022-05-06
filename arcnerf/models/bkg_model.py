@@ -40,6 +40,10 @@ class BkgModel(BaseModel):
 
         return ray_cfgs
 
+    def pretrain_siren(self):
+        """Pretrain siren layer of implicit model"""
+        self.geo_net.pretrain_siren()
+
     def forward(self, inputs, inference_only=False, get_progress=False):
         """The forward function actually call chunk process func ._forward()
         to avoid large memory at same time.
@@ -90,7 +94,23 @@ class BkgModel(BaseModel):
         return output
 
     def _forward(self, inputs, inference_only=False, get_progress=False):
-        """The core forward function, each process a chunk of rays with components in (B, x)"""
+        """
+        All the tensor are in chunk. B is total num of rays by grouping different samples in batch
+        Args:
+            inputs: a dict of torch tensor:
+                inputs['rays_o']: torch.tensor (B, 3), cam_loc/ray_start position
+                inputs['rays_d']: torch.tensor (B, 3), view dir(assume normed)
+                inputs['mask']: torch.tensor (B,), mask value in {0, 1}. optional
+            inference_only: If False, perturb the radius to increase robustness
+            get_progress: If True, output some progress for recording, can not used in inference only mode.
+                          By default False
+
+        Returns:
+            output is a dict with following keys:
+                rgb: torch.tensor (B, 3)
+                depth: torch.tensor (B,)
+                mask: torch.tensor (B,)
+        """
         raise NotImplementedError('Please implement the core forward function')
 
     @torch.no_grad()
@@ -106,7 +126,14 @@ class BkgModel(BaseModel):
                 sigma/sdf: torch.tensor (N_pts), geometry value for each point
                 rgb: torch.tensor (N_pts, 3), color for each point
         """
-        raise NotImplementedError('Please implement the core forward_pts_dir function for simple extracting')
+        sigma, feature = chunk_processing(self.geo_net, self.chunk_pts, pts)
+        if view_dir is None:
+            rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
+        else:
+            rays_d = normalize(view_dir)  # norm view dir
+        rgb = chunk_processing(self.radiance_net, self.chunk_pts, pts, rays_d, None, feature)
+
+        return sigma[..., 0], rgb
 
     @torch.no_grad()
     def forward_pts(self, pts: torch.Tensor):
@@ -119,7 +146,9 @@ class BkgModel(BaseModel):
             output is a dict with following keys:
                 sigma/sdf: torch.tensor (N_pts), geometry value for each point
         """
-        raise NotImplementedError('Please implement the core forward_pts function for getting sigma or sdf')
+        sigma, _ = chunk_processing(self.geo_net, self.chunk_pts, pts)
+
+        return sigma[..., 0]
 
 
 @MODEL_REGISTRY.register()
@@ -142,23 +171,6 @@ class NeRFPP(BkgModel):
         return ray_cfgs
 
     def _forward(self, inputs, inference_only=False, get_progress=False):
-        """
-        All the tensor are in chunk. B is total num of rays by grouping different samples in batch
-        Args:
-            inputs: a dict of torch tensor:
-                inputs['rays_o']: torch.tensor (B, 3), cam_loc/ray_start position
-                inputs['rays_d']: torch.tensor (B, 3), view dir(assume normed)
-                inputs['mask']: torch.tensor (B,), mask value in {0, 1}. optional
-            inference_only: If False, perturb the radius to increase robustness
-            get_progress: If True, output some progress for recording, can not used in inference only mode.
-                          By default False
-
-        Returns:
-            output is a dict with following keys:
-                rgb: torch.tensor (B, 3)
-                depth: torch.tensor (B,)
-                mask: torch.tensor (B,)
-        """
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)
 
@@ -206,40 +218,3 @@ class NeRFPP(BkgModel):
         output['mask'] = output['mask']  # (B,)
 
         return output
-
-    @torch.no_grad()
-    def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
-        """This function forward pts and view dir directly, only for inference the geometry/color
-
-        Args:
-            pts: torch.tensor (N_pts, 3), pts in world coord
-            view_dir: torch.tensor (N_pts, 3) view dir associate with each point. It can be normal or others.
-                      If None, use (0, 0, 0) as the dir for each point.
-        Returns:
-            output is a dict with following keys:
-                sigma: torch.tensor (N_pts), density value for each point
-                rgb: torch.tensor (N_pts, 3), color for each point
-        """
-        sigma, feature = chunk_processing(self.geo_net, self.chunk_pts, pts)
-        if view_dir is None:
-            rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
-        else:
-            rays_d = normalize(view_dir)  # norm view dir
-        rgb = chunk_processing(self.radiance_net, self.chunk_pts, pts, rays_d, None, feature)
-
-        return sigma[..., 0], rgb
-
-    @torch.no_grad()
-    def forward_pts(self, pts: torch.Tensor):
-        """This function forward pts directly, only for inference the geometry
-
-        Args:
-            pts: torch.tensor (N_pts, 3), pts in world coord
-
-        Returns:
-            output is a dict with following keys:
-                sigma/sdf: torch.tensor (N_pts), geometry value for each point
-        """
-        sigma, _ = chunk_processing(self.geo_net, self.chunk_pts, pts)
-
-        return sigma[..., 0]
