@@ -43,7 +43,7 @@ class TestDict(unittest.TestCase):
         self.assertEqual(output['depth'].shape, (self.batch_size, self.n_rays))
         self.assertEqual(output['mask'].shape, (self.batch_size, self.n_rays))
         self.assertEqual(output['normal'].shape, (self.batch_size, self.n_rays, 3))
-        self.assertEqual(output['inv_s'].shape, (1, ))
+        self.assertTrue('inv_s' in output['params'][0])
 
         # get progress
         output = model(feed_in, get_progress=True)

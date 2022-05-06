@@ -1,4 +1,4 @@
-name: dtu_65_neus_siren_nerfpprgb_mask
+name: dtu_65_neus_siren_mask
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_65_neus_siren_nerfpprgb_mask'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_65_neus_siren_mask'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_65_neus_siren_nerfpprgb_mask/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_65_neus_siren_mask/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -145,39 +145,12 @@ model:
         W: 128
         D: 4
         input_ch_pts: 3
-        embed_freq_pts: 6
+        embed_freq_pts: 0             # pts embed freq, not embedding performed
         input_ch_view: 3
         embed_freq_view: 4
         W_feat_in: 256
         weight_norm: True
         use_siren: True               # use siren layer
-    background:
-        type: NeRFPP
-        bkg_blend: 'rgb'
-        rays:
-            bounding_radius: 3.0
-            n_sample: 32
-            perturb: True
-            add_inf_z: True         # must set to be True
-            noise_std: 1.0
-            white_bkg: False
-        chunk_rays: 4096
-        chunk_pts: 32768
-        geometry:
-            W: 256
-            D: 8
-            skips: [4]
-            input_ch: 4     # (xyz/r, 1/r)
-            embed_freq: 10
-            W_feat: 256
-            geometric_init: False
-        radiance:
-            mode: 'vf'
-            W: 128
-            D: 1
-            input_ch_view: 3
-            embed_freq_view: 4
-            W_feat_in: 256
 
 loss:
     ImgMaskL1Loss:

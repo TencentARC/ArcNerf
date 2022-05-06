@@ -147,7 +147,7 @@ model:
         W: 128
         D: 4
         input_ch_pts: 3
-        embed_freq_pts: 6
+        embed_freq_pts: 0             # pts embed freq, not embedding performed
         input_ch_view: 3
         embed_freq_view: 4
         W_feat_in: 256
