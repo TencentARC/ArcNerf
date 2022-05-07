@@ -93,8 +93,8 @@ def get_render_imgs(inputs, output):
     pred_normals = ['normal_coarse', 'normal_fine', 'normal']
     for pred_name in pred_normals:
         if pred_name in output:
-            pred_normal = torch_to_np(output[pred_name][idx]).copy().reshape(h, w, 3).astype(np.uint16)  # (H, W, 3)
-            pred_normal = (127.5 * pred_normal + 127.5).astype(np.uint8)  # (H, W, 3), 0~255, normal in (-1, 1)
+            pred_normal = torch_to_np(output[pred_name][idx]).copy().reshape(h, w, 3)  # (H, W, 3) normal in (-1, 1)
+            pred_normal = np.clip(127.5 * pred_normal + 127.5, 0, 255).astype(np.uint8)  # (H, W, 3), 0~255
             pred_cat = np.concatenate([img, pred_normal], axis=1)  # (H, 2W, 3)
             names.append(pred_name)
             images.append(pred_cat)

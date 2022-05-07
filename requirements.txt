@@ -12,3 +12,4 @@ tensorboard
 thop
 torch
 torchvision
+trimesh
