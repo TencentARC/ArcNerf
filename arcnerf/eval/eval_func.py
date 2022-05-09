@@ -30,7 +30,7 @@ def run_eval(
     for step, inputs in enumerate(loader):
         if show_progress:
             logger.add_log('Progress : {}/{}'.format(step, len(loader) - 1))
-        feed_in, batch_size = get_model_feed_in(inputs, device)
+        feed_in, batch_size = get_model_feed_in(inputs, 'cpu')  # since eval batch are large, put it in cpu
         time0 = time.time()
         output = model(feed_in, inference_only=True)
         total_forward_time += (time.time() - time0)

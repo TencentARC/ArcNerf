@@ -11,11 +11,12 @@ from arcnerf.geometry.mesh import (
     get_normals,
     get_face_centers,
     get_verts_by_faces,
+    render_mesh_images,
     save_meshes,
     simplify_mesh,
 )
 from arcnerf.geometry.point_cloud import save_point_cloud
-from arcnerf.geometry.poses import generate_cam_pose_on_sphere
+from arcnerf.geometry.poses import generate_cam_pose_on_sphere, invert_poses
 from arcnerf.geometry.volume import Volume
 from arcnerf.render.ray_helper import get_rays
 from arcnerf.visual.plot_3d import draw_3d_components
@@ -112,6 +113,24 @@ def set_inference_data(cfgs, intrinsic, wh: tuple, dtype=torch.float32):
         )
         infer_data['volume']['Vol'] = volume
 
+        # add c2w and intrinsic for rendering geometry as well
+        if volume_cfgs['render_mesh'] and render_cfgs is not None:
+            infer_data['volume']['render'] = {
+                'type': infer_data['render']['cfgs']['type'],
+                'intrinsic': infer_data['render']['inputs'][0][0]['intrinsic'],  # (3, 3)
+                'backend': volume_cfgs['render_backend'],
+                'H': int(H),
+                'W': int(W)
+            }
+
+            infer_data['volume']['render']['c2w'] = []
+            for input in infer_data['render']['inputs']:
+                c2w = []
+                for input_per_img in input:
+                    c2w.append(input_per_img['c2w'][None, ...])  # (4, 4)
+                c2w = np.concatenate(c2w, axis=0)
+                infer_data['volume']['render']['c2w'].append(c2w)  # (n_cam, 4, 4)
+
     # not doing anything, return None
     if infer_data['render'] is None and infer_data['volume'] is None:
         return None
@@ -158,7 +177,9 @@ def parse_volume(cfgs):
             'ylen': get_value_from_cfgs_field(cfgs.volume, 'ylen', None),
             'zlen': get_value_from_cfgs_field(cfgs.volume, 'zlen', None),
             'level': get_value_from_cfgs_field(cfgs.volume, 'level', 50.0),
-            'grad_dir': get_value_from_cfgs_field(cfgs.volume, 'grad_dir', 'descent')
+            'grad_dir': get_value_from_cfgs_field(cfgs.volume, 'grad_dir', 'descent'),
+            'render_mesh': valid_key_in_cfgs(cfgs.volume, 'render_mesh'),
+            'render_backend': get_value_from_cfgs_field(cfgs.volume.render_mesh, 'backend'),
         }
         if any([length is None for length in [volume_cfgs['xlen'], volume_cfgs['ylen'], volume_cfgs['zlen']]]):
             volume_cfgs['side'] = get_value_from_cfgs_field(volume_cfgs, 'side', 1.5)  # make sure volume exist
@@ -214,7 +235,7 @@ def run_infer_render(data, get_model_feed_in, model, device, logger):
         img_w, img_h = int(data['wh'][0]), int(data['wh'][1])
         images = []
         for rays in input:
-            feed_in, batch_size = get_model_feed_in(rays, device)  # only read rays_o/d here, (1, WH, 3)
+            feed_in, batch_size = get_model_feed_in(rays, 'cpu')  # only read rays_o/d here, (1, WH, 3)
             assert batch_size == 1, 'Only one image is sent to model at once for inference...'
 
             time0 = time.time()
@@ -261,7 +282,8 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
 
     # use zeros dir to represent volume pts dir
     time0 = time.time()
-    sigma, rgb = get_sigma_rgb_from_model(volume_pts, model, device, None)
+    sigma, rgb = model.forward_pts_dir(volume_pts, None)
+    sigma, rgb = torch_to_np(sigma), torch_to_np(rgb)
     logger.add_log('    Forward {}^3 time for model is {:.2f}s'.format(n_grid, time.time() - time0))
     logger.add_log('    Sigma value range {:.2f}-{:.2f}'.format(sigma.min(), sigma.max()))
 
@@ -298,7 +320,7 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
             logger.add_log('    Extract {} verts, {} faces'.format(verts.shape[0], faces.shape[0]))
 
             volume_out['mesh'] = {}
-            volume_out['mesh']['full'] = get_mesh_components(verts, faces, model, device, volume_pts.dtype, logger)
+            volume_out['mesh']['full'] = get_mesh_components(verts, faces, model, volume_pts.dtype, logger)
 
             # simplify mesh if need
             time0 = time.time()
@@ -309,8 +331,20 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
                 logger.add_log('    Simplify mesh time {:.2f}s'.format(time.time() - time0))
                 logger.add_log('    Simplify {} verts, {} faces'.format(verts_sim.shape[0], faces_sim.shape[0]))
                 volume_out['mesh']['simplify'] = get_mesh_components(
-                    verts_sim, faces_sim, model, device, volume_pts.dtype, logger
+                    verts_sim, faces_sim, model, volume_pts.dtype, logger
                 )
+
+            # add c2w and intrinsic
+            if 'render' in data:
+                volume_out['mesh']['render'] = {
+                    'type': data['render']['type'],
+                    'H': data['render']['H'],
+                    'W': data['render']['W'],
+                    'c2w': data['render']['c2w'],
+                    'intrinsic': data['render']['intrinsic'],
+                    'backend': data['render']['backend'],
+                    'device': next(model.parameters()).device  # to allow gpu usage for rendering
+                }
 
         except ValueError:
             logger.add_log('Can not extract mesh from volue', level='warning')
@@ -321,7 +355,7 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
     return volume_out
 
 
-def get_mesh_components(verts, faces, model, device, dtype, logger):
+def get_mesh_components(verts, faces, model, dtype, logger):
     """Get all the mesh components using model"""
     vert_normals, face_normals = get_normals(verts, faces)
     face_centers = get_face_centers(verts, faces)
@@ -333,7 +367,8 @@ def get_mesh_components(verts, faces, model, device, dtype, logger):
     vert_view_dir = torch.tensor(vert_view_dir, dtype=dtype)  # (n, 3)
 
     time0 = time.time()
-    _, vert_colors = get_sigma_rgb_from_model(vert_pts, model, device, vert_view_dir)
+    _, vert_colors = model.forward_pts_dir(vert_pts, vert_view_dir)
+    vert_colors = torch_to_np(vert_colors)
     logger.add_log('    Get verts color for all {} verts takes {:.2f}s'.format(n_verts, time.time() - time0))
 
     # get face_colors, view point is the reverse normal
@@ -342,7 +377,8 @@ def get_mesh_components(verts, faces, model, device, dtype, logger):
     face_view_dir = torch.tensor(face_view_dir, dtype=dtype)  # (n, 3)
 
     time0 = time.time()
-    _, face_colors = get_sigma_rgb_from_model(face_center_pts, model, device, face_view_dir)
+    _, face_colors = model.forward_pts_dir(face_center_pts, face_view_dir)
+    face_colors = torch_to_np(face_colors)
     logger.add_log('    Get faces color for all {} faces takes {:.2f}s'.format(n_faces, time.time() - time0))
 
     res = {
@@ -356,49 +392,6 @@ def get_mesh_components(verts, faces, model, device, dtype, logger):
     }
 
     return res
-
-
-def get_sigma_rgb_from_model(
-    pts: torch.Tensor,
-    model,
-    device,
-    view_dir: torch.Tensor = None,
-):
-    """Get sigma and rgb from model. pts and view dir are torch tensor in cpu
-    Return result in numpy array to save gpu memory
-
-    Args:
-        pts: (n, 3) torch.tensor
-        model: the model to process
-        device: device should be the model's device, 'cpu' or 'gpu'
-        view_dir: use normal or other correct dir. If None, will create (0,0,0) as all dir
-
-    Returns:
-        sigma: (n,) np array
-        view_dir: (n, 3) np array
-    """
-    chunk_pts = model.get_chunk_pts()
-    sigma = []
-    rgb = []
-    if view_dir is None:  # just use zeros
-        view_dir = torch.zeros_like(pts, dtype=pts.dtype)  # (n, 3)
-
-    for i in range(0, pts.shape[0], chunk_pts):
-        pts_chunk = pts[i:i + chunk_pts, :]  # (chunk_pts, 3)
-        dir_chunk = view_dir[i:i + chunk_pts, :]  # (chunk_pts, 3)
-
-        if device == 'gpu':
-            pts_chunk = pts_chunk.cuda(non_blocking=True)
-            dir_chunk = dir_chunk.cuda(non_blocking=True)
-
-        sigma_chunk, rgb_chunk = model.forward_pts_dir(pts_chunk, dir_chunk)  # (chunk,), (chunk, 3)
-        sigma.append(torch_to_np(sigma_chunk))
-        rgb.append(torch_to_np(rgb_chunk))
-
-    sigma = np.concatenate(sigma)  # (n,)
-    rgb = np.concatenate(rgb)  # (n, 3)
-
-    return sigma, rgb
 
 
 def write_infer_files(files, folder, data, logger):
@@ -475,3 +468,42 @@ def write_infer_files(files, folder, data, logger):
                 plotly_html=True
             )
             logger.add_log('Write mesh visual to {}'.format(folder))
+
+            if 'render' in mesh:  # render the mesh only
+                render = mesh['render']
+                for type, c2w in zip(render['type'], render['c2w']):
+                    color_imgs = render_mesh_images(
+                        mesh['full']['verts'],
+                        mesh['full']['faces'],
+                        mesh['full']['vert_colors'],
+                        mesh['full']['face_colors'],
+                        mesh['full']['vert_normals'],
+                        mesh['full']['face_normals'],
+                        render['H'],
+                        render['W'],
+                        invert_poses(c2w),
+                        render['intrinsic'],
+                        render['backend'],
+                        device=render['device']
+                    )  # (n_cam, h, w, 3)
+
+                    file_path = osp.join(folder, 'color_mesh_render_type{}.mp4'.format(type))
+                    write_video([color_imgs[idx] for idx in range(color_imgs.shape[0])], file_path, True)
+
+                    geo_imgs = render_mesh_images(
+                        mesh['full']['verts'],
+                        mesh['full']['faces'],
+                        None,
+                        None,
+                        mesh['full']['vert_normals'],
+                        mesh['full']['face_normals'],
+                        render['H'],
+                        render['W'],
+                        invert_poses(c2w),
+                        render['intrinsic'],
+                        render['backend'],
+                        device=render['device']
+                    )  # (n_cam, h, w, 3)
+
+                    file_path = osp.join(folder, 'geo_mesh_render_type{}.mp4'.format(type))
+                    write_video([geo_imgs[idx] for idx in range(geo_imgs.shape[0])], file_path, True)

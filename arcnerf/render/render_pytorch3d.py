@@ -110,7 +110,7 @@ class RenderPytorch3d:
     def handle_input(self, value, expand_batch=True, handle_device=True):
         """Handle a single value"""
         if value is not None:
-            value = torch.tensor(value, dtype=self.dtype) if isinstance(value, np.ndarray) \
+            value = torch.tensor(value.copy(), dtype=self.dtype) if isinstance(value, np.ndarray) \
                 else value.type(self.dtype)
 
             if expand_batch and len(value.shape) == 2:
@@ -197,5 +197,8 @@ class RenderPytorch3d:
             img = render_img[..., :3] * 255.0
 
         img = torch_to_np(img).astype(np.uint8)
+
+        # should flip image in y dim
+        img = img[:, ::-1, ...]  # (B, H, W, 3)
 
         return img

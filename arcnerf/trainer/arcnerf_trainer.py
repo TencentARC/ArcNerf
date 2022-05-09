@@ -105,11 +105,12 @@ class ArcNerfTrainer(BasicTrainer):
             data['inference'] = None
 
         # set the sphere and volume for rendering
-        if data['inference'] is not None and 'render' in data['inference']:
-            self.radius = data['inference']['render']['cfgs']['radius']
-        if data['inference'] is not None and 'volume' in data['inference']:
-            vol = data['inference']['volume']['Vol']
-            self.volume_dict = {'grid_pts': torch_to_np(vol.get_corner()), 'lines': vol.get_bound_lines()}
+        if data['inference'] is not None:
+            if data['inference']['render'] is not None:
+                self.radius = data['inference']['render']['cfgs']['radius']
+            if data['inference']['volume'] is not None:
+                vol = data['inference']['volume']['Vol']
+                self.volume_dict = {'grid_pts': torch_to_np(vol.get_corner()), 'lines': vol.get_bound_lines()}
 
         return data
 

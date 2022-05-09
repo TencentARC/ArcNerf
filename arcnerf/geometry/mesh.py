@@ -198,7 +198,7 @@ def render_mesh_images(
         intrinsic: (3, 3) np array, intrinsic
         backend: method to render image. Support 'open3d' and 'pytorch3d' now.
                  for open3d, it only support geo mode without colors
-        device: 'cpu' or 'gpu'. Only in 'pytorch3d'.
+        device: torch.device('cpu') or torch.device('cuda'). Only in 'pytorch3d'.
         sil_mode: whether to render in sil mode. Only in 'pytorch3d'. By default False.
         sil_hard: If in sil mode, render the silhouette in {0, 1} rather than (0-1).
                   By default True, Only in 'pytorch3d'.
