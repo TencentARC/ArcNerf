@@ -72,6 +72,14 @@ class Base3dModel(BaseModel):
         """Get the chunk pts num"""
         return self.chunk_pts
 
+    def set_chunk_rays(self, chunk_rays):
+        """Set the chunk rays num"""
+        self.chunk_rays = chunk_rays
+
+    def set_chunk_pts(self, chunk_pts):
+        """Set the chunk pts num"""
+        self.chunk_pts = chunk_pts
+
     def read_bkg_cfgs(self):
         """Read cfgs for background. Return None if did not use."""
         if valid_key_in_cfgs(self.cfgs.model, 'background'):

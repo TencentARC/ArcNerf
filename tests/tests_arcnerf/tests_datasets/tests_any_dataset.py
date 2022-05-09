@@ -41,7 +41,7 @@ class TestDict(unittest.TestCase):
         cls.c2w, cls.intrinsic, cls.cameras = cls.get_cameras()
         cls.n_cam = cls.c2w.shape[0]
         radius = get_value_from_cfgs_field(cls.cfgs.model.rays, 'bounding_radius')
-        cls.radius = radius if radius is not None else np.linalg.norm(cls.c2w[:, :3, 3], axis=-1).max(0)
+        cls.radius = radius if radius is not None else float(np.linalg.norm(cls.c2w[:, :3, 3], axis=-1).max(0))
         cls.get_inference_cfgs()
         cls.spec_result_dir = osp.abspath(osp.join(RESULT_DIR, cls.dataset_type, cls.dataset.get_identifier()))
         os.makedirs(cls.spec_result_dir, exist_ok=True)

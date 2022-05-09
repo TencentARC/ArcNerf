@@ -104,7 +104,7 @@ Each valid epoch just input one image for rendering, so the batch_size for val i
 ## eval
 Use several closest camera(to avg_cam) for metric evaluation,
 
-use same resolution, and use custom cam paths for rendering video
+use same resolution(Or scale if image really too large), and use custom cam paths for rendering video
 
 - eval_batch_size: batch size for eval
 - eval_max_sample: max num of sample in eval dataset.
@@ -115,4 +115,4 @@ only those will be fully rendered can calculate metric.
 Inference will be performed based on eval dataset params(intrinsic, img shape).
 
 - render: controls the params of render novel view, like the camera path
-- volume: controls the params of volume estimation and mesh extraction.
+- volume: controls the params of volume estimation and mesh extraction/rendering.

@@ -5,7 +5,7 @@ resume: None
 debug:
     debug_mode: False
     print_all_grad: False
-    get_progress: True
+    get_progress: False
 
 dir:
     expr_dir: None
@@ -94,27 +94,29 @@ dataset:
 
 inference:
     render:
-        type: [circle, spiral]
-        n_cam: [30, 60]
+        type: [circle]
+        n_cam: [10]
+        repeat: [5]
         radius: 3.0
         u_start: 0.75
         v_ratio: -0.2
-        v_range: [-0.5, 0]
-        n_rot: 3
-        fps: 5
+        fps: 10
 
     volume:
         n_grid: 512
         side: 1.5
         level: 0.0
         grad_dir: ascent
+        chunk_pts_factor: 2   # neus takes normal/feature that cost gpu
+        render_mesh:
+            backend: pytorch3d
 
 model:
     type: Neus
     rays:
         bounding_radius: 3.0
-        near: 1.5
-        far: 4.5
+        near: 1.0
+        far: 5.0
         n_sample: 64
         n_importance: 64
         n_iter: 4
@@ -128,7 +130,7 @@ model:
         init_var: 0.05                # init var, when it approaches 0, cdf more close
         anneal_end: 50000             # for anneal param, only set during training. please
     chunk_rays: 4096
-    chunk_pts: 32768
+    chunk_pts: 131072
     geometry:
         W: 256
         D: 8
@@ -165,7 +167,7 @@ model:
             noise_std: 1.0
             white_bkg: False
         chunk_rays: 4096
-        chunk_pts: 32768
+        chunk_pts: 131072
         geometry:
             W: 256
             D: 8

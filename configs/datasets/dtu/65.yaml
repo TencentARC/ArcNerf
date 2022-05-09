@@ -25,12 +25,12 @@ model:
 inference:
     render:
         type: [swing]
-        n_cam: [30]
+        n_cam: [10]
         radius: 3.0
         u_range: [0.65, 0.85]
-        v_range: [-0.25, 0.25]
-        n_rot: 3
-        fps: 5
+        v_range: [0, 0]
+        n_rot: 1
+        fps: 10
 
     volume:
         n_grid: 4       # just for visual purpose

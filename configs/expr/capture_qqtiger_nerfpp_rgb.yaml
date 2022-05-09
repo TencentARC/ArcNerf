@@ -5,7 +5,7 @@ resume: None
 debug:
     debug_mode: False
     print_all_grad: False
-    get_progress: True
+    get_progress: False
 
 dir:
     expr_dir: None
@@ -94,24 +94,28 @@ dataset:
 
 inference:
     render:
-        type: [circle, spiral]
-        n_cam: [30, 60]
+        type: [circle]
+        n_cam: [10]
+        repeat: [5]
         radius: 3.0
         u_start: 0.75
         v_ratio: -0.2
-        v_range: [-0.5, 0]
-        n_rot: 3
-        fps: 5
+        fps: 10
 
     volume:
         n_grid: 512
         side: 1.5
         level: 50.0
+        chunk_pts_factor: 32
+        render_mesh:
+            backend: pytorch3d
 
 model:
     type: NeRF
     rays:
         bounding_radius: 3.0
+        near: 1.0
+        far: 5.0
         n_sample: 64
         n_importance: 128
         inverse_linear: False

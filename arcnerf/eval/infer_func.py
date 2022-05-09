@@ -157,11 +157,13 @@ def parse_render(cfgs):
             'reverse': get_value_from_cfgs_field(cfgs.render, 'reverse', False),
             'fps': get_value_from_cfgs_field(cfgs.render, 'fps', 5)
         }
+        render_cfgs['repeat'] = get_value_from_cfgs_field(cfgs.render, 'repeat', [1] * len(render_cfgs['n_cam']))
 
         assert len(render_cfgs['type']) == len(render_cfgs['n_cam']), 'Inconsistent mode and n_cam num'
         assert len(render_cfgs['u_range']) == 2, 'Please input u_range as list of 2'
         assert len(render_cfgs['v_range']) == 2, 'Please input v_range as list of 2'
         assert len(render_cfgs['normal']) == 3, 'Please input normal as list of 3'
+        assert len(render_cfgs['repeat']) == len(render_cfgs['n_cam']), 'Please make correct repeat num'
 
     return render_cfgs
 
@@ -179,6 +181,7 @@ def parse_volume(cfgs):
             'zlen': get_value_from_cfgs_field(cfgs.volume, 'zlen', None),
             'level': get_value_from_cfgs_field(cfgs.volume, 'level', 50.0),
             'grad_dir': get_value_from_cfgs_field(cfgs.volume, 'grad_dir', 'descent'),
+            'chunk_pts_factor': get_value_from_cfgs_field(cfgs.volume, 'chunk_pts_factor', 1),
             'render_mesh': valid_key_in_cfgs(cfgs.volume, 'render_mesh'),
             'render_backend': get_value_from_cfgs_field(cfgs.volume.render_mesh, 'backend'),
         }
@@ -249,6 +252,8 @@ def run_infer_render(data, get_model_feed_in, model, device, logger):
             rgb = output[rgb_key[0]]  # (1, HW, 3)
             rgb = img_to_uint8(torch_to_np(rgb).copy()).reshape(img_h, img_w, 3)  # (H, W, 3), bgr
             images.append(rgb)
+        # repeat the image
+        images = images * data['cfgs']['repeat'][idx]
         render_out.append(images)
 
         logger.add_log(
@@ -280,6 +285,10 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
     # for volume visual
     volume_out['corner'] = torch_to_np(volume.get_corner())
     volume_out['bound_lines'] = volume.get_bound_lines()
+
+    # reset model chunk for faster processing
+    origin_chunk_pts = model.get_chunk_pts()
+    model.set_chunk_pts(origin_chunk_pts * data['cfgs']['chunk_pts_factor'])
 
     # use zeros dir to represent volume pts dir
     time0 = time.time()
@@ -350,6 +359,9 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
 
         except ValueError:
             logger.add_log('Can not extract mesh from volue', level='warning')
+
+    # set back in case training
+    model.set_chunk_pts(origin_chunk_pts)
 
     if volume_out['pc'] is None and volume_out['mesh'] is None:
         return None
@@ -486,6 +498,7 @@ def write_infer_files(files, folder, data, logger):
                         invert_poses(c2w),
                         render['intrinsic'],
                         render['backend'],
+                        single_image_mode=True,
                         device=render['device']
                     )  # (n_cam, h, w, 3)
 
@@ -505,6 +518,7 @@ def write_infer_files(files, folder, data, logger):
                         invert_poses(c2w),
                         render['intrinsic'],
                         render['backend'],
+                        single_image_mode=True,
                         device=render['device']
                     )  # (n_cam, h, w, 3)
 

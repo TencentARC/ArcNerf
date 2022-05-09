@@ -5,7 +5,7 @@ resume: None
 debug:
     debug_mode: False
     print_all_grad: False
-    get_progress: True      # show some progress about the rays
+    get_progress: False
 
 dir:
     expr_dir: None
@@ -87,7 +87,7 @@ dataset:
         eval_max_sample: 3
         type: DTU
         scan_id: 65
-        img_scale: 1.0
+        img_scale: 0.5
         scale_radius: 3.0
         align_cam: True
         precache: True
@@ -95,24 +95,29 @@ dataset:
 inference:
     render:
         type: [swing]
-        n_cam: [30]
+        n_cam: [10]
+        repeat: [5]
         radius: 3.0
         u_range: [0.65, 0.85]
-        v_range: [-0.25, 0.25]
-        n_rot: 3
-        fps: 5
+        v_range: [0, 0]
+        n_rot: 1
+        fps: 10
 
     volume:
         n_grid: 512
         side: 1.5
-        level: 50.0
+        level: 0.0
+        grad_dir: ascent
+        chunk_pts_factor: 2
+        render_mesh:
+            backend: pytorch3d
 
 model:
     type: Neus
     rays:
         bounding_radius: 3.0
-        near: 1.5
-        far: 4.5
+        near: 1.0
+        far: 5.0
         n_sample: 64
         n_importance: 64
         n_iter: 4
@@ -126,7 +131,7 @@ model:
         init_var: 0.05                # init var, when it approaches 0, cdf more close
         anneal_end: 50000             # for anneal param, only set during training. please
     chunk_rays: 4096
-    chunk_pts: 32768
+    chunk_pts: 131072
     geometry:
         W: 256
         D: 8
@@ -155,7 +160,7 @@ model:
 loss:
     ImgMaskL1Loss:
         weight: 1.0
-    MaskL1Loss:
+    MaskBCELoss:
         weight: 1.0
     EikonalPTMaskLoss:
         weight: 0.1

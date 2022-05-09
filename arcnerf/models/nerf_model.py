@@ -62,7 +62,8 @@ class NeRF(Base3dModel):
         # get sigma and rgb, expand rays_d to all pts. shape in (B*N_sample, dim)
         rays_d_repeat = torch.repeat_interleave(rays_d, self.rays_cfgs['n_sample'], dim=0)
         sigma, radiance = chunk_processing(
-            self._forward_pts_dir, self.chunk_pts, False, self.fine_geo_net, self.fine_radiance_net, pts, rays_d_repeat
+            self._forward_pts_dir, self.chunk_pts, False, self.coarse_geo_net, self.coarse_radiance_net, pts,
+            rays_d_repeat
         )
 
         # reshape, ray marching and get color/weights

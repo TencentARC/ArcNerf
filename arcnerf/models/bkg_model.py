@@ -44,6 +44,22 @@ class BkgModel(BaseModel):
         """Check whether the model is on cuda"""
         return next(self.parameters()).is_cuda
 
+    def get_chunk_rays(self):
+        """Get the chunk rays num"""
+        return self.chunk_rays
+
+    def get_chunk_pts(self):
+        """Get the chunk pts num"""
+        return self.chunk_pts
+
+    def set_chunk_rays(self, chunk_rays):
+        """Set the chunk rays num"""
+        self.chunk_rays = chunk_rays
+
+    def set_chunk_pts(self, chunk_pts):
+        """Set the chunk pts num"""
+        self.chunk_pts = chunk_pts
+
     def pretrain_siren(self):
         """Pretrain siren layer of implicit model"""
         self.geo_net.pretrain_siren()

@@ -222,9 +222,11 @@ def draw_rays(ax, rays, ray_colors, ray_linewidth, min_values, max_values, plotl
 def draw_sphere(ax, radius, origin, min_values, max_values, plotly, color=None, alpha=0.1):
     """Draw transparent sphere"""
     if isinstance(radius, int) or isinstance(radius, float):
-        radius = [radius]
+        radius_list = [radius]
+    else:
+        radius_list = radius
 
-    for r in radius:
+    for r in radius_list:
         x, y, z = get_sphere_surface(r, origin)
         # change coordinate
         xyz = np.concatenate([x[..., None], y[..., None], z[..., None]], axis=-1).reshape(-1, 3)

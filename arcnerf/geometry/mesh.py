@@ -179,6 +179,7 @@ def render_mesh_images(
     w2c,
     intrinsic,
     backend,
+    single_image_mode=False,
     device='cpu',
     sil_mode=False,
     sil_hard=True
@@ -198,6 +199,8 @@ def render_mesh_images(
         intrinsic: (3, 3) np array, intrinsic
         backend: method to render image. Support 'open3d' and 'pytorch3d' now.
                  for open3d, it only support geo mode without colors
+        single_image_mode: If True, render each image at once to save GPU memory.
+                           Only in 'pytorch3d'. By default False.
         device: torch.device('cpu') or torch.device('cuda'). Only in 'pytorch3d'.
         sil_mode: whether to render in sil mode. Only in 'pytorch3d'. By default False.
         sil_hard: If in sil mode, render the silhouette in {0, 1} rather than (0-1).
@@ -209,11 +212,23 @@ def render_mesh_images(
     if backend == 'open3d':
         images = render_open3d(verts, faces, vert_normals, face_normals, H, W, w2c, intrinsic)
     elif backend == 'pytorch3d':
-        renderer = RenderPytorch3d(
-            H, W, batch_size=w2c.shape[0], device=device, silhouette_mode=sil_mode, silhouette_hard=sil_hard
-        )
-        renderer.construct_by_matrix(intrinsic)
-        images = renderer.render(verts, faces, vert_colors, face_colors, vert_normals, face_normals, w2c)
+        if single_image_mode:
+            renderer = RenderPytorch3d(
+                H, W, batch_size=1, device=device, silhouette_mode=sil_mode, silhouette_hard=sil_hard
+            )
+            renderer.construct_by_matrix(intrinsic)
+            images = []
+            for i in range(w2c.shape[0]):
+                images.append(
+                    renderer.render(verts, faces, vert_colors, face_colors, vert_normals, face_normals, w2c[i:i + 1])
+                )
+            images = np.concatenate(images, axis=0)
+        else:
+            renderer = RenderPytorch3d(
+                H, W, batch_size=w2c.shape[0], device=device, silhouette_mode=sil_mode, silhouette_hard=sil_hard
+            )
+            renderer.construct_by_matrix(intrinsic)
+            images = renderer.render(verts, faces, vert_colors, face_colors, vert_normals, face_normals, w2c)
     else:
         raise NotImplementedError('Invalid render backend {}'.format(backend))
 

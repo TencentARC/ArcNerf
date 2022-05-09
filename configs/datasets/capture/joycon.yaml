@@ -23,14 +23,12 @@ model:
 
 inference:
     render:
-        type: [circle, spiral]
-        n_cam: [30, 60]
+        type: [circle]
+        n_cam: [10]
         radius: 3.0
         u_start: 0.8
         v_ratio: -0.12
-        v_range: [-0.25, 0]
-        n_rot: 3
-        fps: 5
+        fps: 10
 
     volume:
         n_grid: 4       # just for visual purpose

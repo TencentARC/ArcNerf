@@ -30,7 +30,8 @@ inference:
     # set render if you want to render view
     render:                         # set a list of render camera on sphere
         type: [circle, spiral]      # list of render cam type
-        n_cam: [30, 60]             # each render type num of cam
+        n_cam: [10, 20]             # each render type num of cam
+        repeat: [5, 5]              # repeat the render video
         radius: 3.0                 # sphere radius
         u_start: 0.0                # for start pos u in (0~1)
         u_range: [0.0, 0.5]         # u in (0~1) for swing mode only
@@ -51,6 +52,7 @@ inference:
         zlen: 1.5                   # z-dim length, only when side is None
         level: 50.0                 # level set for mesh extracting. For sigma is around 50. For sdf is 0.
         grad_dir: descent           # if 'descent', sigma is larger than level in obj(NeRF), if 'ascent' is smaller(SDF)
+        chunk_pts_factor: 32        # set this to allow model to process more pts in pts_dir forward mode
         render_mesh:                # If True, will render the extracted mesh(in color and geo only)
             backend: pytorch3d      # Select the render backend type. (Open3d, pytorch3d)
 
