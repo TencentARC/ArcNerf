@@ -40,6 +40,10 @@ class BkgModel(BaseModel):
 
         return ray_cfgs
 
+    def is_cuda(self):
+        """Check whether the model is on cuda"""
+        return next(self.parameters()).is_cuda
+
     def pretrain_siren(self):
         """Pretrain siren layer of implicit model"""
         self.geo_net.pretrain_siren()
@@ -83,7 +87,10 @@ class BkgModel(BaseModel):
         flat_inputs['mask'] = mask
 
         # all output tensor in (B*N, ...), reshape to (B, N, ...)
-        output = chunk_processing(self._forward, self.chunk_rays, flat_inputs, inference_only, get_progress)
+        gpu_on_func = True if (self.is_cuda() and not rays_o.is_cuda) else False
+        output = chunk_processing(
+            self._forward, self.chunk_rays, gpu_on_func, flat_inputs, inference_only, get_progress
+        )
         for k, v in output.items():
             if isinstance(v, torch.Tensor) and batch_size * n_rays_per_batch == v.shape[0]:
                 new_shape = tuple([batch_size, n_rays_per_batch] + list(v.shape)[1:])
@@ -126,14 +133,40 @@ class BkgModel(BaseModel):
                 sigma/sdf: torch.tensor (N_pts), geometry value for each point
                 rgb: torch.tensor (N_pts, 3), color for each point
         """
-        sigma, feature = chunk_processing(self.geo_net, self.chunk_pts, pts)
+        gpu_on_func = True if (self.is_cuda() and not pts.is_cuda) else False
+
         if view_dir is None:
             rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
         else:
             rays_d = normalize(view_dir)  # norm view dir
-        rgb = chunk_processing(self.radiance_net, self.chunk_pts, pts, rays_d, None, feature)
 
-        return sigma[..., 0], rgb
+        sigma, rgb = chunk_processing(
+            self._forward_pts_dir, self.chunk_pts, gpu_on_func, self.geo_net, self.radiance_net, pts, rays_d
+        )
+
+        return sigma, rgb
+
+    @staticmethod
+    def _forward_pts_dir(
+        geo_net,
+        radiance_net,
+        pts: torch.Tensor,
+        rays_d: torch.Tensor = None,
+    ):
+        """Core forward function to forward. Use chunk progress to call it will save memory for feature.
+
+        Args:
+            pts: (B, 3) xyz points
+            rays_d: (B, 3) view dir(normalize)
+
+        Return:
+            sigma: (B, ) sigma value
+            radiance: (B, 3) rgb value in float
+        """
+        sigma, feature = geo_net(pts)
+        radiance = radiance_net(pts, rays_d, None, feature)
+
+        return sigma[..., 0], radiance
 
     @torch.no_grad()
     def forward_pts(self, pts: torch.Tensor):
@@ -146,7 +179,8 @@ class BkgModel(BaseModel):
             output is a dict with following keys:
                 sigma/sdf: torch.tensor (N_pts), geometry value for each point
         """
-        sigma, _ = chunk_processing(self.geo_net, self.chunk_pts, pts)
+        gpu_on_func = True if (self.is_cuda() and not pts.is_cuda) else False
+        sigma, _ = chunk_processing(self.geo_net, self.chunk_pts, gpu_on_func, pts)
 
         return sigma[..., 0]
 
@@ -190,12 +224,13 @@ class NeRFPP(BkgModel):
         pts = pts.view(-1, 4)  # (B*N_sample, 4)
 
         # get sigma and rgb,  expand rays_d to all pts. shape in (B*N_sample, dim)
-        sigma, feature = chunk_processing(self.geo_net, self.chunk_pts, pts)
         rays_d_repeat = torch.repeat_interleave(rays_d, self.rays_cfgs['n_sample'], dim=0)
-        radiance = chunk_processing(self.radiance_net, self.chunk_pts, pts, rays_d_repeat, None, feature)
+        sigma, radiance = chunk_processing(
+            self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, pts, rays_d_repeat
+        )
 
         # reshape, ray marching and get color/weights
-        sigma = sigma.view(-1, self.rays_cfgs['n_sample'], 1)[..., 0]  # (B, N_sample)
+        sigma = sigma.view(-1, self.rays_cfgs['n_sample'])  # (B, N_sample)
         radiance = radiance.view(-1, self.rays_cfgs['n_sample'], 3)  # (B, N_sample, 3)
 
         # ray marching. If two stage and inference only, get weights from single stage.

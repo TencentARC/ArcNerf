@@ -60,6 +60,10 @@ class Base3dModel(BaseModel):
         assert self.rays_cfgs['far'] is None or self.rays_cfgs['far'] <= max_far,\
             'Do not set far exceed {}'.format(max_far)
 
+    def is_cuda(self):
+        """Check whether the model is on cuda"""
+        return next(self.parameters()).is_cuda
+
     def get_chunk_rays(self):
         """Get the chunk rays num"""
         return self.chunk_rays
@@ -133,8 +137,10 @@ class Base3dModel(BaseModel):
         flat_inputs['mask'] = mask
 
         # all output tensor in (B*N, ...), reshape to (B, N, ...)
+        gpu_on_func = True if (self.is_cuda() and not rays_o.is_cuda) else False  # allow rays_o on cpu
         output = chunk_processing(
-            self._forward, self.chunk_rays, flat_inputs, inference_only, get_progress, cur_epoch, total_epoch
+            self._forward, self.chunk_rays, gpu_on_func, flat_inputs, inference_only, get_progress, cur_epoch,
+            total_epoch
         )
         for k, v in output.items():
             if isinstance(v, torch.Tensor) and batch_size * n_rays_per_batch == v.shape[0]:
@@ -248,14 +254,40 @@ class Base3dModel(BaseModel):
                 sigma/sdf: torch.tensor (N_pts), geometry value for each point
                 rgb: torch.tensor (N_pts, 3), color for each point
         """
-        sigma, feature = chunk_processing(self.geo_net, self.chunk_pts, pts)
+        gpu_on_func = True if (self.is_cuda() and not pts.is_cuda) else False
+
         if view_dir is None:
             rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
         else:
             rays_d = normalize(view_dir)  # norm view dir
-        rgb = chunk_processing(self.radiance_net, self.chunk_pts, pts, rays_d, None, feature)
 
-        return sigma[..., 0], rgb
+        sigma, rgb = chunk_processing(
+            self._forward_pts_dir, self.chunk_pts, gpu_on_func, self.geo_net, self.radiance_net, pts, rays_d
+        )
+
+        return sigma, rgb
+
+    @staticmethod
+    def _forward_pts_dir(
+        geo_net,
+        radiance_net,
+        pts: torch.Tensor,
+        rays_d: torch.Tensor = None,
+    ):
+        """Core forward function to forward. Use chunk progress to call it will save memory for feature.
+
+        Args:
+            pts: (B, 3) xyz points
+            rays_d: (B, 3) view dir(normalize)
+
+        Return:
+            sigma: (B, ) sigma value
+            radiance: (B, 3) rgb value in float
+        """
+        sigma, feature = geo_net(pts)
+        radiance = radiance_net(pts, rays_d, None, feature)
+
+        return sigma[..., 0], radiance
 
     @torch.no_grad()
     def forward_pts(self, pts: torch.Tensor):
@@ -269,6 +301,7 @@ class Base3dModel(BaseModel):
             output is a dict with following keys:
                 sigma/sdf: torch.tensor (N_pts), geometry value for each point
         """
-        sigma, _ = chunk_processing(self.geo_net, self.chunk_pts, pts)
+        gpu_on_func = True if (self.is_cuda() and not pts.is_cuda) else False
+        sigma, _ = chunk_processing(self.geo_net, self.chunk_pts, gpu_on_func, pts)
 
         return sigma[..., 0]

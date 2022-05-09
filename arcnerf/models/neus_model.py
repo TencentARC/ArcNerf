@@ -80,12 +80,13 @@ class Neus(Base3dModel):
         mid_pts = mid_pts.view(-1, 3)  # (B*N_total-1, 3)
 
         # get sdf, feature and normal
-        sdf, feature, normal_pts = chunk_processing(self.geo_net.forward_with_grad, self.chunk_pts, mid_pts)
         rays_d_repeat = torch.repeat_interleave(rays_d, int(mid_pts.shape[0] / n_rays), dim=0)
-        radiance = chunk_processing(self.radiance_net, self.chunk_pts, mid_pts, rays_d_repeat, normal_pts, feature)
+        sdf, radiance, normal_pts = chunk_processing(
+            self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, mid_pts, rays_d_repeat
+        )
 
         # reshape, change to real weight
-        sdf = sdf.view(n_rays, -1, 1)[..., 0]  # (B, N_total-1)
+        sdf = sdf.view(n_rays, -1)  # (B, N_total-1)
         rays_d_repeat = rays_d_repeat.view(n_rays, -1, 3)  # (B, N_total-1, 3)
         radiance = radiance.view(n_rays, -1, 3)  # (B, N_total-1, 3)
         normal_pts = normal_pts.view(n_rays, -1, 3)  # (B, N_total-1, 3)
@@ -130,14 +131,41 @@ class Neus(Base3dModel):
     @torch.no_grad()
     def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
         """Rewrite for normal handling"""
-        sdf, feature, normal = chunk_processing(self.geo_net.forward_with_grad, self.chunk_pts, pts)
+        gpu_on_func = True if (self.is_cuda() and not pts.is_cuda) else False
+
         if view_dir is None:
             rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
         else:
             rays_d = normalize(view_dir)  # norm view dir
-        rgb = chunk_processing(self.radiance_net, self.chunk_pts, pts, rays_d, normal, feature)
 
-        return sdf[..., 0], rgb
+        sdf, rgb, _ = chunk_processing(
+            self._forward_pts_dir, self.chunk_pts, gpu_on_func, self.geo_net, self.radiance_net, pts, rays_d
+        )
+
+        return sdf, rgb
+
+    @staticmethod
+    def _forward_pts_dir(
+        geo_net,
+        radiance_net,
+        pts: torch.Tensor,
+        rays_d: torch.Tensor = None,
+    ):
+        """Core forward function to forward. Use chunk progress to call it will save memory for feature.
+        Rewrite to use normal.
+
+        Args:
+            pts: (B, 3) xyz points
+            rays_d: (B, 3) view dir(normalize)
+
+        Return:
+            sdf: (B, ) sigma value
+            radiance: (B, 3) rgb value in float
+        """
+        sdf, feature, normal = geo_net.forward_with_grad(pts)
+        radiance = radiance_net(pts, rays_d, normal, feature)
+
+        return sdf[..., 0], radiance, normal
 
     def _upsample_zvals(self, rays_o: torch.Tensor, rays_d: torch.Tensor, zvals: torch.Tensor, inference_only, s=32):
         """Upsample zvals if N_importance > 0
@@ -163,7 +191,7 @@ class Neus(Base3dModel):
             n_rays, n_pts = zvals.shape[:2]
             pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)
             pts = pts.view(-1, 3)
-            sdf = chunk_processing(self.geo_net.forward_geo_value, self.chunk_pts, pts)  # (B*N_pts)
+            sdf = chunk_processing(self.geo_net.forward_geo_value, self.chunk_pts, False, pts)  # (B*N_pts)
             sdf = sdf.view(n_rays, n_pts)  # (B, N_pts)
 
             # find min slope

@@ -60,12 +60,13 @@ class NeRF(Base3dModel):
         pts = pts.view(-1, 3)  # (B*N_sample, 3)
 
         # get sigma and rgb, expand rays_d to all pts. shape in (B*N_sample, dim)
-        sigma, feature = chunk_processing(self.coarse_geo_net, self.chunk_pts, pts)
         rays_d_repeat = torch.repeat_interleave(rays_d, self.rays_cfgs['n_sample'], dim=0)
-        radiance = chunk_processing(self.coarse_radiance_net, self.chunk_pts, pts, rays_d_repeat, None, feature)
+        sigma, radiance = chunk_processing(
+            self._forward_pts_dir, self.chunk_pts, False, self.fine_geo_net, self.fine_radiance_net, pts, rays_d_repeat
+        )
 
         # reshape, ray marching and get color/weights
-        sigma = sigma.view(-1, self.rays_cfgs['n_sample'], 1)[..., 0]  # (B, N_sample)
+        sigma = sigma.view(-1, self.rays_cfgs['n_sample'])  # (B, N_sample)
         radiance = radiance.view(-1, self.rays_cfgs['n_sample'], 3)  # (B, N_sample, 3)
 
         # merge sigma from background and get result together
@@ -110,12 +111,14 @@ class NeRF(Base3dModel):
             pts = pts.view(-1, 3)  # (B*N_total, 3)
 
             # get sigma and rgb,  expand rays_d to all pts. shape in (B*N_total, dim)
-            sigma, feature = chunk_processing(self.fine_geo_net, self.chunk_pts, pts)
             rays_d_repeat = torch.repeat_interleave(rays_d, n_total, dim=0)
-            radiance = chunk_processing(self.fine_radiance_net, self.chunk_pts, pts, rays_d_repeat, None, feature)
+            sigma, radiance = chunk_processing(
+                self._forward_pts_dir, self.chunk_pts, False, self.fine_geo_net, self.fine_radiance_net, pts,
+                rays_d_repeat
+            )
 
             # reshape, ray marching and get color/weights
-            sigma = sigma.view(-1, n_total, 1)[..., 0]  # (B, n_total)
+            sigma = sigma.view(-1, n_total)  # (B, n_total)
             radiance = radiance.view(-1, n_total, 3)  # (B, n_total, 3)
 
             # merge sigma from background and get result together
@@ -147,6 +150,7 @@ class NeRF(Base3dModel):
     @torch.no_grad()
     def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
         """Rewrite for two stage implementation. """
+        gpu_on_func = True if (self.is_cuda() and not pts.is_cuda) else False
         if self.rays_cfgs['n_importance'] > 0:
             geo_net = self.fine_geo_net
             radiance_net = self.fine_radiance_net
@@ -154,23 +158,27 @@ class NeRF(Base3dModel):
             geo_net = self.coarse_geo_net
             radiance_net = self.coarse_radiance_net
 
-        sigma, feature = chunk_processing(geo_net, self.chunk_pts, pts)
+        # the feature takes large memory, should not keep all to process
         if view_dir is None:
             rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
         else:
             rays_d = normalize(view_dir)  # norm view dir
-        rgb = chunk_processing(radiance_net, self.chunk_pts, pts, rays_d, None, feature)
 
-        return sigma[..., 0], rgb
+        sigma, rgb = chunk_processing(
+            self._forward_pts_dir, self.chunk_pts, gpu_on_func, geo_net, radiance_net, pts, rays_d
+        )
+
+        return sigma, rgb
 
     @torch.no_grad()
     def forward_pts(self, pts: torch.Tensor):
         """Rewrite for two stage implementation. """
+        gpu_on_func = True if (self.is_cuda() and not pts.is_cuda) else False
         if self.rays_cfgs['n_importance'] > 0:
             geo_net = self.fine_geo_net
         else:
             geo_net = self.coarse_geo_net
 
-        sigma, _ = chunk_processing(geo_net, self.chunk_pts, pts)
+        sigma, _ = chunk_processing(geo_net, self.chunk_pts, gpu_on_func, pts)
 
         return sigma[..., 0]

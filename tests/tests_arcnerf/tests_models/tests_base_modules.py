@@ -150,8 +150,10 @@ class TestDict(unittest.TestCase):
                 W_feat=256
             )
 
+            gpu_on_func = False
             if torch.cuda.is_available():
                 model.cuda()
+                gpu_on_func = True  # move volume pts to gpu
 
             model.pretrain_siren()
 
@@ -172,15 +174,13 @@ class TestDict(unittest.TestCase):
             volume_size = volume.get_volume_size()
             volume_len = volume.get_len()
             volume_pts = volume.get_volume_pts()  # (n_grid^3, 3) pts in torch
-            if torch.cuda.is_available():
-                volume_pts = volume_pts.cuda()
             volume_dict = {
                 'grid_pts': torch_to_np(volume.get_corner()),
                 'lines': volume.get_bound_lines(),
                 'faces': volume.get_bound_faces()
             }
 
-            geo_value = chunk_processing(model, chunk_pts, volume_pts)[0][:, 0]  # (n_grid^3, 1) geo sdf value
+            geo_value = chunk_processing(model, chunk_pts, gpu_on_func, volume_pts)[0][:, 0]  # (n_grid^3, 1) sdf value
             valid_sigma = (geo_value <= 0)  # inside pts (n^3,)
             valid_pts = torch_to_np(volume_pts[valid_sigma])  # (n_valid, 3)
             geo_value = torch_to_np(geo_value).reshape((n_grid, n_grid, n_grid))

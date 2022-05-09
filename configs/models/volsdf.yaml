@@ -1,7 +1,7 @@
-# The Neus model without background
+# The VolSDF model without background
 
 model:
-    type: Neus
+    type: VolSDF
     rays:
         bounding_radius: 3.0          # bounding ray sampling region
         near: 1.5                     # hardcode near zvals
@@ -15,11 +15,11 @@ model:
         noise_std: 1.0                # noise for sigma in training
         white_bkg: False              # cast the background as white
     params:
-        speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
-        init_var: 0.05                # init var, when it approaches 0, cdf more close
-        anneal_end: 50000             # for anneal param, only set during training. please
+        speed_factor: 10              # factor for ln_beta = np.log(init_beta)/speed, beta = exp(ln_beta*speed)
+        beta_min: 0.0001              # min beta offset
+        init_beta: 0.1                # init beta, when it approaches 0, cdf more close
     chunk_rays: 4096                  # each chunk to process 1024*4(ray), enough for 32 GB
-    chunk_pts: 32768                  # each chunk to progress 4096*8(pts), for model forward
+    chunk_pts: 131072                  # each chunk to progress 4096*8(pts), for model forward
     geometry:
         W: 256                        # linear hidden neuron
         D: 8                          # num of linear, not include final

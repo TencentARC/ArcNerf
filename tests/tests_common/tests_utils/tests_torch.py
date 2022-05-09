@@ -42,8 +42,8 @@ class TestDict(unittest.TestCase):
             return bn3, bn, bn3_np, bn_np, none, bool, float, str
 
         bn3_o, bn_o, bn3_np_o, bn_np_o, none_o, bool_o, float_o, str_o = chunk_processing(
-            list_func, self.chunk_size, self.bn3, self.bn, self.bn3_np, self.bn_np, self.none, self.bool, self.float,
-            self.str, self.other
+            list_func, self.chunk_size, False, self.bn3, self.bn, self.bn3_np, self.bn_np, self.none, self.bool,
+            self.float, self.str, self.other
         )
         self.assertEqual(bn3_o.shape, self.bn3.shape)
         self.assertEqual(bn_o.shape, self.bn.shape)
@@ -58,7 +58,7 @@ class TestDict(unittest.TestCase):
         def dict_func(input, other):
             return input
 
-        out = chunk_processing(dict_func, self.chunk_size, self.inputs, self.other)
+        out = chunk_processing(dict_func, self.chunk_size, False, self.inputs, self.other)
         self.assertEqual(out['bn3'].shape, self.bn3.shape)
         self.assertEqual(out['bn'].shape, self.bn.shape)
         self.assertEqual(out['bn3_np'].shape, self.bn3_np.shape)
@@ -67,6 +67,48 @@ class TestDict(unittest.TestCase):
         self.assertTrue(all([v is False for v in out['bool']]))
         self.assertTrue(all([v == self.float for v in out['float']]))
         self.assertTrue(all([v == self.str for v in out['str']]))
+
+    def tests_chunk_process_device(self):
+
+        def list_func(bn3, bn, inputs):
+            bn3_o = bn3 + 1.0
+            bn_o = bn + 1.0
+            out = {}
+            for k, v in inputs.items():
+                out[k] = v + 1.0
+            return bn3_o, bn_o, out
+
+        inputs = {'bn3': self.bn3, 'bn': self.bn}
+
+        # cpu to cpu
+        bn3_o, bn_o, out = chunk_processing(list_func, self.chunk_size, False, self.bn3, self.bn, inputs)
+        self.assertFalse(bn3_o.is_cuda)
+        self.assertFalse(bn_o.is_cuda)
+        self.assertFalse(out['bn3'].is_cuda)
+        self.assertFalse(out['bn'].is_cuda)
+
+        if torch.cuda.is_available():
+            # cpu to gpu to cpu
+            self.assertFalse(self.bn3.is_cuda)
+            self.assertFalse(self.bn.is_cuda)
+            self.assertFalse(inputs['bn3'].is_cuda)
+            self.assertFalse(inputs['bn'].is_cuda)
+            bn3_o, bn_o, out = chunk_processing(list_func, self.chunk_size, True, self.bn3, self.bn, inputs)
+            self.assertFalse(bn3_o.is_cuda)
+            self.assertFalse(bn_o.is_cuda)
+            self.assertFalse(out['bn3'].is_cuda)
+            self.assertFalse(out['bn'].is_cuda)
+
+            # gpu to gpu
+            self.bn3 = self.bn.cuda()
+            self.bn = self.bn.cuda()
+            inputs['bn3'] = inputs['bn'].cuda()
+            inputs['bn'] = inputs['bn'].cuda()
+            bn3_o, bn_o, out = chunk_processing(list_func, self.chunk_size, False, self.bn3, self.bn, inputs)
+            self.assertTrue(bn3_o.is_cuda)
+            self.assertTrue(bn_o.is_cuda)
+            self.assertTrue(out['bn3'].is_cuda)
+            self.assertTrue(out['bn'].is_cuda)
 
 
 if __name__ == '__main__':

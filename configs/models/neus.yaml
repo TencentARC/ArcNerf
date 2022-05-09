@@ -19,7 +19,7 @@ model:
         init_var: 0.05                # init var, when it approaches 0, cdf more close
         anneal_end: 50000             # for anneal param, only set during training. please
     chunk_rays: 4096                  # each chunk to process 1024*4(ray), enough for 32 GB
-    chunk_pts: 32768                  # each chunk to progress 4096*8(pts), for model forward
+    chunk_pts: 131072                 # each chunk to progress 4096*32(pts), for model forward
     geometry:
         W: 256                        # linear hidden neuron
         D: 8                          # num of linear, not include final

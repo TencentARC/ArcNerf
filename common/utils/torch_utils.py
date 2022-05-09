@@ -57,12 +57,16 @@ def is_torch_or_np(tensor):
     return isinstance(tensor, torch.Tensor) or isinstance(tensor, np.ndarray)
 
 
-def chunk_processing(func, chunk_size, *args):
+def chunk_processing(func, chunk_size, gpu_on_func, *args):
     """Processing array by func in chunk size, in case direct processing takes too much memory
+    Since the inputs could be large to put in gpu together and concat in gpu, you can set gpu_on_func=True,
+    and just make the inputs in cpu, each chunk will bring tensor into gpu and back to cpu to avoid explosion.
 
     Args:
         func: the func processing array and other parameters
         chunk_size: chunk size for each forward. <=0 means directly process.
+        gpu_on_func: If True, will move torch tensor to 'gpu' before func
+                     and move back to 'cpu' after it(only when tensor original in cpu'), in case large gpu consumption.
         *args: containing arrays for input, assume each (B, d_in), torch or np array. The chunk division is on B-dim.
                Can be other params like float/str/bool/none, etc. But at least contains one array.
                If it is a dict, will slice each item and output the dict as well. (Do not use nested dict)
@@ -94,14 +98,29 @@ def chunk_processing(func, chunk_size, *args):
     # chunk processing
     out = []
     for i in range(0, batch_size, chunk_size):
-        args_slice = get_batch_from_list(*args, start_idx=i, end_idx=i + chunk_size)
+        args_slice, move_to_cpu = get_batch_from_list(
+            *args, start_idx=i, end_idx=i + chunk_size, gpu_on_func=gpu_on_func
+        )
         chunk_out = func(*args_slice)
+        # combine results
         if isinstance(chunk_out, tuple):
             chunk_out = list(chunk_out)
         elif isinstance(chunk_out, list):
             pass
         else:
             chunk_out = [chunk_out]
+        # clean unused gpu memory and move back result to cpu
+        if move_to_cpu:
+            for idx, o in enumerate(chunk_out):
+                if isinstance(o, torch.Tensor):
+                    chunk_out[idx] = o.cpu()
+                elif isinstance(o, dict):
+                    for k, v in o.items():
+                        if isinstance(v, torch.Tensor):
+                            chunk_out[idx][k] = v.cpu()
+
+                torch.cuda.empty_cache()
+
         out.append(chunk_out)
 
     # concat all field, consider dict as well
@@ -139,7 +158,7 @@ def chunk_processing(func, chunk_size, *args):
         return tuple(out_cat)
 
 
-def get_batch_from_list(*args, start_idx, end_idx):
+def get_batch_from_list(*args, start_idx, end_idx, gpu_on_func):
     """Get the batch of list from *args, each one can be an array or None
 
     Args:
@@ -148,26 +167,37 @@ def get_batch_from_list(*args, start_idx, end_idx):
                If it is a dict, will slice each item and output the dict as well. (Do not use nested dict)
         start_idx: start idx for selection.
         end_idx: end idx for selection. Valid for value > B
+        gpu_on_func: If True, will manually move torch tensor to 'gpu'. Original tensor should be on 'cpu'.
 
     Returns:
         out: list of torch or np array in (B, d_out)
+        move_to_cpu: Whether need to move the tensor back to cpu. Only when they are on cpu before and moved to gpu
     """
     batch = []
+    move_to_cpu = False
     for elem in args:
         if is_torch_or_np(elem):
-            batch.append(elem[start_idx:end_idx])
+            if isinstance(elem, torch.Tensor) and gpu_on_func and not elem.is_cuda:  # get to gpu
+                move_to_cpu = True
+                batch.append(elem[start_idx:end_idx].clone().cuda(non_blocking=True))  # move to 'gpu' manually
+            else:
+                batch.append(elem[start_idx:end_idx])
         elif isinstance(elem, dict):
             in_dict = {}
             for k, v in elem.items():
                 if is_torch_or_np(v):
-                    in_dict[k] = v[start_idx:end_idx]
+                    if isinstance(v, torch.Tensor) and gpu_on_func and not v.is_cuda:
+                        move_to_cpu = True
+                        in_dict[k] = v[start_idx:end_idx].clone().cuda(non_blocking=True)  # move to 'gpu' manually
+                    else:
+                        in_dict[k] = v[start_idx:end_idx]
                 else:
                     in_dict[k] = v
             batch.append(in_dict)
         else:
             batch.append(elem)
 
-    return batch
+    return batch, move_to_cpu
 
 
 def mean_tensor_by_mask(tensor: torch.Tensor, mask: torch.Tensor, keep_batch=False):
