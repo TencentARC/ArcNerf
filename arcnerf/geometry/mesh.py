@@ -6,6 +6,7 @@ import skimage
 import trimesh
 
 from arcnerf.geometry.transformation import normalize
+from arcnerf.render.render_pytorch3d import RenderPytorch3d
 
 
 def extract_mesh(sigma, level, volume_size, volume_len, grad_dir='descent'):
@@ -164,3 +165,96 @@ def simplify_mesh(verts, faces, max_faces):
     verts_sim, faces_sim, _ = simplifier.getMesh()
 
     return verts_sim, faces_sim
+
+
+def render_mesh_images(
+    verts,
+    faces,
+    vert_colors,
+    face_colors,
+    vert_normals,
+    face_normals,
+    H: int,
+    W: int,
+    w2c,
+    intrinsic,
+    backend,
+    device='cpu',
+    sil_mode=False,
+    sil_hard=True
+):
+    """Render mesh images
+
+    Args:
+        verts: (V, 3) np array, verts adjusted by volume offset
+        faces: (F, 3) np array, faces
+        vert_colors: (V, 3) np array, rgb color in (0~1). optional
+        face_colors: (F, 3) np array, rgb color in (0~1). optional
+        vert_normals: (V, 3) np array. normal of each vert, pointing outside, optional
+        face_normals: (F, 3) np array. normal of each face, pointing outside, optional
+        H: image height
+        W: image width
+        w2c: (N, 4, 4) np array, extrinsic
+        intrinsic: (3, 3) np array, intrinsic
+        backend: method to render image. Support 'open3d' and 'pytorch3d' now.
+                 for open3d, it only support geo mode without colors
+        device: 'cpu' or 'gpu'. Only in 'pytorch3d'.
+        sil_mode: whether to render in sil mode. Only in 'pytorch3d'. By default False.
+        sil_hard: If in sil mode, render the silhouette in {0, 1} rather than (0-1).
+                  By default True, Only in 'pytorch3d'.
+
+    Returns:
+        images: (N, H, W, 3) numpy array in uint8 from 0-255 in rgb order.
+    """
+    if backend == 'open3d':
+        images = render_open3d(verts, faces, vert_normals, face_normals, H, W, w2c, intrinsic)
+    elif backend == 'pytorch3d':
+        renderer = RenderPytorch3d(
+            H, W, batch_size=w2c.shape[0], device=device, silhouette_mode=sil_mode, silhouette_hard=sil_hard
+        )
+        renderer.construct_by_matrix(intrinsic)
+        images = renderer.render(verts, faces, vert_colors, face_colors, vert_normals, face_normals, w2c)
+    else:
+        raise NotImplementedError('Invalid render backend {}'.format(backend))
+
+    return images
+
+
+def render_open3d(verts, faces, vert_normals, face_normals, H: int, W: int, w2c, intrinsic):
+    """Render image in open3d"""
+    try:
+        import open3d  # in case some machine do not support
+    except ImportError:
+        raise ImportError('Can not import open3d...')
+
+    # init mesh
+    mesh = open3d.geometry.TriangleMesh()
+    mesh.vertices = open3d.utility.Vector3dVector(verts)
+    mesh.triangles = open3d.utility.Vector3iVector(faces)
+    mesh.vertex_normals = open3d.utility.Vector3dVector(vert_normals)
+    mesh.triangle_normals = open3d.utility.Vector3dVector(face_normals)
+
+    # set up scene
+    vis = open3d.visualization.Visualizer()
+    vis.create_window(width=W, height=H, visible=False)
+    vis.add_geometry(mesh)
+
+    # set intrinsic
+    ctrl = vis.get_view_control()
+    cam = ctrl.convert_to_pinhole_camera_parameters()
+    intrinsic_adj = intrinsic.copy()
+    intrinsic_adj[:2, 2] -= 0.5
+    cam.intrinsic.intrinsic_matrix = intrinsic_adj
+    ctrl.convert_from_pinhole_camera_parameters(cam)
+
+    images = []
+    for cam_id in range(w2c.shape[0]):
+        cam.extrinsic = w2c[cam_id]
+        ctrl.convert_from_pinhole_camera_parameters(cam)
+        vis.poll_events()
+        vis.update_renderer()
+        image = vis.capture_screen_float_buffer(do_render=True)
+        images.append((np.asarray(image) * 255.0).astype(np.uint8)[None])
+    images = np.concatenate(images, axis=0)
+
+    return images

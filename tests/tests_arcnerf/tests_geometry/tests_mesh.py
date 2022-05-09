@@ -7,18 +7,22 @@ import os.path as osp
 import unittest
 
 import numpy as np
+import torch
 
 from arcnerf.geometry.mesh import (
     extract_mesh,
     get_normals,
     get_face_centers,
     get_verts_by_faces,
+    render_mesh_images,
     save_meshes,
     simplify_mesh,
 )
+from arcnerf.geometry.poses import generate_cam_pose_on_sphere, invert_poses
 from arcnerf.geometry.volume import Volume
 from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.torch_utils import torch_to_np
+from common.utils.video_utils import write_video
 from common.visual import get_colors_from_cm, get_combine_colors
 
 RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results', 'mesh'))
@@ -129,6 +133,64 @@ class TestDict(unittest.TestCase):
             plotly=True,
             plotly_html=True
         )
+
+        # pytorch3d rendering
+        try:  # may not have pytorch3d
+            color_img = self.render_mesh(
+                verts, faces, vert_colors, face_colors, vert_normals, face_normals, 'pytorch3d'
+            )
+            file_path = osp.join(object_dir, 'pytorch3d_color_render.mp4')
+            write_video([color_img[idx] for idx in range(color_img.shape[0])], file_path, True)
+
+            geo_img = self.render_mesh(verts, faces, None, None, vert_normals, face_normals, 'pytorch3d')
+            file_path = osp.join(object_dir, 'pytorch3d_geo_render.mp4')
+            write_video([geo_img[idx] for idx in range(geo_img.shape[0])], file_path, True)
+
+            sil_img = self.render_mesh(verts, faces, None, None, vert_normals, face_normals, 'pytorch3d', True)
+            file_path = osp.join(object_dir, 'pytorch3d_sil_render.mp4')
+            write_video([sil_img[idx] for idx in range(sil_img.shape[0])], file_path, True)
+        except ImportError:
+            pass
+
+        # open3d rendering, only geometry.
+        try:  # may not have open3d
+            geo_img = self.render_mesh(verts, faces, None, None, vert_normals, face_normals, 'open3d')
+            file_path = osp.join(object_dir, 'open3d_geo_render.mp4')
+            write_video([geo_img[idx] for idx in range(geo_img.shape[0])], file_path, True)
+        except ImportError:
+            pass
+
+    def render_mesh(self, verts, faces, vert_colors, face_colors, vert_normals, face_normals, backend, sil_mode=False):
+        n_cam = 30
+        c2w = generate_cam_pose_on_sphere('circle', self.side * 2.0, n_cam)  # (n_cam, 4, 4)
+        w2c = invert_poses(c2w)
+        h, w = 300, 400
+        focal = 500.0
+        intrinsic = np.array([[focal, 0.0, w / 2.0], [0.0, focal, h / 2.0], [0, 0, 1]])  # (3, 3)
+
+        device = torch.device('cpu')
+        if torch.cuda.is_available():  # gpu is much faster
+            verts = torch.tensor(verts, dtype=torch.float32).cuda()
+            device = verts.device
+
+        # set up renderer
+        img_list = render_mesh_images(
+            verts,
+            faces,
+            vert_colors,
+            face_colors,
+            vert_normals,
+            face_normals,
+            h,
+            w,
+            w2c,
+            intrinsic,
+            backend=backend,
+            device=device,
+            sil_mode=sil_mode
+        )
+
+        return img_list
 
     def tests_mesh_sphere(self):
         self.run_mesh('sphere')
