@@ -15,7 +15,6 @@ Single pass model. MSE/L1 Loss for rgb values.
 - Output:
   - 'rgb': rgb from ray marching. `(B, N_rays, 3)`
 
-
 ## ImgCFMaskLoss / ImgCFMaskL1Loss
 For two stage model like nerf(coarse+fine) with mask. MSE/L1 Loss for rgb values.
 Mask is adjust on each sample instead of meaning all pixels together.
@@ -45,6 +44,7 @@ For two stage model like nerf(coarse+fine). MSE/L1/BCE Loss for mask values.
 - Output:
   - 'mask_coarse': coarse mask from ray marching. `(B, N_rays)`
   - 'mask_fine': fine mask from ray marching. `(B, N_rays)`
+- for `BCE` Loss, the outputs should be clipped in `(1e-3, 1.0-1e-3)`
 
 ## MaskLoss / MaskL1Loss / MaskBCELoss
 Single pass model. MSE/L1/BCE Loss for mask values.
@@ -52,6 +52,7 @@ Single pass model. MSE/L1/BCE Loss for mask values.
   - 'mask': mask value in float (0~1). `(B, N_rays)`
 - Output:
   - 'mask': mask from ray marching. `(B, N_rays)`
+  - for `BCE` Loss, the output should be clipped in `(1e-3, 1.0-1e-3)`
 
 
 # geo_loss

@@ -24,6 +24,7 @@ Many function about sphere is provided, including:
 - uv-xyz transform
 - get sphere line/surface
 - get spiral line
+- get swing line
 
 It provides help for camera path creation.
 
@@ -54,6 +55,7 @@ Function for mesh extraction, color extraction, etc.
 - get_normals: get the vert/face normals
 - get_face_centers: get the triangle centers
 - simplify_mesh: simplify mesh
+- render_mesh: it will call open3d/pytorch3d backend to render the mesh by cam positions.
 
 # volume
 Definition and function of a volume. For all the point you can get it in grid or fatten(by default)

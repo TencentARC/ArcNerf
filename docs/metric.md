@@ -13,6 +13,5 @@ For coarse image, with mask
 ### MaskPSNRFine
 For fine image, with mask
 
-## SSIM
-
-## MaskSSIM
+## SSIM / MaskSSIM
+Same layout as PSNR, but use SSIM core calculation.

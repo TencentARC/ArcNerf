@@ -3,7 +3,7 @@ kaleido
 loguru
 matplotlib
 numpy
-#open3d==0.9.0
+#open3d==0.9.0  install if you need
 opencv-python
 plotly
 pyfqmr
@@ -13,5 +13,6 @@ scikit-image
 tensorboard
 thop
 torch
+torchgeometry
 torchvision
 trimesh

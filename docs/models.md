@@ -37,7 +37,14 @@ size,  and the core `_forward` in child class (like `NeRF`) process `(N_rays_per
 In the core `_forward`, the model may forward the pts sampled on rays. We set `chunk_pts` for a single forward size for
 pts. By default we use `4096*192=786432`, it works good for 32GB memory GPU.
 
-## Rays
+## gpu_online
+The chunk process function supports bringing tensor online for each chunk and bring back after processing.
+This helps to save GPU memory in case large batch size is used and brought to GPU for calculation and concat.
+
+You just need to keep the tensors in cpu and set `gpu_on_func` and it will bring every tensor to GPU online.
+(But large concatenation still takes time.)
+
+# Rays
 The dataset only provides `rays_o` and `rays_d`, but the actual sampling procedure is in model. Dataset may provide
 `bounds` for sampling guidance, which is generally coming from point_cloud in cam space.
 - near: Hard reset the near zvals for all rays
@@ -59,7 +66,7 @@ For ray marching(color blending):
 - noise_std: if >0.0, add to sigma when ray marching. good for training.
 - white_bkg: If True, will make the rays with mask = 0 as rgb = 1.0
 
-## background
+# background
 There are three ways to handle background
 - (1) Set a far zvals in rays for sampling. It will combine obj+background together for rendering.
 `ImgLoss` can be applied on the whole image for optimization.

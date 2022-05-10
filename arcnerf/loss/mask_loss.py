@@ -12,6 +12,7 @@ class MaskCFLoss(nn.Module):
     def __init__(self, cfgs=None):
         super(MaskCFLoss, self).__init__()
         self.loss = nn.MSELoss(reduction='none')
+        self.clip_output = False  # for BCE Loss
 
     def forward(self, data, output):
         """
@@ -26,9 +27,19 @@ class MaskCFLoss(nn.Module):
         device = output['mask_coarse'].device
         gt = data['mask'].to(device)
 
-        loss = self.loss(output['mask_coarse'], gt)  # (B, N_rays)
+        # coarse
+        if self.clip_output:
+            loss = self.loss(output['mask_coarse'].clip(1e-3, 1.0 - 1e-3), gt)
+        else:
+            loss = self.loss(output['mask_coarse'], gt)
+
+        # fine
         if 'mask_fine' in output:
-            loss += self.loss(output['mask_fine'], gt)
+            if self.clip_output:
+                loss += self.loss(output['mask_fine'].clip(1e-3, 1.0 - 1e-3), gt)
+            else:
+                loss += self.loss(output['mask_fine'], gt)
+
         loss = loss.mean()
 
         return loss
@@ -50,6 +61,7 @@ class MaskCFBCELoss(MaskCFLoss):
     def __init__(self, cfgs=None):
         super(MaskCFBCELoss, self).__init__()
         self.loss = nn.BCELoss(reduction='none')
+        self.clip_output = True
 
 
 @LOSS_REGISTRY.register()
@@ -59,6 +71,7 @@ class MaskLoss(nn.Module):
     def __init__(self, cfgs=None):
         super(MaskLoss, self).__init__()
         self.loss = nn.MSELoss(reduction='none')
+        self.clip_output = False  # for BCE Loss
 
     def forward(self, data, output):
         """
@@ -72,7 +85,11 @@ class MaskLoss(nn.Module):
         device = output['mask'].device
         gt = data['mask'].to(device)
 
-        loss = self.loss(output['mask'], gt)
+        if self.clip_output:
+            loss = self.loss(output['mask'].clip(1e-3, 1.0 - 1e-3), gt)  # in case explode
+        else:
+            loss = self.loss(output['mask'], gt)
+
         loss = loss.mean()
 
         return loss
@@ -94,3 +111,4 @@ class MaskBCELoss(MaskLoss):
     def __init__(self, cfgs=None):
         super(MaskLoss, self).__init__()
         self.loss = nn.BCELoss(reduction='none')
+        self.clip_output = True

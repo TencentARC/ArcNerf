@@ -30,15 +30,15 @@ class EikonalLoss(nn.Module):
         dtype = output[self.key].dtype
         device = output[self.key].device
         out = output[self.key]
-        norm = torch.norm(out, dim=-1)  # (B, n_rays, (n_pts))
+        norm = torch.norm(out, dim=-1)  # (B, N_rays, (N_pts))
         norm_ones = torch.ones_like(norm, dtype=dtype).to(device)
         if self.use_mask:
-            mask = data['mask'].to(device)  # (B, n_rays)
+            mask = data['mask'].to(device)  # (B, N_rays)
 
         loss = self.loss(norm, norm_ones)
         if self.use_mask:
             if self.pts:  # expand for pts-dim
-                mask = torch.repeat_interleave(mask.unsqueeze(-1), loss.shape[-1], -1)
+                mask = torch.repeat_interleave(mask.unsqueeze(-1), loss.shape[-1], -1)  # (B, N_rays, N_pts)
             loss = mean_tensor_by_mask(loss, mask)
         else:
             loss = loss.mean()
