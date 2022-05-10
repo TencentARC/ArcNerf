@@ -101,7 +101,7 @@ inference:
         u_range: [0.65, 0.85]
         v_range: [0, 0]
         n_rot: 1
-        fps: 10
+        fps: 5
 
     volume:
         n_grid: 512

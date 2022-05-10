@@ -121,7 +121,8 @@ def set_inference_data(cfgs, intrinsic, wh: tuple, dtype=torch.float32):
                 'backend': volume_cfgs['render_backend'],
                 'H': int(H),
                 'W': int(W),
-                'fps': infer_data['render']['cfgs']['fps']
+                'fps': infer_data['render']['cfgs']['fps'],
+                'repeat': infer_data['render']['cfgs']['repeat']
             }
 
             infer_data['volume']['render']['c2w'] = []
@@ -351,6 +352,7 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
                     'H': data['render']['H'],
                     'W': data['render']['W'],
                     'fps': data['render']['fps'],
+                    'repeat': data['render']['repeat'],
                     'c2w': data['render']['c2w'],
                     'intrinsic': data['render']['intrinsic'],
                     'backend': data['render']['backend'],
@@ -485,7 +487,7 @@ def write_infer_files(files, folder, data, logger):
 
             if 'render' in mesh:  # render the mesh only
                 render = mesh['render']
-                for type, c2w in zip(render['type'], render['c2w']):
+                for path_id, (path_type, c2w) in enumerate(zip(render['type'], render['c2w'])):
                     color_imgs = render_mesh_images(
                         mesh['full']['verts'],
                         mesh['full']['faces'],
@@ -502,9 +504,9 @@ def write_infer_files(files, folder, data, logger):
                         device=render['device']
                     )  # (n_cam, h, w, 3)
 
-                    file_path = osp.join(folder, 'color_mesh_render_type{}.mp4'.format(type))
-                    write_video([color_imgs[idx] for idx in range(color_imgs.shape[0])], file_path, True,
-                                mesh['render']['fps'])
+                    file_path = osp.join(folder, 'color_mesh_render_type{}.mp4'.format(path_type))
+                    write_video([color_imgs[idx] for idx in range(color_imgs.shape[0])] * render['repeat'][path_id],
+                                file_path, True, render['fps'])
 
                     geo_imgs = render_mesh_images(
                         mesh['full']['verts'],
@@ -522,6 +524,6 @@ def write_infer_files(files, folder, data, logger):
                         device=render['device']
                     )  # (n_cam, h, w, 3)
 
-                    file_path = osp.join(folder, 'geo_mesh_render_type{}.mp4'.format(type))
-                    write_video([geo_imgs[idx] for idx in range(geo_imgs.shape[0])], file_path, True,
-                                mesh['render']['fps'])
+                    file_path = osp.join(folder, 'geo_mesh_render_type{}.mp4'.format(path_type))
+                    write_video([geo_imgs[idx] for idx in range(geo_imgs.shape[0])] * render['repeat'][path_id],
+                                file_path, True, render['fps'])

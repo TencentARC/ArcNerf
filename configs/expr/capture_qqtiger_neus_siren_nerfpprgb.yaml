@@ -100,7 +100,7 @@ inference:
         radius: 3.0
         u_start: 0.75
         v_ratio: -0.2
-        fps: 10
+        fps: 5
 
     volume:
         n_grid: 512

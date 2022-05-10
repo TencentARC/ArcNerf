@@ -122,7 +122,7 @@ inference:
         normal: [0.0, 1.0, 0.0]     # for cam path rotation, (0,1,0) is horizontal without rotation
         n_rot: 3                    # n_rot of camera path
         reverse: False              # reverse u range for swing mode only
-        fps: 10                     # render video fps
+        fps: 5                      # render video fps
 
     volume:                         # volume params
         origin: (0.0, 0.0, 0.0)     # volume center
