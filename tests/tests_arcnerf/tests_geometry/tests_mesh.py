@@ -41,18 +41,22 @@ class TestDict(unittest.TestCase):
         cls.max_faces = 500  # 500000 is okay for mesh with no rays
 
     def make_sphere_sdf(self, volume_pts):
-        """make the sphere sdf with radius from volume_pts"""
-        return self.radius - np.linalg.norm(volume_pts, axis=-1)
+        """make the sphere sdf with radius from volume_pts. Inside -/outside +"""
+        sdf = self.radius - np.linalg.norm(volume_pts, axis=-1)
+        sdf *= -1.0
+
+        return sdf
 
     def make_hourglass_sdf(self, volume_pts, n_grid):
-        """make the hourglass sdf with radius from volume_pts"""
-        sigma = abs(volume_pts[:, 1])**2 - (volume_pts[:, 0]**2 + volume_pts[:, 2]**2)
-        sigma = sigma.reshape((n_grid, n_grid, n_grid))
+        """make the hourglass sdf with radius from volume_pts Inside -/outside +"""
+        sdf = abs(volume_pts[:, 1])**2 - (volume_pts[:, 0]**2 + volume_pts[:, 2]**2)
+        sdf = sdf.reshape((n_grid, n_grid, n_grid))
         offset = int(n_grid * (1 - (self.hourglass_h / self.side)) / 2)
-        sigma[:, :offset, :] = -1.0
-        sigma[:, -offset:, :] = -1.0
+        sdf[:, :offset, :] = -1.0
+        sdf[:, -offset:, :] = -1.0
+        sdf = sdf.reshape(-1) * -1.0
 
-        return sigma.reshape(-1)
+        return sdf
 
     def get_mesh_components(self, verts, faces):
         """Get all components of mesh from verts and faces"""
@@ -73,7 +77,7 @@ class TestDict(unittest.TestCase):
 
         return face_centers, vert_normals, face_normals, vert_colors, face_colors
 
-    def run_mesh(self, type='sphere'):
+    def run_mesh(self, type='sphere', grad_dir='descent'):
         """Simulate a object with sigma >0 inside, <0 outside. Extract voxels"""
         assert type in ['sphere', 'hourglass'], 'Invalid object'
         object_dir = osp.join(RESULT_DIR, type)
@@ -91,20 +95,60 @@ class TestDict(unittest.TestCase):
 
         # simulate a object sdf
         if type == 'sphere':
-            sigma = self.make_sphere_sdf(volume_pts)  # (n^3, )
+            sdf = self.make_sphere_sdf(volume_pts)  # (n^3, )
         else:
-            sigma = self.make_hourglass_sdf(volume_pts, self.n_grid)  # (n^3, )
+            sdf = self.make_hourglass_sdf(volume_pts, self.n_grid)  # (n^3, )
+
+        # reverse sdf to density
+        geo_title = 'sdf'
+        if grad_dir == 'descent':
+            sdf *= -1  # inside gets +
+            geo_title = 'sigma'
+
+        object_dir = osp.join(object_dir, geo_title)
+        os.makedirs(object_dir, exist_ok=True)
 
         # get full mesh
-        sigma = sigma.reshape((self.n_grid, self.n_grid, self.n_grid))
-        verts, faces, vert_normals_ = extract_mesh(sigma.copy(), self.level, volume_size, volume_len)
+        sdf = sdf.reshape((self.n_grid, self.n_grid, self.n_grid))
+        verts, faces, vert_normals_ = extract_mesh(sdf.copy(), self.level, volume_size, volume_len, grad_dir)
         face_centers, vert_normals, face_normals, vert_colors, face_colors = self.get_mesh_components(verts, faces)
 
         # save ply
         mesh_file = osp.join(object_dir, 'full_mesh_ngrid{}.ply'.format(self.n_grid))
         save_meshes(mesh_file, verts, faces, vert_colors, face_colors, vert_normals, face_normals)
 
-        # get simplified mesh
+        mesh_geo_file = osp.join(object_dir, 'full_mesh_geo_ngrid{}.ply'.format(self.n_grid))
+        save_meshes(mesh_geo_file, verts, faces, None, None, vert_normals, face_normals, geo_only=True)
+
+        # only in gpu, cpu too long
+        if torch.cuda.is_available():
+            # pytorch3d rendering full mesh
+            try:  # may not have pytorch3d
+                color_img = self.render_mesh(
+                    verts, faces, vert_colors, face_colors, vert_normals, face_normals, 'pytorch3d'
+                )
+                file_path = osp.join(object_dir, 'pytorch3d_color_render.mp4')
+                write_video([color_img[idx] for idx in range(color_img.shape[0])], file_path, True)
+
+                geo_img = self.render_mesh(verts, faces, None, None, vert_normals, face_normals, 'pytorch3d')
+                file_path = osp.join(object_dir, 'pytorch3d_geo_render.mp4')
+                write_video([geo_img[idx] for idx in range(geo_img.shape[0])], file_path, True)
+
+                sil_img = self.render_mesh(verts, faces, None, None, vert_normals, face_normals, 'pytorch3d', True)
+                file_path = osp.join(object_dir, 'pytorch3d_sil_render.mp4')
+                write_video([sil_img[idx] for idx in range(sil_img.shape[0])], file_path, True)
+            except ImportError:
+                pass
+
+            # open3d rendering, only geometry.
+            try:  # may not have open3d
+                geo_img = self.render_mesh(verts, faces, None, None, vert_normals, face_normals, 'open3d')
+                file_path = osp.join(object_dir, 'open3d_geo_render.mp4')
+                write_video([geo_img[idx] for idx in range(geo_img.shape[0])], file_path, True)
+            except ImportError:
+                pass
+
+        # get simplified mesh for plotly 3d. Otherwise too large to save and open
         verts, faces = simplify_mesh(verts, faces, self.max_faces)
         self.assertLessEqual(faces.shape[0], self.max_faces)
         face_centers, vert_normals, face_normals, vert_colors, face_colors = self.get_mesh_components(verts, faces)
@@ -128,37 +172,11 @@ class TestDict(unittest.TestCase):
             ray_colors=ray_colors,
             meshes=[verts_by_faces],
             face_colors=[face_colors],
-            title='Meshes extract from volume v{}/f{}'.format(n_verts, n_faces),
+            title='Meshes extract from volume v{}/f{} by - {}'.format(n_verts, n_faces, geo_title),
             save_path=file_path,
             plotly=True,
             plotly_html=True
         )
-
-        # pytorch3d rendering
-        try:  # may not have pytorch3d
-            color_img = self.render_mesh(
-                verts, faces, vert_colors, face_colors, vert_normals, face_normals, 'pytorch3d'
-            )
-            file_path = osp.join(object_dir, 'pytorch3d_color_render.mp4')
-            write_video([color_img[idx] for idx in range(color_img.shape[0])], file_path, True)
-
-            geo_img = self.render_mesh(verts, faces, None, None, vert_normals, face_normals, 'pytorch3d')
-            file_path = osp.join(object_dir, 'pytorch3d_geo_render.mp4')
-            write_video([geo_img[idx] for idx in range(geo_img.shape[0])], file_path, True)
-
-            sil_img = self.render_mesh(verts, faces, None, None, vert_normals, face_normals, 'pytorch3d', True)
-            file_path = osp.join(object_dir, 'pytorch3d_sil_render.mp4')
-            write_video([sil_img[idx] for idx in range(sil_img.shape[0])], file_path, True)
-        except ImportError:
-            pass
-
-        # open3d rendering, only geometry.
-        try:  # may not have open3d
-            geo_img = self.render_mesh(verts, faces, None, None, vert_normals, face_normals, 'open3d')
-            file_path = osp.join(object_dir, 'open3d_geo_render.mp4')
-            write_video([geo_img[idx] for idx in range(geo_img.shape[0])], file_path, True)
-        except ImportError:
-            pass
 
     def render_mesh(self, verts, faces, vert_colors, face_colors, vert_normals, face_normals, backend, sil_mode=False):
         n_cam = 30
@@ -168,10 +186,8 @@ class TestDict(unittest.TestCase):
         focal = 500.0
         intrinsic = np.array([[focal, 0.0, w / 2.0], [0.0, focal, h / 2.0], [0, 0, 1]])  # (3, 3)
 
-        device = torch.device('cpu')
-        if torch.cuda.is_available():  # gpu is much faster
-            verts = torch.tensor(verts, dtype=torch.float32).cuda()
-            device = verts.device
+        verts = torch.tensor(verts, dtype=torch.float32).cuda()
+        device = verts.device
 
         # set up renderer
         img_list = render_mesh_images(
@@ -192,8 +208,14 @@ class TestDict(unittest.TestCase):
 
         return img_list
 
-    def tests_mesh_sphere(self):
+    def tests_mesh_sphere_sdf(self):
+        self.run_mesh('sphere', grad_dir='ascent')
+
+    def tests_mesh_hourglass_sdf(self):
+        self.run_mesh('hourglass', grad_dir='ascent')
+
+    def tests_mesh_sphere_sigma(self):
         self.run_mesh('sphere')
 
-    def tests_mesh_hourglass(self):
+    def tests_mesh_hourglass_sigma(self):
         self.run_mesh('hourglass')

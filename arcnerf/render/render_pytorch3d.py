@@ -30,7 +30,8 @@ class RenderPytorch3d:
         silhouette_mode=False,
         silhouette_hard=False,
         sigma=1e-5,
-        device=torch.device('cpu')
+        device=torch.device('cpu'),
+        to_np=True
     ):
         """
         Args:
@@ -42,6 +43,7 @@ class RenderPytorch3d:
             silhouette_hard: whether to hard cast silhouette image to {0, 1}, by default False
             sigma: use in sil raster_settings
             device: torch.device('cpu') or torch.device('cudax'). By default cpu.
+            to_np: If True, turn final image into np image. False only in training mode
         """
         self.type = 'pytorch3d'
         self.resolution = (h, w)
@@ -52,6 +54,7 @@ class RenderPytorch3d:
         self.silhouette_hard = silhouette_hard
         self.sigma = sigma
         self.device = device
+        self.to_np = to_np
 
     def construct_by_matrix(self, intrinsic):
         """Construct intrinsic matrix by given a matrix
@@ -59,9 +62,9 @@ class RenderPytorch3d:
         Args:
             intrinsic: (B, 3, 3) or (3, 3) matrix, w2c matrix in torch or numpy
         """
-        intrinsic = self.handle_input(intrinsic, handle_device=False)
-        focal = torch.cat([intrinsic[:, 0, 0].unsqueeze(-1), intrinsic[:, 1, 1].unsqueeze(-1)], dim=-1)  # (B, 2)
-        center = torch.cat([intrinsic[:, 0, 2].unsqueeze(-1), intrinsic[:, 1, 2].unsqueeze(-1)], dim=-1)  # (B, 2)
+        _intrinsic = self.handle_input(intrinsic, handle_device=False)
+        focal = torch.cat([_intrinsic[:, 0, 0].unsqueeze(-1), _intrinsic[:, 1, 1].unsqueeze(-1)], dim=-1)  # (B, 2)
+        center = torch.cat([_intrinsic[:, 0, 2].unsqueeze(-1), _intrinsic[:, 1, 2].unsqueeze(-1)], dim=-1)  # (B, 2)
         self.construct_by_focal_and_center(focal, center)
 
     def construct_by_focal_and_center(self, focal, center):
@@ -72,15 +75,15 @@ class RenderPytorch3d:
             focal: a tensor of size (B, 2)
             center: a tensor of size (B, 2)
         """
-        focal = self.handle_input(focal, expand_batch=False, handle_device=False)
-        center = self.handle_input(center, expand_batch=False, handle_device=False)
+        _focal = self.handle_input(focal, expand_batch=False, handle_device=False)
+        _center = self.handle_input(center, expand_batch=False, handle_device=False)
 
-        image_size = torch.ones_like(focal, dtype=focal.dtype)
+        image_size = torch.ones_like(_focal, dtype=_focal.dtype)
         image_size[:, 0] *= self.resolution[0]
         image_size[:, 1] *= self.resolution[1]
         self.camera = PerspectiveCameras(
-            focal_length=focal,  # -?
-            principal_point=center,
+            focal_length=_focal,  # -?
+            principal_point=_center,
             image_size=image_size,
             in_ndc=False,
             device=self.device
@@ -110,29 +113,32 @@ class RenderPytorch3d:
     def handle_input(self, value, expand_batch=True, handle_device=True):
         """Handle a single value"""
         if value is not None:
-            value = torch.tensor(value.copy(), dtype=self.dtype) if isinstance(value, np.ndarray) \
-                else value.type(self.dtype)
+            _value = torch.tensor(value.copy(), dtype=self.dtype) if isinstance(value, np.ndarray) \
+                else value.clone().type(self.dtype)
 
-            if expand_batch and len(value.shape) == 2:
-                value = torch.repeat_interleave(value[None], self.batch_size, 0)
+            if expand_batch and len(_value.shape) == 2:
+                _value = torch.repeat_interleave(_value[None], self.batch_size, 0)
 
             if handle_device:
-                value = value.to(self.device)
-        return value
+                _value = _value.to(self.device)
+        else:
+            _value = value
+
+        return _value
 
     def handle_render_components(self, verts, faces, vert_colors, face_colors, vert_normals, face_normals, w2c):
         """get correct dtype and device
         All tensor has shape (B, n, 3) or (n, 3)
         """
-        verts = self.handle_input(verts)
-        faces = self.handle_input(faces)
-        vert_colors = self.handle_input(vert_colors)
-        face_colors = self.handle_input(face_colors)
-        vert_normals = self.handle_input(vert_normals)
-        face_normals = self.handle_input(face_normals)
-        w2c = self.handle_input(w2c)
+        _verts = self.handle_input(verts)
+        _faces = self.handle_input(faces)
+        _vert_colors = self.handle_input(vert_colors)
+        _face_colors = self.handle_input(face_colors)
+        _vert_normals = self.handle_input(vert_normals)
+        _face_normals = self.handle_input(face_normals)
+        _w2c = self.handle_input(w2c)
 
-        return verts, faces, vert_colors, face_colors, vert_normals, face_normals, w2c
+        return _verts, _faces, _vert_colors, _face_colors, _vert_normals, _face_normals, _w2c
 
     def render(self, verts, faces, vert_colors=None, face_colors=None, vert_normals=None, face_normals=None, w2c=None):
         """The core rendering function. Allows back-propagation. Batch processing
@@ -149,29 +155,34 @@ class RenderPytorch3d:
         Returns
             render_img: (B, H, W, 3) if rgb mode, (B, H, W) if sil mode. All in (0-255) uint8.
         """
-        verts, faces, vert_colors, face_colors, vert_normals, face_normals, w2c = self.handle_render_components(
+        _verts, _faces, _vert_colors, _face_colors, _vert_normals, _face_normals, _w2c = self.handle_render_components(
             verts, faces, vert_colors, face_colors, vert_normals, face_normals, w2c
         )
 
+        # reverse the normals, point inward seems correct TODO: Need to check source code for normal
+        _vert_normals *= -1.0
+        _face_normals *= -1.0
+
         # load mesh
-        assert len(verts.shape) == 3, 'verts should be in shape (b, v, 3)'
-        assert len(faces.shape) == 3, 'Faces should be in shape (b, v, 3)'
+        assert len(_verts.shape) == 3, 'verts should be in shape (b, v, 3)'
+        assert len(_faces.shape) == 3, 'Faces should be in shape (b, v, 3)'
 
-        mesh = Meshes(verts=verts, faces=faces, verts_normals=vert_normals)
+        mesh = Meshes(verts=_verts, faces=_faces, verts_normals=_vert_normals)
         if not self.silhouette_mode:
-            if face_colors is not None:
-                mesh.textures = TexturesAtlas(face_colors.unsqueeze(-2).unsqueeze(-2))  # (B, F, 1, 1, 3)
-            elif vert_colors is not None:
-                mesh.textures = TexturesVertex(verts_features=vert_colors)
+            if _face_colors is not None:
+                mesh.textures = TexturesAtlas(_face_colors.unsqueeze(-2).unsqueeze(-2))  # (B, F, 1, 1, 3)
+            elif _vert_colors is not None:
+                mesh.textures = TexturesVertex(verts_features=_vert_colors)
             else:
-                vert_colors = get_colors('silver', to_int=False, to_np=True)  # (3,)
-                vert_colors = vert_colors[None].repeat(verts.shape[1], 0)[None].repeat(verts.shape[0], 0)  # (B, V, 3)
-                vert_colors = self.handle_input(vert_colors)
-                mesh.textures = TexturesVertex(verts_features=vert_colors)
+                vert_colors_silver = get_colors('silver', to_int=False, to_np=True)  # (3,)
+                vert_colors_silver = vert_colors_silver[None].repeat(_verts.shape[1],
+                                                                     0)[None].repeat(_verts.shape[0], 0)
+                _vert_colors = self.handle_input(vert_colors_silver)  # (B, V, 3)
+                mesh.textures = TexturesVertex(verts_features=_vert_colors)
 
-        if w2c is not None:
-            rotation = w2c[:, :3, :3].clone().to(self.device)
-            translate = w2c[:, :3, 3].clone().to(self.device)
+        if _w2c is not None:
+            rotation = _w2c[:, :3, :3].to(self.device)
+            translate = _w2c[:, :3, 3].to(self.device)
         else:
             rotation = torch.repeat_interleave(torch.eye(3, dtype=self.dtype).unsqueeze(0), self.batch_size, dim=0)\
                 .to(self.device)
@@ -196,9 +207,10 @@ class RenderPytorch3d:
         else:
             img = render_img[..., :3] * 255.0
 
-        img = torch_to_np(img).astype(np.uint8)
-
         # should flip image in y dim
-        img = img[:, ::-1, ...]  # (B, H, W, 3)
+        img = torch.flip(img, dims=[1])  # (B, H, W, 3)
+
+        if self.to_np:  # for visual mode only
+            img = torch_to_np(img).astype(np.uint8)
 
         return img

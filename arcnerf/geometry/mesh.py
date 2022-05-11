@@ -41,6 +41,9 @@ def extract_mesh(sigma, level, volume_size, volume_len, grad_dir='descent'):
     # normalize normals
     vert_normals = normalize(vert_normals)
 
+    # marching cube in skimage provides faces that makes normals pointing inside
+    faces = faces[:, ::-1]
+
     return verts, faces, vert_normals
 
 
@@ -48,6 +51,7 @@ def save_meshes(
     mesh_file, verts, faces, vert_colors=None, face_colors=None, vert_normals=None, face_normals=None, geo_only=False
 ):
     """Export mesh to .ply file
+    Notice: trimesh always export mesh opened in meshlab with inverse direction. Need to manually handle it in meshlab.
 
     Args:
         mesh_file: file path in .ply
@@ -63,8 +67,8 @@ def save_meshes(
         mesh_ply = trimesh.Trimesh(
             vertices=verts,
             faces=faces,
-            vertex_normals=-vert_normals if vert_normals is not None else None,
-            face_normals=-face_normals if face_normals is not None else None,
+            vertex_normals=vert_normals if vert_normals is not None else None,
+            face_normals=face_normals if face_normals is not None else None,
         )
         mesh_ply.export(mesh_file)
     else:
@@ -73,8 +77,8 @@ def save_meshes(
         mesh_ply = trimesh.Trimesh(
             vertices=verts,
             faces=faces,
-            vertex_normals=-vert_normals if vert_normals is not None else None,
-            face_normals=-face_normals if face_normals is not None else None,
+            vertex_normals=vert_normals if vert_normals is not None else None,
+            face_normals=face_normals if face_normals is not None else None,
             vert_colors=vert_colors_uint8,
             face_colors=face_colors_uint8
         )
@@ -94,7 +98,7 @@ def get_normals(verts, faces):
         face_normals: (F, 3) np array, normal of each face, pointing outside
     """
     mesh = trimesh.Trimesh(vertices=verts, faces=faces)
-    face_normals = -mesh.face_normals  # It get inside normals
+    face_normals = mesh.face_normals  # It get inside normals
     vert_normals = trimesh.geometry.mean_vertex_normals(verts.shape[0], faces, face_normals)
 
     # normalize
@@ -245,7 +249,7 @@ def render_open3d(verts, faces, vert_normals, face_normals, H: int, W: int, w2c,
     # init mesh
     mesh = open3d.geometry.TriangleMesh()
     mesh.vertices = open3d.utility.Vector3dVector(verts)
-    mesh.triangles = open3d.utility.Vector3iVector(faces)
+    mesh.triangles = open3d.utility.Vector3iVector(faces)  # TODO: May need to check api to make sure normal correct
     mesh.vertex_normals = open3d.utility.Vector3dVector(vert_normals)
     mesh.triangle_normals = open3d.utility.Vector3dVector(face_normals)
 

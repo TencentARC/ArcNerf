@@ -299,7 +299,10 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
     logger.add_log('    Sigma value range {:.2f}-{:.2f}'.format(sigma.min(), sigma.max()))
 
     # for 3d point cloud visual, valid sigma is area with large enough sigma
-    valid_sigma = (sigma >= level)  # (n^3,)
+    if grad_dir == 'descent':
+        valid_sigma = (sigma >= level)  # (n^3,)
+    else:
+        valid_sigma = (sigma <= level)  # (n^3,)
     volume_out['pc'] = None
     volume_out['mesh'] = None
 
