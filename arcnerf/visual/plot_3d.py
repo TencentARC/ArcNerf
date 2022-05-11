@@ -393,6 +393,7 @@ def draw_3d_components(
     sphere_radius=None,
     sphere_origin=(0, 0, 0),
     title='',
+    show_axis=True,  # TODO: do False and check
     save_path=None,
     plotly=False,
     plotly_html=False,
@@ -423,6 +424,7 @@ def draw_3d_components(
         sphere_radius: if not None, draw a sphere with such radius. It can be a float num or a list of float num
         sphere_origin: the origin of sphere, by default is (0, 0, 0)
         title: a string of figure title
+        show_axis: If False, do not show axis. By default True.
         save_path: path to save the fig. None will only show fig
         plotly: If True, use plotly instead of plt. Can be zoom-in/out. By default False.
         plotly_html: If True and save_path is not True, save to .html file instead of .png, good for interactive
@@ -488,15 +490,18 @@ def draw_3d_components(
                 'scene': {
                     'xaxis': {
                         'range': [mid_x - max_range, mid_x + max_range],
-                        'title': 'x'
+                        'title': 'x',
+                        'visible': show_axis
                     },
                     'yaxis': {
                         'range': [mid_y - max_range, mid_y + max_range],
-                        'title': 'z'
+                        'title': 'z',
+                        'visible': show_axis
                     },
                     'zaxis': {
                         'range': [mid_z - max_range, mid_z + max_range],
-                        'title': '- y'
+                        'title': '- y',
+                        'visible': show_axis
                     },
                     'aspectmode': 'cube'
                 },
@@ -532,6 +537,9 @@ def draw_3d_components(
         ax.set_ylabel('z')
         ax.set_zlabel('- y')
         ax.set_title(title)
+
+        if not show_axis:
+            ax.axis('off')
 
         if save_path:
             fig.savefig(save_path)
