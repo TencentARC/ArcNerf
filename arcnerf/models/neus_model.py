@@ -121,7 +121,7 @@ class Neus(Base3dModel):
         output = self._merge_bkg_rgb(inputs, output, inference_only)
 
         if get_progress:  # this save the sigma with out blending bkg, only in foreground
-            for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights', 'radiance']:
+            for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
                 n_fg = self._get_n_fg(sdf)
                 output['progress_{}'.format(key)] = output[key][:, :n_fg].detach()  # (B, N_sample(-1))
             output['sigma_reverse3d'] = True  # for rays 3d visual of sdf

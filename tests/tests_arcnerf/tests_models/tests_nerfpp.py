@@ -1,72 +1,44 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import os
-import os.path as osp
-import unittest
-
-import torch
-
-from . import log_model_info
-from arcnerf.models import build_model
-from common.utils.cfgs_utils import load_configs, get_value_from_cfgs_field
-from common.utils.logger import Logger
-
-CONFIG = osp.abspath(osp.join(__file__, '../../../..', 'configs', 'models', 'nerfpp.yaml'))
-RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results'))
-os.makedirs(RESULT_DIR, exist_ok=True)
+from . import TestModelDict
+from common.utils.cfgs_utils import get_value_from_cfgs_field
 
 
-class TestDict(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        cls.batch_size = 1
-        cls.n_rays = 72 * 35
-        cls.cfgs = load_configs(osp.join(CONFIG), None)
-        cls.logger = Logger(path=osp.join(RESULT_DIR, 'nerfpp.txt'), keep_console=False)
+class TestDict(TestModelDict):
 
     def tests_nerfpp_model(self):
-        model = build_model(self.cfgs, None)
-        feed_in = {
-            'img': torch.ones(self.batch_size, self.n_rays, 3),
-            'mask': torch.ones(self.batch_size, self.n_rays),
-            'rays_o': torch.rand(self.batch_size, self.n_rays, 3),
-            'rays_d': torch.rand(self.batch_size, self.n_rays, 3),
-            'bounds': torch.rand(self.batch_size, self.n_rays, 2)
-        }
+        cfgs = self.load_model_configs('nerfpp.yaml')
+        logger = self.set_logger('nerfpp.txt')
+        model = self.build_model_to_cuda(cfgs, logger)
 
-        log_model_info(self.logger, model, feed_in, self.cfgs, self.batch_size, self.n_rays)
+        feed_in = self.create_feed_in_to_cuda()
+        self.log_model_info(logger, model, feed_in, cfgs)
 
-        output = model(feed_in)
-        self.assertEqual(output['rgb_coarse'].shape, (self.batch_size, self.n_rays, 3))
-        self.assertEqual(output['depth_coarse'].shape, (self.batch_size, self.n_rays))
-        self.assertEqual(output['mask_coarse'].shape, (self.batch_size, self.n_rays))
+        # test forward
+        self._test_forward(model, feed_in, '_coarse')
 
-        if self.cfgs.model.rays.n_importance > 0:
-            self.assertEqual(output['rgb_fine'].shape, (self.batch_size, self.n_rays, 3))
-            self.assertEqual(output['depth_fine'].shape, (self.batch_size, self.n_rays))
-            self.assertEqual(output['mask_fine'].shape, (self.batch_size, self.n_rays))
+        if cfgs.model.rays.n_importance > 0:
+            self._test_forward(model, feed_in, '_fine')
+
+        # inference only
+        self._test_forward_inference_only_cf(model, feed_in)
 
         # get progress
-        output = model(feed_in, get_progress=True)
-        n_sample = self.cfgs.model.rays.n_sample
-        n_importance = self.cfgs.model.rays.n_importance
+        n_sample = cfgs.model.rays.n_sample
+        n_importance = cfgs.model.rays.n_importance
         n_total = n_sample + n_importance
         remove_last = 0
-        if self.cfgs.model.background.bkg_blend == 'rgb':
-            if get_value_from_cfgs_field(self.cfgs.model.rays, 'add_inf_z', False) is False:
+        if cfgs.model.background.bkg_blend == 'rgb':
+            if get_value_from_cfgs_field(cfgs.model.rays, 'add_inf_z', False) is False:
                 remove_last = 1
 
         if n_importance > 0:
-            gt_shape = (self.batch_size, self.n_rays, n_total - remove_last)
+            progress_shape = (self.batch_size, self.n_rays, n_total - remove_last)
         else:
-            gt_shape = (self.batch_size, self.n_rays, n_sample - remove_last)
-        for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
-            self.assertEqual(output['progress_{}'.format(key)].shape, gt_shape)
+            progress_shape = (self.batch_size, self.n_rays, n_sample - remove_last)
+        self._test_forward_progress(model, feed_in, progress_shape)
 
-        # inference only
-        output = model(feed_in, inference_only=True)
-        self.assertTrue('rgb_coarse' not in output)
-        self.assertTrue('depth_coarse' not in output)
-        self.assertTrue('mask_coarse' not in output)
+        # direct pts/view
+        pts, view_dir = self.create_pts_dir_to_cuda()
+        self._test_pts_dir_forward(model, pts, view_dir)

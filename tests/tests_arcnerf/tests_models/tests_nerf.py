@@ -1,77 +1,39 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import os
-import os.path as osp
-import unittest
-
-import torch
-
-from . import log_model_info
-from arcnerf.models import build_model
-from common.utils.cfgs_utils import load_configs
-from common.utils.logger import Logger
-
-CONFIG = osp.abspath(osp.join(__file__, '../../../..', 'configs', 'models', 'nerf.yaml'))
-RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results'))
-os.makedirs(RESULT_DIR, exist_ok=True)
+from . import TestModelDict
 
 
-class TestDict(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        cls.batch_size = 1
-        cls.n_rays = 72 * 35
-        cls.cfgs = load_configs(osp.join(CONFIG), None)
-        cls.logger = Logger(path=osp.join(RESULT_DIR, 'nerf.txt'), keep_console=False)
+class TestDict(TestModelDict):
 
     def tests_nerf_model(self):
-        model = build_model(self.cfgs, None)
-        feed_in = {
-            'img': torch.ones(self.batch_size, self.n_rays, 3),
-            'mask': torch.ones(self.batch_size, self.n_rays),
-            'rays_o': torch.rand(self.batch_size, self.n_rays, 3),
-            'rays_d': torch.rand(self.batch_size, self.n_rays, 3),
-            'bounds': torch.rand(self.batch_size, self.n_rays, 2)
-        }
+        cfgs = self.load_model_configs('nerf.yaml')
+        logger = self.set_logger('nerf.txt')
+        model = self.build_model_to_cuda(cfgs, logger)
 
-        log_model_info(self.logger, model, feed_in, self.cfgs, self.batch_size, self.n_rays)
+        feed_in = self.create_feed_in_to_cuda()
+        self.log_model_info(logger, model, feed_in, cfgs)
 
-        output = model(feed_in)
-        self.assertEqual(output['rgb_coarse'].shape, (self.batch_size, self.n_rays, 3))
-        self.assertEqual(output['depth_coarse'].shape, (self.batch_size, self.n_rays))
-        self.assertEqual(output['mask_coarse'].shape, (self.batch_size, self.n_rays))
+        # test forward
+        self._test_forward(model, feed_in, '_coarse')
 
-        if self.cfgs.model.rays.n_importance > 0:
-            self.assertEqual(output['rgb_fine'].shape, (self.batch_size, self.n_rays, 3))
-            self.assertEqual(output['depth_fine'].shape, (self.batch_size, self.n_rays))
-            self.assertEqual(output['mask_fine'].shape, (self.batch_size, self.n_rays))
+        if cfgs.model.rays.n_importance > 0:
+            self._test_forward(model, feed_in, '_fine')
 
         # inference only
-        output = model(feed_in, inference_only=True)
-        self.assertTrue('rgb_coarse' not in output)
-        self.assertTrue('depth_coarse' not in output)
-        self.assertTrue('mask_coarse' not in output)
+        self._test_forward_inference_only_cf(model, feed_in)
 
         # get progress
-        output = model(feed_in, get_progress=True)
-        n_sample = self.cfgs.model.rays.n_sample
-        n_importance = self.cfgs.model.rays.n_importance
+        n_sample = cfgs.model.rays.n_sample
+        n_importance = cfgs.model.rays.n_importance
         n_total = n_sample + n_importance
-        add_inf_z = self.cfgs.model.rays.add_inf_z
+        add_inf_z = cfgs.model.rays.add_inf_z
         if n_importance > 0:
-            gt_shape = (self.batch_size, self.n_rays, n_total if add_inf_z else n_total - 1)
+            progress_shape = (self.batch_size, self.n_rays, n_total if add_inf_z else n_total - 1)
         else:
-            gt_shape = (self.batch_size, self.n_rays, n_sample if add_inf_z else n_sample - 1)
-        for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
-            self.assertEqual(output['progress_{}'.format(key)].shape, gt_shape)
+            progress_shape = (self.batch_size, self.n_rays, n_sample if add_inf_z else n_sample - 1)
+        self._test_forward_progress(model, feed_in, progress_shape)
 
-        # direct inference
-        pts = torch.ones(self.n_rays, 3)
-        view_dir = torch.ones(self.n_rays, 3)
-        sigma = model.forward_pts(pts)
-        self.assertEqual(sigma.shape, (self.n_rays, ))
-        sigma, rgb = model.forward_pts_dir(pts, view_dir)
-        self.assertEqual(sigma.shape, (self.n_rays, ))
-        self.assertEqual(rgb.shape, (self.n_rays, 3))
+        # direct pts/view
+        pts, view_dir = self.create_pts_dir_to_cuda()
+        self._test_pts_dir_forward(model, pts, view_dir)
