@@ -263,6 +263,9 @@ class NeRFPP(BkgModel):
         if get_progress:  # this save the sigma/radiance with out blending bkg
             for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights', 'radiance']:
                 output['progress_{}'.format(key)] = output[key].detach()  # (B, N_sample-1)
+        else:  # pop to reduce memory
+            for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights', 'radiance']:
+                output.pop(key)
 
         output['rgb'] = output['rgb']  # (B, 3)
         output['depth'] = output['depth']  # (B,)

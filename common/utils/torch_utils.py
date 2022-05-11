@@ -96,7 +96,7 @@ def chunk_processing(func, chunk_size, gpu_on_func, *args):
         return func(*args)
 
     # chunk processing
-    out = []
+    out_cat = None
     for i in range(0, batch_size, chunk_size):
         args_slice, move_to_cpu = get_batch_from_list(
             *args, start_idx=i, end_idx=i + chunk_size, gpu_on_func=gpu_on_func
@@ -121,41 +121,42 @@ def chunk_processing(func, chunk_size, gpu_on_func, *args):
 
                 torch.cuda.empty_cache()
 
-        out.append(chunk_out)
+        # direct concat
+        if out_cat is None:
+            out_cat = chunk_out
+            for i_o, o in enumerate(out_cat):
+                if not isinstance(o, dict) and not is_torch_or_np(o):
+                    out_cat[i_o] = [o]
+                elif isinstance(o, dict):
+                    for k, v in o.items():
+                        if not is_torch_or_np(v):
+                            out_cat[i_o][k] = [v]
+        else:
+            # concat all field, consider dict as well
+            n_out_field = len(out_cat)
+            for field_id in range(n_out_field):
+                if isinstance(chunk_out[field_id], np.ndarray):
+                    out_cat[field_id] = np.concatenate([out_cat[field_id], chunk_out[field_id]], axis=0)
+                elif isinstance(chunk_out[field_id], torch.Tensor):
+                    out_cat[field_id] = torch.cat([out_cat[field_id], chunk_out[field_id]], dim=0)
+                elif isinstance(chunk_out[field_id], dict):
+                    for k, v in chunk_out[field_id].items():
+                        if isinstance(v, np.ndarray):
+                            out_cat[field_id][k] = np.concatenate([out_cat[field_id][k], v], axis=0)
+                        elif isinstance(v, torch.Tensor):
+                            out_cat[field_id][k] = torch.cat([out_cat[field_id][k], v], dim=0)
+                        else:
+                            out_cat[field_id][k].append(v)
+                else:
+                    out_cat[field_id].append(chunk_out[field_id])
 
-    # concat all field, consider dict as well
-    n_chunk = len(out)
-    n_out_field = len(out[0])
-    out_cat = out[0]
-    for i, o in enumerate(out_cat):
-        if not isinstance(o, dict) and not is_torch_or_np(o):
-            out_cat[i] = [o]
-        elif isinstance(o, dict):
-            for k, v in o.items():
-                if not is_torch_or_np(v):
-                    out_cat[i][k] = [v]
+    if out_cat is None:
+        return None
 
-    for i in range(1, n_chunk):
-        for field_id in range(n_out_field):
-            if isinstance(out[i][field_id], np.ndarray):
-                out_cat[field_id] = np.concatenate([out_cat[field_id], out[i][field_id]], axis=0)
-            elif isinstance(out[i][field_id], torch.Tensor):
-                out_cat[field_id] = torch.cat([out_cat[field_id], out[i][field_id]], dim=0)
-            elif isinstance(out[i][field_id], dict):
-                for k, v in out[i][field_id].items():
-                    if isinstance(v, np.ndarray):
-                        out_cat[field_id][k] = np.concatenate([out_cat[field_id][k], out[i][field_id][k]], axis=0)
-                    elif isinstance(v, torch.Tensor):
-                        out_cat[field_id][k] = torch.cat([out_cat[field_id][k], out[i][field_id][k]], dim=0)
-                    else:
-                        out_cat[field_id][k].append(out[i][field_id][k])
-            else:
-                out_cat[field_id].append(out[i][field_id])
-
-    if n_out_field == 1:
+    if len(out_cat) == 1:
         return out_cat[0]
-    else:
-        return tuple(out_cat)
+
+    return tuple(out_cat)
 
 
 def get_batch_from_list(*args, start_idx, end_idx, gpu_on_func):
@@ -225,3 +226,37 @@ def mean_tensor_by_mask(tensor: torch.Tensor, mask: torch.Tensor, keep_batch=Fal
         tensor_mean = tensor_mean.mean()
 
     return tensor_mean
+
+
+def print_gpu_memory(str_info):
+    """For gpu memory debug"""
+    import nvidia_smi
+    nvidia_smi.nvmlInit()
+    handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
+    info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+    torch.cuda.synchronize()
+    print(
+        '{}: ({:.2f}% free): {:.2f}GB (total), {:.2f}GB (free), {:.2f}GB (used)'.format(
+            str_info, 100 * info.free / info.total, byte_to_gigabyte(info.total), byte_to_gigabyte(info.free),
+            byte_to_gigabyte(info.used)
+        )
+    )
+    nvidia_smi.nvmlShutdown()
+
+
+def byte_to_gigabyte(byte_size):
+    """GB = B / 1024**3"""
+    return byte_size / (1024.0**3)
+
+
+def tensor_byte_size(tensor: torch.Tensor, byte_level='GB'):
+    """Get tensor byte size. Return a string in {}GB/MB/KB/B"""
+    byte_size = tensor.element_size() * tensor.nelement()
+    if byte_level == 'GB':
+        return '{:.2f}GB'.format(byte_size / 1024.0**3)
+    elif byte_level == 'MB':
+        return '{:.2f}MB'.format(byte_size / 1024.0**2)
+    elif byte_level == 'KB':
+        return '{:.2f}KB'.format(byte_size / 1024.0)
+    else:
+        return '{:.2f}B'.format(byte_size)

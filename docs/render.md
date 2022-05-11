@@ -15,3 +15,12 @@ Ray function in rendering, or helper function for sampling. Other geometric func
 - sample_cdf: resample pts from cdf.
 - ray_marching: ray marching function and get color, will output intermediate result for debug.
 - sample_ray_marching_output_by_index: sample ray marching intermediate result for 2d visual
+
+# render
+Several renderers have been provided for rendered mesh/color mesh.
+## open3d
+Only use for geometry rendering, no backward is allowed. Can not be used for training.
+## pytorch3d
+Batch process, allow mesh/color mesh rendering, can be used for training.
+## nvdiffras
+To be implemented.

@@ -87,7 +87,7 @@ dataset:
         eval_max_sample: 3
         type: DTU
         scan_id: 65
-        img_scale: 0.5
+        img_scale: 1.0
         scale_radius: 3.0
         align_cam: True
         precache: True

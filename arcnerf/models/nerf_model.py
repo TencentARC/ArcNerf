@@ -93,9 +93,12 @@ class NeRF(Base3dModel):
             output['mask_coarse'] = output_coarse['mask']  # (B,)
 
         if get_progress:  # this save the sigma with out blending bkg, only in foreground
-            for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
+            for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights', 'radiance']:
                 n_fg = self._get_n_fg(sigma)
                 output['progress_{}'.format(key)] = output_coarse[key][:, :n_fg].detach()  # (B, N_sample(-1))
+        else:  # pop to reduce memory
+            for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights', 'radiance']:
+                output.pop(key)
 
         # fine model. resample is only performed in foreground zvals
         if self.rays_cfgs['n_importance'] > 0:
@@ -142,9 +145,12 @@ class NeRF(Base3dModel):
             output['mask_fine'] = output_fine['mask']  # (B,)
 
             if get_progress:  # replace with fine, in foreground only
-                for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
+                for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights', 'radiance']:
                     n_fg = self._get_n_fg(sigma)
                     output['progress_{}'.format(key)] = output_fine[key][:, :n_fg].detach()  # (B, N_sample(-1))
+            else:  # pop to reduce memory
+                for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights', 'radiance']:
+                    output.pop(key)
 
         return output
 

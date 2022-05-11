@@ -96,6 +96,9 @@ and change input to `(x/r, y/r, z/r, 1/r)` for different radius.
 
 # Models
 Below are the models we support.
+- inference_only: Use in eval/infer mode. If True, only keep 'rgb/depth/mask',
+            will remove progress item like 'sigma/radiance' to save memory.
+- get_progress: Use in train/val mode. If True, keep 'sigma/radiance' for visual purpose.
 ## Nerf
 Nerf model with single forward(NeRF), and hierarchical sampling(NeRFFull).
 

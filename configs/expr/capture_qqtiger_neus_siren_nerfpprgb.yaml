@@ -107,7 +107,7 @@ inference:
         side: 1.5
         level: 0.0
         grad_dir: ascent
-        chunk_pts_factor: 2  # neus takes normal/feature that cost gpu
+        chunk_pts_factor: 1
         render_mesh:
             backend: pytorch3d
 

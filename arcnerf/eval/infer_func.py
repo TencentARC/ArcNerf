@@ -240,7 +240,7 @@ def run_infer_render(data, get_model_feed_in, model, device, logger):
         img_w, img_h = int(data['wh'][0]), int(data['wh'][1])
         images = []
         for rays in input:
-            feed_in, batch_size = get_model_feed_in(rays, 'cpu')  # only read rays_o/d here, (1, WH, 3)
+            feed_in, batch_size = get_model_feed_in(rays, device)  # only read rays_o/d here, (1, WH, 3)
             assert batch_size == 1, 'Only one image is sent to model at once for inference...'
 
             time0 = time.time()
@@ -271,7 +271,7 @@ def run_infer_render(data, get_model_feed_in, model, device, logger):
 def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=500000):
     """Run volume inference and return pts and mesh
     Reduce pts and faces num for visual in plotly/plt
-    # TODO: extract from sigma now. we may need to extract from model if model support
+    # TODO: extract from sigma/sdf now. we may need to extract from model if model support
     """
     volume_out = {}
     logger.add_log('Extracting volume from model...')
@@ -282,6 +282,9 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
     volume_pts = volume.get_volume_pts()  # (n_grid^3, 3) pts in torch
     volume_size = volume.get_volume_size()  # (3,) tuple
     volume_len = volume.get_len()  # (3,) tuple
+
+    if device == 'gpu':
+        volume_pts = volume_pts.cuda()
 
     # for volume visual
     volume_out['corner'] = torch_to_np(volume.get_corner())
