@@ -282,8 +282,8 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
     volume_size = volume.get_volume_size()  # (3,) tuple
     volume_len = volume.get_len()  # (3,) tuple
 
-    if device == 'gpu':
-        volume_pts = volume_pts.cuda()
+    # move to gpu
+    volume_pts = volume_pts.cuda() if model.is_cuda() else volume_pts
 
     # for volume visual
     volume_out['corner'] = torch_to_np(volume.get_corner())
@@ -387,6 +387,10 @@ def get_mesh_components(verts, faces, model, dtype, logger):
     vert_pts = torch.tensor(verts, dtype=dtype)  # (n, 3)
     vert_view_dir = torch.tensor(vert_view_dir, dtype=dtype)  # (n, 3)
 
+    # move to gpu
+    vert_pts = vert_pts.cuda() if model.is_cuda() else vert_pts
+    vert_view_dir = vert_view_dir.cuda() if model.is_cuda() else vert_view_dir
+
     time0 = time.time()
     _, vert_colors = model.forward_pts_dir(vert_pts, vert_view_dir)
     vert_colors = torch_to_np(vert_colors)
@@ -396,6 +400,10 @@ def get_mesh_components(verts, faces, model, dtype, logger):
     face_view_dir = -face_normals
     face_center_pts = torch.tensor(face_centers, dtype=dtype)  # (n, 3)
     face_view_dir = torch.tensor(face_view_dir, dtype=dtype)  # (n, 3)
+
+    # move to gpu
+    face_center_pts = face_center_pts.cuda() if model.is_cuda() else face_center_pts
+    face_view_dir = face_view_dir.cuda() if model.is_cuda() else face_view_dir
 
     time0 = time.time()
     _, face_colors = model.forward_pts_dir(face_center_pts, face_view_dir)
@@ -509,7 +517,7 @@ def write_infer_files(files, folder, data, logger):
                         device=render['device']
                     )  # (n_cam, h, w, 3)
 
-                    file_path = osp.join(folder, 'color_mesh_render_type{}.mp4'.format(path_type))
+                    file_path = osp.join(folder, 'color_mesh_render_{}.mp4'.format(path_type))
                     write_video([color_imgs[idx] for idx in range(color_imgs.shape[0])] * render['repeat'][path_id],
                                 file_path, True, render['fps'])
 
@@ -529,6 +537,6 @@ def write_infer_files(files, folder, data, logger):
                         device=render['device']
                     )  # (n_cam, h, w, 3)
 
-                    file_path = osp.join(folder, 'geo_mesh_render_type{}.mp4'.format(path_type))
+                    file_path = osp.join(folder, 'geo_mesh_render_{}.mp4'.format(path_type))
                     write_video([geo_imgs[idx] for idx in range(geo_imgs.shape[0])] * render['repeat'][path_id],
                                 file_path, True, render['fps'])

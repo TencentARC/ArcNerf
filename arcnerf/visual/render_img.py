@@ -5,6 +5,7 @@ import os.path as osp
 
 import cv2
 import numpy as np
+import torch
 
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.render.ray_helper import sample_ray_marching_output_by_index
@@ -127,22 +128,22 @@ def get_sample_ray_imgs(inputs, output, train=False, sample_num=16):
         'rays_d': [],
     }
     # get the progress keys
-    prgress_keys = []
-    for key in output.keys():
-        if key.startswith('progress_'):
-            prgress_keys.append(key)
+    progress_keys = [
+        key for key in output.keys() if key.startswith('progress_') and isinstance(output[key][idx], torch.Tensor)
+    ]
+
     # origin, rays with progress
     rays_o = torch_to_np(inputs['rays_o'][idx]).copy()  # (n_rays, 3)
     rays_d = torch_to_np(inputs['rays_d'][idx]).copy()  # (n_rays, 3)
     progress = {}
-    for key in prgress_keys:
+    for key in progress_keys:
         progress[key] = torch_to_np(output[key][idx]).copy()  # (n_rays, n_pts)
         sample_dict[key.replace('progress_', '')] = []
 
     for index in ray_index:
         sample_dict['rays_o'].append(rays_o[index, :][None, :])  # (1, 3)
         sample_dict['rays_d'].append(rays_d[index, :][None, :])  # (1, 3)
-        for key in prgress_keys:
+        for key in progress_keys:
             sample_dict[key.replace('progress_', '')].append(progress[key][index, :][None, :])  # (1, n_pts)
 
     for key in sample_dict.keys():

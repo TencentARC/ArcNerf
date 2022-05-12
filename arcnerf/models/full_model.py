@@ -57,11 +57,30 @@ class FullModel(nn.Module):
             assert fg_model_far is None or fg_model_far <= max_far,\
                 'Do not set fg_model far exceed {}'.format(max_far)
 
+    def get_chunk_rays(self):
+        """Get the chunk rays num from fg_model"""
+        return self.fg_model.get_chunk_rays()
+
+    def get_chunk_pts(self):
+        """Get the chunk pts num from fg_model"""
+        return self.fg_model.get_chunk_pts()
+
+    def set_chunk_rays(self, chunk_rays):
+        """Set the chunk rays num for both model"""
+        self.fg_model.set_chunk_pts(chunk_rays)
+        if self.bkg_model is not None:
+            self.bkg_model.set_chunk_pts(chunk_rays)
+
+    def set_chunk_pts(self, chunk_pts):
+        """Set the chunk pts num for both model"""
+        self.fg_model.set_chunk_pts(chunk_pts)
+        if self.bkg_model is not None:
+            self.bkg_model.set_chunk_pts(chunk_pts)
+
     def pretrain_siren(self):
         """Pretrain siren layer of implicit model.
         Need to rewrite if your network name is different
         """
-        self.geo_net.pretrain_siren()
         self.fg_model.pretrain_siren()
         if self.bkg_model is not None:
             self.bkg_model.pretrain_siren()
@@ -108,6 +127,16 @@ class FullModel(nn.Module):
         progress_keys = [k for k in output.keys() if k.startswith('progress_')]
         for k in progress_keys:
             output.pop(k)
+
+        return output
+
+    @staticmethod
+    def detach_progress(output):
+        """Detach progress to delete graph"""
+        progress_keys = [k for k in output.keys() if k.startswith('progress_')]
+        for k in progress_keys:
+            if isinstance(output[k], torch.Tensor):
+                output[k] = output[k].detach()
 
         return output
 
@@ -201,13 +230,11 @@ class FullModel(nn.Module):
         """
         assert 'progress_trans_shift_coarse' in fg_output, 'You must get_progress for fg_model'
 
-        bkg_lamba_coarse = fg_output['progress_trans_shift_coarse'][:, -1
-                                                                    ]  # (B,) prob that light passed through foreground
+        bkg_lamba_coarse = fg_output['progress_trans_shift_coarse'][:, -1]  # (B,) prob that light pass foreground
         fg_output['rgb_coarse'] = fg_output['rgb_coarse'] + bkg_lamba_coarse[:, None] * bkg_output['rgb']
         fg_output['depth_coarse'] = fg_output['depth_coarse'] + bkg_lamba_coarse * bkg_output['depth']
         if 'rgb_fine' in fg_output:
-            bkg_lamba_fine = fg_output['progress_trans_shift_fine'][:, -1
-                                                                    ]  # (B,) prob that light passed through foreground
+            bkg_lamba_fine = fg_output['progress_trans_shift_fine'][:, -1]  # (B,) prob that light pass foreground
             fg_output['rgb_fine'] = fg_output['rgb_fine'] + bkg_lamba_fine[:, None] * bkg_output['rgb']
             fg_output['depth_fine'] = fg_output['depth_fine'] + bkg_lamba_fine * bkg_output['depth']
 
@@ -302,8 +329,9 @@ class FullModel(nn.Module):
                 cur_epoch, total_epoch
             )  # bkg model always keep progress item for blending. Will not be saved after merge
 
-        # merge output
+        # merge output and detach progress item
         output = self.blend_output(fg_output, bkg_output, inference_only, get_progress)
+        output = self.detach_progress(output)
 
         # reshape values from (B*N, ...) to (B, N, ...)
         for k, v in output.items():

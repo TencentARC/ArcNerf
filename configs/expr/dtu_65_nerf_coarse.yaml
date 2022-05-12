@@ -95,8 +95,8 @@ dataset:
 inference:
     render:
         type: [swing]
-        n_cam: [10]
-        repeat: [5]
+        n_cam: [20]
+        repeat: [3]
         radius: 3.0
         u_range: [0.65, 0.85]
         v_range: [0, 0]

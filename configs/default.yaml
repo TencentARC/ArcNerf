@@ -112,8 +112,8 @@ dataset:
 inference:
     render:                         # set a list of render camera on sphere
         type: [circle, spiral]      # list of render cam type
-        n_cam: [10, 20]             # each render type num of cam
-        repeat: [5, 5]              # repeat the render video
+        n_cam: [20, 20]             # each render type num of cam
+        repeat: [3, 3]              # repeat the render video
         radius: 3.0                 # sphere radius
         u_start: 0.0                # for start pos u in (0~1)
         u_range: [0.0, 0.5]         # u in (0~1) for swing mode only

@@ -121,7 +121,6 @@ class NeRF(Base3dModel):
 
         return zvals
 
-    @torch.no_grad()
     def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
         """Rewrite for two stage implementation. """
         if self.get_ray_cfgs('n_importance') > 0:
@@ -140,7 +139,6 @@ class NeRF(Base3dModel):
 
         return sigma, rgb
 
-    @torch.no_grad()
     def forward_pts(self, pts: torch.Tensor):
         """Rewrite for two stage implementation. """
         if self.get_ray_cfgs('n_importance') > 0:
