@@ -173,4 +173,4 @@ loss:
         weight: 1.0
 
 metric:
-    PSNRFine:
+    PSNR:

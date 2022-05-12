@@ -44,6 +44,9 @@ This helps to save GPU memory in case large batch size is used and brought to GP
 You just need to keep the tensors in cpu and set `gpu_on_func` and it will bring every tensor to GPU online.
 (But large concatenation still takes time.)
 
+Generally we don't use this mode but put everything on GPU together. You need to carefully specify the chunk size
+when input size is huge(like 512^3).
+
 # Rays
 The dataset only provides `rays_o` and `rays_d`, but the actual sampling procedure is in model. Dataset may provide
 `bounds` for sampling guidance, which is generally coming from point_cloud in cam space.
@@ -67,7 +70,7 @@ For ray marching(color blending):
 - white_bkg: If True, will make the rays with mask = 0 as rgb = 1.0
 
 # background
-There are three ways to handle background
+There are four ways to handle background
 - (1) Set a far zvals in rays for sampling. It will combine obj+background together for rendering.
 `ImgLoss` can be applied on the whole image for optimization.
   - background will be noisy and hard to model.
@@ -77,34 +80,42 @@ There are three ways to handle background
 Set `white_bkg` in the rays, and sample in the ball. Directly compare the image and output rgb.
 - (4) Use a separate background model(nerf++), restrict the inner rays in sphere. Combine the inner and background model
 For color. `ImgLoss` and be applied on the combined image. `MaskLoss` and `MaskImageLoss` can be applied on obj image.
-### bkg_model
-- bkg_model are not child class of `base_3d_model` to avoid circular import. All background models are directly added in
-`base_3d_model` to be used to add the background output to main object view.
-- Background model are similar to the `base_3d_model` and can be call directly from model cfgs yaml.
-They can also be embraced locally in a `base_3d_model` class.
-### bkg_blend
-Method two merge bkg mode.
-- If `rgb`, get fg and bkg rgb separately, then use fg_weight factor to mix bkg color.
-  - In this mode, `add_inf_z` in `background.rays` should be True to get inf zvals.
-  `add_inf_z` in `model.rays` must be False to avoid inf zvals in fg color computation.
-- If `sigma`, merge all sigma from fg and bg together and do ray marching for val.
-  - In this mode `add_inf_z` in `background.rays` must be False to get correct zvals to merge.
-  `add_inf_z` in `model.rays` is suggested be True to avoid merge inf zvals for color computation.
-#### NeRFPP(nerf++)
-The nerf++ model use same structure of one stage NeRF model to model the background in Multi-Sphere Image(MSI),
-and change input to `(x/r, y/r, z/r, 1/r)` for different radius.
+
+The first three methods do not require a separate model, but the final one does.
 
 # Models
 Below are the models we support.
 - inference_only: Use in eval/infer mode. If True, only keep 'rgb/depth/mask',
             will remove progress item like 'sigma/radiance' to save memory.
 - get_progress: Use in train/val mode. If True, keep 'sigma/radiance' for visual purpose.
-## Nerf
+- cur_epoch/total_epoch: to adjust strategies during training
+
+## FullModel
+Full Model is the class for all models. It contains fg_model and optional bkg_model.
+It combines values from both model and get final results. If you don't use bkg model, you need
+to reconstruct the whole scene by fg_model.
+- The input size(like rays_o/rays_d) are `(B, N_rays, ...)` in `FullModel.forward()`.
+But they are flattened into `(B*N_rays, ...)` and process by chunk in fg_model/bkg_model.
+### bkg_blend
+Method two merge bkg_model with fg_mdeol.
+- If `rgb`, get fg and bkg rgb separately, then use fg_weight factor to mix bkg color.
+  - In this mode, `add_inf_z` in `background.rays` should be True to get inf zvals.
+  `add_inf_z` in `model.rays` must be False to avoid inf zvals in fg color computation.
+- If `sigma`, merge all sigma from fg and bg together and do ray marching for val.
+  - In this mode `add_inf_z` in `background.rays` must be False to get correct zvals to merge.
+  `add_inf_z` in `model.rays` is suggested be True to avoid merge inf zvals for color computation.
+
+## Base_3d_Model
+Base_3d_Model is the class for all fg_model and bkg_model. bkg_model is able to used as fg_model
+if you actually need it. It generally contains geo_net and radiance_net for geometry/rgb reconstrunction.
+
+## fg_model
+Here are the class of fg_model, which concentrates on building the foreground object part.
+### Nerf
 Nerf model with single forward(NeRF), and hierarchical sampling(NeRFFull).
 
 It is combination of GeoNet and RadianceNet, with ray sampling, resample pdf, ray marching, etc.
-
-## Neus
+### Neus
 Neus model sdf as geo value and up-sample pts.
 
 It is combination of GeoNet and RadianceNet, with up sample, resample pdf, ray marching, etc.
@@ -115,3 +126,11 @@ Since it gets sdf value instead of sigma, we do not support sigma mode for blend
 - init_var: use to init the inv_s param. By default `inv_s = -np.log(init_var)/speed_factor`, init as `0.05`
 - speed_factor: use to init the inv_s, and get scale by `exp(inv_s * speed_factor``. By default `10`.
 - anneal_end: num of epoch for slope blending. In infer model, the factor is `1`, else `min(epoch/anneal_end, 1)`
+
+
+## bkg_model
+Here are the class of bkg_model, which concentrates on building the background.
+The model is also able to model foreground together if you set the parameters well.
+### NeRFPP(nerf++)
+The nerf++ model use same structure of one stage NeRF model to model the background in Multi-Sphere Image(MSI),
+and change input to `(x/r, y/r, z/r, 1/r)` for different radius.

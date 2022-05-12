@@ -1,10 +1,11 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from . import TestModelDict
+from tests.tests_arcnerf.tests_models import TestModelDict
 
 
 class TestDict(TestModelDict):
+    """Test the background models only as they are the foreground model"""
 
     def tests_nerfpp_model(self):
         cfgs = self.load_model_configs('nerfpp.yaml')

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from . import TestModelDict
+from tests.tests_arcnerf.tests_models import TestModelDict
 
 
 class TestDict(TestModelDict):
@@ -21,7 +21,7 @@ class TestDict(TestModelDict):
             self._test_forward(model, feed_in, '_fine')
 
         # inference only
-        self._test_forward_inference_only_cf(model, feed_in)
+        self._test_forward_inference_only(model, feed_in)
 
         # get progress
         n_sample = cfgs.model.rays.n_sample

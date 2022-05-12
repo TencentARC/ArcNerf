@@ -332,7 +332,7 @@ def ray_marching(
         - C_ray = sum_i_1_N(Ti * alpha_i * C_i): accumulated color at each point
 
     Args:
-        sigma: (N_rays, N_pts), density value, can use alpha directly. optional
+        sigma: (N_rays, N_pts), density value, can use alpha directly. optional if alpha is input
         radiance: (N_rays, N_pts, 3), radiance value for each point. If none, will not cal rgb from weighted radiance
         zvals: (N_rays, N_pts), zvals for ray in unit-length
         add_inf_z: If True, add inf zvals(1e10) for calculation. If False, ignore last point for rgb/depth calculation

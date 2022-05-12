@@ -147,5 +147,5 @@ loss:
         weight: 1.0
 
 metric:
-    PSNRCoarse:
-    MaskPSNRCoarse:
+    PSNR:
+    MaskPSNR:

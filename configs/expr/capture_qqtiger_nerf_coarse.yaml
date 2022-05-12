@@ -145,4 +145,4 @@ loss:
         weight: 1.0
 
 metric:
-    PSNRCoarse:
+    PSNR:

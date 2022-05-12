@@ -153,7 +153,8 @@ def get_sample_ray_imgs(inputs, output, train=False, sample_num=16):
     pts_size = None
     if 'sigma' in sample_dict.keys():
         sigma = sample_dict['sigma'].copy()  # (n_idx, n_pts)
-        if 'sigma_reverse3d' in output.keys() and output['sigma_reverse3d'][idx] is True:  # do not touch 2d visual
+        # reverse pt size if sigma_reverse
+        if 'progress_sigma_reverse' in output.keys() and output['progress_sigma_reverse'][idx] is True:
             sigma_3d = -1 * sigma  # make sdf like sigma pos in the object
         else:
             sigma_3d = sigma

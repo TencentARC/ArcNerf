@@ -248,11 +248,10 @@ def run_infer_render(data, get_model_feed_in, model, device, logger):
             total_forward_time += (time.time() - time0)
 
             # get rgb only
-            rgb_key = [key for key in output if key.startswith('rgb')]
-            assert len(rgb_key) == 1, 'Only one rgb value should be produced by model in inference mode...'
-            rgb = output[rgb_key[0]]  # (1, HW, 3)
+            rgb = output['rgb']  # (1, HW, 3)
             rgb = img_to_uint8(torch_to_np(rgb).copy()).reshape(img_h, img_w, 3)  # (H, W, 3), bgr
             images.append(rgb)
+
         # repeat the image
         images = images * data['cfgs']['repeat'][idx]
         render_out.append(images)
