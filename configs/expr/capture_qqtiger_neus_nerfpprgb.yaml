@@ -148,7 +148,7 @@ model:
             beta: 100
     radiance:
         mode: 'pvnf'
-        W: 128
+        W: 256
         D: 4
         input_ch_pts: 3
         embed_freq_pts: 0             # pts embed freq, not embedding performed

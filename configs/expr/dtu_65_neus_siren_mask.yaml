@@ -137,7 +137,7 @@ model:
         D: 8
         skips: []
         input_ch: 3
-        embed_freq: 6
+        embed_freq: 0                 # siren do not use
         W_feat: 256
         geometric_init: True          # use geometric init. need radius_init
         radius_init: 0.5              # geometric init sphere radius
@@ -147,7 +147,7 @@ model:
         use_siren: True               # use siren layer with geometric_init
     radiance:
         mode: 'pvnf'
-        W: 128
+        W: 256
         D: 4
         input_ch_pts: 3
         embed_freq_pts: 0             # pts embed freq, not embedding performed
