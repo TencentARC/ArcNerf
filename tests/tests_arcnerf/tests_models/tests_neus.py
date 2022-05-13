@@ -1,14 +1,24 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from tests.tests_arcnerf.tests_models import TestModelDict
+import os
+import os.path as osp
+
+from arcnerf.models.neus_model import sdf_to_alpha
+from arcnerf.render.ray_helper import make_sample_rays, ray_marching, sample_ray_marching_output_by_index
+from common.utils.torch_utils import np_wrapper
+from common.visual.plot_2d import draw_2d_components
+from tests.tests_arcnerf.tests_models import TestModelDict, RESULT_DIR
 
 
-class TestDict(TestModelDict):
+class TestNeusDict(TestModelDict):
 
-    def tests_neus_model(self):
-        cfgs = self.load_model_configs('neus.yaml')
-        logger = self.set_logger('neus.txt')
+    def make_result_dir(self):
+        self.result_dir = osp.join(RESULT_DIR, 'neus')
+        os.makedirs(self.result_dir, exist_ok=True)
+
+    def tests_model(self):
+        cfgs, logger = self.get_cfgs_logger('neus.yaml', 'neus.txt')
         model = self.build_model_to_cuda(cfgs, logger)
 
         feed_in = self.create_feed_in_to_cuda()
@@ -34,6 +44,9 @@ class TestDict(TestModelDict):
         pts, view_dir = self.create_pts_dir_to_cuda()
         self._test_pts_dir_forward(model, pts, view_dir)
 
+        # test sdf_to_alpha
+        self._sdf_to_alpha()
+
     def _test_forward_inference_only(self, model, feed_in):
         """Test that all keys are not started with progress_"""
         output = model(feed_in, inference_only=True)
@@ -43,3 +56,31 @@ class TestDict(TestModelDict):
         self.assertTrue(all([not k.startswith('progress_') for k in output.keys()]))
         self.assertTrue('normal_pts' not in output.keys())
         self.assertTrue('params' not in output.keys())
+
+    def _sdf_to_alpha(self):
+        scale = [1, 10, 100]
+        sample_sdf = make_sample_rays(n_pts=128)
+
+        self.make_result_dir()
+
+        for s in scale:
+            alpha = np_wrapper(sdf_to_alpha, sample_sdf['mid_vals'], sample_sdf['zvals'], sample_sdf['mid_slope'], s)
+            output = np_wrapper(
+                ray_marching, sample_sdf['mid_vals'], None, sample_sdf['mid_zvals'], False, 0.0, False, False, alpha
+            )
+            visual_list, _ = sample_ray_marching_output_by_index(output)
+
+            # change sigma name to sdf
+            visual_list = visual_list[0]
+            visual_list['legends'][0] = 'sdf'
+
+            file_path = osp.join(self.result_dir, 'neus_sdf_to_alpha_s{}.png'.format(s))
+            draw_2d_components(
+                points=visual_list['points'],
+                lines=visual_list['lines'],
+                legends=visual_list['legends'],
+                xlabel='zvals',
+                ylabel='',
+                title='ray marching from neus sdf_to_alpha. Scale {}'.format(s),
+                save_path=file_path
+            )

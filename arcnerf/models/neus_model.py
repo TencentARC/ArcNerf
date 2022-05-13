@@ -114,7 +114,7 @@ class Neus(Base3dModel):
         return output
 
     def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
-        """Rewrite to use normal. processing """
+        """Rewrite to use normal processing """
         if view_dir is None:
             rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
         else:
@@ -133,7 +133,7 @@ class Neus(Base3dModel):
         pts: torch.Tensor,
         rays_d: torch.Tensor = None,
     ):
-        """Rewrite to use normal. processing """
+        """Rewrite to use normal processing """
         sdf, feature, normal = geo_net.forward_with_grad(pts)
         radiance = radiance_net(pts, rays_d, normal, feature)
 
@@ -201,21 +201,21 @@ def sdf_to_cdf(sdf: torch.Tensor, s):
     return torch.sigmoid(sdf * s)
 
 
-def sdf_to_alpha(mid_sdf: torch.Tensor, zvals: torch.Tensor, slope: torch.Tensor, s):
-    """Turn sdf to alpha
+def sdf_to_alpha(mid_sdf: torch.Tensor, zvals: torch.Tensor, mid_slope: torch.Tensor, s):
+    """Turn sdf to alpha. When s goes to inf, weights focus more on surface
 
     Args:
         mid_sdf: tensor (B, N_pts-1) of mid pts
         zvals: tensor (B, N_pts)
-        slope: tensor (B, N_pts-1)/(B, ) of mid pts
+        mid_slope: tensor (B, N_pts-1)/(B, ) of mid pts
         s: scale factor
 
     Returns:
         alpha: tensor (B, N_pts-1) of mid pts
     """
     dist = zvals[:, 1:] - zvals[:, :-1]
-    prev_esti_sdf = mid_sdf - slope * dist * 0.5  # > mid_sdf, (B, N_pts-1)
-    next_esti_sdf = mid_sdf + slope * dist * 0.5  # < mid_sdf, (B, N_pts-1)
+    prev_esti_sdf = mid_sdf - mid_slope * dist * 0.5  # > mid_sdf, (B, N_pts-1)
+    next_esti_sdf = mid_sdf + mid_slope * dist * 0.5  # < mid_sdf, (B, N_pts-1)
     prev_cdf = sdf_to_cdf(prev_esti_sdf, s)
     next_cdf = sdf_to_cdf(next_esti_sdf, s)
 

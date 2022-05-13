@@ -498,3 +498,75 @@ def sample_ray_marching_output_by_index(output, index=None, n_rays=1, sigma_scal
         out_list.append(res)
 
     return out_list, sample_index
+
+
+def make_sample_rays(near=2.0, far=4.0, n_pts=32, v_max=2.0, v_min=-1.0, sdf=True):
+    """Make a synthetic sdf ray from + -> 0 -> - -> 0 -> +
+   (near)           (far)
+     + (max)         + (max)
+      +             +
+       +           +
+        +         +
+         0       0
+          -     -
+           -   -
+            - -(min)
+
+    Args:
+        near: near zval. By default 2.0
+        far: far zval. By default 4.0
+        n_pts: num of total points. By default 32
+        v_max: max value. By default 2.0
+        v_min: min value. By default -1.0
+        sdf: If True, value goes from v_max->0->v_min->0->v_max.
+             Else from -v_max->0->-v_min->->0-v_max.
+             By default True.
+
+    Returns:
+        output: a dict with following:
+            zvals: np (1, N_pts), zvals from near to far
+            zvals_list: list (N_pts)
+            vals: np (1, N_pts), sdf or sigma values
+            vals_list: list (N_pts)
+            mid_zvals: (1, N_pts-1), middle of zvals
+            mid_zvals_list: list (N_pts-1)
+            mid_vals: (1, N_pts-1), middle of values
+            mid_vals_list: list (N_pts-1)
+            mid_slope: (1, N_pts-1), slope of middle values
+            mid_slope_lost: list (N_pts-1)
+    """
+    assert v_max > 0 > v_min, 'Assert v_max > 0 > v_min in sample generation'
+    assert n_pts % 2 == 0, 'Put input even num of pts'
+
+    half_pts = int(n_pts / 2)
+    zvals = np.linspace(near, far, n_pts)[None]
+    zvals_list = zvals[0].tolist()
+
+    mid_zvals = 0.5 * (zvals[:, 1:] + zvals[:, -1])
+    mid_zvals_list = mid_zvals[0].tolist()
+
+    vals = np.concatenate([np.linspace(v_max, v_min, half_pts), np.linspace(v_min, v_max, half_pts)])[None]
+    if not sdf:  # -v_max -> -v_min -> -v_max
+        vals = -1 * vals
+    vals_list = vals[0].tolist()
+
+    mid_vals = 0.5 * (vals[:, 1:] + vals[:, :-1])
+    mid_vals_list = mid_vals[0].tolist()
+
+    mid_slope = (vals[:, 1:] - vals[:, :-1]) / (zvals[:, 1:] - zvals[:, :-1] + 1e-5)  # (1, N_pts-1)
+    mid_slope_list = mid_slope[0].tolist()
+
+    output = {
+        'zvals': zvals,  # (1, N_pts)
+        'zvals_list': zvals_list,  # (N_pts)
+        'vals': vals,  # (1, N_pts)
+        'vals_list': vals_list,  # (1N_pts)
+        'mid_zvals': mid_zvals,  # (1, N_pts-1)
+        'mid_zvals_list': mid_zvals_list,  # (N_pts-1)
+        'mid_vals': mid_vals,  # (1, N_pts-1)
+        'mid_vals_list': mid_vals_list,  # (N_pts-1)
+        'mid_slope': mid_slope,  # (1, N_pts-1)
+        'mid_slope_list': mid_slope_list  # (N_pts-1)
+    }
+
+    return output

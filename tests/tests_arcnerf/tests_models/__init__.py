@@ -48,6 +48,12 @@ class TestModelDict(unittest.TestCase):
         cls.batch_size = 1
         cls.n_rays = 72 * 35
 
+    def get_cfgs_logger(self, config_file, logger_file):
+        cfgs = self.load_model_configs(config_file)
+        logger = self.set_logger(logger_file)
+
+        return cfgs, logger
+
     def load_model_configs(self, config_name):
         return load_configs(osp.join(osp.join(CONFIG_DIR, config_name)), None)
 

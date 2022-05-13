@@ -4,13 +4,12 @@
 from tests.tests_arcnerf.tests_models import TestModelDict
 
 
-class TestDict(TestModelDict):
+class TestBkgDict(TestModelDict):
     """Test the background models only as they are the foreground model"""
 
-    def tests_nerfpp_model(self):
-        cfgs = self.load_model_configs('nerfpp.yaml')
+    def tests_model(self):
+        cfgs, logger = self.get_cfgs_logger('nerfpp.yaml', 'bkg_nerfpp.txt')
         cfgs = self.add_model_field(cfgs.model.background)
-        logger = self.set_logger('bkg_nerfpp.txt')
         model = self.build_model_to_cuda(cfgs, logger)
 
         feed_in = self.create_feed_in_to_cuda()

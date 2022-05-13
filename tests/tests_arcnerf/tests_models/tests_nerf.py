@@ -4,11 +4,10 @@
 from tests.tests_arcnerf.tests_models import TestModelDict
 
 
-class TestDict(TestModelDict):
+class TestNerfDict(TestModelDict):
 
-    def tests_nerf_model(self):
-        cfgs = self.load_model_configs('nerf.yaml')
-        logger = self.set_logger('nerf.txt')
+    def tests_model(self):
+        cfgs, logger = self.get_cfgs_logger('nerf.yaml', 'nerf.txt')
         model = self.build_model_to_cuda(cfgs, logger)
 
         feed_in = self.create_feed_in_to_cuda()

@@ -5,11 +5,10 @@ from tests.tests_arcnerf.tests_models import TestModelDict
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 
 
-class TestDict(TestModelDict):
+class TestNerfPPDict(TestModelDict):
 
-    def tests_nerfpp_model(self):
-        cfgs = self.load_model_configs('nerfpp.yaml')
-        logger = self.set_logger('nerfpp.txt')
+    def tests_model(self):
+        cfgs, logger = self.get_cfgs_logger('nerfpp.yaml', 'nerfpp.txt')
         model = self.build_model_to_cuda(cfgs, logger)
 
         feed_in = self.create_feed_in_to_cuda()

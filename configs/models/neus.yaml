@@ -37,7 +37,7 @@ model:
             beta: 100
     radiance:
         mode: 'pvnf'                  # pts, view_dir, normal and feature
-        W: 128                        # linear hidden dim
+        W: 256                        # linear hidden dim
         D: 4                          # num of linear, not include final
         input_ch_pts: 3               # pts input channel
         embed_freq_pts: 0             # pts embed freq, not embedding performed
