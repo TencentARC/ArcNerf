@@ -25,6 +25,7 @@ class BkgModel(Base3dModel):
 
     def get_zvals_outside_sphere(self, rays_o: torch.Tensor, rays_d: torch.Tensor, inference_only=False):
         """Get the zvals from ray-sphere intersection.
+
         It will use ray_cfgs['n_sample'] to select samples.
                     ray_cfgs['bounding_radius'] as the inner sphere radius.
         Other sample keys are not allowed.
@@ -53,7 +54,7 @@ class BkgModel(Base3dModel):
 @MODEL_REGISTRY.register()
 class NeRFPP(BkgModel):
     """ Nerf++ model. 8 layers in GeoNet and 1 layer in RadianceNet.
-     Process bkg points only. Do not support geometric extractration.
+        Process bkg points only. Do not support geometric extractration.
         ref: https://arxiv.org/abs/2010.07492
     """
 
@@ -76,13 +77,13 @@ class NeRFPP(BkgModel):
         pts = torch.cat([pts / radius, 1 / radius], dim=-1)
         pts = pts.view(-1, 4)  # (B*N_sample, 4)
 
-        # get sigma and rgb,  expand rays_d to all pts. shape in (B*N_sample, dim)
+        # get sigma and rgb,  expand rays_d to all pts. shape in (B*N_sample, ...)
         rays_d_repeat = torch.repeat_interleave(rays_d, self.get_ray_cfgs('n_sample'), dim=0)
         sigma, radiance = chunk_processing(
             self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, pts, rays_d_repeat
         )
 
-        # reshape, ray marching and get color/weights
+        # reshape
         sigma = sigma.view(-1, self.get_ray_cfgs('n_sample'))  # (B, N_sample)
         radiance = radiance.view(-1, self.get_ray_cfgs('n_sample'), 3)  # (B, N_sample, 3)
 

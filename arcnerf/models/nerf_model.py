@@ -52,20 +52,22 @@ class NeRF(Base3dModel):
         pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (B, N_sample, 3)
         pts = pts.view(-1, 3)  # (B*N_sample, 3)
 
-        # get sigma and rgb, expand rays_d to all pts. shape in (B*N_sample, dim)
+        # get sigma and rgb, expand rays_d to all pts. shape in (B*N_sample, ...)
         rays_d_repeat = torch.repeat_interleave(rays_d, self.get_ray_cfgs('n_sample'), dim=0)
         sigma, radiance = chunk_processing(
             self._forward_pts_dir, self.chunk_pts, False, self.coarse_geo_net, self.coarse_radiance_net, pts,
             rays_d_repeat
         )
 
-        # reshape, ray marching and get color/weights
+        # reshape
         sigma = sigma.view(-1, self.get_ray_cfgs('n_sample'))  # (B, N_sample)
         radiance = radiance.view(-1, self.get_ray_cfgs('n_sample'), 3)  # (B, N_sample, 3)
 
-        # ray marching for coarse network
+        # ray marching for coarse network, keep the coarse weights for next stage
         output_coarse = self.ray_marching(sigma, radiance, zvals, inference_only=inference_only)
         coarse_weights = output_coarse['weights']
+
+        # handle progress
         output['coarse'] = self.output_get_progress(output_coarse, get_progress)
 
         # fine model
@@ -78,21 +80,21 @@ class NeRF(Base3dModel):
             pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (B, N_total, 3)
             pts = pts.view(-1, 3)  # (B*N_total, 3)
 
-            # get sigma and rgb, expand rays_d to all pts. shape in (B*N_total, dim)
+            # get sigma and rgb, expand rays_d to all pts. shape in (B*N_total, ...)
             rays_d_repeat = torch.repeat_interleave(rays_d, n_total, dim=0)
             sigma, radiance = chunk_processing(
                 self._forward_pts_dir, self.chunk_pts, False, self.fine_geo_net, self.fine_radiance_net, pts,
                 rays_d_repeat
             )
 
-            # reshape, ray marching and get color/weights
+            # reshape
             sigma = sigma.view(-1, n_total)  # (B, n_total)
             radiance = radiance.view(-1, n_total, 3)  # (B, n_total, 3)
 
             # ray marching for fine network
             output_fine = self.ray_marching(sigma, radiance, zvals, inference_only=inference_only)
 
-            # merge rgb with background
+            # handle progress
             output['fine'] = self.output_get_progress(output_fine, get_progress)
 
         # adjust two stage output

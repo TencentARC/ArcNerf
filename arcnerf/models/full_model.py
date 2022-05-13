@@ -36,7 +36,6 @@ class FullModel(nn.Module):
 
     def check_bkg_cfgs(self):
         """If bkg model is used, check for invalid cfgs"""
-        # foreground model should not add add_inf_z if bkg_blend == 'rgb',
         if self.bkg_blend == 'rgb':
             assert self.fg_model.get_ray_cfgs('add_inf_z') is False, 'Do not add_inf_z for foreground'
             assert self.bkg_model.get_ray_cfgs('add_inf_z') is True,\
@@ -47,7 +46,7 @@ class FullModel(nn.Module):
         else:
             raise NotImplementedError('Invalid bkg_blend type {}'.format(self.bkg_blend))
 
-        # foreground far distance should not exceed 2*bkg_bounding_radius
+        # foreground far distance should not exceed 2*bkg_bounding_radius. foreground radius should be smaller as well.
         max_far = 2.0 * self.bkg_model.get_ray_cfgs('bounding_radius')
         fg_model_far = self.fg_model.get_ray_cfgs('far')
         if fg_model_far is None:
@@ -78,9 +77,7 @@ class FullModel(nn.Module):
             self.bkg_model.set_chunk_pts(chunk_pts)
 
     def pretrain_siren(self):
-        """Pretrain siren layer of implicit model.
-        Need to rewrite if your network name is different
-        """
+        """Pretrain siren layer of implicit network for both models."""
         self.fg_model.pretrain_siren()
         if self.bkg_model is not None:
             self.bkg_model.pretrain_siren()
@@ -90,7 +87,7 @@ class FullModel(nn.Module):
         return next(self.parameters()).is_cuda
 
     def sigma_reverse(self):
-        """Whether fg_model is sigma or sdf"""
+        """Whether fg_model's implicit model is modeling sigma or sdf(flow different)"""
         return self.fg_model.sigma_reverse()
 
     @staticmethod
@@ -271,9 +268,8 @@ class FullModel(nn.Module):
         return final_output
 
     def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
-        """The forward function actually call chunk process func ._forward()
-        to avoid large memory at same time.
-        Do not call forward directly using chunk_process since the tensor are not flatten to represent batch of rays.
+        """Do not call forward directly using chunk_process since the tensor are not flatten to represent batch of rays.
+        It will call fg/bkg model.forward() with flatten inputs, and blend the result if bkg_model exists.
 
         Args:
             inputs: a dict of torch tensor:

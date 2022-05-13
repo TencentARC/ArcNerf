@@ -18,6 +18,7 @@ from common.utils.torch_utils import chunk_processing
 @MODEL_REGISTRY.register()
 class Neus(Base3dModel):
     """ Neus model. 8 layers in GeoNet and 4 layer in RadianceNet
+        Model SDF and convert it to alpha.
         ref: https://lingjie0206.github.io/papers/NeuS
              https://github.com/ventusff/neurecon#volume-rendering--3d-implicit-surface
     """
@@ -36,8 +37,7 @@ class Neus(Base3dModel):
 
     @staticmethod
     def sigma_reverse():
-        """It use SDF(inside object is smaller)
-        """
+        """It use SDF(inside object is smaller)"""
         return True
 
     def get_params(self):
@@ -79,13 +79,13 @@ class Neus(Base3dModel):
         mid_pts = get_ray_points_by_zvals(rays_o, rays_d, mid_zvals)  # (B, N_total-1, 3)
         mid_pts = mid_pts.view(-1, 3)  # (B*N_total-1, 3)
 
-        # get sdf, feature and normal
+        # get sdf, rgb and normal, expand rays_d to all pts. shape in (B*N_total, ...)
         rays_d_repeat = torch.repeat_interleave(rays_d, int(mid_pts.shape[0] / n_rays), dim=0)
         sdf, radiance, normal_pts = chunk_processing(
             self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, mid_pts, rays_d_repeat
         )
 
-        # reshape, change to real weight
+        # reshape
         sdf = sdf.view(n_rays, -1)  # (B, N_total-1)
         rays_d_repeat = rays_d_repeat.view(n_rays, -1, 3)  # (B, N_total-1, 3)
         radiance = radiance.view(n_rays, -1, 3)  # (B, N_total-1, 3)
@@ -94,7 +94,7 @@ class Neus(Base3dModel):
         # estimate sdf for section pts using mid pts sdf
         cos_anneal_ratio = 1.0 if inference_only else self.get_cos_anneal(cur_epoch)
 
-        # rays and normal are opposite, slope is neg (dot prod of rays and normal)
+        # rays and normal are opposite, slope is neg (dot prod of rays and normal). convert sdf to alpha
         slope = torch.sum(rays_d_repeat * normal_pts, dim=-1, keepdim=True)[..., 0]  # (B, N_total-1)
         iter_slope = -(F.relu(-slope * 0.5 + 0.5) * (1 - cos_anneal_ratio) + F.relu(-slope) * cos_anneal_ratio)  # neg
         alpha = sdf_to_alpha(sdf, zvals, iter_slope, self.forward_scale())  # (B, N_total-1)

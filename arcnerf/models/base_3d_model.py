@@ -98,7 +98,8 @@ class Base3dModel(BaseModel):
         return near, far
 
     def get_zvals_from_near_far(self, near: torch.Tensor, far: torch.Tensor, inference_only=False):
-        """Get te zvals from near/far.
+        """Get the zvals from near/far.
+
         It will use ray_cfgs['n_sample'] to select coarse samples.
         Other sample keys are not allowed.
 
@@ -134,7 +135,6 @@ class Base3dModel(BaseModel):
 
         It will use self.add_inf_z to blend inf depth.
                     ray_cfgs['noise_std'] to add noise to sigma
-
         Other sample keys are not allowed.
 
         Args:
@@ -183,6 +183,8 @@ class Base3dModel(BaseModel):
                     output['progress_{}'.format(key)] = output[key][:, n_fg]  # (B, N_fg)
                 else:
                     output['progress_{}'.format(key)] = output[key]  # (B, N_sample(-1))
+
+            # in the model it decides whether it models sigma or sdf.
             if self.sigma_reverse():
                 output['progress_sigma_reverse'] = True  # for rays 3d visual of sdf
 
@@ -279,6 +281,7 @@ class Base3dModel(BaseModel):
         """
         All the tensor are in chunk. B is total num of rays by grouping different samples in batch
         The inputs are flatten into (B, ...) from FullModel's (B, N_rays, ...)
+
         Args:
             inputs: a dict of torch tensor:
                 inputs['rays_o']: torch.tensor (B, 3), cam_loc/ray_start position
@@ -293,15 +296,17 @@ class Base3dModel(BaseModel):
 
         Returns:
             output: is a dict with following keys:
-                coarse_rgb: torch.tensor (B, 3), only if inference_only=False
-                coarse_depth: torch.tensor (B,), only if inference_only=False
-                coarse_mask: torch.tensor (B,), only if inference_only=False
-                Return bellow if inference_only
-                    fine_rgb: torch.tensor (B, 3)
-                    fine_depth: torch.tensor (B,)
-                    fine_mask: torch.tensor (B,)
+                rgb/rgb_coarse/rgb_fine: torch.tensor (B, 3), depends on model type and inference only
+                depth/depth_coarse/depth_fine: torch.tensor (B,), depends on model type and inference only
+                mask/mask_coarse/mask_fine: torch.tensor (B,), depends on model type and inference only
+                normal/normal_coarse/normal_fine: torch.tensor (B, 3), optional for normal models
+                    If inference_only, above term will not have suffix '_coarse/_fine'.
+                    If use two stage model(NeRF), it will have rgb_coarse/rgb_fine(optional) instead of rgb.
+
                 If get_progress is True:
-                    sigma/zvals/alpha/trans_shift/weights: torch.tensor (B, n_pts)
-                    Use from fine stage if n_importance > 0
+                    progress_sigma/zvals/alpha/trans_shift/weights: torch.tensor (B, n_pts)
+                    with suffix '_coarse/_fine' if use two stage model
+
+                params: a dict containing the custom params used in the model. Only when inference_only=False
         """
         raise NotImplementedError('Please implement the core forward function')

@@ -8,7 +8,6 @@ from .base_3d_model import Base3dModel
 from .base_modules import GeoNet, RadianceNet
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.transformation import normalize
-from arcnerf.render.ray_helper import get_zvals_from_near_far, ray_marching
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import MODEL_REGISTRY
 from common.utils.torch_utils import chunk_processing
@@ -17,6 +16,7 @@ from common.utils.torch_utils import chunk_processing
 @MODEL_REGISTRY.register()
 class VolSDF(Base3dModel):
     """ VolSDF model. 8 layers in GeoNet and 4 layer in RadianceNet
+        Model SDF and convert it to density.
         ref: https://github.com/lioryariv/volsdf
              https://github.com/ventusff/neurecon#volume-rendering--3d-implicit-surface
     """
@@ -34,8 +34,7 @@ class VolSDF(Base3dModel):
 
     @staticmethod
     def sigma_reverse():
-        """It use SDF(inside object is smaller)
-        """
+        """It use SDF(inside object is smaller)"""
         return True
 
     def get_params(self):
@@ -48,26 +47,20 @@ class VolSDF(Base3dModel):
 
         return ln_beta, beta_min, speed_factor
 
-    def _forward_beta(self):
+    def forward_beta(self):
         """Return scale = exp(ln_beta * speed)"""
         return torch.exp(self.ln_beta * self.speed_factor)
 
-    def _forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+    def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)
         n_rays = rays_o.shape[0]
 
-        # get bounds for object, (B, 1) * 2
-        near, far = self._get_near_far_from_rays(inputs)
+        # get bounds for object
+        near, far = self._get_near_far_from_rays(inputs)  # (B, 1) * 2
 
         # get coarse zvals
-        zvals = get_zvals_from_near_far(
-            near,
-            far,
-            self.rays_cfgs['n_sample'],
-            inverse_linear=self.rays_cfgs['inverse_linear'],
-            perturb=self.rays_cfgs['perturb'] if not inference_only else False
-        )  # (B, N_sample)
+        zvals = self.get_zvals_from_near_far(near, far, inference_only)  # (B, N_sample)
 
         # up-sample zvals, (B, N_total(N_sample+N_importance)) for zvals,  (B, 1) for zvals_surface
         zvals, zvals_surface = self._upsample_zvals(rays_o, rays_d, zvals, inference_only)
@@ -76,68 +69,43 @@ class VolSDF(Base3dModel):
         pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (B, N_total, 3)
         pts = pts.view(-1, 3)  # (B*N_total, 3)
 
-        # get sdf, feature and normal
+        # get sdf, rgb and normal, expand rays_d to all pts. shape in (B*N_total, ...)
         rays_d_repeat = torch.repeat_interleave(rays_d, int(pts.shape[0] / n_rays), dim=0)
         sdf, radiance, normal_pts = chunk_processing(
             self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, pts, rays_d_repeat
         )
+
         # reshape
         sdf = sdf.view(n_rays, -1)  # (B, N_total)
         radiance = radiance.view(n_rays, -1, 3)  # (B, N_total, 3)
         normal_pts = normal_pts.view(n_rays, -1, 3)  # (B, N_total, 3)
 
-        # get sigma
-        sigma = sdf_to_sigma(sdf, self._forward_beta(), self.beta_min)  # (B, N_total)
+        # convert sdf to sigma
+        sigma = sdf_to_sigma(sdf, self.forward_beta(), self.beta_min)  # (B, N_total)
 
-        # merge sigma from background and get result together
-        sigma_all, radiance_all, zvals_all = self._merge_bkg_sigma(inputs, sigma, radiance, zvals, inference_only)
-
-        # ray marching
-        output = ray_marching(
-            sigma_all,
-            radiance_all,
-            zvals_all,
-            self.rays_cfgs['add_inf_z'],  # rgb mode should be False, sigma mode should True
-            self.rays_cfgs['noise_std'] if not inference_only else 0.0,
-            weights_only=False,
-            white_bkg=self.rays_cfgs['white_bkg'],
-        )
+        # ray marching, sdf will not be used for calculation but for recording
+        output = self.ray_marching(sigma, radiance, zvals, inference_only=inference_only)
 
         # add normal. For normal map, needs to normalize each pts
         output['normal'] = torch.sum(output['weights'].unsqueeze(-1) * normalize(normal_pts), -2)  # (B, 3)
         if not inference_only:
-            output['params'] = {'beta': float(self._forward_beta().clone())}
-            # for training, only get random pts
-            eikonal_pts = self._get_eikonal_pts(rays_o, rays_d, zvals_surface).view(-1, 3)  # (B*2, 3)
-            _, _, normal_eikpnal_pts = chunk_processing(
-                self.geo_net.forward_with_grad, self.chunk_pts, False, eikonal_pts
-            )
-            output['normal_pts'] = normal_eikpnal_pts.view(n_rays, -1, 3)  # (B, 2, 3), do not normalize it
+            output['params'] = {'beta': float(self.forward_beta().clone())}
+            output['normal_pts'] = self.get_eikonal_pts(rays_o, rays_d, zvals_surface)  # (B, 2, 3), do not normalize it
 
-        # merge rgb with background
-        output = self._merge_bkg_rgb(inputs, output, inference_only)
-
-        if get_progress:  # this save the sigma with out blending bkg, only in foreground
-            for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
-                n_fg = self._get_n_fg(sdf)
-                output['progress_{}'.format(key)] = output[key][:, :n_fg].detach()  # (B, N_sample(-1))
-        else:  # pop to reduce memory
-            for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights', 'radiance']:
-                output.pop(key)
+        # handle progress
+        output = self.output_get_progress(output, get_progress)
 
         return output
 
     def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
         """Rewrite for normal handling"""
-        gpu_on_func = True if (self.is_cuda() and not pts.is_cuda) else False
-
         if view_dir is None:
             rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
         else:
             rays_d = normalize(view_dir)  # norm view dir
 
         sdf, rgb, _ = chunk_processing(
-            self._forward_pts_dir, self.chunk_pts, gpu_on_func, self.geo_net, self.radiance_net, pts, rays_d
+            self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, pts, rays_d
         )
 
         return sdf, rgb
