@@ -146,9 +146,7 @@ class FullModel(nn.Module):
         All inputs flatten in (B, x) dim
         """
         assert 'progress_sigma_coarse' in fg_output, 'You must get_progress for fg_model'
-        # coarse stage output from fg_model
-        n_fg_coarse = fg_output['progress_sigma_coarse'].shape[1]
-        # (B, n_fg + n_bkg-1), already sorted since fg/bkg in different range
+        # coarse stage output from fg_model, (B, n_fg + n_bkg-1), already sorted since fg/bkg in different range
         sigma_coarse_all = torch.cat([fg_output['progress_sigma_coarse'], bkg_output['progress_sigma']], 1)
         radiance_coarse_all = torch.cat([fg_output['progress_radiance_coarse'], bkg_output['progress_radiance']], 1)
         zvals_coarse_all = torch.cat([fg_output['progress_zvals_coarse'], bkg_output['progress_zvals']], 1)
@@ -162,14 +160,12 @@ class FullModel(nn.Module):
             inference_only=inference_only
         )
 
-        # handle progress again
-        fg_output_coarse = self.fg_model.output_get_progress(fg_output_coarse, get_progress, n_fg=n_fg_coarse)
-        for key in ['rgb', 'depth', 'mask']:
+        # just replace overall rgb and depth
+        for key in ['rgb', 'depth']:
             fg_output[key + '_coarse'] = fg_output_coarse[key]
 
-        # fine stage output from fg_model
+        # fine stage output from fg_model, (B, n_fg + n_bkg-1), already sorted since fg/bkg in different range
         if 'progress_sigma_fine' in fg_output:
-            n_fg_fine = fg_output['progress_sigma_fine'].shape[1]
             # (B, n_fg + n_bkg-1), already sorted since fg/bkg in different range
             sigma_fine_all = torch.cat([fg_output['progress_sigma_fine'], bkg_output['progress_sigma']], 1)
             radiance_fine_all = torch.cat([fg_output['progress_radiance_fine'], bkg_output['progress_radiance']], 1)
@@ -184,9 +180,8 @@ class FullModel(nn.Module):
                 inference_only=inference_only
             )
 
-            # handle progress again
-            fg_output_fine = self.fg_model.output_get_progress(fg_output_fine, get_progress, n_fg=n_fg_fine)
-            for key in ['rgb', 'depth', 'mask']:
+            # just replace overall rgb and depth
+            for key in ['rgb', 'depth']:
                 fg_output[key + '_fine'] = fg_output_fine[key]
 
         # keep one set of progress
@@ -204,14 +199,13 @@ class FullModel(nn.Module):
 
         assert 'progress_sigma' in fg_output, 'You must get_progress for fg_model'
 
-        n_fg = fg_output['progress_sigma'].shape[1]
         # (B, n_fg + n_bkg-1), already sorted since fg/bkg in different range
         sigma_all = torch.cat([fg_output['progress_sigma'], bkg_output['progress_sigma']], 1)
         radiance_all = torch.cat([fg_output['progress_radiance'], bkg_output['progress_radiance']], 1)
         zvals_all = torch.cat([fg_output['progress_zvals'], bkg_output['progress_zvals']], 1)
 
         # re-run fg ray-marching
-        fg_output = self.fg_model.ray_marching(
+        fg_output_all = self.fg_model.ray_marching(
             sigma_all,
             radiance_all,
             zvals_all,
@@ -219,8 +213,9 @@ class FullModel(nn.Module):
             inference_only=inference_only
         )
 
-        # handle progress again
-        fg_output = self.fg_model.output_get_progress(fg_output, get_progress, n_fg=n_fg)
+        # just replace overall rgb and depth
+        for key in ['rgb', 'depth']:
+            fg_output[key] = fg_output_all[key]
 
         return fg_output
 

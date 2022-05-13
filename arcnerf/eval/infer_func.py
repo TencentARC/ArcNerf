@@ -365,7 +365,7 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
                 }
 
         except ValueError:
-            logger.add_log('Can not extract mesh from volue', level='warning')
+            logger.add_log('Can not extract mesh from volume', level='warning')
 
     # set back in case training
     model.set_chunk_pts(origin_chunk_pts)
@@ -429,8 +429,12 @@ def write_infer_files(files, folder, data, logger):
         logger.add_log('No inference perform...', level='warning')
         return
 
+    # reduce memory for mesh rendering
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
     # write down video
-    if files['render'] is not None:
+    if files['render'] is not None and len(files['render']) > 0:
         for vid, frames in enumerate(files['render']):
             video_path = osp.join(
                 folder, 'render_video{}_{}_n{}_fps{}.mp4'.format(
@@ -446,7 +450,7 @@ def write_infer_files(files, folder, data, logger):
         corner = files['volume']['corner']
         bound_lines = files['volume']['bound_lines']
         volume_dict = {'grid_pts': corner, 'lines': bound_lines}
-        if 'pc' in files['volume']:
+        if 'pc' in files['volume'] and files['volume']['pc'] is not None:
             pc = files['volume']['pc']
             # full pts to ply
             pts = pc['full']['pts']
@@ -470,7 +474,7 @@ def write_infer_files(files, folder, data, logger):
             )
             logger.add_log('Write point cloud visual to {}'.format(folder))
 
-        if 'mesh' in files['volume']:
+        if 'mesh' in files['volume'] and files['volume']['mesh'] is not None:
             mesh = files['volume']['mesh']
 
             # save full mesh as .ply file, save verts/faces only
