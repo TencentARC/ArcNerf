@@ -1,4 +1,4 @@
-name: capture_qqtiger_neus_nerfpprgb
+name: capture_qqtiger_volsdf_siren_nerfpprgb
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_neus_nerfpprgb'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_volsdf_siren_nerfpprgb'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_neus_nerfpprgb/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_volsdf_siren_nerfpprgb/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -25,7 +25,7 @@ dist:
     slurm: False
 
 batch_size: 2
-n_rays: 512     # follow original repo
+n_rays: 1024     # follow original repo
 worker: 4
 
 optim:
@@ -33,9 +33,9 @@ optim:
     optim_type: adam
     weight_decay: 0.0
     lr_scheduler:
-        type: WarmUpCosineLR        # follow the original implementation
-        lr_steps: [5000]
-        min_factor: 0.05
+        type: ExponentialLR    # follow original repo
+        lr_gamma: 0.1
+        lr_steps: [200000]
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -112,40 +112,41 @@ inference:
             backend: pytorch3d
 
 model:
-    type: Neus
+    type: VolSDF
     rays:
         bounding_radius: 3.0
         near: 1.0
         # far: 4.5
         n_sample: 64
-        n_importance: 64
-        n_iter: 4
+        n_importance: 32
+        n_eval: 128
+        n_iter: 5
+        beta_iter: 10
+        eps: 0.1
         inverse_linear: False
         perturb: True
         add_inf_z: False
         noise_std: 1.0
         white_bkg: False
     params:
-        speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
-        init_var: 0.05                # init var, when it approaches 0, cdf more close
-        anneal_end: 50000             # for anneal param, only set during training. please
+        speed_factor: 10              # factor for ln_beta = np.log(init_beta)/speed, beta = exp(ln_beta*speed)
+        beta_min: 0.0001              # min beta offset
+        init_beta: 0.1                # init beta, when it approaches 0, cdf more close
     chunk_rays: 4096
     chunk_pts: 131072
     geometry:
         W: 256
         D: 8
-        skips: [4]
+        skips: []                     # no skip for siren network
         input_ch: 3
-        embed_freq: 6
+        embed_freq: 0                 # siren do not use
         W_feat: 256
         geometric_init: True          # use geometric init. need radius_init
         radius_init: 0.75             # geometric init sphere radius
         weight_norm: True
         skip_reduce_output: True
         norm_skip: True
-        act_cfg:                      # activation function for dense layer
-            type: softplus
-            beta: 100
+        use_siren: True               # use siren layer with geometric_init
     radiance:
         mode: 'pvnf'
         W: 256
@@ -156,6 +157,7 @@ model:
         embed_freq_view: 4
         W_feat_in: 256
         weight_norm: True
+        use_siren: True               # use siren layer
     background:
         type: NeRFPP
         bkg_blend: 'rgb'

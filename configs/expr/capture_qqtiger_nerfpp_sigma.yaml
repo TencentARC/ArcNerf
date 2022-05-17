@@ -57,7 +57,7 @@ progress:
     max_samples_val: 1
 
     epoch_save_checkpoint: 100000
-    local_progress: True
+    local_progress: False
 
     init_eval: False
     epoch_eval: 100000
@@ -115,7 +115,7 @@ model:
     rays:
         bounding_radius: 3.0
         near: 1.0
-        far: 4.5
+        # far: 4.5
         n_sample: 64
         n_importance: 128
         inverse_linear: False

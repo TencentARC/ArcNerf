@@ -8,6 +8,7 @@ from .base_3d_model import Base3dModel
 from .base_modules import GeoNet, RadianceNet
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.transformation import normalize
+from arcnerf.render.ray_helper import sample_pdf, get_zvals_from_near_far
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import MODEL_REGISTRY
 from common.utils.torch_utils import chunk_processing
@@ -26,8 +27,12 @@ class VolSDF(Base3dModel):
         self.geo_net = GeoNet(**self.cfgs.model.geometry.__dict__)
         self.radiance_net = RadianceNet(**self.cfgs.model.radiance.__dict__)
         # custom rays cfgs for upsampling
-        self.rays_cfgs['n_importance'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'n_importance', 0)
-        self.rays_cfgs['n_iter'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'n_iter', 4)
+        self.ray_cfgs['n_importance'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'n_importance', 0)
+        self.ray_cfgs['n_eval'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'n_eval', 128)
+        self.ray_cfgs['n_iter'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'n_iter', 5)
+        assert self.get_ray_cfgs('n_iter'), 'You must have at least one iter for sampling'
+        self.ray_cfgs['beta_iter'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'beta_iter', 10)
+        self.ray_cfgs['eps'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'eps', 0.1)
         # radius init for object
         self.radius_init = get_value_from_cfgs_field(self.cfgs.model.geometry, 'radius_init', 1.0)
         self.ln_beta, self.beta_min, self.speed_factor = self.get_params()
@@ -57,13 +62,19 @@ class VolSDF(Base3dModel):
         n_rays = rays_o.shape[0]
 
         # get bounds for object
-        near, far = self._get_near_far_from_rays(inputs)  # (B, 1) * 2
+        near, far = self.get_near_far_from_rays(inputs)  # (B, 1) * 2
 
-        # get coarse zvals
-        zvals = self.get_zvals_from_near_far(near, far, inference_only)  # (B, N_sample)
+        # get coarse zvals, use N_eval instead of using N_sample
+        zvals = get_zvals_from_near_far(
+            near,
+            far,
+            self.get_ray_cfgs('n_eval'),
+            inverse_linear=self.get_ray_cfgs('inverse_linear'),
+            perturb=self.get_ray_cfgs('perturb') if not inference_only else False
+        )  # (B, N_eval)
 
-        # up-sample zvals, (B, N_total(N_sample+N_importance)) for zvals,  (B, 1) for zvals_surface
-        zvals, zvals_surface = self._upsample_zvals(rays_o, rays_d, zvals, inference_only)
+        # sample zvals near surface, (B, N_total(N_sample+N_importance)) for zvals,  (B, 1) for zvals_surface
+        zvals, zvals_surface = self.sample_zvals(rays_o, rays_d, zvals, inference_only, self.forward_pts)
 
         # get points
         pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (B, N_total, 3)
@@ -85,12 +96,20 @@ class VolSDF(Base3dModel):
 
         # ray marching, sdf will not be used for calculation but for recording
         output = self.ray_marching(sigma, radiance, zvals, inference_only=inference_only)
+        normal_pts = normal_pts[:, :output['weights'].shape[1]]  # in case add_inf_z
 
         # add normal. For normal map, needs to normalize each pts
         output['normal'] = torch.sum(output['weights'].unsqueeze(-1) * normalize(normal_pts), -2)  # (B, 3)
         if not inference_only:
             output['params'] = {'beta': float(self.forward_beta().clone())}
-            output['normal_pts'] = self.get_eikonal_pts(rays_o, rays_d, zvals_surface)  # (B, 2, 3), do not normalize it
+            # only sample some pts in sphere and on surface
+            eikonal_pts = self.get_eikonal_pts(rays_o, rays_d, zvals_surface).view(-1, 3)  # (B*2, 3)
+            rays_d_repeat = torch.repeat_interleave(rays_d, int(eikonal_pts.shape[0] / n_rays), dim=0)
+            _, _, normal_eikonal_pts = chunk_processing(
+                self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, eikonal_pts,
+                rays_d_repeat
+            )
+            output['normal_pts'] = normal_eikonal_pts.view(n_rays, -1, 3)  # (B, 2, 3), do not normalize it
 
         # handle progress
         output = self.output_get_progress(output, get_progress)
@@ -123,29 +142,161 @@ class VolSDF(Base3dModel):
 
         return sdf[..., 0], radiance, normal
 
-    def upsample_zvals(self, rays_o: torch.Tensor, rays_d: torch.Tensor, zvals: torch.Tensor, inference_only, s=32):
-        """Upsample zvals if N_importance > 0
+    def sample_zvals(self, rays_o: torch.Tensor, rays_d: torch.Tensor, zvals: torch.Tensor, inference_only, sdf_func):
+        """Sample zvals near surface
 
         Args:
             rays_o: torch.tensor (B, 3), cam_loc/ray_start position
             rays_d: torch.tensor (B, 3), view dir(assume normed)
-            zvals: tensor (B, N_sample), coarse zvals for all rays
+            zvals: tensor (B, N_eval), coarse zvals for all rays, uniformly distributed in (near, far)
             inference_only: affect the sample_pdf deterministic. By default False(For train)
-            s: factor for up-sample. By default 32
+            sdf_func: generally the model.forward_pts() func to get sdf from pts.
+                       You can call it outside for debug.
 
         Returns:
-            zvals: tensor (B, N_sample + N_importance), up-sample zvals near the surface
+            zvals: tensor (B, N_sample + N_importance), sample zvals near the surface
             zvals_surface: (B, 1) zvals on surface
         """
-        if self.rays_cfgs['n_importance'] <= 0:
-            return zvals
+        dtype = zvals.dtype
+        device = zvals.device
+        n_rays = zvals.shape[0]
 
-        # dtype = zvals.dtype
-        # device = zvals.device
-        # n_sample_per_iter = self.rays_cfgs['n_importance'] // self.rays_cfgs['n_iter']
+        samples, samples_idx = zvals.clone(), None
+        sdf = None
 
-        zvals_surface = None
-        return zvals, zvals_surface
+        beta0 = self.forward_beta().detach()
+        eps = self.get_ray_cfgs('eps')
+        cur_iter, not_converge = 0, True
+
+        # Get maximum beta from the upper bound (Lemma 2)
+        dists = zvals[:, 1:] - zvals[:, :-1]  # (B, N_eval-1)
+        log_eps_one = torch.log(torch.tensor(eps + 1.0, dtype=dtype)).to(device)
+        bound = (1.0 / (4.0 * log_eps_one)) * (dists**2.).sum(-1)
+        beta = torch.sqrt(bound)
+
+        # Algorithm 1
+        while not_converge and cur_iter < self.get_ray_cfgs('n_iter'):
+            pts = get_ray_points_by_zvals(rays_o, rays_d, samples).view(-1, 3)  # (B*N_eval, 3)
+            # Calculating the SDF only for the new sampled points
+            with torch.no_grad():
+                sample_sdf = sdf_func(pts).unsqueeze(-1)  # (B*N_eval, 1)
+
+            if samples_idx is not None:
+                sdf_cat = torch.cat([sdf, sample_sdf.reshape(n_rays, -1)], dim=-1)  # (B, (iter+1)*N_eval)
+                sdf = torch.gather(sdf_cat, 1, samples_idx)  # (B, (iter+1)*N_eval) sorted concat sdf
+            else:
+                sdf = sample_sdf.view(n_rays, -1)  # (B, N_eval), init uniform pts
+
+            # Calculating the bound d* (Theorem 1)
+            dists = zvals[:, 1:] - zvals[:, :-1]
+            a, b, c = dists, sdf[:, :-1].abs(), sdf[:, 1:].abs()  # (B, iter*N_eval-1)
+            first_cond = a.pow(2) + b.pow(2) <= c.pow(2)
+            second_cond = a.pow(2) + c.pow(2) <= b.pow(2)
+            d_star = torch.zeros(zvals.shape[0], zvals.shape[1] - 1, dtype=dtype).to(device)  # (B, iter*N_eval-1)
+            d_star[first_cond] = b[first_cond]
+            d_star[second_cond] = c[second_cond]
+            s = (a + b + c) / 2.0  # (B, N_eval-1)
+            area_before_sqrt = s * (s - a) * (s - b) * (s - c)
+            mask = ~first_cond & ~second_cond & (b + c - a > 0)
+            d_star[mask] = (2.0 * torch.sqrt(area_before_sqrt[mask])) / (a[mask])
+            d_star = (sdf[:, 1:].sign() * sdf[:, :-1].sign() == 1) * d_star  # (B, iter*N_eval-1)
+
+            # Updating beta using line search
+            cur_error = self.get_error_bound(beta0, sdf, zvals, d_star)  # (B, )
+            beta[cur_error <= eps] = beta0
+            beta_min, beta_max = beta0.repeat(zvals.shape[0]), beta  # (B, ) * 2
+            for j in range(self.get_ray_cfgs('beta_iter')):
+                beta_mid = (beta_min + beta_max) / 2.  # (B, )
+                cur_error = self.get_error_bound(beta_mid.unsqueeze(-1), sdf, zvals, d_star)
+                beta_max[cur_error <= eps] = beta_mid[cur_error <= eps]
+                beta_min[cur_error > eps] = beta_mid[cur_error > eps]
+            beta = beta_max  # (B, )
+
+            # get new weights
+            sigma = sdf_to_sigma(sdf, beta.unsqueeze(-1), self.beta_min)
+            output = self.ray_marching(sigma, None, zvals, True, None, inference_only, weights_only=False)
+            trans_shift, weights = output['trans_shift'], output['weights']  # (B, iter*N_eval) * 2
+
+            # check converge
+            cur_iter += 1
+            not_converge = beta.max() >= beta0
+
+            det = not self.get_ray_cfgs('perturb') if not inference_only else True
+            if not_converge and cur_iter < self.get_ray_cfgs('n_iter'):  # not converge
+                n_pts = self.get_ray_cfgs('n_eval')
+                bound_opacity = self.get_integral_bound(trans_shift, beta.unsqueeze(-1), d_star, dists)
+                pdf = bound_opacity  # (B, N_eval-1)
+                det = True  # force det resample
+            else:  # converge, final sample N_sample
+                n_pts = self.get_ray_cfgs('n_sample')
+                pdf = weights[..., :-1]  # (B, N_sample-1)
+
+            # sample in the iter
+            samples = sample_pdf(zvals, pdf, n_pts, det).detach()  # (B, N_eval/sample)
+
+            if not_converge and cur_iter < self.get_ray_cfgs('n_iter'):  # not converge, add to zvals
+                zvals, samples_idx = torch.sort(torch.cat([zvals, samples], -1), -1)  # (B, (iter+1)*N_eval)
+
+        zvals_sample = samples  # (B, N_sample)
+
+        # on surface pts
+        idx = torch.randint(zvals_sample.shape[-1], (zvals_sample.shape[0], )).to(device)
+        zvals_surface = torch.gather(zvals_sample, 1, idx.unsqueeze(-1))
+
+        # add more pts on the whole ray. Actually take more pts not on surface
+        if self.get_ray_cfgs('n_importance') > 0:
+            n_importance = self.get_ray_cfgs('n_importance')
+            if inference_only:
+                sample_idx = torch.linspace(0, zvals.shape[1] - 1, n_importance).long().to(device)
+            else:
+                sample_idx = torch.randperm(zvals.shape[1])[:n_importance].to(device)
+            zvals_extra = zvals[:, sample_idx]  # (B, N_importance)
+            zvals_sample, _ = torch.sort(torch.cat([zvals_sample, zvals_extra], -1), -1)  # (B, N_sample + N_importance)
+
+        return zvals_sample, zvals_surface
+
+    def get_error_bound(self, beta, sdf: torch.Tensor, zvals: torch.Tensor, d_star: torch.Tensor):
+        """Calculate the error bound from approximate integration.
+        Theorem 1, eq.12 in paper.
+
+        Args:
+            beta: beta value. single value or tensor (B, N_pts/1)
+            sdf: torch.tensor (B, N_pts) sdf on ray
+            zvals: torch.tensor (B, N_pts) zvals of the points
+            d_star: torch.tensor (B, N_pts-1) the bounding d in each interval (zi, zi+1)
+
+        Returns:
+            bound_opacity: torch.tensor (B,) the max bounding error of each ray from integral
+        """
+        dtype = zvals.dtype
+        device = zvals.device
+
+        dists = zvals[:, 1:] - zvals[:, :-1]
+        sigma = sdf_to_sigma(sdf, beta, self.beta_min)  # (B, N_pts)
+        zeros = torch.zeros(dists.shape[0], 1, dtype=dtype).to(device)  # (B, 1)
+        shifted_free_energy = torch.cat([zeros, dists * sigma[:, :-1]], dim=-1)  # (B, N_pts)
+        integral_esti = torch.cumsum(shifted_free_energy, dim=-1)
+        bound_opacity = self.get_integral_bound(integral_esti, beta, d_star, dists)
+
+        return bound_opacity.max(-1)[0]
+
+    def get_integral_bound(self, integral_esti, beta, d_star, dists):
+        """Sub-func under error bound calculation
+
+        Args:
+            integral_esti: estimated integral value
+            beta: beta value. single value or tensor (B, N_pts/1)
+            d_star: torch.tensor (B, N_pts-1) the bounding d in each interval (zi, zi+1)
+            dists: torch.tensor (B, N_pts-1) dists of intervals.
+
+        Returns:
+            bound_opacity: torch.tensor (B, N_pts-1) the bounding error of each ray from integral
+        """
+        error_per_section = torch.exp(-d_star / beta) * (dists**2.) / (4 * beta**2)
+        error_integral = torch.cumsum(error_per_section, dim=-1)  # (B, N_pts)
+        bound_opacity = (torch.clamp(torch.exp(error_integral), max=1.e6) - 1.0) * torch.exp(-integral_esti[:, :-1])
+
+        return bound_opacity
 
     def get_eikonal_pts(self, rays_o: torch.Tensor, rays_d: torch.Tensor, zvals_surface: torch.Tensor):
         """Get random eikonal pts from bounding sphere and near surface
@@ -154,10 +305,10 @@ class VolSDF(Base3dModel):
         Args:
             rays_o: torch.tensor (B, 3), cam_loc/ray_start position
             rays_d: torch.tensor (B, 3), view dir(assume normed)
-            zvals_surface: tensor (B, 1), zvals on surface
+            zvals_surface: tensor (B, 1), zvals on surface. If None, do not sample on surface
 
         Returns:
-            pts: torch.tensor (B, 2, 3), in sphere pts + surface pts
+            pts_all: torch.tensor (B, 2, 3), in sphere pts + surface pts. (B, 1, 3) if zvals_surface is None.
         """
         dtype = rays_o.dtype
         device = rays_o.device
@@ -169,9 +320,15 @@ class VolSDF(Base3dModel):
         pts_rand = pts_rand / torch.norm(pts_rand, -1, keepdim=True) * bounding_radius  # make sure in sphere
 
         # pts on surface, (B, 1, 3)
-        pts_surface = get_ray_points_by_zvals(rays_o, rays_d, zvals_surface)
+        pts_surface = None
+        if zvals_surface is not None:
+            pts_surface = get_ray_points_by_zvals(rays_o, rays_d, zvals_surface)
 
-        pts_all = torch.cat([pts_rand, pts_surface], dim=1)  # (B, 2, 3)
+        # merge pts
+        if pts_surface is None:
+            pts_all = pts_rand  # (B, 1, 3)
+        else:
+            pts_all = torch.cat([pts_rand, pts_surface], dim=1)  # (B, 2, 3)
 
         return pts_all
 
@@ -186,7 +343,7 @@ def sdf_to_sigma(sdf: torch.Tensor, beta, beta_min=0.0001):
 
     Args:
         sdf: tensor (B, N_pts) of pts
-        beta: beta for cdf adjustment
+        beta: beta for cdf adjustment. single value or tensor (B, N_pts/1)
         beta_min: add to beta in case beta too small
 
     Returns:

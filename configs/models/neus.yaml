@@ -5,7 +5,7 @@ model:
     rays:
         bounding_radius: 3.0          # bounding ray sampling region
         near: 1.5                     # hardcode near zvals
-        far: 4.5                      # hardcode far zvals
+        # far: 4.5                    # hardcode far zvals
         n_sample: 64                  # n_sample for zvals sampling
         n_importance: 64              # n_importance for zvals for up-sample near surface
         n_iter: 4                     # n_iter for zvals up-sample, each time sample (n_importance // n_iter)

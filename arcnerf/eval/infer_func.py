@@ -544,3 +544,5 @@ def write_infer_files(files, folder, data, logger):
                     file_path = osp.join(folder, 'geo_mesh_render_{}.mp4'.format(path_type))
                     write_video([geo_imgs[idx] for idx in range(geo_imgs.shape[0])] * render['repeat'][path_id],
                                 file_path, True, render['fps'])
+
+                    logger.add_log('Write mesh rendering by {} to {}'.format(render['backend'], folder))

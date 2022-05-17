@@ -1,4 +1,4 @@
-name: capture_qqtiger_neus_nerfpprgb
+name: capture_joycon_neus_nerfpprgb
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_neus_nerfpprgb'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_joycon_neus_nerfpprgb'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_neus_nerfpprgb/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_joycon_neus_nerfpprgb/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -66,30 +66,30 @@ progress:
 dataset:
     train:
         type: Capture
-        scene_name: qqtiger
+        scene_name: joycon
         img_scale: 1.0
         scale_radius: 3.0
-        pc_radius: 2.0
+        pc_radius: 1.0
         precache: True
         augmentation:
             shuffle: True
 
     val:
         type: Capture
-        scene_name: qqtiger
+        scene_name: joycon
         img_scale: 0.5
         scale_radius: 3.0
-        pc_radius: 2.0
+        pc_radius: 1.0
         precache: False
 
     eval:
         eval_batch_size: 1
         eval_max_sample: 3
         type: Capture
-        scene_name: qqtiger
+        scene_name: joycon
         img_scale: 1.0
         scale_radius: 3.0
-        pc_radius: 2.0
+        pc_radius: 1.0
         precache: True
 
 inference:
@@ -98,8 +98,8 @@ inference:
         n_cam: [20]
         repeat: [3]
         radius: 3.0
-        u_start: 0.75
-        v_ratio: -0.2
+        u_start: 0.8
+        v_ratio: -0.12
         fps: 5
 
     volume:

@@ -5,10 +5,13 @@ model:
     rays:
         bounding_radius: 3.0          # bounding ray sampling region
         near: 1.5                     # hardcode near zvals
-        far: 4.5                      # hardcode far zvals
-        n_sample: 64                  # n_sample for zvals sampling
-        n_importance: 64              # n_importance for zvals for up-sample near surface
-        n_iter: 4                     # n_iter for zvals up-sample, each time sample (n_importance // n_iter)
+        # far: 4.5                    # hardcode far zvals
+        n_sample: 64                  # n_sample for zvals sampling, all near surface
+        n_importance: 32              # n_importance for extra random samples. Since n_sample are near surface, optional
+        n_eval: 128                   # n_eval for zvals in each iteration
+        n_iter: 5                     # max n_iter for zvals up-sample
+        beta_iter: 10                 # max beta_iter for beta binary search
+        eps: 0.1                      # error bounding for sample
         inverse_linear: False         # inverse_linear make zvals close to near
         perturb: True                 # perturb zvals interval
         add_inf_z: False              # Add inf zval for ray marching

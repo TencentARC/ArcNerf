@@ -4,7 +4,7 @@ model:
     type: NeRF
     rays:
         bounding_radius: 3.0          # bounding ray sampling region
-        near: 2.0                     # hardcode near zvals
+        near: 1.5                     # hardcode near zvals
         # far: 4.0                    # should not set far if background model here
         n_sample: 64                  # n_sample for zvals sampling
         n_importance: 128             # n_importance for zvals for hierarchical sampling

@@ -56,6 +56,14 @@ class FullModel(nn.Module):
             assert fg_model_far is None or fg_model_far <= max_far,\
                 'Do not set fg_model far exceed {}'.format(max_far)
 
+    def get_fg_model(self):
+        """Get the foreground model"""
+        return self.fg_model
+
+    def get_bkg_model(self):
+        """Get the background model"""
+        return self.bkg_model
+
     def get_chunk_rays(self):
         """Get the chunk rays num from fg_model"""
         return self.fg_model.get_chunk_rays()

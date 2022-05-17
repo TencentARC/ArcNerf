@@ -57,7 +57,7 @@ progress:
     max_samples_val: 1
 
     epoch_save_checkpoint: 100000
-    local_progress: True
+    local_progress: False
 
     init_eval: False
     epoch_eval: 100000

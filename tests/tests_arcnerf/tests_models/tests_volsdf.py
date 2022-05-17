@@ -3,9 +3,12 @@
 
 import os
 import os.path as osp
+import torch
 
 from arcnerf.models.volsdf_model import sdf_to_sigma
-from arcnerf.render.ray_helper import make_sample_rays, ray_marching, sample_ray_marching_output_by_index
+from arcnerf.render.ray_helper import (
+    get_zvals_from_near_far, make_sample_rays, ray_marching, sample_ray_marching_output_by_index
+)
 from common.utils.torch_utils import np_wrapper
 from common.visual.plot_2d import draw_2d_components
 from tests.tests_arcnerf.tests_models import TestModelDict, RESULT_DIR
@@ -16,6 +19,21 @@ class TestVolsdfDict(TestModelDict):
     def make_result_dir(self):
         self.result_dir = osp.join(RESULT_DIR, 'volsdf')
         os.makedirs(self.result_dir, exist_ok=True)
+
+    def create_feed_in_to_cuda(self):
+        feed_in = {
+            'img': torch.ones(self.batch_size, self.n_rays, 3),
+            'mask': torch.ones(self.batch_size, self.n_rays),
+            'rays_o': torch.rand(self.batch_size, self.n_rays, 3),
+            'rays_d': torch.rand(self.batch_size, self.n_rays, 3),
+            'bounds': torch.rand(self.batch_size, self.n_rays, 2),
+            'near': torch.ones(self.batch_size * self.n_rays, 1),
+            'far': torch.ones(self.batch_size * self.n_rays, 1)
+        }
+        for k, v in feed_in.items():
+            feed_in[k] = self.to_cuda(v)
+
+        return feed_in
 
     def tests_model(self):
         cfgs, logger = self.get_cfgs_logger('volsdf.yaml', 'volsdf.txt')
@@ -33,10 +51,19 @@ class TestVolsdfDict(TestModelDict):
         # inference only
         self._test_forward_inference_only(model, feed_in)
 
-        # get progress
+        # test sample size
         n_sample = cfgs.model.rays.n_sample
-        n_importance = (cfgs.model.rays.n_importance // cfgs.model.rays.n_iter) * cfgs.model.rays.n_iter
+        n_importance = cfgs.model.rays.n_importance
         n_total = n_sample + n_importance
+        zvals = get_zvals_from_near_far(feed_in['near'], feed_in['far'], cfgs.model.rays.n_eval)  # (B, N_eval)
+        zvals, zvals_surface = model.get_fg_model().sample_zvals(
+            feed_in['rays_o'].view(-1, 3), feed_in['rays_d'].view(-1, 3), zvals, False,
+            model.get_fg_model().forward_pts
+        )
+        self.assertEqual(zvals.shape, (self.batch_size * self.n_rays, n_total))
+        self.assertEqual(zvals_surface.shape, (self.batch_size * self.n_rays, 1))
+
+        # get progress
         progress_shape = (self.batch_size, self.n_rays, n_total - 1)
         self._test_forward_progress(model, feed_in, progress_shape)
 
