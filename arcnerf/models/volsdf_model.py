@@ -189,17 +189,7 @@ class VolSDF(Base3dModel):
 
             # Calculating the bound d* (Theorem 1)
             dists = zvals[:, 1:] - zvals[:, :-1]
-            a, b, c = dists, sdf[:, :-1].abs(), sdf[:, 1:].abs()  # (B, iter*N_eval-1)
-            first_cond = a.pow(2) + b.pow(2) <= c.pow(2)
-            second_cond = a.pow(2) + c.pow(2) <= b.pow(2)
-            d_star = torch.zeros(zvals.shape[0], zvals.shape[1] - 1, dtype=dtype).to(device)  # (B, iter*N_eval-1)
-            d_star[first_cond] = b[first_cond]
-            d_star[second_cond] = c[second_cond]
-            s = (a + b + c) / 2.0  # (B, N_eval-1)
-            area_before_sqrt = s * (s - a) * (s - b) * (s - c)
-            mask = ~first_cond & ~second_cond & (b + c - a > 0)
-            d_star[mask] = (2.0 * torch.sqrt(area_before_sqrt[mask])) / (a[mask])
-            d_star = (sdf[:, 1:].sign() * sdf[:, :-1].sign() == 1) * d_star  # (B, iter*N_eval-1)
+            d_star = self.get_d_star(zvals, sdf)  # (B, iter*N_eval-1)
 
             # Updating beta using line search
             cur_error = self.get_error_bound(beta0, sdf, zvals, d_star)  # (B, )
@@ -255,7 +245,7 @@ class VolSDF(Base3dModel):
 
         return zvals_sample, zvals_surface
 
-    def get_error_bound(self, beta, sdf: torch.Tensor, zvals: torch.Tensor, d_star: torch.Tensor):
+    def get_error_bound(self, beta, sdf: torch.Tensor, zvals: torch.Tensor, d_star: torch.Tensor, max_per_ray=True):
         """Calculate the error bound from approximate integration.
         Theorem 1, eq.12 in paper.
 
@@ -264,9 +254,11 @@ class VolSDF(Base3dModel):
             sdf: torch.tensor (B, N_pts) sdf on ray
             zvals: torch.tensor (B, N_pts) zvals of the points
             d_star: torch.tensor (B, N_pts-1) the bounding d in each interval (zi, zi+1)
+            max_per_ray: If True, return the max error on each ray. By default True
 
         Returns:
             bound_opacity: torch.tensor (B,) the max bounding error of each ray from integral
+                           If not max_per_ray, return (B, N_pts-1)
         """
         dtype = zvals.dtype
         device = zvals.device
@@ -276,11 +268,44 @@ class VolSDF(Base3dModel):
         zeros = torch.zeros(dists.shape[0], 1, dtype=dtype).to(device)  # (B, 1)
         shifted_free_energy = torch.cat([zeros, dists * sigma[:, :-1]], dim=-1)  # (B, N_pts)
         integral_esti = torch.cumsum(shifted_free_energy, dim=-1)
-        bound_opacity = self.get_integral_bound(integral_esti, beta, d_star, dists)
+        bound_opacity = self.get_integral_bound(integral_esti, beta, d_star, dists)  # (B, N_pts-1)
 
-        return bound_opacity.max(-1)[0]
+        if max_per_ray:
+            bound_opacity = bound_opacity.max(-1)[0]  # (B,)
 
-    def get_integral_bound(self, integral_esti, beta, d_star, dists):
+        return bound_opacity
+
+    @staticmethod
+    def get_d_star(zvals: torch.Tensor, sdf: torch.Tensor):
+        """Calculate the d_star value between interval
+
+        Args:
+            zvals: torch.tensor (B, N_pts) zvals of the points
+            sdf: torch.tensor (B, N_pts) sdf on ray
+
+        Returns:
+            d_star: torch.tensor (B, N_pts-1) the bounding d in each interval (zi, zi+1)
+        """
+        dtype = zvals.dtype
+        device = zvals.device
+
+        dists = zvals[:, 1:] - zvals[:, :-1]
+        a, b, c = dists, sdf[:, :-1].abs(), sdf[:, 1:].abs()  # (B, N_pts-1)
+        first_cond = a.pow(2) + b.pow(2) <= c.pow(2)
+        second_cond = a.pow(2) + c.pow(2) <= b.pow(2)
+        d_star = torch.zeros(zvals.shape[0], zvals.shape[1] - 1, dtype=dtype).to(device)  # (B, N_pts-1)
+        d_star[first_cond] = b[first_cond]
+        d_star[second_cond] = c[second_cond]
+        s = (a + b + c) / 2.0  # (B, N_eval-1)
+        area_before_sqrt = s * (s - a) * (s - b) * (s - c)
+        mask = ~first_cond & ~second_cond & (b + c - a > 0)
+        d_star[mask] = (2.0 * torch.sqrt(area_before_sqrt[mask])) / (a[mask])
+        d_star = (sdf[:, 1:].sign() * sdf[:, :-1].sign() == 1) * d_star  # (B, N_pts-1)
+
+        return d_star
+
+    @staticmethod
+    def get_integral_bound(integral_esti, beta, d_star, dists):
         """Sub-func under error bound calculation
 
         Args:
@@ -295,6 +320,8 @@ class VolSDF(Base3dModel):
         error_per_section = torch.exp(-d_star / beta) * (dists**2.) / (4 * beta**2)
         error_integral = torch.cumsum(error_per_section, dim=-1)  # (B, N_pts)
         bound_opacity = (torch.clamp(torch.exp(error_integral), max=1.e6) - 1.0) * torch.exp(-integral_esti[:, :-1])
+        # handle nan
+        bound_opacity[torch.isnan(bound_opacity)] = np.inf
 
         return bound_opacity
 

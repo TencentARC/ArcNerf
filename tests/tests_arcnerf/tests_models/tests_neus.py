@@ -4,7 +4,9 @@
 import os
 import os.path as osp
 
-from arcnerf.models.neus_model import sdf_to_alpha
+import numpy as np
+
+from arcnerf.models.neus_model import sdf_to_alpha, sdf_to_pdf
 from arcnerf.render.ray_helper import make_sample_rays, ray_marching, sample_ray_marching_output_by_index
 from common.utils.torch_utils import np_wrapper
 from common.visual.plot_2d import draw_2d_components
@@ -45,7 +47,10 @@ class TestNeusDict(TestModelDict):
         self._test_pts_dir_forward(model, pts, view_dir)
 
         # test sdf_to_alpha
-        self._sdf_to_alpha()
+        self._test_sdf_to_alpha()
+
+        # test weight
+        self._test_sdf_weight()
 
     def _test_forward_inference_only(self, model, feed_in):
         """Test that all keys are not started with progress_"""
@@ -57,7 +62,8 @@ class TestNeusDict(TestModelDict):
         self.assertTrue('normal_pts' not in output.keys())
         self.assertTrue('params' not in output.keys())
 
-    def _sdf_to_alpha(self):
+    def _test_sdf_to_alpha(self):
+        """Test sdf to alpha under different scale"""
         scale = [1, 10, 100]
         sample_sdf = make_sample_rays(n_pts=128)
 
@@ -84,3 +90,74 @@ class TestNeusDict(TestModelDict):
                 title='ray marching from neus sdf_to_alpha. Scale {}'.format(s),
                 save_path=file_path
             )
+
+    def _test_sdf_weight(self):
+        """Test sdf to weight under different algorithm"""
+        s = 100
+        sample_sdf = make_sample_rays(n_pts=256)
+        total_len = len(sample_sdf['zvals_list'])
+        # only select a decreasing list
+        start, end = int(total_len / 3.5), int(total_len / 2.5)
+        sample_sdf['vals'] = sample_sdf['vals'][:, start:end]
+        sample_sdf['mid_vals'] = sample_sdf['mid_vals'][:, start:end - 1]
+        sample_sdf['zvals'] = sample_sdf['zvals'][:, start:end]
+        sample_sdf['mid_zvals'] = sample_sdf['mid_zvals'][:, start:end - 1]
+        sample_sdf['mid_slope'] = sample_sdf['mid_slope'][:, start:end - 1]
+
+        self.make_result_dir()
+
+        # use simple sdf to sigma
+        sigma = np_wrapper(sdf_to_pdf, sample_sdf['vals'], s)
+        output = np_wrapper(ray_marching, sigma, None, sample_sdf['zvals'], False, 0.0, False, False, None)
+        visual_list, _ = sample_ray_marching_output_by_index(output)
+        visual_list = visual_list[0]
+
+        # use neus
+        alpha = np_wrapper(sdf_to_alpha, sample_sdf['mid_vals'], sample_sdf['zvals'], sample_sdf['mid_slope'], s)
+        output = np_wrapper(
+            ray_marching, sample_sdf['mid_vals'], None, sample_sdf['mid_zvals'], False, 0.0, False, False, alpha
+        )
+        visual_list_neus, _ = sample_ray_marching_output_by_index(output)
+        visual_list_neus = visual_list_neus[0]
+        visual_list_neus['legends'][0] = 'sdf'
+
+        # combine result
+        points = visual_list_neus['points']
+        lines = []
+        legends = []
+
+        for idx, legend in enumerate(visual_list_neus['legends']):
+            if legend == 'sdf':
+                lines.append(visual_list_neus['lines'][idx])
+                legends.append('sdf')
+            elif legend == 'weights':
+                weights = visual_list_neus['lines'][idx]
+                lines.append(weights)
+                legends.append('neus_weights')
+                # add a vertical weight for max
+                max_weight_index = weights[1].index(max(weights[1]))
+                max_zvals = weights[0][max_weight_index]
+                lines.append([[max_zvals] * 30, np.linspace(-1, 2, 30)])
+                legends.append('neus_max_weights')
+
+        for idx, legend in enumerate(visual_list['legends']):
+            if legend == 'weights':
+                weights = visual_list['lines'][idx]
+                lines.append(weights)
+                legends.append('naive_weights')
+                # add a vertical weight for max
+                max_weight_index = weights[1].index(max(weights[1]))
+                max_zvals = weights[0][max_weight_index]
+                lines.append([[max_zvals] * 30, np.linspace(-1, 2, 30)])
+                legends.append('naive_max_weights')
+
+        file_path = osp.join(self.result_dir, 'neus_weight.png')
+        draw_2d_components(
+            points=points,
+            lines=lines,
+            legends=legends,
+            xlabel='zvals',
+            ylabel='',
+            title='ray marching from neus by different method',
+            save_path=file_path
+        )

@@ -542,7 +542,7 @@ def make_sample_rays(near=2.0, far=4.0, n_pts=32, v_max=2.0, v_min=-1.0, sdf=Tru
     zvals = np.linspace(near, far, n_pts)[None]
     zvals_list = zvals[0].tolist()
 
-    mid_zvals = 0.5 * (zvals[:, 1:] + zvals[:, -1])
+    mid_zvals = 0.5 * (zvals[:, 1:] + zvals[:, :-1])
     mid_zvals_list = mid_zvals[0].tolist()
 
     vals = np.concatenate([np.linspace(v_max, v_min, half_pts), np.linspace(v_min, v_max, half_pts)])[None]

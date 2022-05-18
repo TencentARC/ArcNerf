@@ -201,6 +201,17 @@ def sdf_to_cdf(sdf: torch.Tensor, s):
     return torch.sigmoid(sdf * s)
 
 
+def sdf_to_pdf(sdf: torch.Tensor, s):
+    """Turn sdf to pdf function using sigmoid function
+
+    Args:
+        sdf: tensor (B, N_pts)
+        s: scale factor
+    """
+    esx = torch.exp(-sdf * s)
+    return s * esx / ((1 + esx)**2)
+
+
 def sdf_to_alpha(mid_sdf: torch.Tensor, zvals: torch.Tensor, mid_slope: torch.Tensor, s):
     """Turn sdf to alpha. When s goes to inf, weights focus more on surface
 
