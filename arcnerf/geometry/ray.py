@@ -251,3 +251,213 @@ def sphere_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, radius: 
     pts = pts.contiguous().view(n_rays, n_sphere, 2, 3)
 
     return near, far, pts, mask
+
+
+def surface_ray_intersection(
+    rays_o: torch.Tensor,
+    rays_d: torch.Tensor,
+    geo_func,
+    method='sphere_tracing',
+    far=10.0,
+    n_step=128,
+    n_iter=20,
+    threshold=0.01,
+    level=0.0,
+    grad_dir='ascent',
+):
+    """Finding the surface-ray intersection given geo_func(like sdf func)
+
+    Args:
+        rays_o: ray origin, (N_rays, 3)
+        rays_d: ray direction, assume normalized, (N_rays, 3)
+        geo_func: input a point with (N_pts, 3), return (N_pts) as sdf value
+        method: method used to find the intersection. support
+                ['sphere_tracing', 'secant_root_finding']
+        far: far distance to end the searching, after that are background. By default 10.0
+        n_step: used for secant_root_finding, split the whole ray into intervals. By default 128
+        n_iter: num of iter to run finding algorithm. By default 20
+        threshold: error bounding to stop the iteration. By default 0.01
+        level: the surface pts geo_value offset. 0.0 is for sdf. some positive value may be for density.
+        grad_dir: If descent, the inner obj has geo_value > level,
+                            find the root where geo_value first meet ---level+++
+                  If ascent, the inner obj has geo_value < level(like sdf),
+                            find the root where geo_value first meet +++level---
+
+    Returns:
+        zvals: (N_rays, 1), each ray intersection zvals. If no intersection, use the zvals after far
+        pts: (N_rays, 3), each ray with a point intersected with surface.
+        mask: (N_rays,), show whether each ray has intersection with the surface, BoolTensor
+    """
+    if method == 'sphere_tracing':
+        zvals, pts, mask = sphere_tracing(rays_o, rays_d, geo_func, far, n_iter, threshold)
+    elif method == 'secant_root_finding':
+        zvals, pts, mask = secant_root_finding(
+            rays_o, rays_d, geo_func, far, n_step, n_iter, threshold, level, grad_dir
+        )
+    else:
+        raise NotImplementedError('Method {} not support for surface-ray intersection'.format(method))
+
+    return zvals, pts, mask
+
+
+def sphere_tracing(rays_o: torch.Tensor, rays_d: torch.Tensor, sdf_func, far=20.0, n_iter=20, threshold=0.01):
+    """Finding the surface-ray intersection by sphere_tracing using sdf_func
+       If the pts is inside the obj (sdf < 0) or more than far, do not find its intersection pts.
+
+    Args:
+        rays_o: ray origin, (N_rays, 3)
+        rays_d: ray direction, assume normalized, (N_rays, 3)
+        sdf_func: input a point with (N_pts, 3), return (N_pts) as sdf value
+        far: far distance to end the searching, after that are background. By default 10.0
+        n_iter: num of iter to run sphere_tracing algorithm. By default 20
+        threshold: error bounding to stop the iteration. By default 0.01
+
+    Returns:
+        zvals: (N_rays, 1), each ray intersection zvals. If no intersection, use the zvals after far
+        pts: (N_rays, 3), each ray with a point intersected with surface.
+        mask: (N_rays,), show whether each ray has intersection with the surface, BoolTensor
+    """
+    dtype = rays_o.dtype
+    device = rays_o.device
+    n_rays = rays_o.shape[0]
+
+    zvals = torch.zeros((n_rays, 1), dtype=dtype).to(device)  # (N_rays, 1), start from rays_o
+    mask = torch.ones(n_rays).type(torch.BoolTensor).to(device)  # (N_rays)
+
+    for _ in range(n_iter):
+        pts = get_ray_points_by_zvals(rays_o, rays_d, zvals).view(-1, 3)  # (N_rays, 3)
+        with torch.no_grad():
+            sdf = sdf_func(pts)  # (N_rays)
+        # stop if all valid update sdf is small
+        if torch.all(torch.abs(sdf[mask]) < threshold):
+            break
+        zvals[mask] += sdf[mask][:, None]  # (N_rays, 1)
+        mask[zvals[:, 0] > far] = False
+        mask[zvals[:, 0] < 0.0] = False
+    zvals = zvals.clamp_min(0.0)  # negative becomes
+
+    pts = get_ray_points_by_zvals(rays_o, rays_d, zvals).view(-1, 3)
+
+    return zvals, pts, mask
+
+
+def secant_root_finding(
+    rays_o: torch.Tensor,
+    rays_d: torch.Tensor,
+    geo_func,
+    far=20.0,
+    n_step=128,
+    n_iter=20,
+    threshold=0.01,
+    level=0.0,
+    grad_dir='ascent'
+):
+    """Finding the surface-ray intersection by root finding using secant method. It does not require sdf
+
+    Args:
+        rays_o: ray origin, (N_rays, 3)
+        rays_d: ray direction, assume normalized, (N_rays, 3)
+        geo_func: input a point with (N_pts, 3), return (N_pts) as geo value(density, sdf)
+        far: far distance to end the searching, after that are background. By default 10.0
+        n_step: used for secant_root_finding, split the whole ray into intervals. By default 128
+        n_iter: num of iter to run finding algorithm. By default 20
+        threshold: error bounding to stop the iteration. By default 0.01
+        level: the surface pts geo_value offset. 0.0 is for sdf. some positive value may be for density.
+        grad_dir: If descent, the inner obj has geo_value > level,
+                            find the root where geo_value first meet ---level+++
+                  If ascent, the inner obj has geo_value < level(like sdf),
+                            find the root where geo_value first meet +++level---
+
+    Returns:
+        zvals: (N_rays, 1), each ray intersection zvals. If no intersection, use the zvals as far
+        pts: (N_rays, 3), each ray with a point intersected with surface.
+        mask: (N_rays,), show whether each ray has intersection with the surface, BoolTensor
+    """
+    dtype = rays_o.dtype
+    device = rays_o.device
+    n_rays = rays_o.shape[0]
+
+    zvals = torch.zeros((n_rays, 1), dtype=dtype).to(device)  # (N_rays, 1), start from rays_o
+
+    t = torch.linspace(0., 1., n_step, device=device)[None, :]  # (N_pts, 1)
+    _near = torch.zeros((n_rays, 1), dtype=dtype).to(device)
+    _far = torch.ones((n_rays, 1), dtype=dtype).to(device) * far
+    step = _near * (1 - t) + _far * t  # (N_rays, N_pts)
+
+    pts = get_ray_points_by_zvals(rays_o, rays_d, step).view(-1, 3)  # (N_rays*N_pts, 3)
+    with torch.no_grad():
+        geo_value = geo_func(pts).view(n_rays, -1)  # (N_rays, N_pts)
+    geo_value_diff = geo_value - level
+    if grad_dir == 'descent':
+        geo_value_diff *= -1  # from ---+++ to +++---
+
+    # if the first one is inside, the value is negative
+    mask_not_occ = (geo_value_diff[..., 0] > 0)  # (N_rays)
+
+    # capture the sign change from +++ to ---
+    sign_matrix = torch.cat(
+        [
+            torch.sign(geo_value_diff[..., :-1] * geo_value_diff[..., 1:]),  # (N_rays, N_pts-1)
+            torch.ones([n_rays, 1], device=device)  # (N_rays, 1)
+        ],
+        dim=-1
+    )  # (N_rays, N_pts)
+
+    # first change gives higher weights
+    cost_matrix = sign_matrix * torch.arange(n_step, 0, -1).type(dtype).to(device)  # (N_rays, N_pts)
+    min_cost, index = torch.min(cost_matrix, -1)  # (N_rays) * 2
+
+    # at least one sign change in (0, far)
+    mask_sign_change = (min_cost < 0)
+
+    # mask change from +++ to ---
+    mask_pos_to_neg = (geo_value_diff[torch.arange(n_rays), index] > 0)
+
+    # all the mask
+    mask = (mask_not_occ & mask_sign_change & mask_pos_to_neg)
+
+    # run secant method, just run on the rays with intersection
+    z_high = step[torch.arange(n_rays), index][mask]  # (N_rays_valid)
+    geo_high = geo_value_diff[torch.arange(n_rays), index][mask]  # (N_rays_valid)
+    index = torch.clamp(index + 1, max=n_step - 1)
+    z_low = step[torch.arange(n_rays), index][mask]  # (N_rays_valid)
+    geo_low = geo_value_diff[torch.arange(n_rays), index][mask]  # (N_rays_valid)
+
+    rays_o_mask = rays_o[mask]
+    rays_d_mask = rays_d[mask]
+    n_rays_valid = rays_o_mask.shape[0]
+
+    # weight zvals near surface
+    z_mid = -geo_low * (z_high - z_low) / (geo_high - geo_low) + z_low  # (N_rays_valid)
+    z_mid_init = z_mid.clone()
+    for i in range(n_iter):
+        # stop if all valid update sdf is small
+        if i > 0 and torch.all(torch.abs(z_mid_init - z_mid) < threshold):
+            break
+        pts_mid = get_ray_points_by_zvals(rays_o_mask, rays_d_mask, z_mid.unsqueeze(1)).view(-1, 3)  # (N_rays_valid, 3)
+        with torch.no_grad():
+            geo_mid_value = geo_func(pts_mid).view(n_rays_valid, -1)  # (n_rays_valid, 1)
+        geo_mid_value_diff = geo_mid_value - level
+        if grad_dir == 'descent':
+            geo_mid_value_diff *= -1  # from ---+++ to +++---
+
+        ind_low = (geo_mid_value_diff[:, 0] < 0)  # (n_rays_valid)
+        if ind_low.sum() > 0:
+            z_low[ind_low] = z_mid[ind_low]
+            geo_low[ind_low] = geo_mid_value_diff[ind_low]
+
+        if ~ind_low.sum() > 0:
+            z_high[~ind_low] = z_mid[~ind_low]
+            geo_high[~ind_low] = geo_mid_value_diff[~ind_low]
+
+        z_mid = -geo_low * (z_high - z_low) / (geo_high - geo_low) + z_low  # (N_rays_valid)
+
+    # update zvals for different case
+    zvals[mask] = z_mid
+    zvals[~mask] = far  # if no change, too far
+    zvals[~mask_not_occ] = 0.0  # inside obj
+    zvals.clamp_min(0.0)
+
+    pts = get_ray_points_by_zvals(rays_o, rays_d, zvals).view(-1, 3)
+
+    return zvals, pts, mask

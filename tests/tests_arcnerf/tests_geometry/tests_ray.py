@@ -6,11 +6,12 @@ import os.path as osp
 import unittest
 
 import numpy as np
+import torch
 
 from arcnerf.geometry.poses import look_at, generate_cam_pose_on_sphere
 from arcnerf.geometry.ray import (
     closest_point_on_ray, closest_point_to_rays, closest_point_to_two_rays, get_ray_points_by_zvals,
-    sphere_ray_intersection
+    sphere_ray_intersection, sphere_tracing, secant_root_finding
 )
 from arcnerf.geometry.transformation import normalize
 from arcnerf.render.camera import PerspectiveCamera
@@ -318,6 +319,96 @@ class TestDict(unittest.TestCase):
             plotly=True,
             plotly_html=True
         )
+
+    def tests_sphere_tracing(self):
+        # set sphere
+        radius = 1.0
+
+        # set rays
+        rays_o = np.array([
+            [1.5, 1.5, 1.5],  # outside with intersection
+            [0.2, 0.2, 0.2],  # inside with intersection, do not count
+            [1.5, 1.5, 1.5],  # outside with no intersection
+        ])  # (N_rays, 3)
+        rays_d = np.array([[-1.0, -1.0, -1.0], [-1.0, -1.0, -1.0], [1.0, 0.0, 0.0]])  # (N_rays, 3)
+        rays_d = normalize(rays_d)
+
+        # sdf func by (dist - r)
+        def sdf_func(pts):
+            return torch.norm(pts, dim=-1) - radius
+
+        zvals, pts, mask = np_wrapper(sphere_tracing, rays_o, rays_d, sdf_func, 2.0)
+
+        # for different case
+        rays_d[mask] *= zvals[mask] * 1.2
+        blue_color = get_combine_colors(['blue'], [1])
+        ray_colors = get_combine_colors(['red'], [rays_o.shape[0]])
+        ray_colors[mask, :] = blue_color[0]
+
+        file_path = osp.join(RESULT_DIR, 'surface_ray_intersection_sphere_tracing.png')
+        draw_3d_components(
+            points=pts,
+            rays=(rays_o, rays_d),
+            ray_linewidth=0.5,
+            ray_colors=ray_colors,
+            sphere_radius=radius,
+            title='surface ray intersection(ray in red no intersection), method sphere_tracing',
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True
+        )
+
+    def tests_secant_root_finding(self):
+        # set sphere
+        radius = 1.0
+
+        # set rays
+        rays_o = np.array([
+            [1.5, 1.5, 1.5],  # outside with intersection
+            [0.2, 0.2, 0.2],  # inside with intersection, do not count
+            [1.5, 1.5, 1.5],  # outside with no intersection
+        ])  # (N_rays, 3)
+        rays_d = np.array([[-1.0, -1.0, -1.0], [-1.0, -1.0, -1.0], [1.0, 0.0, 0.0]])  # (N_rays, 3)
+        rays_d = normalize(rays_d)
+
+        # sdf func by (dist - r)
+        def sdf_func(pts):
+            return torch.norm(pts, dim=-1) - radius
+
+        # density with 10.0 as surface break value
+        level = 10.0
+
+        def sigma_func(pts):
+            return (radius - torch.norm(pts, dim=-1)) + level
+
+        # two cases, sdf and density
+        geo_types = ['sdf', 'sigma']
+        levels = [0, level]
+        grad_dirs = ['ascent', 'descent']
+        geo_funcs = [sdf_func, sigma_func]
+
+        for geo_type, level, grad_dir, geo_func in zip(geo_types, levels, grad_dirs, geo_funcs):
+            zvals, pts, mask = np_wrapper(
+                secant_root_finding, rays_o, rays_d, geo_func, 5.0, 128, 10, 0.01, level, grad_dir
+            )
+
+            rays_d[mask] *= zvals[mask] * 1.2
+            blue_color = get_combine_colors(['blue'], [1])
+            ray_colors = get_combine_colors(['red'], [rays_o.shape[0]])
+            ray_colors[mask, :] = blue_color[0]
+
+            file_path = osp.join(RESULT_DIR, 'surface_ray_intersection_secant_root_finding_{}.png'.format(geo_type))
+            draw_3d_components(
+                points=pts,
+                rays=(rays_o, rays_d),
+                ray_linewidth=0.5,
+                ray_colors=ray_colors,
+                sphere_radius=radius,
+                title='surface ray intersection(ray in red no intersection), method secant_root_finding',
+                save_path=file_path,
+                plotly=True,
+                plotly_html=True
+            )
 
     @staticmethod
     def get_max_abs_error(a, b):
