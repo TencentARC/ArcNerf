@@ -25,7 +25,7 @@ inference:
     render:
         type: [circle]
         n_cam: [20]
-        radius: 3.0
+        radius: 2.0     # cam distribution is different in front and back
         u_start: 0.75
         v_ratio: -0.2
 

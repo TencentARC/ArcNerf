@@ -52,7 +52,7 @@ progress:
     epoch_save_progress: 50000
     iter_save_progress: 1
 
-    epoch_val: 10
+    epoch_val: 50000
     save_progress_val: True
     max_samples_val: 1
 
@@ -60,7 +60,7 @@ progress:
     local_progress: False
 
     init_eval: False
-    epoch_eval: 20
+    epoch_eval: 100000
     max_samples_eval: 3
 
 dataset:
@@ -97,7 +97,7 @@ inference:
         type: [circle]
         n_cam: [1]
         repeat: [3]
-        radius: 3.0
+        radius: 2.0
         u_start: 0.75
         v_ratio: -0.2
         fps: 5
