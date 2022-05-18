@@ -5,11 +5,13 @@ import os
 import os.path as osp
 import torch
 
+from arcnerf.geometry.ray import get_ray_points_by_zvals
+from arcnerf.geometry.transformation import normalize
 from arcnerf.models.volsdf_model import sdf_to_sigma
 from arcnerf.render.ray_helper import (
     get_zvals_from_near_far, make_sample_rays, ray_marching, sample_ray_marching_output_by_index
 )
-from common.utils.torch_utils import np_wrapper
+from common.utils.torch_utils import np_wrapper, torch_to_np
 from common.visual.plot_2d import draw_2d_components
 from tests.tests_arcnerf.tests_models import TestModelDict, RESULT_DIR
 
@@ -74,6 +76,9 @@ class TestVolsdfDict(TestModelDict):
         # test sdf_to_sigma
         self._test_sdf_to_sigma()
 
+        # test sample position
+        self._test_sampling(model, cfgs)
+
     def _test_forward_inference_only(self, model, feed_in):
         """Test that all keys are not started with progress_"""
         output = model(feed_in, inference_only=True)
@@ -110,3 +115,84 @@ class TestVolsdfDict(TestModelDict):
                 title='ray marching from volsdf sdf_to_sigma. Beta {}'.format(str(b)),
                 save_path=file_path
             )
+
+    def _test_sampling(self, model, cfgs):
+
+        def sdf_func(pts: torch.Tensor):
+            """pts: (B, 3). sdf (B)"""
+            radius = 1.0
+            return torch.norm(pts, dim=1) - radius
+
+        def get_2d_output(zvals, zvals_sample, zvals_surface, sdf):
+            """Return a dict for 2d """
+            # write output
+            res = {'points': [], 'lines': [], 'legends': []}
+            # all coarse sample
+            x = torch_to_np(zvals[0]).tolist()
+            res['points'].append([x, [-1] * len(x)])
+            # real sampling
+            x = torch_to_np(zvals_sample[0]).tolist()
+            res['points'].append([x, [-1.5] * len(x)])
+            # surface point
+            x = torch_to_np(zvals_surface[0]).tolist()
+            res['points'].append([x, [-2] * len(x)])
+
+            # sdf line with coarse zvals
+            res['lines'].append([torch_to_np(zvals[0]).tolist(), sdf.tolist()])
+            res['legends'].append('sdf')
+
+            res['lines'].append([torch_to_np(zvals[0]).tolist(), [0] * zvals.shape[1]])
+            res['legends'].append('surface')
+
+            return res
+
+        self.make_result_dir()
+
+        # ray
+        rays_o = torch.tensor([1.5, 1.5, 1.5])[None]  # (1, 3)
+        rays_d = torch.tensor([-1.0, -1.0, -1.0])[None]  # (1, 3)
+        rays_d = normalize(rays_d)
+
+        # near/far zvals of coarse sampling
+        near = torch.tensor([0.5])[None]
+        far = torch.tensor([5.5])[None]
+        zvals = get_zvals_from_near_far(near, far, cfgs.model.rays.n_eval)  # (1, N_eval)
+        pts = get_ray_points_by_zvals(rays_o, rays_d, zvals).view(-1, 3)  # (N_eval, 3)
+        sdf = sdf_func(pts)  # (N_eval)
+
+        # with n_importance
+        zvals_sample, zvals_surface = model.get_fg_model().sample_zvals(
+            rays_o, rays_d, zvals, True, sdf_func
+        )  # (1, n_importance+n_sample), (1, 1)
+
+        res = get_2d_output(zvals, zvals_sample, zvals_surface, sdf)
+
+        file_path = osp.join(
+            self.result_dir, 'volsdf_sample_zvals_nimportance{}.png'.format(cfgs.model.rays.n_importance)
+        )
+        draw_2d_components(
+            points=res['points'],
+            lines=res['lines'],
+            legends=res['legends'],
+            title='Sample with n_importance',
+            save_path=file_path
+        )
+
+        # with no n_importance(all near surface)
+        model.get_fg_model().set_ray_cfgs('n_importance', 0)
+
+        zvals_sample, zvals_surface = model.get_fg_model().sample_zvals(
+            rays_o, rays_d, zvals, True, sdf_func
+        )  # (1, n_sample), (1, 1)
+
+        res = get_2d_output(zvals, zvals_sample, zvals_surface, sdf)
+
+        file_path = osp.join(self.result_dir, 'volsdf_sample_zvals_nimportance0.png')
+
+        draw_2d_components(
+            points=res['points'],
+            lines=res['lines'],
+            legends=res['legends'],
+            title='Sample with no n_importance',
+            save_path=file_path
+        )

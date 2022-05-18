@@ -49,10 +49,15 @@ class Base3dModel(BaseModel):
         return ray_cfgs
 
     def get_ray_cfgs(self, key=None):
+        """Get ray cfgs by optional key"""
         if key is None:
             return self.ray_cfgs
 
         return self.ray_cfgs[key]
+
+    def set_ray_cfgs(self, key, value):
+        """Set ray cfgs by key"""
+        self.ray_cfgs[key] = value
 
     def get_chunk_rays(self):
         """Get the chunk rays num"""
