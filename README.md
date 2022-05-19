@@ -2,7 +2,6 @@
 
 
 # TODO:
-- shpere tracing(sdf, density), surface类方法
 - cuda实现的geometry函数和数据结构
 - tetrahedra相关
 - nvdiffras vs pytorch3d
