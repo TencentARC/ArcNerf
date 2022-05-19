@@ -102,6 +102,10 @@ def set_inference_data(cfgs, intrinsic, wh: tuple, dtype=torch.float32):
 
             infer_data['render']['inputs'].append(input)
 
+        # add surface render result
+        if render_cfgs['surface_render'] is not None:
+            infer_data['render']['surface_render'] = render_cfgs['surface_render'].__dict__
+
     # create volume for extraction
     if volume_cfgs is not None:
         infer_data['volume'] = {}
@@ -156,7 +160,8 @@ def parse_render(cfgs):
             'n_rot': get_value_from_cfgs_field(cfgs.render, 'n_rot', 3),
             'normal': tuple(get_value_from_cfgs_field(cfgs.render, 'normal', [0.0, 1.0, 0.0])),
             'reverse': get_value_from_cfgs_field(cfgs.render, 'reverse', False),
-            'fps': get_value_from_cfgs_field(cfgs.render, 'fps', 5)
+            'fps': get_value_from_cfgs_field(cfgs.render, 'fps', 5),
+            'surface_render': get_value_from_cfgs_field(cfgs.render, 'surface_render', None)
         }
         render_cfgs['repeat'] = get_value_from_cfgs_field(cfgs.render, 'repeat', [1] * len(render_cfgs['n_cam']))
 
@@ -234,36 +239,86 @@ def run_infer(data, get_model_feed_in, model, logger, device):
 def run_infer_render(data, get_model_feed_in, model, device, logger):
     """Run render inference and return lists of different video frames"""
     render_out = []
-    for idx, input in enumerate(data['inputs']):
-        total_forward_time = 0.0
-        logger.add_log('Rendering video {}...'.format(idx))
-        img_w, img_h = int(data['wh'][0]), int(data['wh'][1])
-        images = []
-        for rays in input:
-            feed_in, batch_size = get_model_feed_in(rays, device)  # only read rays_o/d here, (1, WH, 3)
-            assert batch_size == 1, 'Only one image is sent to model at once for inference...'
+    surface_render_out = []
+    # for idx, input in enumerate(data['inputs']):
+    #     total_forward_time = 0.0
+    #     logger.add_log('Rendering video {}...'.format(idx))
+    #     img_w, img_h = int(data['wh'][0]), int(data['wh'][1])
+    #     images = []
+    #     for rays in input:
+    #         feed_in, batch_size = get_model_feed_in(rays, device)  # only read rays_o/d here, (1, WH, 3)
+    #         assert batch_size == 1, 'Only one image is sent to model at once for inference...'
+    #
+    #         time0 = time.time()
+    #         output = model(feed_in, inference_only=True)
+    #         total_forward_time += (time.time() - time0)
+    #
+    #         # get rgb only
+    #         rgb = output['rgb']  # (1, HW, 3)
+    #         rgb = img_to_uint8(torch_to_np(rgb).copy()).reshape(img_h, img_w, 3)  # (H, W, 3), bgr
+    #         images.append(rgb)
+    #
+    #     # repeat the image
+    #     images = images * data['cfgs']['repeat'][idx]
+    #     render_out.append(images)
+    #
+    #     logger.add_log(
+    #         '    Render {} image, each hw({}/{}) total time {:.2f}s'.format(
+    #             len(input), img_h, img_w, total_forward_time
+    #         )
+    #     )
+    #     logger.add_log('    Each image takes time {:.2f}s'.format(total_forward_time / float(len(input))))
 
-            time0 = time.time()
-            output = model(feed_in, inference_only=True)
-            total_forward_time += (time.time() - time0)
+    # surface render
+    if 'surface_render' in data and data['surface_render'] is not None:
+        # reset model chunk rays for faster processing
+        origin_chunk_rays = model.get_chunk_rays()
+        chunk_rays_factor = 1
+        if 'chunk_rays_factor' in data['surface_render']:
+            chunk_rays_factor = data['surface_render']['chunk_rays_factor']
+        model.set_chunk_rays(origin_chunk_rays * chunk_rays_factor)
 
-            # get rgb only
-            rgb = output['rgb']  # (1, HW, 3)
-            rgb = img_to_uint8(torch_to_np(rgb).copy()).reshape(img_h, img_w, 3)  # (H, W, 3), bgr
-            images.append(rgb)
+        for idx, input in enumerate(data['inputs']):
+            total_forward_time = 0.0
+            logger.add_log('Rendering video {} by surface rendering...'.format(idx))
+            img_w, img_h = int(data['wh'][0]), int(data['wh'][1])
+            images = []
+            for rays in input:
+                feed_in, batch_size = get_model_feed_in(rays, device)  # only read rays_o/d here, (1, WH, 3)
+                assert batch_size == 1, 'Only one image is sent to model at once for inference...'
 
-        # repeat the image
-        images = images * data['cfgs']['repeat'][idx]
-        render_out.append(images)
+                time0 = time.time()
+                output = model.surface_render(feed_in, **data['surface_render'])  # call surface rendering
+                total_forward_time += (time.time() - time0)
 
-        logger.add_log(
-            '    Render {} image, each hw({}/{}) total time {:.2f}s'.format(
-                len(input), img_h, img_w, total_forward_time
+                # get rgb only
+                rgb = output['rgb']  # (1, HW, 3)
+                rgb = img_to_uint8(torch_to_np(rgb).copy()).reshape(img_h, img_w, 3)  # (H, W, 3), bgr
+                images.append(rgb)
+
+            # repeat the image
+            images = images * data['cfgs']['repeat'][idx]
+            surface_render_out.append(images)
+
+            logger.add_log(
+                '   Surface Render {} image, each hw({}/{}) total time {:.2f}s'.format(
+                    len(input), img_h, img_w, total_forward_time
+                )
             )
-        )
-        logger.add_log('    Each image takes time {:.2f}s'.format(total_forward_time / float(len(input))))
+            logger.add_log('    Each image takes time {:.2f}s'.format(total_forward_time / float(len(input))))
 
-    return render_out
+        # set back
+        model.set_chunk_rays(origin_chunk_rays)
+
+    if len(render_out) == 0 and len(surface_render_out) == 0:
+        return None
+
+    output = {
+        'render_out': render_out,
+        'surface_out': surface_render_out,
+    }
+
+    return output
 
 
 @torch.no_grad()
@@ -433,9 +488,9 @@ def write_infer_files(files, folder, data, logger):
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    # write down video
-    if files['render'] is not None and len(files['render']) > 0:
-        for vid, frames in enumerate(files['render']):
+    # write down video for volume rendering
+    if files['render'] is not None and len(files['render']['render_out']) > 0:
+        for vid, frames in enumerate(files['render']['render_out']):
             video_path = osp.join(
                 folder, 'render_video{}_{}_n{}_fps{}.mp4'.format(
                     vid, data['render']['cfgs']['type'][vid], data['render']['cfgs']['n_cam'][vid],
@@ -443,7 +498,19 @@ def write_infer_files(files, folder, data, logger):
                 )
             )
             write_video(frames, video_path, fps=data['render']['cfgs']['fps'])
-        logger.add_log('Write videos to {}'.format(folder))
+        logger.add_log('Write volume render videos to {}'.format(folder))
+
+    # write down video for surface rendering
+    if files['render'] is not None and len(files['render']['surface_out']) > 0:
+        for vid, frames in enumerate(files['render']['surface_out']):
+            video_path = osp.join(
+                folder, 'surface_render_video{}_{}_n{}_fps{}.mp4'.format(
+                    vid, data['render']['cfgs']['type'][vid], data['render']['cfgs']['n_cam'][vid],
+                    data['render']['cfgs']['fps']
+                )
+            )
+            write_video(frames, video_path, fps=data['render']['cfgs']['fps'])
+        logger.add_log('Write surface render videos to {}'.format(folder))
 
     # write down extract mesh
     if files['volume'] is not None:

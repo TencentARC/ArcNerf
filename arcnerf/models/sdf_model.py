@@ -78,7 +78,7 @@ class SdfModel(Base3dModel):
         # get full result
         depth = zvals  # at max zvals after far
         mask_float = mask.type(dtype)
-        rgb = torch.zeros((n_rays, 3), dtype=dtype).to(device)
+        rgb = torch.ones((n_rays, 3), dtype=dtype).to(device)  # white bkg
         normal = torch.zeros((n_rays, 3), dtype=dtype).to(device)
         rgb[mask] = rgb_mask
         normal[mask] = normal_mask

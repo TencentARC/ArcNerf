@@ -375,7 +375,7 @@ class Base3dModel(BaseModel):
         # get full result
         depth = zvals  # at max zvals after far
         mask_float = mask.type(dtype)
-        rgb = torch.zeros((n_rays, 3), dtype=dtype).to(device)
+        rgb = torch.ones((n_rays, 3), dtype=dtype).to(device)  # white bkg
         rgb[mask] = rgb_mask
 
         output = {

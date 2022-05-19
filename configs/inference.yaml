@@ -41,6 +41,14 @@ inference:
         n_rot: 3                    # n_rot of camera path
         reverse: False              # reverse u range for swing mode only
         fps: 5                      # render video fps
+        # surface_render:           # whether to add surface rendering, good for sdf model
+        #     chunk_rays_factor: 16 # set this to allow model to process more rays in surface_render mode
+        #     method: sphere_tracing  # method to find surface pts, ['sphere_tracing', 'secant_root_finding']
+        #     n_step: 128           # used for secant_root_finding, split the whole ray into intervals. By default 128
+        #     n_iter: 20            # num of iter to run finding algorithm. By default 20
+        #     threshold: 0.01       # error bounding to stop the iteration. By default 0.01
+        #     level: 0.0            # level set for mesh extracting. For sigma is around 50. For sdf is 0.
+        #     grad_dir: ascent      # if 'descent', sigma is larger than level in obj(NeRF), if 'ascent' is smaller(SDF)
 
     # set volume if you want to extract mesh
     volume:                         # volume params

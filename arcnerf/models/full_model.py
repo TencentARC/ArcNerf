@@ -74,9 +74,9 @@ class FullModel(nn.Module):
 
     def set_chunk_rays(self, chunk_rays):
         """Set the chunk rays num for both model"""
-        self.fg_model.set_chunk_pts(chunk_rays)
+        self.fg_model.set_chunk_rays(chunk_rays)
         if self.bkg_model is not None:
-            self.bkg_model.set_chunk_pts(chunk_rays)
+            self.bkg_model.set_chunk_rays(chunk_rays)
 
     def set_chunk_pts(self, chunk_pts):
         """Set the chunk pts num for both model"""
@@ -371,7 +371,15 @@ class FullModel(nn.Module):
         return output
 
     def surface_render(
-        self, inputs, method='sphere_tracing', n_step=128, n_iter=20, threshold=0.01, level=0.0, grad_dir='ascent'
+        self,
+        inputs,
+        method='sphere_tracing',
+        n_step=128,
+        n_iter=20,
+        threshold=0.01,
+        level=0.0,
+        grad_dir='ascent',
+        **kwargs
     ):
         """Surface rendering using foreground model. Only in inference mode.
 

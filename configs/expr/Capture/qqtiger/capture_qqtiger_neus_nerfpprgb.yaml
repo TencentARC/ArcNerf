@@ -101,6 +101,10 @@ inference:
         u_start: 0.75
         v_ratio: -0.2
         fps: 5
+        surface_render:
+            chunk_rays_factor: 16
+            method: sphere_tracing
+
 
     volume:
         n_grid: 512

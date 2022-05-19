@@ -513,7 +513,7 @@ def sample_ray_marching_output_by_index(output, index=None, n_rays=1, sigma_scal
 
 def make_sample_rays(near=2.0, far=4.0, n_pts=32, v_max=2.0, v_min=-1.0, sdf=True):
     """Make a synthetic sdf ray from + -> 0 -> - -> 0 -> +
-   (near)           (far)
+    (near)           (far)
      + (max)         + (max)
       +             +
        +           +
