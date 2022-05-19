@@ -289,8 +289,6 @@ class VolSDF(SdfModel):
         error_per_section = torch.exp(-d_star / beta) * (dists**2.) / (4 * beta**2)
         error_integral = torch.cumsum(error_per_section, dim=-1)  # (B, N_pts)
         bound_opacity = (torch.clamp(torch.exp(error_integral), max=1.e6) - 1.0) * torch.exp(-integral_esti[:, :-1])
-        # handle nan
-        bound_opacity[torch.isnan(bound_opacity)] = np.inf
 
         return bound_opacity
 
@@ -313,7 +311,7 @@ class VolSDF(SdfModel):
         # random pts in sphere, (B, 1, 3)
         pts_rand = torch.empty(size=(rays_o.shape[0], 1, 3), dtype=dtype)\
             .uniform_(-bounding_radius, bounding_radius).to(device)
-        pts_rand = pts_rand / torch.norm(pts_rand, -1, keepdim=True) * bounding_radius  # make sure in sphere
+        pts_rand = pts_rand / torch.norm(pts_rand, dim=-1, keepdim=True).max() * bounding_radius  # make sure in sphere
 
         # pts on surface, (B, 1, 3)
         pts_surface = None

@@ -147,12 +147,12 @@ class GeoNet(nn.Module):
             tensor in shape (B, 1) for geometric value(sdf, sigma, occ).
             tensor in shape (B, W_feat) if W_feat > 0. None if W_feat <= 0
         """
-        x = self.embed_fn(x)  # input_ch -> embed_dim
-        out = x
+        x_embed = self.embed_fn(x)  # input_ch -> embed_dim
+        out = x_embed
 
         for i in range(self.D + 1):
             if i in self.skips:
-                out = torch.cat([out, x], dim=-1)  # cat at last
+                out = torch.cat([out, x_embed], dim=-1)  # cat at last
                 if self.norm_skip:
                     out = out / math.sqrt(2)
             out = self.layers[i](out)
@@ -324,8 +324,8 @@ class RadianceNet(nn.Module):
         """
         inputs = []
         if 'p' in self.mode:
-            x = self.embed_fn_pts(x)  # input_ch_pts -> embed_pts_dim
-            inputs.append(x)
+            x_embed = self.embed_fn_pts(x)  # input_ch_pts -> embed_pts_dim
+            inputs.append(x_embed)
         if 'v' in self.mode:
             view_dirs = self.embed_fn_view(view_dirs)  # input_ch_view -> embed_view_dim
             inputs.append(view_dirs)

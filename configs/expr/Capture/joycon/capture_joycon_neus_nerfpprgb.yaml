@@ -143,7 +143,7 @@ model:
         embed_freq: 6
         W_feat: 256
         geometric_init: True          # use geometric init. need radius_init
-        radius_init: 0.75             # geometric init sphere radius
+        radius_init: 0.5             # geometric init sphere radius
         weight_norm: True
         skip_reduce_output: True
         norm_skip: True
