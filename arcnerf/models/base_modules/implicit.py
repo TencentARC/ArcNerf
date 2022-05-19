@@ -163,8 +163,8 @@ class GeoNet(nn.Module):
             return out[:, 0].unsqueeze(-1), out[:, 1:]
 
     def forward_geo_value(self, x: torch.Tensor):
-        """Only get geometry value like sigma/sdf/occ"""
-        return self.forward(x)[0]
+        """Only get geometry value like sigma/sdf/occ. In shape (B,) """
+        return self.forward(x)[0][:, 0]
 
     def forward_with_grad(self, x: torch.Tensor):
         """Get the grad of geo_value wrt input x. It could be the normal on surface"""

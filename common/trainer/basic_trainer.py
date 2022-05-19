@@ -153,10 +153,10 @@ class BasicTrainer(object):
     def set_reproducibility(self):
         """Set the random seed given cfgs.random_seed. Helps to keep reproducibility"""
         if self.cfgs.dist.random_seed:
-            self.logger.add_log('Require reproducibility, random seed as [{}].'.format(self.cfgs.random_seed))
+            self.logger.add_log('Require reproducibility, random seed as [{}].'.format(self.cfgs.dist.random_seed))
             torch.backends.cudnn.benchmark = False
             torch.backends.cudnn.deterministic = True
-            set_random_seed(self.cfgs.random_seed)
+            set_random_seed(self.cfgs.dist.random_seed)
         else:
             self.logger.add_log('Do not Require reproducibility.')
             torch.backends.cudnn.benchmark = True

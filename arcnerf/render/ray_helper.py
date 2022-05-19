@@ -129,7 +129,7 @@ def get_near_far_from_rays(
 
         if bounds is None:
             radius = torch.tensor([bounding_radius], dtype=dtype).to(device)
-            near, far, _, mask = sphere_ray_intersection(rays_o, rays_d, radius=radius)  # (BN, 1)
+            near, far, _, mask = sphere_ray_intersection(rays_o, rays_d, radius=radius)  # (N_rays, 1)
         else:
             near, far = bounds[:, 0:1], bounds[:, 1:2]
 
@@ -139,8 +139,11 @@ def get_near_far_from_rays(
         if far_hardcode is not None:
             far = far * 0 + far_hardcode
     else:
-        near = torch.ones(size=(n_rays, 1), dtype=dtype).to(device) * near_hardcode  # (BN, 1)
-        far = torch.ones(size=(n_rays, 1), dtype=dtype).to(device) * far_hardcode  # (BN, 1)
+        near = torch.ones(size=(n_rays, 1), dtype=dtype).to(device) * near_hardcode  # (N_rays, 1)
+        far = torch.ones(size=(n_rays, 1), dtype=dtype).to(device) * far_hardcode  # (N_rays, 1)
+
+    # in case near > far, cast far as near
+    far[far < near] = near[far < near]
 
     return near, far
 
@@ -255,7 +258,7 @@ def sample_pdf(bins: torch.Tensor, weights: torch.Tensor, n_sample, det=False, e
         eps: small value, 1e-5
 
     Returns:
-        samples: (B, n_sample) sampled based on pdf from bins
+        samples: (B, n_sample) sampled based on pdf from bins. sorted for each sample
     """
     weights = weights + eps
     pdf = weights / torch.sum(weights, -1, keepdim=True)  # (B, n_pts-1)
@@ -277,7 +280,7 @@ def sample_cdf(bins: torch.Tensor, cdf: torch.Tensor, n_sample, det=False, eps=1
         eps: small value, 1e-5
 
     Returns:
-        samples: (B, n_sample) sampled based on cdf from bins
+        samples: (B, n_sample) sampled based on cdf from bins. sorted for each sample
     """
     # Take uniform samples
     device = bins.device
@@ -303,6 +306,9 @@ def sample_cdf(bins: torch.Tensor, cdf: torch.Tensor, n_sample, det=False, eps=1
     denom[denom < eps] = 1
     t = (u - cdf_g[..., 0]) / denom
     samples = bins_g[..., 0] + t * (bins_g[..., 1] - bins_g[..., 0])  # (B, n_sample)
+
+    # sort
+    samples, _ = torch.sort(samples, -1)  # (B, n_sample)
 
     return samples
 
@@ -362,9 +368,13 @@ def ray_marching(
     assert sigma is not None or alpha is not None, 'Can not be None for both alpha and sigma..'
 
     deltas = zvals[:, 1:] - zvals[:, :-1]  # (N_rays, N_pts-1)
+    assert torch.all(deltas >= 0), 'zvals is not all increase....'
+
     _sigma = sigma
     _radiance = radiance
     _zvals = zvals
+
+    # add an inf distance as last to keep original dimension
     if add_inf_z:  # (N_rays, N_pts)
         deltas = torch.cat([deltas, 1e10 * torch.ones(size=(n_rays, 1), dtype=dtype).to(device)], dim=-1)
     else:
@@ -373,7 +383,8 @@ def ray_marching(
             _radiance = radiance[:, :-1, :] if radiance is not None else None  # (N_rays, N_pts-1, 3)
             _zvals = zvals[:, :-1]  # (N_rays, N_pts-1)
 
-    if alpha is None:  # use sigma to get alpha
+    # use sigma to get alpha
+    if alpha is None:
         noise = 0.0
         if noise_std > 0.0:
             noise = torch.randn(_sigma.shape, dtype=dtype).to(device) * noise_std
@@ -560,7 +571,7 @@ def make_sample_rays(near=2.0, far=4.0, n_pts=32, v_max=2.0, v_min=-1.0, sdf=Tru
         'zvals': zvals,  # (1, N_pts)
         'zvals_list': zvals_list,  # (N_pts)
         'vals': vals,  # (1, N_pts)
-        'vals_list': vals_list,  # (1N_pts)
+        'vals_list': vals_list,  # (1, N_pts)
         'mid_zvals': mid_zvals,  # (1, N_pts-1)
         'mid_zvals_list': mid_zvals_list,  # (N_pts-1)
         'mid_vals': mid_vals,  # (1, N_pts-1)

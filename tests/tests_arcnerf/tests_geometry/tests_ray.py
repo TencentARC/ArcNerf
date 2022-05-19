@@ -337,7 +337,7 @@ class TestDict(unittest.TestCase):
         def sdf_func(pts):
             return torch.norm(pts, dim=-1) - radius
 
-        zvals, pts, mask = np_wrapper(sphere_tracing, rays_o, rays_d, sdf_func, 2.0)
+        zvals, pts, mask = np_wrapper(sphere_tracing, rays_o, rays_d, sdf_func, 0.0, 2.0)
 
         # for different case
         rays_d[mask] *= zvals[mask] * 1.2
@@ -389,7 +389,7 @@ class TestDict(unittest.TestCase):
 
         for geo_type, level, grad_dir, geo_func in zip(geo_types, levels, grad_dirs, geo_funcs):
             zvals, pts, mask = np_wrapper(
-                secant_root_finding, rays_o, rays_d, geo_func, 5.0, 128, 10, 0.01, level, grad_dir
+                secant_root_finding, rays_o, rays_d, geo_func, 0.0, 5.0, 128, 10, 0.01, level, grad_dir
             )
 
             rays_d[mask] *= zvals[mask] * 1.2

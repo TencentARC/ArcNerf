@@ -22,21 +22,6 @@ class TestVolsdfDict(TestModelDict):
         self.result_dir = osp.join(RESULT_DIR, 'volsdf')
         os.makedirs(self.result_dir, exist_ok=True)
 
-    def create_feed_in_to_cuda(self):
-        feed_in = {
-            'img': torch.ones(self.batch_size, self.n_rays, 3),
-            'mask': torch.ones(self.batch_size, self.n_rays),
-            'rays_o': torch.rand(self.batch_size, self.n_rays, 3),
-            'rays_d': torch.rand(self.batch_size, self.n_rays, 3),
-            'bounds': torch.rand(self.batch_size, self.n_rays, 2),
-            'near': torch.ones(self.batch_size * self.n_rays, 1),
-            'far': torch.ones(self.batch_size * self.n_rays, 1)
-        }
-        for k, v in feed_in.items():
-            feed_in[k] = self.to_cuda(v)
-
-        return feed_in
-
     def tests_model(self):
         cfgs, logger = self.get_cfgs_logger('volsdf.yaml', 'volsdf.txt')
         model = self.build_model_to_cuda(cfgs, logger)
@@ -159,6 +144,12 @@ class TestVolsdfDict(TestModelDict):
         zvals = get_zvals_from_near_far(near, far, cfgs.model.rays.n_eval)  # (1, N_eval)
         pts = get_ray_points_by_zvals(rays_o, rays_d, zvals).view(-1, 3)  # (N_eval, 3)
         sdf = sdf_func(pts)  # (N_eval)
+
+        # put to gpu
+        if torch.cuda.is_available():
+            rays_o = rays_o.cuda()
+            rays_d = rays_d.cuda()
+            zvals = zvals.cuda()
 
         # with n_importance
         zvals_sample, zvals_surface = model.get_fg_model().sample_zvals(

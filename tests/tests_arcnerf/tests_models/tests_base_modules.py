@@ -107,7 +107,7 @@ class TestDict(unittest.TestCase):
         self.assertEqual(x.shape, grad.shape)
         self.assertEqual(feat.shape, (self.batch_size, 256))
         geo_value = model.forward_geo_value(x)
-        self.assertEqual(geo_value.shape, (self.batch_size, 1))
+        self.assertEqual(geo_value.shape, (self.batch_size, ))
 
     def tests_radiancenet(self):
         xyz = torch.ones((self.batch_size, 3))

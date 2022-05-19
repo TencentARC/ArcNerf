@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from .base_3d_model import Base3dModel
+from .sdf_model import SdfModel
 from .base_modules import GeoNet, RadianceNet
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.transformation import normalize
@@ -15,7 +15,7 @@ from common.utils.torch_utils import chunk_processing
 
 
 @MODEL_REGISTRY.register()
-class VolSDF(Base3dModel):
+class VolSDF(SdfModel):
     """ VolSDF model. 8 layers in GeoNet and 4 layer in RadianceNet
         Model SDF and convert it to density.
         ref: https://github.com/lioryariv/volsdf
@@ -36,11 +36,6 @@ class VolSDF(Base3dModel):
         # radius init for object
         self.radius_init = get_value_from_cfgs_field(self.cfgs.model.geometry, 'radius_init', 1.0)
         self.ln_beta, self.beta_min, self.speed_factor = self.get_params()
-
-    @staticmethod
-    def sigma_reverse():
-        """It use SDF(inside object is smaller)"""
-        return True
 
     def get_params(self):
         """Get scale param"""
@@ -116,32 +111,6 @@ class VolSDF(Base3dModel):
 
         return output
 
-    def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
-        """Rewrite for normal handling"""
-        if view_dir is None:
-            rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
-        else:
-            rays_d = normalize(view_dir)  # norm view dir
-
-        sdf, rgb, _ = chunk_processing(
-            self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, pts, rays_d
-        )
-
-        return sdf, rgb
-
-    @staticmethod
-    def _forward_pts_dir(
-        geo_net,
-        radiance_net,
-        pts: torch.Tensor,
-        rays_d: torch.Tensor = None,
-    ):
-        """Rewrite to use normal processing """
-        sdf, feature, normal = geo_net.forward_with_grad(pts)
-        radiance = radiance_net(pts, rays_d, normal, feature)
-
-        return sdf[..., 0], radiance, normal
-
     def sample_zvals(self, rays_o: torch.Tensor, rays_d: torch.Tensor, zvals: torch.Tensor, inference_only, sdf_func):
         """Sample zvals near surface
 
@@ -161,7 +130,7 @@ class VolSDF(Base3dModel):
         device = zvals.device
         n_rays = zvals.shape[0]
 
-        samples, samples_idx = zvals.clone(), None
+        samples, samples_idx = zvals, None
         sdf = None
 
         beta0 = self.forward_beta().detach()

@@ -5,7 +5,6 @@ import torch
 from .base_3d_model import Base3dModel
 from .base_modules import GeoNet, RadianceNet
 from arcnerf.geometry.ray import get_ray_points_by_zvals
-from arcnerf.geometry.transformation import normalize
 from arcnerf.render.ray_helper import sample_pdf
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import MODEL_REGISTRY
@@ -29,6 +28,17 @@ class NeRF(Base3dModel):
         if self.get_ray_cfgs('n_importance') > 0:
             self.fine_geo_net = GeoNet(**self.cfgs.model.geometry.__dict__)
             self.fine_radiance_net = RadianceNet(**self.cfgs.model.radiance.__dict__)
+
+    def get_net(self):
+        """Get the actual net for usage"""
+        if self.get_ray_cfgs('n_importance') > 0:
+            geo_net = self.fine_geo_net
+            radiance_net = self.fine_radiance_net
+        else:
+            geo_net = self.coarse_geo_net
+            radiance_net = self.coarse_radiance_net
+
+        return geo_net, radiance_net
 
     def pretrain_siren(self):
         """Pretrain siren layer of implicit model"""
@@ -123,31 +133,21 @@ class NeRF(Base3dModel):
 
         return zvals
 
-    def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
-        """Rewrite for two stage implementation. """
-        if self.get_ray_cfgs('n_importance') > 0:
-            geo_net = self.fine_geo_net
-            radiance_net = self.fine_radiance_net
-        else:
-            geo_net = self.coarse_geo_net
-            radiance_net = self.coarse_radiance_net
+    def surface_render(
+        self,
+        inputs,
+        method='secant_root_finding',
+        n_step=128,
+        n_iter=20,
+        threshold=0.01,
+        level=50.0,
+        grad_dir='descent'
+    ):
+        """For density model, the surface is not exactly accurate. Not suggest ot use this func"""
+        assert grad_dir == 'descent', 'Invalid for density model in nerf...'
+        assert method != 'sphere_tracing', 'Do not support for density model in nerf...'
 
-        if view_dir is None:
-            rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
-        else:
-            rays_d = normalize(view_dir)  # norm view dir
+        # call parent class
+        output = super().surface_render(inputs, method, n_step, n_iter, threshold, level, grad_dir)
 
-        sigma, rgb = chunk_processing(self._forward_pts_dir, self.chunk_pts, False, geo_net, radiance_net, pts, rays_d)
-
-        return sigma, rgb
-
-    def forward_pts(self, pts: torch.Tensor):
-        """Rewrite for two stage implementation. """
-        if self.get_ray_cfgs('n_importance') > 0:
-            geo_net = self.fine_geo_net
-        else:
-            geo_net = self.coarse_geo_net
-
-        sigma, _ = chunk_processing(geo_net, self.chunk_pts, False, pts)
-
-        return sigma[..., 0]
+        return output

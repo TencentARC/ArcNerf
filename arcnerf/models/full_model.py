@@ -275,26 +275,20 @@ class FullModel(nn.Module):
 
         return final_output
 
-    def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
-        """Do not call forward directly using chunk_process since the tensor are not flatten to represent batch of rays.
-        It will call fg/bkg model.forward() with flatten inputs, and blend the result if bkg_model exists.
+    @staticmethod
+    def prepare_flatten_inputs(inputs):
+        """Prepare the inputs by flatten them from (B, N, ...) to (BN, ...)
 
         Args:
             inputs: a dict of torch tensor:
                 inputs['rays_o']: torch.tensor (B, N, 3), cam_loc/ray_start position
                 inputs['rays_d']: torch.tensor (B, N, 3), view dir(assume normed)
                 inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
-                inputs['bounds']: torch.tensor (B, 2). optional
-            inference_only: If True, only return the final results(not coarse, no progress).
-                            Use in eval/infer mode to save memory. By default False
-            get_progress: If True, output some progress for recording(in foreground),
-                          can not used in inference only mode. By default False
-            cur_epoch: current epoch, for training purpose only. By default 0.
-            total_epoch: total num of epoch, for training purpose only. By default 300k.
+                inputs['bounds']: torch.tensor (B, N, 2). optional
 
         Returns:
-            output: is a dict keys like (rgb/rgb_coarse/rgb_fine, depth, mask, normal, etc) based on _forward function.
-            If get_progress is True, output will contain keys like 'progress_xx' for xx in ['sigma', 'zvals', etc].
+            flatten_inputs:
+                value in inputs flatten into (BN, ...)
         """
         flat_inputs = {}
         rays_o = inputs['rays_o'].view(-1, 3)  # (BN, 3)
@@ -307,13 +301,52 @@ class FullModel(nn.Module):
         # optional inputs
         bounds = None
         if 'bounds' in inputs:
-            bounds = inputs['bounds'].view(-1, 2)  # (BN, 3)
+            bounds = inputs['bounds'].view(-1, 2)  # (BN, 2)
         flat_inputs['bounds'] = bounds
 
         mask = None
         if 'mask' in inputs:
             mask = inputs['mask'].view(-1)  # (BN,)
         flat_inputs['mask'] = mask
+
+        return flat_inputs, batch_size, n_rays_per_batch
+
+    @staticmethod
+    def reshape_output(output, batch_size, n_rays_per_batch):
+        """Reshape flatten output from (BN, ...) into (B, N, ...) dim"""
+        for k, v in output.items():
+            if isinstance(v, torch.Tensor) and batch_size * n_rays_per_batch == v.shape[0]:
+                new_shape = tuple([batch_size, n_rays_per_batch] + list(v.shape)[1:])
+                output[k] = v.view(new_shape)
+            else:
+                output[k] = v
+
+        return output
+
+    def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+        """Do not call forward directly using chunk_process since the tensor are not flatten to represent batch of rays.
+        It will call fg/bkg model.forward() with flatten inputs, and blend the result if bkg_model exists.
+
+        Args:
+            inputs: a dict of torch tensor:
+                inputs['rays_o']: torch.tensor (B, N, 3), cam_loc/ray_start position
+                inputs['rays_d']: torch.tensor (B, N, 3), view dir(assume normed)
+                inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
+                inputs['bounds']: torch.tensor (B, N, 2). optional
+            inference_only: If True, only return the final results(not coarse, no progress).
+                            Use in eval/infer mode to save memory. By default False
+            get_progress: If True, output some progress for recording(in foreground),
+                          can not used in inference only mode. By default False
+            cur_epoch: current epoch, for training purpose only. By default 0.
+            total_epoch: total num of epoch, for training purpose only. By default 300k.
+
+        Returns:
+            output: is a dict keys like (rgb/rgb_coarse/rgb_fine, depth, mask, normal, etc) based on _forward function.
+                      in (B, N, ...) dim.
+            If get_progress is True, output will contain keys like 'progress_xx' for xx in ['sigma', 'zvals', etc].
+        """
+        # prepare flatten inputs
+        flat_inputs, batch_size, n_rays_per_batch = self.prepare_flatten_inputs(inputs)
 
         # get fg output and bkg output
         get_progress_fg = True if (self.bkg_model is not None) else get_progress  # need the progress to blend
@@ -333,12 +366,47 @@ class FullModel(nn.Module):
         output = self.detach_progress(output)
 
         # reshape values from (B*N, ...) to (B, N, ...)
-        for k, v in output.items():
-            if isinstance(v, torch.Tensor) and batch_size * n_rays_per_batch == v.shape[0]:
-                new_shape = tuple([batch_size, n_rays_per_batch] + list(v.shape)[1:])
-                output[k] = v.view(new_shape)
-            else:
-                output[k] = v
+        output = self.reshape_output(output, batch_size, n_rays_per_batch)
+
+        return output
+
+    def surface_render(
+        self, inputs, method='sphere_tracing', n_step=128, n_iter=20, threshold=0.01, level=0.0, grad_dir='ascent'
+    ):
+        """Surface rendering using foreground model. Only in inference mode.
+
+        Args:
+            inputs: a dict of torch tensor:
+                inputs['rays_o']: torch.tensor (B, N, 3), cam_loc/ray_start position
+                inputs['rays_d']: torch.tensor (B, N, 3), view dir(assume normed)
+                inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
+                inputs['bounds']: torch.tensor (B, N, 2). optional
+            method: method used to find the intersection. support
+                ['sphere_tracing', 'secant_root_finding']
+            n_step: used for secant_root_finding, split the whole ray into intervals. By default 128
+            n_iter: num of iter to run finding algorithm. By default 20
+            threshold: error bounding to stop the iteration. By default 0.01
+            level: the surface pts geo_value offset. 0.0 is for sdf. some positive value may be for density.
+            grad_dir: If descent, the inner obj has geo_value > level,
+                                find the root where geo_value first meet ---level+++
+                      If ascent, the inner obj has geo_value < level(like sdf),
+                                find the root where geo_value first meet +++level---
+
+        Returns:
+            output: is a dict keys like (rgb/rgb_coarse/rgb_fine, depth, mask, normal, etc) based on _forward function.
+                    in (B, N, ...) dim.
+        """
+        # prepare flatten inputs
+        flat_inputs, batch_size, n_rays_per_batch = self.prepare_flatten_inputs(inputs)
+
+        # fg_model do surface tracing
+        output = chunk_processing(
+            self.fg_model.surface_render, self.fg_model.get_chunk_rays(), False, flat_inputs, method, n_step, n_iter,
+            threshold, level, grad_dir
+        )
+
+        # reshape values from (B*N, ...) to (B, N, ...)
+        output = self.reshape_output(output, batch_size, n_rays_per_batch)
 
         return output
 

@@ -41,3 +41,6 @@ class TestNerfPPDict(TestModelDict):
         # direct pts/view
         pts, view_dir = self.create_pts_dir_to_cuda()
         self._test_pts_dir_forward(model, pts, view_dir)
+
+        # surface render
+        self._test_surface_render(model, feed_in, method='secant_root_finding', grad_dir='descent')

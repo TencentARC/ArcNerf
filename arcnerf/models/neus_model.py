@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .base_3d_model import Base3dModel
+from .sdf_model import SdfModel
 from .base_modules import GeoNet, RadianceNet
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.transformation import normalize
@@ -16,7 +16,7 @@ from common.utils.torch_utils import chunk_processing
 
 
 @MODEL_REGISTRY.register()
-class Neus(Base3dModel):
+class Neus(SdfModel):
     """ Neus model. 8 layers in GeoNet and 4 layer in RadianceNet
         Model SDF and convert it to alpha.
         ref: https://lingjie0206.github.io/papers/NeuS
@@ -34,11 +34,6 @@ class Neus(Base3dModel):
         self.radius_init = get_value_from_cfgs_field(self.cfgs.model.geometry, 'radius_init', 1.0)
         self.inv_s, self.speed_factor = self.get_params()
         self.anneal_end = get_value_from_cfgs_field(self.cfgs.model.params, 'anneal_end', 0)
-
-    @staticmethod
-    def sigma_reverse():
-        """It use SDF(inside object is smaller)"""
-        return True
 
     def get_params(self):
         """Get scale param"""
@@ -112,32 +107,6 @@ class Neus(Base3dModel):
         output = self.output_get_progress(output, get_progress)
 
         return output
-
-    def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
-        """Rewrite to use normal processing """
-        if view_dir is None:
-            rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
-        else:
-            rays_d = normalize(view_dir)  # norm view dir
-
-        sigma, rgb, _ = chunk_processing(
-            self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, pts, rays_d
-        )
-
-        return sigma, rgb
-
-    @staticmethod
-    def _forward_pts_dir(
-        geo_net,
-        radiance_net,
-        pts: torch.Tensor,
-        rays_d: torch.Tensor = None,
-    ):
-        """Rewrite to use normal processing """
-        sdf, feature, normal = geo_net.forward_with_grad(pts)
-        radiance = radiance_net(pts, rays_d, normal, feature)
-
-        return sdf[..., 0], radiance, normal
 
     def upsample_zvals(self, rays_o: torch.Tensor, rays_d: torch.Tensor, zvals: torch.Tensor, inference_only, s=32):
         """Upsample zvals if N_importance > 0

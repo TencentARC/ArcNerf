@@ -52,6 +52,9 @@ class TestNeusDict(TestModelDict):
         # test weight
         self._test_sdf_weight()
 
+        # surface render
+        self._test_surface_render(model, feed_in, extra_keys=['normal'], extra_bn3=[True])
+
     def _test_forward_inference_only(self, model, feed_in):
         """Test that all keys are not started with progress_"""
         output = model(feed_in, inference_only=True)

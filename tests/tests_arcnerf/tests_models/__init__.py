@@ -83,11 +83,26 @@ class TestModelDict(unittest.TestCase):
 
     def create_feed_in_to_cuda(self):
         feed_in = {
-            'img': torch.ones(self.batch_size, self.n_rays, 3),
-            'mask': torch.ones(self.batch_size, self.n_rays),
-            'rays_o': torch.rand(self.batch_size, self.n_rays, 3),
-            'rays_d': torch.rand(self.batch_size, self.n_rays, 3),
-            'bounds': torch.rand(self.batch_size, self.n_rays, 2)
+            'img':
+            torch.ones(self.batch_size, self.n_rays, 3),
+            'mask':
+            torch.ones(self.batch_size, self.n_rays),
+            'rays_o':
+            torch.rand(self.batch_size, self.n_rays, 3),
+            'rays_d':
+            torch.rand(self.batch_size, self.n_rays, 3),
+            'near':
+            torch.ones(self.batch_size * self.n_rays, 1) * 2.0,
+            'far':
+            torch.ones(self.batch_size * self.n_rays, 1) * 6.0,
+            'bounds':
+            torch.cat(
+                [
+                    torch.ones(self.batch_size, self.n_rays, 1) * 2.0,  # near
+                    torch.ones(self.batch_size, self.n_rays, 1) * 6.0
+                ],  # far
+                dim=-1
+            ),
         }
         for k, v in feed_in.items():
             feed_in[k] = self.to_cuda(v)
@@ -159,3 +174,22 @@ class TestModelDict(unittest.TestCase):
             self.assertEqual(output['progress_{}'.format(key)].shape, progress_shape)
         if model.sigma_reverse():
             self.assertTrue(output['progress_sigma_reverse'][0])
+
+    def _test_surface_render(
+        self, model, feed_in, method='sphere_tracing', grad_dir='ascent', extra_keys=None, extra_bn3=None
+    ):
+        output = model.surface_render(feed_in, method=method, grad_dir=grad_dir)
+
+        if extra_keys is not None:
+            for idx, key in enumerate(extra_keys):
+                if extra_bn3 is None:
+                    gt_shape = (
+                        self.batch_size,
+                        self.n_rays,
+                    )
+                else:
+                    gt_shape = (self.batch_size, self.n_rays, 3) if extra_bn3[idx] else (
+                        self.batch_size,
+                        self.n_rays,
+                    )
+                self.assertEqual(output['{}'.format(key)].shape, gt_shape)

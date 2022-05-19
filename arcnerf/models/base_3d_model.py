@@ -2,6 +2,7 @@
 
 import torch
 
+from arcnerf.geometry.ray import surface_ray_intersection
 from arcnerf.geometry.transformation import normalize
 from arcnerf.render.ray_helper import get_near_far_from_rays, get_zvals_from_near_far, ray_marching
 from common.models.base_model import BaseModel
@@ -75,11 +76,21 @@ class Base3dModel(BaseModel):
         """Set the chunk pts num"""
         self.chunk_pts = chunk_pts
 
+    def get_net(self):
+        """Get the actual net for usage
+
+        Returns:
+            geo_net: The geometric network
+            radiance_net: The radiance network
+        """
+        return self.geo_net, self.radiance_net
+
     def pretrain_siren(self):
         """Pretrain siren layer of implicit model.
         Need to rewrite if your network name is different
         """
-        self.geo_net.pretrain_siren()
+        geo_net = self.get_net()[0]
+        geo_net.pretrain_siren()
 
     def get_near_far_from_rays(self, inputs):
         """Get the near/far zvals from rays given settings
@@ -233,14 +244,13 @@ class Base3dModel(BaseModel):
                 sigma/sdf: torch.tensor (N_pts), geometry value for each point
                 rgb: torch.tensor (N_pts, 3), color for each point
         """
+        geo_net, radiance_net = self.get_net()
         if view_dir is None:
             rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
         else:
             rays_d = normalize(view_dir)  # norm view dir
 
-        sigma, rgb = chunk_processing(
-            self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, pts, rays_d
-        )
+        sigma, rgb = chunk_processing(self._forward_pts_dir, self.chunk_pts, False, geo_net, radiance_net, pts, rays_d)
 
         return sigma, rgb
 
@@ -278,7 +288,8 @@ class Base3dModel(BaseModel):
             output: is a dict with following keys:
                 sigma/sdf: torch.tensor (N_pts), geometry value for each point
         """
-        sigma, _ = chunk_processing(self.geo_net, self.chunk_pts, False, pts)
+        geo_net, _ = self.get_net()
+        sigma, _ = chunk_processing(geo_net, self.chunk_pts, False, pts)
 
         return sigma[..., 0]
 
@@ -315,3 +326,62 @@ class Base3dModel(BaseModel):
                 params: a dict containing the custom params used in the model. Only when inference_only=False
         """
         raise NotImplementedError('Please implement the core forward function')
+
+    def surface_render(
+        self, inputs, method='sphere_tracing', n_step=128, n_iter=20, threshold=0.01, level=50.0, grad_dir='descent'
+    ):
+        """Surface rendering by finding the surface point and its color. Only for inference
+
+        Args:
+            inputs: a dict of torch tensor:
+                inputs['rays_o']: torch.tensor (B, 3), cam_loc/ray_start position
+                inputs['rays_d']: torch.tensor (B, 3), view dir(assume normed)
+                inputs['mask']: torch.tensor (B,), mask value in {0, 1}. optional
+                inputs['bounds']: torch.tensor (B, 2). optional
+            method: method used to find the intersection. support
+                ['sphere_tracing', 'secant_root_finding']
+            n_step: used for secant_root_finding, split the whole ray into intervals. By default 128
+            n_iter: num of iter to run finding algorithm. By default 20
+            threshold: error bounding to stop the iteration. By default 0.01
+            level: the surface pts geo_value offset. 0.0 is for sdf. some positive value may be for density.
+            grad_dir: If descent, the inner obj has geo_value > level,
+                                find the root where geo_value first meet ---level+++
+                      If ascent, the inner obj has geo_value < level(like sdf),
+                                find the root where geo_value first meet +++level---
+        Returns:
+            output: is a dict keys like (rgb/rgb_coarse/rgb_fine, depth, mask, normal, etc) based on _forward function.
+                    in (B, ...) dim.
+        """
+        rays_o = inputs['rays_o']  # (B, 3)
+        rays_d = inputs['rays_d']  # (B, 3)
+        dtype = rays_o.dtype
+        device = rays_o.device
+        n_rays = rays_o.shape[0]
+
+        # get bounds for object
+        near, far = self.get_near_far_from_rays(inputs)  # (B, 1) * 2
+
+        # get the network
+        geo_net, radiance_net = self.get_net()
+
+        # get surface pts
+        zvals, pts, mask = surface_ray_intersection(
+            rays_o, rays_d, geo_net.forward_geo_value, method, near, far, n_step, n_iter, threshold, level, grad_dir
+        )
+
+        # forward mask pts/dir for color
+        _, rgb_mask = self._forward_pts_dir(geo_net, radiance_net, pts[mask], rays_d[mask])
+
+        # get full result
+        depth = zvals  # at max zvals after far
+        mask_float = mask.type(dtype)
+        rgb = torch.zeros((n_rays, 3), dtype=dtype).to(device)
+        rgb[mask] = rgb_mask
+
+        output = {
+            'rgb': rgb,  # (B, 3)
+            'depth': depth,  # (B,)
+            'mask': mask_float,  # (B,)
+        }
+
+        return output
