@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import time
+import os
 import os.path as osp
 
 import numpy as np
@@ -238,36 +239,36 @@ def run_infer(data, get_model_feed_in, model, logger, device):
 @torch.no_grad()
 def run_infer_render(data, get_model_feed_in, model, device, logger):
     """Run render inference and return lists of different video frames"""
-    render_out = []
+    volume_render_out = []
     surface_render_out = []
-    # for idx, input in enumerate(data['inputs']):
-    #     total_forward_time = 0.0
-    #     logger.add_log('Rendering video {}...'.format(idx))
-    #     img_w, img_h = int(data['wh'][0]), int(data['wh'][1])
-    #     images = []
-    #     for rays in input:
-    #         feed_in, batch_size = get_model_feed_in(rays, device)  # only read rays_o/d here, (1, WH, 3)
-    #         assert batch_size == 1, 'Only one image is sent to model at once for inference...'
-    #
-    #         time0 = time.time()
-    #         output = model(feed_in, inference_only=True)
-    #         total_forward_time += (time.time() - time0)
-    #
-    #         # get rgb only
-    #         rgb = output['rgb']  # (1, HW, 3)
-    #         rgb = img_to_uint8(torch_to_np(rgb).copy()).reshape(img_h, img_w, 3)  # (H, W, 3), bgr
-    #         images.append(rgb)
-    #
-    #     # repeat the image
-    #     images = images * data['cfgs']['repeat'][idx]
-    #     render_out.append(images)
-    #
-    #     logger.add_log(
-    #         '    Render {} image, each hw({}/{}) total time {:.2f}s'.format(
-    #             len(input), img_h, img_w, total_forward_time
-    #         )
-    #     )
-    #     logger.add_log('    Each image takes time {:.2f}s'.format(total_forward_time / float(len(input))))
+    for idx, input in enumerate(data['inputs']):
+        total_forward_time = 0.0
+        logger.add_log('Rendering video {}...'.format(idx))
+        img_w, img_h = int(data['wh'][0]), int(data['wh'][1])
+        images = []
+        for rays in input:
+            feed_in, batch_size = get_model_feed_in(rays, device)  # only read rays_o/d here, (1, WH, 3)
+            assert batch_size == 1, 'Only one image is sent to model at once for inference...'
+
+            time0 = time.time()
+            output = model(feed_in, inference_only=True)
+            total_forward_time += (time.time() - time0)
+
+            # get rgb only
+            rgb = output['rgb']  # (1, HW, 3)
+            rgb = img_to_uint8(torch_to_np(rgb).copy()).reshape(img_h, img_w, 3)  # (H, W, 3), bgr
+            images.append(rgb)
+
+        # repeat the image
+        images = images * data['cfgs']['repeat'][idx]
+        volume_render_out.append(images)
+
+        logger.add_log(
+            '    Render {} image, each hw({}/{}) total time {:.2f}s'.format(
+                len(input), img_h, img_w, total_forward_time
+            )
+        )
+        logger.add_log('    Each image takes time {:.2f}s'.format(total_forward_time / float(len(input))))
 
     # surface render
     if 'surface_render' in data and data['surface_render'] is not None:
@@ -310,11 +311,11 @@ def run_infer_render(data, get_model_feed_in, model, device, logger):
         # set back
         model.set_chunk_rays(origin_chunk_rays)
 
-    if len(render_out) == 0 and len(surface_render_out) == 0:
+    if len(volume_render_out) == 0 and len(surface_render_out) == 0:
         return None
 
     output = {
-        'render_out': render_out,
+        'volume_out': volume_render_out,
         'surface_out': surface_render_out,
     }
 
@@ -484,33 +485,39 @@ def write_infer_files(files, folder, data, logger):
         logger.add_log('No inference perform...', level='warning')
         return
 
+    # store the geometry and rendering results
+    geo_folder = osp.join(folder, 'geometry')
+    os.makedirs(geo_folder, exist_ok=True)
+    render_folder = osp.join(folder, 'render')
+    os.makedirs(render_folder, exist_ok=True)
+
     # reduce memory for mesh rendering
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
     # write down video for volume rendering
-    if files['render'] is not None and len(files['render']['render_out']) > 0:
-        for vid, frames in enumerate(files['render']['render_out']):
+    if files['render'] is not None and len(files['render']['volume_out']) > 0:
+        for vid, frames in enumerate(files['render']['volume_out']):
             video_path = osp.join(
-                folder, 'render_video{}_{}_n{}_fps{}.mp4'.format(
+                render_folder, 'volume_render_video{}_{}_n{}_fps{}.mp4'.format(
                     vid, data['render']['cfgs']['type'][vid], data['render']['cfgs']['n_cam'][vid],
                     data['render']['cfgs']['fps']
                 )
             )
             write_video(frames, video_path, fps=data['render']['cfgs']['fps'])
-        logger.add_log('Write volume render videos to {}'.format(folder))
+        logger.add_log('Write volume render videos to {}'.format(render_folder))
 
     # write down video for surface rendering
     if files['render'] is not None and len(files['render']['surface_out']) > 0:
         for vid, frames in enumerate(files['render']['surface_out']):
             video_path = osp.join(
-                folder, 'surface_render_video{}_{}_n{}_fps{}.mp4'.format(
+                render_folder, 'surface_render_video{}_{}_n{}_fps{}.mp4'.format(
                     vid, data['render']['cfgs']['type'][vid], data['render']['cfgs']['n_cam'][vid],
                     data['render']['cfgs']['fps']
                 )
             )
             write_video(frames, video_path, fps=data['render']['cfgs']['fps'])
-        logger.add_log('Write surface render videos to {}'.format(folder))
+        logger.add_log('Write surface render videos to {}'.format(render_folder))
 
     # write down extract mesh
     if files['volume'] is not None:
@@ -522,13 +529,13 @@ def write_infer_files(files, folder, data, logger):
             # full pts to ply
             pts = pc['full']['pts']
             pts_colors = pc['full']['color']
-            pc_file = osp.join(folder, 'pc_extract.ply')
+            pc_file = osp.join(geo_folder, 'pc_extract.ply')
             save_point_cloud(pc_file, pts, pts_colors)
             # sample pts to plotly
             pts = pc['sample']['pts']
             pts_colors = pc['sample']['color']
             # draw pts in plotly
-            file_path = osp.join(folder, 'pc_extract.png')
+            file_path = osp.join(geo_folder, 'pc_extract.png')
             draw_3d_components(
                 points=pts,
                 point_colors=pts_colors,
@@ -539,25 +546,25 @@ def write_infer_files(files, folder, data, logger):
                 plotly=True,
                 plotly_html=True
             )
-            logger.add_log('Write point cloud visual to {}'.format(folder))
+            logger.add_log('Write point cloud visual to {}'.format(geo_folder))
 
         if 'mesh' in files['volume'] and files['volume']['mesh'] is not None:
             mesh = files['volume']['mesh']
 
             # save full mesh as .ply file, save verts/faces only
-            mesh_file = osp.join(folder, 'mesh_extract.ply')
+            mesh_file = osp.join(geo_folder, 'mesh_extract.ply')
             save_meshes(
                 mesh_file, mesh['full']['verts'], mesh['full']['faces'], mesh['full']['vert_colors'],
                 mesh['full']['face_colors'], mesh['full']['vert_normals'], mesh['full']['face_normals']
             )
-            mesh_geo_file = osp.join(folder, 'mesh_extract_geo.ply')
+            mesh_geo_file = osp.join(geo_folder, 'mesh_extract_geo.ply')
             save_meshes(mesh_geo_file, mesh['full']['verts'], mesh['full']['faces'], geo_only=True)
 
             # draw simplified in plotly
             verts_sim, faces_sim = mesh['simplify']['verts'], mesh['simplify']['faces']
             face_colors_sim = mesh['simplify']['face_colors']
             verts_by_faces, _ = get_verts_by_faces(verts_sim, faces_sim, None)
-            file_path = osp.join(folder, 'mesh_extract.png')
+            file_path = osp.join(geo_folder, 'mesh_extract.png')
             draw_3d_components(
                 volume=volume_dict,
                 meshes=[verts_by_faces],
@@ -567,7 +574,7 @@ def write_infer_files(files, folder, data, logger):
                 plotly=True,
                 plotly_html=True
             )
-            logger.add_log('Write mesh visual to {}'.format(folder))
+            logger.add_log('Write mesh visual to {}'.format(geo_folder))
 
             if 'render' in mesh:  # render the mesh only
                 render = mesh['render']
@@ -588,7 +595,7 @@ def write_infer_files(files, folder, data, logger):
                         device=render['device']
                     )  # (n_cam, h, w, 3)
 
-                    file_path = osp.join(folder, 'color_mesh_render_{}.mp4'.format(path_type))
+                    file_path = osp.join(render_folder, 'color_mesh_render_{}.mp4'.format(path_type))
                     write_video([color_imgs[idx] for idx in range(color_imgs.shape[0])] * render['repeat'][path_id],
                                 file_path, True, render['fps'])
 
@@ -608,8 +615,8 @@ def write_infer_files(files, folder, data, logger):
                         device=render['device']
                     )  # (n_cam, h, w, 3)
 
-                    file_path = osp.join(folder, 'geo_mesh_render_{}.mp4'.format(path_type))
+                    file_path = osp.join(render_folder, 'geo_mesh_render_{}.mp4'.format(path_type))
                     write_video([geo_imgs[idx] for idx in range(geo_imgs.shape[0])] * render['repeat'][path_id],
                                 file_path, True, render['fps'])
 
-                    logger.add_log('Write mesh rendering by {} to {}'.format(render['backend'], folder))
+                    logger.add_log('Write mesh rendering by {} to {}'.format(render['backend'], render_folder))
