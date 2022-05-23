@@ -312,7 +312,8 @@ class Volume(nn.Module):
 
     def update_voxel_idx(self, pts, grid_pts, volume_range, voxel_idx, valid_idx, check_idx, level):
         """Update the voxel_idx and valid_idx. It will only check the pts and update the idx using check_idx.
-        This call the function iteratively, may need to optimize memory/speed
+        TODO: This function is slow when call iteratively. Any way to optimize it?
+        TODO: Using pts only is slow, should we introduce pts_on_rays instead of rays?
 
         Args:
             pts: (B, 3)
