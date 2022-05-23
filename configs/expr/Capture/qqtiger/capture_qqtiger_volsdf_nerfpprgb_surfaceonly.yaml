@@ -84,7 +84,7 @@ dataset:
 
     eval:
         eval_batch_size: 1
-        eval_max_sample: 1
+        eval_max_sample: 3
         type: Capture
         scene_name: qqtiger
         img_scale: 1.0
@@ -95,7 +95,7 @@ dataset:
 inference:
     render:
         type: [circle]
-        n_cam: [1]
+        n_cam: [20]
         repeat: [3]
         radius: 2.0
         u_start: 0.75
