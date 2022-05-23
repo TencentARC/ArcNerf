@@ -55,13 +55,23 @@ Test func for ray sampling, resample cdf/pdf, etc.
 ### tests_models
 #### tests_base_modules
 Test embedder, implicit function, radiance function, with correct input/output.
+#### tests_bkg_model
+Test each bkg model like nerf++.
 #### tests_nerf
-Test NeRF model and NeRFFull Model
+Test NeRF model.
+#### tests_nerfpp
+Test NeRF model with nerf++ as bkg model.
+#### tests_neus
+Test Neus model and its sdf_to_alpha method with sampling.
+#### tests_volsdf
+Test VolSDF model and its sdf_to_sigma method with sampling.
+#### tests_volnet
+Test the custom dense volnet method, which contains an explict volume and get values for pts
+using trilinear interpolation.
 
 
 ### tests_loss
-Tests for loss functions.
+Tests for loss functions. Including geo_loss, img_loss, mask_loss.
 
 ### tests_metric
-Tests for eval metric functions.
-go
+Tests for eval metric functions. Including img_metric

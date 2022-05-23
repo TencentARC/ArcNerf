@@ -13,19 +13,20 @@ We provide `matplotlib` and `plotly` for visualization. By default it use `plt`.
 and is able to zoom-in/out, move. We can add `plotly=True` in `draw_3d_components`.
 
 ## Camera
-- c2w pose in `(N_cam, 4, 4)`. Local camera models will be created and transformed into world space
-- cam_colors in `(N_cam, 3)` or `(3,)` can be used to color each or all cams
-- intrinsic in `(3, 3)` is used to adjust local cam model for actual ray direction.
+- c2w pose: in `(N_cam, 4, 4)`. Local camera models will be created and transformed into world space
+- cam_colors: in `(N_cam, 3)` or `(3,)` can be used to color each or all cams
+- intrinsic: in `(3, 3)` is used to adjust local cam model for actual ray direction.
 
 ## Points
-- point in `(N_p, 3)` in world space
-- point_size is single value used to set each point size
-- point_color in `(N_p, 3)` or `(3,)` can be used to color each or all points
+- point: in `(N_p, 3)` in world space
+- point_size: is single value used to set each point size
+- point_color: in `(N_p, 3)` or `(3,)` can be used to color each or all points
 
 ## Lines
 - lines: a list of lines in `(N_pts_in_line, 3)` in world space, total `N_line`,
 each line prints `N_pt_in_line-1` line seg
-- line_colors in `(N_line, 3)` or `(3,)` can be used to color each or all lines
+- line_width: is single value or list of value used to set each line width.
+- line_colors: in `(N_line, 3)` or `(3,)` can be used to color each or all lines
 
 ## Meshes
 - meshes: a list of mesh of `(N_tri, 3, 3)` in world space, len is `N_m`

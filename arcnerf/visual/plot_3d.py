@@ -257,7 +257,7 @@ def draw_sphere(ax, radius, origin, min_values, max_values, plotly, color=None, 
     return min_values, max_values
 
 
-def draw_lines(ax, lines, line_colors, min_values, max_values, plotly):
+def draw_lines(ax, lines, line_widths, line_colors, min_values, max_values, plotly):
     """Draw lines. Each line in list is a np.array with shape (N_pt_in_line, 3)"""
     # set color, by default is dark
     n_line = len(lines)
@@ -266,6 +266,11 @@ def draw_lines(ax, lines, line_colors, min_values, max_values, plotly):
     if line_colors.shape == (3, ):
         line_colors = np.repeat(line_colors[None, :], n_line, axis=0)
     assert line_colors.shape == (n_line, 3), 'Invalid line colors shape...(N_line, 3) or (3,)'
+
+    if line_widths is None:
+        line_widths = [1.0] * n_line
+    elif isinstance(line_widths, int) or isinstance(line_widths, float):
+        line_widths = [line_widths] * n_line
 
     for idx, line in enumerate(lines):
         line_plt = transform_plt_space(line, xyz_axis=1)  # (N_pt, 3)
@@ -276,13 +281,16 @@ def draw_lines(ax, lines, line_colors, min_values, max_values, plotly):
                     y=line_plt[:, 1],
                     z=line_plt[:, 2],
                     mode='lines',
-                    line={'color': colorize_np(line_colors[idx])},
+                    line={
+                        'color': colorize_np(line_colors[idx]),
+                        'width': line_widths[idx]
+                    },
                     showlegend=False,
                     name='line {}'.format(idx)
                 )
             )
         else:
-            ax.plot(line_plt[:, 0], line_plt[:, 1], line_plt[:, 2], color=line_colors[idx])
+            ax.plot(line_plt[:, 0], line_plt[:, 1], line_plt[:, 2], color=line_colors[idx], linewidth=line_widths[idx])
         min_values = np.minimum(min_values, line_plt.min(0))
         max_values = np.maximum(max_values, line_plt.max(0))
 
@@ -359,7 +367,7 @@ def draw_volume(ax, volume, min_values, max_values, plotly):
 
     if 'lines' in volume:
         lines = volume['lines']  # n_lines * (2, 3)
-        min_values, max_values = draw_lines(ax, lines, None, min_values, max_values, plotly)
+        min_values, max_values = draw_lines(ax, lines, None, None, min_values, max_values, plotly)
 
     if 'faces' in volume:
         faces = volume['faces']  # (n, 4, 3)
@@ -382,6 +390,7 @@ def draw_3d_components(
     point_size=20,
     point_colors=None,
     lines=None,
+    line_widths=None,
     line_colors=None,
     rays=None,
     ray_colors=None,
@@ -412,6 +421,7 @@ def draw_3d_components(
         point_size: size of point, by default set up 20
         point_colors: color in (N_p, 3) or (3,), applied for each or all point
         lines: line in list of (N_pts_in_line, 3), len is N_line
+        line_widths: width of line in list of len N_line. Single value or None is accepted
         line_colors: color in (N_line, 3) or (3,), applied for each or all line
         rays: a tuple (rays_o, rays_d), each in (N_r, 3), in world coord
                 rays_d is with actual len, if you want longer arrow, you need to extend rays_d
@@ -458,7 +468,7 @@ def draw_3d_components(
         min_values, max_values = draw_sphere(ax, sphere_radius, sphere_origin, min_values, max_values, plotly)
 
     if lines is not None:
-        min_values, max_values = draw_lines(ax, lines, line_colors, min_values, max_values, plotly)
+        min_values, max_values = draw_lines(ax, lines, line_widths, line_colors, min_values, max_values, plotly)
 
     if meshes is not None:
         min_values, max_values = draw_meshes(ax, meshes, mesh_colors, face_colors, min_values, max_values, plotly)

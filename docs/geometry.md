@@ -68,6 +68,14 @@ Definition and function of a volume. For all the point you can get it in grid or
 - dense_lines: inner+outside bounding lines, `3*(n+1)^3` lines with `(2, 3)` start-end pts.
 - bound_faces: outside bounding faces, `6 faces`, tensor in `(6, 4, 3)` shape
 - dense_faces: inner+outside bounding faces, tensor in `((n_grid+1)n_grid^2*3, 4, 3)` shape
+- convert_flatten_index_to_xyz_index/convert_xyz_index_to_flatten_index: index conversion
+## ray/pts in volume
+For ray in pts in volume, we provide a lot of function like
+- check_pts_in_grid_boundary: check pts in voxel
+- get_voxel_idx_from_xyz: get voxel idx from pts position
+- get_grid_pts_idx_by_voxel_idx/get_grid_pts_by_voxel_idx: get grid pts index and position by voxel idx
+- cal_weights_to_grid_pts / interpolate: interpolate pts by grid_pts using trilinear interpolation
+
 
 # point cloud
 Function of point cloud with pts and color.

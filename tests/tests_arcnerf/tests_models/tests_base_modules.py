@@ -6,6 +6,7 @@ import os
 import os.path as osp
 import unittest
 
+from thop import profile
 import torch
 import torch.nn as nn
 
@@ -23,6 +24,7 @@ from arcnerf.models.base_modules import (
 from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.cfgs_utils import dict_to_obj
 from common.utils.torch_utils import torch_to_np, chunk_processing
+from common.utils.logger import Logger
 from common.visual import get_colors
 
 RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results'))
@@ -108,6 +110,27 @@ class TestDict(unittest.TestCase):
         self.assertEqual(feat.shape, (self.batch_size, 256))
         geo_value = model.forward_geo_value(x)
         self.assertEqual(geo_value.shape, (self.batch_size, ))
+
+    def tests_geonet_detail(self):
+        model = GeoNet()
+        logger = Logger(path=osp.join(RESULT_DIR, 'geonet.txt'), keep_console=False)
+        logger.add_log('Model Layers:')
+        logger.add_log(model)
+        logger.add_log('')
+        logger.add_log('Model Parameters: ')
+        for n, _ in model.named_parameters():
+            logger.add_log('   ' + n)
+        n_pts = 4096 * 128
+        flops, params = profile(model, inputs=(torch.ones((n_pts, 3)), ), verbose=False)
+        logger.add_log('Module Flops/Params: ')
+        logger.add_log('   N_pts: {}'.format(n_pts))
+        logger.add_log('')
+        if flops > 1024**3:
+            flops, unit = flops / (1024.0**3), 'G'
+        else:
+            flops, unit = flops / (1024.0**2), 'M'
+        logger.add_log('   Flops: {:.2f}{}'.format(flops, unit))
+        logger.add_log('   Params: {:.2f}M'.format(params / (1024.0**2)))
 
     def tests_radiancenet(self):
         xyz = torch.ones((self.batch_size, 3))
