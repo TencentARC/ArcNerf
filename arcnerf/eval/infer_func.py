@@ -339,7 +339,8 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
     volume_len = volume.get_len()  # (3,) tuple
 
     # move to gpu
-    volume_pts = volume_pts.cuda() if model.is_cuda() else volume_pts
+    if device == 'gpu':
+        volume_pts = volume_pts.cuda()
 
     # for volume visual
     volume_out['corner'] = torch_to_np(volume.get_corner())
@@ -392,7 +393,7 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
             logger.add_log('    Extract {} verts, {} faces'.format(verts.shape[0], faces.shape[0]))
 
             volume_out['mesh'] = {}
-            volume_out['mesh']['full'] = get_mesh_components(verts, faces, model, volume_pts.dtype, logger)
+            volume_out['mesh']['full'] = get_mesh_components(verts, faces, model, volume_pts.dtype, logger, device)
 
             # simplify mesh if need
             time0 = time.time()
@@ -403,7 +404,7 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
                 logger.add_log('    Simplify mesh time {:.2f}s'.format(time.time() - time0))
                 logger.add_log('    Simplify {} verts, {} faces'.format(verts_sim.shape[0], faces_sim.shape[0]))
                 volume_out['mesh']['simplify'] = get_mesh_components(
-                    verts_sim, faces_sim, model, volume_pts.dtype, logger
+                    verts_sim, faces_sim, model, volume_pts.dtype, logger, device
                 )
 
             # add c2w and intrinsic
@@ -432,7 +433,7 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
     return volume_out
 
 
-def get_mesh_components(verts, faces, model, dtype, logger):
+def get_mesh_components(verts, faces, model, dtype, logger, device):
     """Get all the mesh components using model"""
     vert_normals, face_normals = get_normals(verts, faces)
     face_centers = get_face_centers(verts, faces)
@@ -444,8 +445,9 @@ def get_mesh_components(verts, faces, model, dtype, logger):
     vert_view_dir = torch.tensor(vert_view_dir, dtype=dtype)  # (n, 3)
 
     # move to gpu
-    vert_pts = vert_pts.cuda() if model.is_cuda() else vert_pts
-    vert_view_dir = vert_view_dir.cuda() if model.is_cuda() else vert_view_dir
+    if device == 'gpu':
+        vert_pts = vert_pts.cuda()
+        vert_view_dir = vert_view_dir.cuda()
 
     time0 = time.time()
     _, vert_colors = model.forward_pts_dir(vert_pts, vert_view_dir)
@@ -458,8 +460,9 @@ def get_mesh_components(verts, faces, model, dtype, logger):
     face_view_dir = torch.tensor(face_view_dir, dtype=dtype)  # (n, 3)
 
     # move to gpu
-    face_center_pts = face_center_pts.cuda() if model.is_cuda() else face_center_pts
-    face_view_dir = face_view_dir.cuda() if model.is_cuda() else face_view_dir
+    if device == 'gpu':
+        face_center_pts = face_center_pts.cuda()
+        face_view_dir = face_view_dir.cuda()
 
     time0 = time.time()
     _, face_colors = model.forward_pts_dir(face_center_pts, face_view_dir)

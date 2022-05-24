@@ -261,8 +261,8 @@ def surface_ray_intersection(
     near=0.0,
     far=10.0,
     n_step=128,
-    n_iter=20,
-    threshold=0.01,
+    n_iter=100,
+    threshold=0.001,
     level=0.0,
     grad_dir='ascent',
 ):
@@ -278,8 +278,8 @@ def surface_ray_intersection(
         far: far distance to end the searching, after that are background. By default 10.0
             near/far can be single value or tensor in (N_rays, 1)
         n_step: used for secant_root_finding, split the whole ray into intervals. By default 128
-        n_iter: num of iter to run finding algorithm. By default 20
-        threshold: error bounding to stop the iteration. By default 0.01
+        n_iter: num of iter to run finding algorithm. By default 100, large enough to escape
+        threshold: error bounding to stop the iteration. By default 0.001 (1mm)
         level: the surface pts geo_value offset. 0.0 is for sdf. some positive value may be for density.
         grad_dir: If descent, the inner obj has geo_value > level,
                             find the root where geo_value first meet ---level+++
@@ -303,7 +303,9 @@ def surface_ray_intersection(
     return zvals, pts, mask
 
 
-def sphere_tracing(rays_o: torch.Tensor, rays_d: torch.Tensor, sdf_func, near=0.0, far=10.0, n_iter=20, threshold=0.01):
+def sphere_tracing(
+    rays_o: torch.Tensor, rays_d: torch.Tensor, sdf_func, near=0.0, far=10.0, n_iter=100, threshold=0.001
+):
     """Finding the surface-ray intersection by sphere_tracing using sdf_func
        If the pts is inside the obj (sdf < 0) or more than far, do not find its intersection pts.
 
@@ -314,8 +316,8 @@ def sphere_tracing(rays_o: torch.Tensor, rays_d: torch.Tensor, sdf_func, near=0.
         near: near distance to start the searching. By default 0.0
         far: far distance to end the searching, after that are background. By default 10.0
             near/far can be single value or tensor in (N_rays, 1)
-        n_iter: num of iter to run sphere_tracing algorithm. By default 20
-        threshold: error bounding to stop the iteration. By default 0.01
+        n_iter: num of iter to run sphere_tracing algorithm. By default 100, large enough to escape
+        threshold: error bounding to stop the iteration. By default 0.001 (1mm)
 
     Returns:
         zvals: (N_rays, 1), each ray intersection zvals. If no intersection, use the zvals after far
@@ -338,19 +340,30 @@ def sphere_tracing(rays_o: torch.Tensor, rays_d: torch.Tensor, sdf_func, near=0.
 
     zvals = torch.ones((n_rays, 1), dtype=dtype).to(device) * _near  # (N_rays, 1), start from rays_o
     mask = torch.ones(n_rays).type(torch.BoolTensor).to(device)  # (N_rays)
+    obj_mask = torch.zeros(n_rays).type(torch.BoolTensor).to(device)  # (N_rays)
+    sdf = torch.zeros(n_rays, dtype=dtype).to(device)  # (N_rays)
 
     for _ in range(n_iter):
-        pts = get_ray_points_by_zvals(rays_o, rays_d, zvals).view(-1, 3)  # (N_rays, 3)
-        with torch.no_grad():
-            sdf = sdf_func(pts)  # (N_rays)
-        # stop if all valid update sdf is small
-        if torch.all(torch.abs(sdf[mask]) < threshold):
+        # only update for the valid pts
+        valid_mask = torch.logical_and(~obj_mask, mask)  # (N_valid,)
+        pts = get_ray_points_by_zvals(rays_o[valid_mask], rays_d[valid_mask], zvals[valid_mask]).view(-1, 3)
+        # all pts are invalid
+        if pts.shape[0] == 0:
             break
-        zvals[mask] += sdf[mask][:, None]  # (N_rays, 1)
+        with torch.no_grad():
+            sdf[valid_mask] = sdf_func(pts)  # (N_valid)
+        # stop if all valid update sdf is small
+        if torch.all(torch.abs(sdf) < threshold):
+            break
+        # update obj mask if sdf is small
+        obj_mask[torch.abs(sdf) < threshold] = True
+        # update only not converge rays
+        zvals[torch.logical_and(~obj_mask, mask)] += sdf[torch.logical_and(~obj_mask, mask)][:, None]  # (N_valid, 1)
+        # update mask
         mask[zvals[:, 0] > _far[:, 0]] = False
         mask[zvals[:, 0] < _near[:, 0]] = False
 
-    zvals[zvals <= near] = 0.0  # set min distance
+    zvals[zvals <= near] = 0.0  # set min distance as 0.0
 
     pts = get_ray_points_by_zvals(rays_o, rays_d, zvals).view(-1, 3)
 
@@ -365,7 +378,7 @@ def secant_root_finding(
     far=10.0,
     n_step=128,
     n_iter=20,
-    threshold=0.01,
+    threshold=0.001,
     level=0.0,
     grad_dir='ascent'
 ):
@@ -380,7 +393,7 @@ def secant_root_finding(
             near/far can be single value or tensor in (N_rays, 1)
         n_step: used for secant_root_finding, split the whole ray into intervals. By default 128
         n_iter: num of iter to run finding algorithm. By default 20
-        threshold: error bounding to stop the iteration. By default 0.01
+        threshold: error bounding to stop the iteration. By default 0.001 (1mm)
         level: the surface pts geo_value offset. 0.0 is for sdf. some positive value may be for density.
         grad_dir: If descent, the inner obj has geo_value > level,
                             find the root where geo_value first meet ---level+++
