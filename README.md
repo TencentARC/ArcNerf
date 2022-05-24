@@ -10,16 +10,18 @@
 - 材质拆解
 
 - real time inference online demo, any view point visual(opengl, cuda, etc)
+- 在线训练可视化， 前后端
 
 - 参考框架
   - nerf(nerfpl) - DONE
   - nerf++ - DONE
   - neus/volsdf (sdf/occpancy) - neurcon - DONE
+
+  - nsvf/plenoxel/plenoctree + instangp/hash_nerf
   - neuraltex
+  - marching/deftet, demtet
   - nerfFactor/nerd
   - mip-nerf
-  - nsvf/plenoxel/plenoctree + instangp
-  - marching/deftet, demtet
   - dynamic
   - neural volume
   - nex (mpi, msi, etc)
