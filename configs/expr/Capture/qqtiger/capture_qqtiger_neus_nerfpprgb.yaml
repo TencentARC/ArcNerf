@@ -102,7 +102,7 @@ inference:
         v_ratio: -0.2
         fps: 5
         surface_render:
-            chunk_rays_factor: 16
+            chunk_rays_factor: 1024
             method: sphere_tracing
 
 

@@ -375,7 +375,7 @@ class FullModel(nn.Module):
         inputs,
         method='sphere_tracing',
         n_step=128,
-        n_iter=20,
+        n_iter=100,
         threshold=0.01,
         level=0.0,
         grad_dir='ascent',
@@ -392,7 +392,7 @@ class FullModel(nn.Module):
             method: method used to find the intersection. support
                 ['sphere_tracing', 'secant_root_finding']
             n_step: used for secant_root_finding, split the whole ray into intervals. By default 128
-            n_iter: num of iter to run finding algorithm. By default 20
+            n_iter: num of iter to run finding algorithm. By default 100, large enough to escape
             threshold: error bounding to stop the iteration. By default 0.01
             level: the surface pts geo_value offset. 0.0 is for sdf. some positive value may be for density.
             grad_dir: If descent, the inner obj has geo_value > level,
