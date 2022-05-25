@@ -61,6 +61,36 @@ class Volume(nn.Module):
         self.cal_grid_pts()
         self.cal_volume_pts()
 
+    def to(self, device):
+        """Manually put the params to device"""
+        self.origin = self.origin.to(device)
+        self.xlen = self.xlen.to(device)
+        self.ylen = self.ylen.to(device)
+        self.zlen = self.zlen.to(device)
+        if self.range is not None:
+            self.range = self.range.to(device)
+        if self.corner is not None:
+            self.corner = self.corner.to(device)
+        if self.grid_pts is not None:
+            self.grid_pts = self.grid_pts.to(device)
+        if self.volume_pts is not None:
+            self.volume_pts = self.volume_pts.to(device)
+
+    def cuda(self, device=None):
+        """Manually put the params to cuda device"""
+        self.origin = self.origin.cuda(device)
+        self.xlen = self.xlen.cuda(device)
+        self.ylen = self.ylen.cuda(device)
+        self.zlen = self.zlen.cuda(device)
+        if self.range is not None:
+            self.range = self.range.cuda(device)
+        if self.corner is not None:
+            self.corner = self.corner.cuda(device)
+        if self.grid_pts is not None:
+            self.grid_pts = self.grid_pts.cuda(device)
+        if self.volume_pts is not None:
+            self.volume_pts = self.volume_pts.cuda(device)
+
     @torch.no_grad()
     def set_len(self, side, xlen, ylen, zlen):
         """Set len of each dim"""
@@ -85,10 +115,7 @@ class Volume(nn.Module):
         self.origin[2] = origin[2]
 
     def get_origin(self):
-        """
-        Returns:
-            origin: tensor(3, )
-        """
+        """Gets origin in tensor(3, )"""
         return self.origin
 
     def cal_range(self):

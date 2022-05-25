@@ -2,6 +2,7 @@
 
 import os
 import os.path as osp
+import time
 import unittest
 
 from thop import profile
@@ -60,6 +61,14 @@ def log_base_model_info(logger, model, feed_in, n_pts):
         flops, unit = flops / (1024.0**2), 'M'
     logger.add_log('   Flops: {:.2f}{}'.format(flops, unit))
     logger.add_log('   Params: {:.2f}M'.format(params / (1024.0**2)))
+
+    if torch.cuda.is_available():
+        model = model.cuda()
+        feed_in = feed_in.cuda()
+        time0 = time.time()
+        _ = model(feed_in)
+        torch.cuda.synchronize()
+        logger.add_log('For {} pts time {:.2f}s'.format(n_pts, time.time() - time0))
 
 
 class TestModelDict(unittest.TestCase):

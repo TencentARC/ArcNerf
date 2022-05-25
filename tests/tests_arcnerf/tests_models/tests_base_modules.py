@@ -12,13 +12,7 @@ import torch.nn as nn
 from arcnerf.geometry.mesh import extract_mesh, get_verts_by_faces
 from arcnerf.geometry.volume import Volume
 from arcnerf.models.base_modules import (
-    Embedder,
-    DenseLayer,
-    get_activation,
-    GeoNet,
-    RadianceNet,
-    Sine,
-    SirenLayer,
+    Embedder, DenseLayer, get_activation, GeoNet, RadianceNet, Sine, SirenLayer, VolGeoNet
 )
 from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.cfgs_utils import dict_to_obj
@@ -132,6 +126,45 @@ class TestDict(unittest.TestCase):
             model = RadianceNet(mode=mode, W=128, D=8, W_feat_in=256)
             y = model(xyz, view_dirs, normals, feat)
             self.assertEqual(y.shape, (self.batch_size, 3))
+
+    def tests_geo_volnet(self):
+        x = torch.rand((self.batch_size, 3)) * 0.5
+        # normal case
+        model = VolGeoNet(geometric_init=False, n_grid=128, side=1.5)
+        y, feat = model(x)
+        self.assertEqual(y.shape, (self.batch_size, 1))
+        self.assertEqual(feat.shape, (self.batch_size, 256))
+        # forward with normal output and geo value only
+        geo_value = model.forward_geo_value(x)
+        self.assertEqual(geo_value.shape, (self.batch_size, ))
+        geo_value, feat, grad = model.forward_with_grad(x)
+        self.assertEqual(x.shape, grad.shape)
+        self.assertEqual(feat.shape, (self.batch_size, 256))
+        # W_feat <= 0
+        model = VolGeoNet(geometric_init=False, n_grid=128, side=1.5, W_feat=0)
+        y, _ = model(x)
+        self.assertEqual(y.shape, (self.batch_size, 1))
+
+        # with nn
+        model = VolGeoNet(geometric_init=False, n_grid=128, side=1.5, use_nn=True)
+        y, feat = model(x)
+        self.assertEqual(y.shape, (self.batch_size, 1))
+        self.assertEqual(feat.shape, (self.batch_size, 256))
+
+        # geo_init
+        model = VolGeoNet(geometric_init=True, n_grid=128, side=1.5, use_nn=True)
+        y, feat = model(x)
+        self.assertEqual(y.shape, (self.batch_size, 1))
+        self.assertEqual(feat.shape, (self.batch_size, 256))
+
+    def tests_geo_volnet_detail(self):
+        n_grid = 16
+        model = VolGeoNet(geometric_init=False, n_grid=n_grid, side=1.5)
+        logger = Logger(path=osp.join(RESULT_DIR, 'geo_volnet.txt'), keep_console=False)
+        n_pts = 4096 * 128
+        feed_in = torch.rand((n_pts, 3)) * 0.5
+        log_base_model_info(logger, model, feed_in, n_pts)
+        logger.add_log('    Num grid {}'.format(n_grid))
 
     def tests_geonet_geo_siren_init(self):
         BASEMODULE_DIR = osp.abspath(osp.join(RESULT_DIR, 'base_module'))

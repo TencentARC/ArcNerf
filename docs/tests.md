@@ -1,8 +1,9 @@
 # Usage
 For any test, if it's `unittest` class, you can run
-`python -m unittest tests/xxx/test_file.py` or
-`python -m unittest discover tests/xxx/test_dir`, to auto run
+`python -m unittest tests.xxx.test_file.py` or
+`python -m unittest discover tests.xxx.test_dir`, to auto run
 all unittest for checking.
+Test a single func, use `python -m unittest tests.xxx.test_file.TestDict.tests_method`.
 
 For some tests that are not `unittest`, they are python by
 `python test_file.py`. They generally provide visual results.

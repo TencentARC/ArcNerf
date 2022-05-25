@@ -198,10 +198,6 @@ class VolSDF(SdfModel):
 
         zvals_sample = samples  # (B, N_sample)
 
-        # on surface pts
-        idx = torch.randint(zvals_sample.shape[-1], (zvals_sample.shape[0], )).to(device)
-        zvals_surface = torch.gather(zvals_sample, 1, idx.unsqueeze(-1))
-
         # add more pts on the whole ray. Actually take more pts not on surface
         if self.get_ray_cfgs('n_importance') > 0:
             n_importance = self.get_ray_cfgs('n_importance')
@@ -211,6 +207,10 @@ class VolSDF(SdfModel):
                 sample_idx = torch.randperm(zvals.shape[1])[:n_importance].to(device)
             zvals_extra = zvals[:, sample_idx]  # (B, N_importance)
             zvals_sample, _ = torch.sort(torch.cat([zvals_sample, zvals_extra], -1), -1)  # (B, N_sample + N_importance)
+
+        # follow volsdf original repo, sampled on the whole ray TODO: Check correctness
+        idx = torch.randint(zvals_sample.shape[-1], (zvals_sample.shape[0], )).to(device)
+        zvals_surface = torch.gather(zvals_sample, 1, idx.unsqueeze(-1))
 
         return zvals_sample, zvals_surface
 

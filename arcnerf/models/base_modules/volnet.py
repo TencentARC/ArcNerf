@@ -97,6 +97,20 @@ class VolGeoNet(nn.Module):
         if use_nn and D > 0 and W_feat_vol > 0:
             self.layers = self.setup_network(W, D, W_feat_vol, W_feat, act_cfg)
 
+    def to(self, device=None):
+        """Move self volume to device"""
+        super().to(device)
+        self.volume.to(device)
+
+        return self
+
+    def cuda(self, device=None):
+        """Move self volume to cuda"""
+        super().cuda(device)
+        self.volume.cuda(device)
+
+        return self
+
     def get_volume(self):
         """Get the dense volume"""
         return self.volume
