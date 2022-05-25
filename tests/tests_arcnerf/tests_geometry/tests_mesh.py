@@ -85,7 +85,7 @@ class TestDict(unittest.TestCase):
 
         volume = Volume(n_grid=self.n_grid, side=self.side)
         volume_pts = torch_to_np(volume.get_volume_pts())  # (n^3, 3)
-        volume_size = volume.get_volume_size()
+        voxel_size = volume.get_voxel_size()
         volume_len = volume.get_len()
         volume_dict = {
             'grid_pts': torch_to_np(volume.get_corner()),
@@ -110,7 +110,7 @@ class TestDict(unittest.TestCase):
 
         # get full mesh
         sdf = sdf.reshape((self.n_grid, self.n_grid, self.n_grid))
-        verts, faces, vert_normals_ = extract_mesh(sdf.copy(), self.level, volume_size, volume_len, grad_dir)
+        verts, faces, vert_normals_ = extract_mesh(sdf.copy(), self.level, voxel_size, volume_len, grad_dir)
         face_centers, vert_normals, face_normals, vert_colors, face_colors = self.get_mesh_components(verts, faces)
 
         # save ply

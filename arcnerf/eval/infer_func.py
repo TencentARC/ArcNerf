@@ -335,7 +335,7 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
     level = data['cfgs']['level']
     grad_dir = data['cfgs']['grad_dir']
     volume_pts = volume.get_volume_pts()  # (n_grid^3, 3) pts in torch
-    volume_size = volume.get_volume_size()  # (3,) tuple
+    voxel_size = volume.get_voxel_size()  # (3,) tuple
     volume_len = volume.get_len()  # (3,) tuple
 
     # move to gpu
@@ -388,7 +388,7 @@ def run_infer_volume(data, model, device, logger, max_pts=200000, max_faces=5000
         try:
             # full mesh
             time0 = time.time()
-            verts, faces, _ = extract_mesh(sigma.copy(), level, volume_size, volume_len, grad_dir)
+            verts, faces, _ = extract_mesh(sigma.copy(), level, voxel_size, volume_len, grad_dir)
             logger.add_log('    Extract mesh time {:.2f}s'.format(time.time() - time0))
             logger.add_log('    Extract {} verts, {} faces'.format(verts.shape[0], faces.shape[0]))
 

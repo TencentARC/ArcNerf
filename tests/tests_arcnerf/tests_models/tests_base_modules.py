@@ -180,7 +180,7 @@ class TestDict(unittest.TestCase):
 
             # volume and get pts
             volume = Volume(n_grid=n_grid, side=side)
-            volume_size = volume.get_volume_size()
+            voxel_size = volume.get_voxel_size()
             volume_len = volume.get_len()
             volume_pts = volume.get_volume_pts()  # (n_grid^3, 3) pts in torch
             volume_dict = {
@@ -209,7 +209,7 @@ class TestDict(unittest.TestCase):
             )
 
             # draw the mesh in plotly
-            verts, faces, _ = extract_mesh(geo_value.copy(), 0, volume_size, volume_len, grad_dir='ascent')
+            verts, faces, _ = extract_mesh(geo_value.copy(), 0, voxel_size, volume_len, grad_dir='ascent')
             verts_by_faces, _ = get_verts_by_faces(verts, faces)
             # draw mesh in plotly
             file_path = osp.join(

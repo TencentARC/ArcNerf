@@ -172,7 +172,7 @@ class Volume(nn.Module):
 
     def cal_volume_pts(self):
         """Cal all the volume center pts. tensor ((self.n_grid)^3, 3) """
-        v_x, v_y, v_z = self.get_volume_size()  # volume size
+        v_x, v_y, v_z = self.get_voxel_size()  # volume size
         x = torch.linspace(float(self.range[0, 0]) + 0.5 * v_x, float(self.range[0, 1]) - 0.5 * v_x, self.n_grid)  # (n)
         y = torch.linspace(float(self.range[1, 0]) + 0.5 * v_y, float(self.range[1, 1]) - 0.5 * v_y, self.n_grid)  # (n)
         z = torch.linspace(float(self.range[2, 0]) + 0.5 * v_z, float(self.range[2, 1]) - 0.5 * v_z, self.n_grid)  # (n)
@@ -187,11 +187,10 @@ class Volume(nn.Module):
         else:
             return self.volume_pts
 
-    def get_volume_size(self):
-        """Get volume size on each side. Good for marching cube"""
-        x_s = float(self.xlen) / float(self.n_grid)
-        y_s = float(self.ylen) / float(self.n_grid)
-        z_s = float(self.zlen) / float(self.n_grid)
+    def get_voxel_size(self):
+        """Get each voxel size on each side. Good for marching cube"""
+        xyz_s = self.get_grid_pts(True)[1, 1, 1, :] - self.get_grid_pts(True)[0, 0, 0, :]  # (3,)
+        x_s, y_s, z_s = float(xyz_s[0]), float(xyz_s[1]), float(xyz_s[2])
 
         return x_s, y_s, z_s
 
@@ -253,7 +252,7 @@ class Volume(nn.Module):
 
     @staticmethod
     def check_pts_in_grid_boundary(pts, grid_pts):
-        """Check whether pts in grid pts boundary
+        """Check whether pts in grid pts boundary. Remind that float accuracy affect the real choice.
 
         Args:
             pts: (B, 3), points to be check
@@ -273,14 +272,14 @@ class Volume(nn.Module):
 
         # check in min_max boundary
         pts_min_req = torch.BoolTensor(pts >= grid_pts_expand.min(dim=1)[0]).to(pts.device)
-        pts_max_req = torch.BoolTensor(pts <= grid_pts_expand.max(dim=1)[0]).to(pts.device)
+        pts_max_req = torch.BoolTensor(pts < grid_pts_expand.max(dim=1)[0]).to(pts.device)
         pts_in_boundary = torch.logical_and(pts_min_req, pts_max_req)  # (B, 3)
         pts_in_boundary = torch.all(pts_in_boundary, dim=-1)  # (B, )
 
         return pts_in_boundary
 
     def get_voxel_idx_from_xyz(self, pts):
-        """Get the voxel idx from xyz pts. It does not check all n_grid_pts, by check in 1->8->...->n_grid^3 way
+        """Get the voxel idx from xyz pts. Directly calculate the offset index in each dim.
 
         Args:
             pts: xyz position of points. (B, 3) tensor of xyz
@@ -292,59 +291,22 @@ class Volume(nn.Module):
         """
         assert sum([(self.n_grid >> i) & 1 for i in range(64)]) == 1, 'only support volume that has side in pow of 2'
 
+        dtype = pts.dtype
         device = pts.device
-        n_pts = pts.shape[0]
 
-        voxel_idx = torch.zeros((n_pts, 3), dtype=torch.long).to(device)  # (B, 3)
-        valid_idx = torch.zeros((n_pts, )).type(torch.bool).to(device)  # (B, )
-        check_idx = torch.ones((n_pts, )).type(torch.bool).to(device)  # (B, )
+        x_s, y_s, z_s = self.get_voxel_size()
+        voxel_size = torch.Tensor([x_s, y_s, z_s]).type(dtype).to(device).unsqueeze(0)  # (1, 3)
+        start_point = self.get_range()[:, 0].unsqueeze(0)  # min xyz (1, 3)
+        voxel_idx = (pts - start_point) / voxel_size  # (B, 3)
 
-        # outmost volume range
-        init_volume_range = [(0, self.n_grid), (0, self.n_grid), (0, self.n_grid)]
+        valid_idx = torch.logical_and(
+            torch.all(voxel_idx >= 0, dim=1), torch.all(voxel_idx < float(self.n_grid), dim=1)
+        )
 
-        # update the voxel idx in each 1/8 subdivided volume
-        self.update_voxel_idx(pts, self.get_corner(), init_volume_range, voxel_idx, valid_idx, check_idx, level=1)
-
-        # set invalid pts as -1
         voxel_idx[~valid_idx] = -1
+        voxel_idx = torch.floor(voxel_idx).type(torch.long)
 
         return voxel_idx, valid_idx
-
-    def update_voxel_idx(self, pts, grid_pts, volume_range, voxel_idx, valid_idx, check_idx, level):
-        """Update the voxel_idx and valid_idx. It will only check the pts and update the idx using check_idx.
-        TODO: This function is slow when call iteratively. Any way to optimize it?
-        TODO: Using pts only is slow, should we introduce pts_on_rays instead of rays?
-
-        Args:
-            pts: (B, 3)
-            grid_pts: (8, 3), outer largest 8 grid pts that forming the volume
-            volume_range: list of 3, containing (idx_start, idx_end) for xyz
-            voxel_idx: (B, 3) all voxel idx that you need to update
-            valid_idx: (B, ) all valid idx that you need to update
-            check_idx: (B, ) the index that needs to be check in this func.
-            level: sub divide level. If level == n_grid-1, stop subdivide since it reaches the finest level.
-        """
-        # end the subdivision
-        device = pts.device
-        n_pts = pts.shape[0]
-        if level == self.n_grid:
-            pts_in_voxel = torch.zeros((n_pts, )).type(torch.bool).to(device)  # (B, )
-            pts_in_voxel[check_idx] = self.check_pts_in_grid_boundary(pts[check_idx], grid_pts)  # (n_check,)
-            valid_idx[pts_in_voxel] = True
-            voxel_idx[pts_in_voxel, 0] = volume_range[0][0]  # assign x
-            voxel_idx[pts_in_voxel, 1] = volume_range[1][0]  # assign y
-            voxel_idx[pts_in_voxel, 2] = volume_range[2][0]  # assign z
-        else:
-            # subdivide the volume as 8 new volumes and check
-            sub_grid_pts, sub_volume_range = self.get_subdivide_grid_pts(volume_range)  # (8, 8, 3)
-            for idx in range(sub_grid_pts.shape[0]):
-                # check in this sub volume only
-                sub_check_idx = check_idx.clone()  # (B, )
-                sub_check_idx[check_idx] = self.check_pts_in_grid_boundary(pts[check_idx], sub_grid_pts[idx])
-                if torch.any(sub_check_idx):
-                    self.update_voxel_idx(
-                        pts, sub_grid_pts[idx], sub_volume_range[idx], voxel_idx, valid_idx, sub_check_idx, 2 * level
-                    )
 
     def get_grid_pts_idx_by_voxel_idx(self, voxel_idx):
         """Get the grid pts index from voxel idx
@@ -405,18 +367,18 @@ class Volume(nn.Module):
         assert grid_pts.shape == (n_pts, 8, 3), 'Shape not match'
 
         w_xyz = (pts - grid_pts[:, 0, :]) / (grid_pts[:, -1, :] - grid_pts[:, 0, :])  # (B, 3)
-
-        assert torch.all(self.check_pts_in_grid_boundary(pts, grid_pts)), 'Some pts are not in correct grid...'
+        w_xyz = w_xyz.clip(0.0, 1.0)  # in case some pts out of grid
 
         # linear interpolation
-        weights = torch.cat([(1 - w_xyz[:, 0:1]) * (1 - w_xyz[:, 1:2]) * (1 - w_xyz[:, 2:3]),
-                             (1 - w_xyz[:, 0:1]) * (w_xyz[:, 1:2]) * (1 - w_xyz[:, 2:3]),
-                             (w_xyz[:, 0:1]) * (1 - w_xyz[:, 1:2]) * (1 - w_xyz[:, 2:3]),
-                             (w_xyz[:, 0:1]) * (w_xyz[:, 1:2]) * (1 - w_xyz[:, 2:3]),
-                             (1 - w_xyz[:, 0:1]) * (1 - w_xyz[:, 1:2]) * (w_xyz[:, 2:3]), (1 - w_xyz[:, 0:1]) *
-                             (w_xyz[:, 1:2]) * (w_xyz[:, 2:3]), (w_xyz[:, 0:1]) * (1 - w_xyz[:, 1:2]) * (w_xyz[:, 2:3]),
-                             (w_xyz[:, 0:1]) * (w_xyz[:, 1:2]) * (w_xyz[:, 2:3])],
-                            dim=-1)  # (B, 8)
+        permute_index = self.get_eight_permutation_index()  # (8, 3)
+        weights = []
+        for idx in range(permute_index.shape[0]):
+            weights.append(
+                (permute_index[idx][0] * (w_xyz[:, 0:1]) + (1 - permute_index[idx][0]) * (1 - w_xyz[:, 0:1])) *
+                (permute_index[idx][1] * (w_xyz[:, 1:2]) + (1 - permute_index[idx][1]) * (1 - w_xyz[:, 1:2])) *
+                (permute_index[idx][2] * (w_xyz[:, 2:3]) + (1 - permute_index[idx][2]) * (1 - w_xyz[:, 2:3]))
+            )
+        weights = torch.cat(weights, dim=-1)  # (B, 8)
 
         return weights
 

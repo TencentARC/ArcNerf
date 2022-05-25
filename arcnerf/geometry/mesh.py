@@ -9,14 +9,14 @@ from arcnerf.geometry.transformation import normalize
 from arcnerf.render.render_pytorch3d import RenderPytorch3d
 
 
-def extract_mesh(sigma, level, volume_size, volume_len, grad_dir='descent'):
+def extract_mesh(sigma, level, voxel_size, volume_len, grad_dir='descent'):
     """Extracting mesh from sigma level sets. It has the same coord system with world coord.
     Currently this is only a cpu implementation. In the future may support cpu
 
     Args:
         sigma: (N, N, N) np array
         level: isosurface value. For nerf is around 50.0, for sdf-methods is 0.0.
-        volume_size: tuple of 3, each small volume size
+        voxel_size: tuple of 3, each small voxel size
         volume_len: tuple of 3, each axis len
         grad_dir: if 'descent': object sigma is large than level (NeRF: Sigma is density)
                   if 'ascent': object sigma is smaller than level (volsdf: sdf is <0 inside)
@@ -28,15 +28,15 @@ def extract_mesh(sigma, level, volume_size, volume_len, grad_dir='descent'):
     """
     assert grad_dir in ['descent', 'ascent'], 'Invalid grad_dir, only descent/ascent'
     verts, faces, vert_normals, _ = skimage.measure.marching_cubes(
-        sigma, level=level, spacing=volume_size, gradient_direction=grad_dir
+        sigma, level=level, spacing=voxel_size, gradient_direction=grad_dir
     )
 
     # adjust offset by whole large and small volume size
-    volume_offset = ((volume_len[0] - volume_size[0]) / 2.0, (volume_len[1] - volume_size[1]) / 2.0,
-                     (volume_len[2] - volume_size[2]) / 2.0)
-    verts[:, 0] -= volume_offset[0]
-    verts[:, 1] -= volume_offset[1]
-    verts[:, 2] -= volume_offset[2]
+    voxel_offset = ((volume_len[0] - voxel_size[0]) / 2.0, (volume_len[1] - voxel_size[1]) / 2.0,
+                    (volume_len[2] - voxel_size[2]) / 2.0)
+    verts[:, 0] -= voxel_offset[0]
+    verts[:, 1] -= voxel_offset[1]
+    verts[:, 2] -= voxel_offset[2]
 
     # normalize normals
     vert_normals = normalize(vert_normals)

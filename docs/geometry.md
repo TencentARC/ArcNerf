@@ -62,6 +62,7 @@ Definition and function of a volume. For all the point you can get it in grid or
 - n_grid: num of volume/line seg on each side
 - corner: 8 corner pts
 - grid_pts: all the grid points, in total `(n_grid+1)^3`
+- voxel_size: each voxel size, useful for marching cubes.
 - volume_pts: all the volume center points, in total `(n_grid)^3`
   - This can be sent to the network and get the volume density
 - bound_lines: outside bounding lines, `12` lines with `(2, 3)` start-end pts.
