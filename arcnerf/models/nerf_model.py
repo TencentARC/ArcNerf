@@ -3,7 +3,7 @@
 import torch
 
 from .base_3d_model import Base3dModel
-from .base_modules import GeoNet, RadianceNet
+from .base_modules import build_geo_model, build_radiance_model
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.render.ray_helper import sample_pdf
 from common.utils.cfgs_utils import get_value_from_cfgs_field
@@ -13,21 +13,21 @@ from common.utils.torch_utils import chunk_processing
 
 @MODEL_REGISTRY.register()
 class NeRF(Base3dModel):
-    """ Nerf model. 8 layers in GeoNet and 1 layer in RadianceNet
+    """ Nerf model.
         The two-stage nerf use coarse/fine models for different stage, instead of using just one.
         ref: https://www.matthewtancik.com/nerf
     """
 
     def __init__(self, cfgs):
         super(NeRF, self).__init__(cfgs)
-        self.coarse_geo_net = GeoNet(**self.cfgs.model.geometry.__dict__)
-        self.coarse_radiance_net = RadianceNet(**self.cfgs.model.radiance.__dict__)
+        self.coarse_geo_net = build_geo_model(self.cfgs.model.geometry)
+        self.coarse_radiance_net = build_radiance_model(self.cfgs.model.radiance)
         # custom rays cfgs
         self.ray_cfgs['n_importance'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'n_importance', 0)
         # set fine model if n_importance > 0
         if self.get_ray_cfgs('n_importance') > 0:
-            self.fine_geo_net = GeoNet(**self.cfgs.model.geometry.__dict__)
-            self.fine_radiance_net = RadianceNet(**self.cfgs.model.radiance.__dict__)
+            self.fine_geo_net = build_geo_model(self.cfgs.model.geometry)
+            self.fine_radiance_net = build_radiance_model(self.cfgs.model.radiance)
 
     def get_net(self):
         """Get the actual net for usage"""

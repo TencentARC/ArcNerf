@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 from .sdf_model import SdfModel
-from .base_modules import GeoNet, RadianceNet
+from .base_modules import build_geo_model, build_radiance_model
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.transformation import normalize
 from arcnerf.render.ray_helper import sample_pdf, get_zvals_from_near_far
@@ -16,7 +16,7 @@ from common.utils.torch_utils import chunk_processing
 
 @MODEL_REGISTRY.register()
 class VolSDF(SdfModel):
-    """ VolSDF model. 8 layers in GeoNet and 4 layer in RadianceNet
+    """ VolSDF model.
         Model SDF and convert it to density.
         ref: https://github.com/lioryariv/volsdf
              https://github.com/ventusff/neurecon#volume-rendering--3d-implicit-surface
@@ -24,8 +24,8 @@ class VolSDF(SdfModel):
 
     def __init__(self, cfgs):
         super(VolSDF, self).__init__(cfgs)
-        self.geo_net = GeoNet(**self.cfgs.model.geometry.__dict__)
-        self.radiance_net = RadianceNet(**self.cfgs.model.radiance.__dict__)
+        self.geo_net = build_geo_model(self.cfgs.model.geometry)
+        self.radiance_net = build_radiance_model(self.cfgs.model.radiance)
         # custom rays cfgs for upsampling
         self.ray_cfgs['n_importance'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'n_importance', 0)
         self.ray_cfgs['n_eval'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'n_eval', 128)

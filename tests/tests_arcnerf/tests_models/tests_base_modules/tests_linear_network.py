@@ -7,68 +7,24 @@ import os.path as osp
 import unittest
 
 import torch
-import torch.nn as nn
 
 from arcnerf.geometry.mesh import extract_mesh, get_verts_by_faces
 from arcnerf.geometry.volume import Volume
-from arcnerf.models.base_modules import (
-    Embedder, DenseLayer, get_activation, GeoNet, RadianceNet, Sine, SirenLayer, VolGeoNet
-)
+from arcnerf.models.base_modules import GeoNet, RadianceNet
 from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.cfgs_utils import dict_to_obj
 from common.utils.torch_utils import torch_to_np, chunk_processing
 from common.utils.logger import Logger
 from common.visual import get_colors
-from tests.tests_arcnerf.tests_models import log_base_model_info
-
-RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results'))
-os.makedirs(RESULT_DIR, exist_ok=True)
+from tests.tests_arcnerf.tests_models.tests_base_modules import log_base_model_info, RESULT_DIR
 
 
 class TestDict(unittest.TestCase):
+    """This tests the GeoNet and RadianceNet"""
 
     @classmethod
     def setUpClass(cls):
         cls.batch_size = 10
-
-    def tests_embedder(self):
-        input_dims = range(1, 10)
-        n_freqs = [0, 5, 10]
-        periodic_fns = (torch.sin, torch.cos)
-        include_inputs = [True, False]
-        for input_dim in input_dims:
-            for freq in n_freqs:
-                for include in include_inputs:
-                    if freq == 0 and include is False:
-                        continue  # this case is not allowed
-                    xyz = torch.ones((self.batch_size, input_dim))
-                    model = Embedder(input_dim, freq, include_input=include, periodic_fns=periodic_fns)
-                    out = model(xyz)
-                    self.assertEqual(out.shape[0], self.batch_size)
-                    out_dim = input_dim * (len(periodic_fns) * freq + include)
-                    self.assertEqual(out.shape[1], out_dim)
-
-    def tests_dense_layer(self):
-        input_dims = range(1, 10)
-        out_dims = range(1, 10)
-        for i_dim in input_dims:
-            for o_dim in out_dims:
-                model = DenseLayer(i_dim, o_dim)
-                model_s = SirenLayer(i_dim, o_dim)
-                x = torch.ones((self.batch_size, i_dim))
-                y = model(x)
-                y_s = model_s(x)
-                self.assertEqual(y.shape, (self.batch_size, o_dim))
-                self.assertEqual(y_s.shape, (self.batch_size, o_dim))
-
-    def tests_get_activation(self):
-        types = ['relu', 'softplus', 'leakyrelu', 'sine', 'sigmoid']
-        act_types = [nn.ReLU, nn.Softplus, nn.LeakyReLU, Sine, nn.Sigmoid]
-        for i, act_type in enumerate(types):
-            cfg = {'type': act_type, 'slope': 1e-2, 'w': 30, 'beta': 100}
-            cfg = dict_to_obj(cfg)
-            act = get_activation(cfg)
-            self.assertIsInstance(act, act_types[i])
 
     def tests_geonet(self):
         x = torch.ones((self.batch_size, 3))
@@ -127,48 +83,9 @@ class TestDict(unittest.TestCase):
             y = model(xyz, view_dirs, normals, feat)
             self.assertEqual(y.shape, (self.batch_size, 3))
 
-    def tests_geo_volnet(self):
-        x = torch.rand((self.batch_size, 3)) * 0.5
-        # normal case
-        model = VolGeoNet(geometric_init=False, n_grid=128, side=1.5)
-        y, feat = model(x)
-        self.assertEqual(y.shape, (self.batch_size, 1))
-        self.assertEqual(feat.shape, (self.batch_size, 256))
-        # forward with normal output and geo value only
-        geo_value = model.forward_geo_value(x)
-        self.assertEqual(geo_value.shape, (self.batch_size, ))
-        geo_value, feat, grad = model.forward_with_grad(x)
-        self.assertEqual(x.shape, grad.shape)
-        self.assertEqual(feat.shape, (self.batch_size, 256))
-        # W_feat <= 0
-        model = VolGeoNet(geometric_init=False, n_grid=128, side=1.5, W_feat=0)
-        y, _ = model(x)
-        self.assertEqual(y.shape, (self.batch_size, 1))
-
-        # with nn
-        model = VolGeoNet(geometric_init=False, n_grid=128, side=1.5, use_nn=True)
-        y, feat = model(x)
-        self.assertEqual(y.shape, (self.batch_size, 1))
-        self.assertEqual(feat.shape, (self.batch_size, 256))
-
-        # geo_init
-        model = VolGeoNet(geometric_init=True, n_grid=128, side=1.5, use_nn=True)
-        y, feat = model(x)
-        self.assertEqual(y.shape, (self.batch_size, 1))
-        self.assertEqual(feat.shape, (self.batch_size, 256))
-
-    def tests_geo_volnet_detail(self):
-        n_grid = 16
-        model = VolGeoNet(geometric_init=False, n_grid=n_grid, side=1.5)
-        logger = Logger(path=osp.join(RESULT_DIR, 'geo_volnet.txt'), keep_console=False)
-        n_pts = 4096 * 128
-        feed_in = torch.rand((n_pts, 3)) * 0.5
-        log_base_model_info(logger, model, feed_in, n_pts)
-        logger.add_log('    Num grid {}'.format(n_grid))
-
     def tests_geonet_geo_siren_init(self):
-        BASEMODULE_DIR = osp.abspath(osp.join(RESULT_DIR, 'base_module'))
-        os.makedirs(BASEMODULE_DIR, exist_ok=True)
+        GEOINIT_DIR = osp.abspath(osp.join(RESULT_DIR, 'geo_init'))
+        os.makedirs(GEOINIT_DIR, exist_ok=True)
 
         # params
         radius_init = 0.5  # for inner obj radius
@@ -228,9 +145,7 @@ class TestDict(unittest.TestCase):
             geo_value = torch_to_np(geo_value).reshape((n_grid, n_grid, n_grid))
 
             # draw pts in plotly
-            file_path = osp.join(
-                BASEMODULE_DIR, 'model_geo_init_pc(siren).png' if use_siren else 'model_geo_init_pc.png'
-            )
+            file_path = osp.join(GEOINIT_DIR, 'model_geo_init_pc(siren).png' if use_siren else 'model_geo_init_pc.png')
             draw_3d_components(
                 points=valid_pts,
                 point_colors=get_colors('blue', to_np=True),
@@ -246,7 +161,7 @@ class TestDict(unittest.TestCase):
             verts_by_faces, _ = get_verts_by_faces(verts, faces)
             # draw mesh in plotly
             file_path = osp.join(
-                BASEMODULE_DIR, 'model_geo_init_mesh(siren).png' if use_siren else 'model_geo_init_mesh.png'
+                GEOINIT_DIR, 'model_geo_init_mesh(siren).png' if use_siren else 'model_geo_init_mesh.png'
             )
             draw_3d_components(
                 volume=volume_dict,

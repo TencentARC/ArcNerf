@@ -3,7 +3,7 @@
 import torch
 
 from .base_3d_model import Base3dModel
-from .base_modules import GeoNet, RadianceNet
+from .base_modules import build_geo_model, build_radiance_model
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.render.ray_helper import get_zvals_outside_sphere
 from common.utils.registry import MODEL_REGISTRY
@@ -53,15 +53,15 @@ class BkgModel(Base3dModel):
 
 @MODEL_REGISTRY.register()
 class NeRFPP(BkgModel):
-    """ Nerf++ model. 8 layers in GeoNet and 1 layer in RadianceNet.
+    """ Nerf++ model.
         Process bkg points only. Do not support geometric extractration.
         ref: https://arxiv.org/abs/2010.07492
     """
 
     def __init__(self, cfgs):
         super(NeRFPP, self).__init__(cfgs)
-        self.geo_net = GeoNet(**self.cfgs.model.geometry.__dict__)
-        self.radiance_net = RadianceNet(**self.cfgs.model.radiance.__dict__)
+        self.geo_net = build_geo_model(self.cfgs.model.geometry)
+        self.radiance_net = build_radiance_model(self.cfgs.model.radiance)
         # check bounding_radius
         assert self.get_ray_cfgs('bounding_radius') is not None, 'Please specify the bounding radius for nerf++ model'
 

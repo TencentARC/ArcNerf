@@ -4,12 +4,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from . import MODULE_REGISTRY
+from .base_netwok import BaseGeoNet
 from .activation import get_activation
 from .linear import DenseLayer
 from arcnerf.geometry.volume import Volume
 
 
-class VolGeoNet(nn.Module):
+@MODULE_REGISTRY.register()
+class VolGeoNet(BaseGeoNet):
     """Dense Volume Net with voxels, modeling geometry.
     Each grid pts (N+1)^3 store some representation. Each pts/dir is interpolated from the grid pts and get result.
     Shallow network is support after grid interpolation.
@@ -36,7 +39,9 @@ class VolGeoNet(nn.Module):
         D=2,
         W_feat=256,
         act_cfg=None,
-        weight_norm=False
+        weight_norm=False,
+        *args,
+        **kwargs
     ):
         """
         Args:
@@ -190,6 +195,7 @@ class VolGeoNet(nn.Module):
             self.grid_value_param, grid_pts_weights_valid, voxel_idx[valid_idx]
         )  # (B_valid, 1)
 
+        # this could be slow for large tensor multiplication even in gpu
         out_feat = None
         if self.W_feat_vol > 0 and not geo_only:
             out_feat = torch.zeros((n_pts, self.W_feat_vol), dtype=dtype).to(device)  # (B, W_feat_vol)
@@ -209,25 +215,3 @@ class VolGeoNet(nn.Module):
                 out, out_feat = out[:, :1], out[:, 1:]
 
         return out, out_feat
-
-    def forward_geo_value(self, x: torch.Tensor):
-        """Only get geometry value like sigma/sdf/occ. In shape (B,)
-           You should assume the geo value is single (W==1)
-        """
-        return self.forward(x, geo_only=True)[0][:, 0]
-
-    def forward_with_grad(self, x: torch.Tensor):
-        """Get the grad of geo_value wrt input x. It could be the normal on surface"""
-        with torch.enable_grad():
-            x = x.requires_grad_(True)
-            geo_value, h = self.forward(x)
-            grad = torch.autograd.grad(
-                outputs=geo_value,
-                inputs=x,
-                grad_outputs=torch.ones_like(geo_value, requires_grad=False, device=x.device),
-                create_graph=True,
-                retain_graph=True,
-                only_inputs=True
-            )[0]
-
-        return geo_value, h, grad

@@ -6,13 +6,16 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from . import MODULE_REGISTRY
+from .base_netwok import BaseGeoNet, BaseRadianceNet
 from .activation import get_activation
 from .embed import Embedder
 from .linear import DenseLayer, SirenLayer
 
 
-class GeoNet(nn.Module):
-    """Geometry network. Input xyz coord, get geometry value like density, sdf, occpancy, etc
+@MODULE_REGISTRY.register()
+class GeoNet(BaseGeoNet):
+    """Geometry network with linear network implementation.
         ref: https://github.com/ventusff/neurecon/blob/main/models/base.py
     """
 
@@ -144,8 +147,8 @@ class GeoNet(nn.Module):
             x: torch.tensor (B, input_ch)
 
         Returns:
-            tensor in shape (B, 1) for geometric value(sdf, sigma, occ).
-            tensor in shape (B, W_feat) if W_feat > 0. None if W_feat <= 0
+            out: tensor in shape (B, 1) for geometric value(sdf, sigma, occ).
+            out_feat: tensor in shape (B, W_feat) if W_feat > 0. None if W_feat <= 0
         """
         x_embed = self.embed_fn(x)  # input_ch -> embed_dim
         out = x_embed
@@ -161,26 +164,6 @@ class GeoNet(nn.Module):
             return out, None
         else:  # (B, 1), (B, W_feat)
             return out[:, 0].unsqueeze(-1), out[:, 1:]
-
-    def forward_geo_value(self, x: torch.Tensor):
-        """Only get geometry value like sigma/sdf/occ. In shape (B,) """
-        return self.forward(x)[0][:, 0]
-
-    def forward_with_grad(self, x: torch.Tensor):
-        """Get the grad of geo_value wrt input x. It could be the normal on surface"""
-        with torch.enable_grad():
-            x = x.requires_grad_(True)
-            geo_value, h = self.forward(x)
-            grad = torch.autograd.grad(
-                outputs=geo_value,
-                inputs=x,
-                grad_outputs=torch.ones_like(geo_value, requires_grad=False, device=x.device),
-                create_graph=True,
-                retain_graph=True,
-                only_inputs=True
-            )[0]
-
-        return geo_value, h, grad
 
 
 def pretrain_siren(model, radius_init, sample_radius, n_iter=5000, lr=1e-4, thres=0.01, n_pts=5000):
@@ -216,8 +199,9 @@ def pretrain_siren(model, radius_init, sample_radius, n_iter=5000, lr=1e-4, thre
             break
 
 
-class RadianceNet(nn.Module):
-    """Radiance network. Input view direction(optional: xyz dir, feature, norm, etc), get rgb color.
+@MODULE_REGISTRY.register()
+class RadianceNet(BaseRadianceNet):
+    """Radiance network with linear network implementation.
         ref: https://github.com/ventusff/neurecon/blob/main/models/base.py
     """
 
