@@ -7,8 +7,8 @@ import torch
 import torch.nn as nn
 
 from . import MODULE_REGISTRY
-from .base_netwok import BaseGeoNet, BaseRadianceNet
 from .activation import get_activation
+from .base_netwok import BaseGeoNet, BaseRadianceNet
 from .embed import Embedder
 from .linear import DenseLayer, SirenLayer
 
@@ -233,7 +233,7 @@ class RadianceNet(BaseRadianceNet):
                             output dim will be input_ch * (freq * 2 + 1). 0 means not embed.
             embed_freq_view: embedding freq for view_dir. by default 4.
                             output dim will be input_ch * (freq * 2 + 1). 0 means not embed.
-            W_feat: Num of feature input if mode contains 'f'. Used to calculate the first layer input dim.
+            W_feat_in: Num of feature input if mode contains 'f'. Used to calculate the first layer input dim.
                     By default 256
             act_cfg: cfg obj for selecting activation. None for relu.
                      For surface modeling, usually use SoftPlus(beta=100)
