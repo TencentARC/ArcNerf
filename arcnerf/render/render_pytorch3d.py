@@ -142,6 +142,7 @@ class RenderPytorch3d:
 
     def render(self, verts, faces, vert_colors=None, face_colors=None, vert_normals=None, face_normals=None, w2c=None):
         """The core rendering function. Allows back-propagation. Batch processing
+        TODO: The rendered seems to have different w2c compared with rendering. Need to check.
 
         Args:
             verts: (B, n_vert, 3), tensor or np
@@ -207,8 +208,8 @@ class RenderPytorch3d:
         else:
             img = render_img[..., :3] * 255.0
 
-        # should flip image in y dim
-        img = torch.flip(img, dims=[1])  # (B, H, W, 3)
+        # should flip image in both x,y dim to match volume render
+        img = torch.flip(img, dims=[1, 2])  # (B, H, W, 3)
 
         if self.to_np:  # for visual mode only
             img = torch_to_np(img).astype(np.uint8)

@@ -4,7 +4,7 @@
 # TODO:
 - cuda实现的geometry函数和数据结构
 - tetrahedra相关
-- nvdiffras vs pytorch3d
+- nvdiffras vs pytorch3d (The renderer is not fully tested yet. Inconsistency appears in rendering)
 
 - 光照拆解
 - 材质拆解

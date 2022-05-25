@@ -240,7 +240,9 @@ def render_mesh_images(
 
 
 def render_open3d(verts, faces, vert_normals, face_normals, H: int, W: int, w2c, intrinsic):
-    """Render image in open3d"""
+    """Render image in open3d
+    TODO: Haven't check the correctness of renderer intensively
+    """
     try:
         import open3d  # in case some machine do not support
     except ImportError:
