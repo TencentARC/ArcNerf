@@ -66,6 +66,6 @@ class BaseRadianceNet(nn.Module):
             geo_feat: (B, W_feat_in)
 
         Returns:
-            tensor in shape (B, 3) for radiance value(rgb).
+            out: tensor in shape (B, 3) for radiance value(rgb).
         """
         raise NotImplementedError('You must implement this function')

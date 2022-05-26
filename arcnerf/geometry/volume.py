@@ -30,7 +30,7 @@ class Volume(nn.Module):
             ylen: len of y dim, if None use side
             zlen: len of z dim, if None use side
             dtype: dtype of params. By default is torch.float32
-            requires_grad: whether the parameters requires grad
+            requires_grad: whether the parameters requires grad. If True, waste memory for graphic.
         """
         super(Volume, self).__init__()
         self.requires_grad = requires_grad
@@ -60,36 +60,6 @@ class Volume(nn.Module):
         self.cal_corner()
         self.cal_grid_pts()
         self.cal_volume_pts()
-
-    def to(self, device):
-        """Manually put the params to device"""
-        self.origin = self.origin.to(device)
-        self.xlen = self.xlen.to(device)
-        self.ylen = self.ylen.to(device)
-        self.zlen = self.zlen.to(device)
-        if self.range is not None:
-            self.range = self.range.to(device)
-        if self.corner is not None:
-            self.corner = self.corner.to(device)
-        if self.grid_pts is not None:
-            self.grid_pts = self.grid_pts.to(device)
-        if self.volume_pts is not None:
-            self.volume_pts = self.volume_pts.to(device)
-
-    def cuda(self, device=None):
-        """Manually put the params to cuda device"""
-        self.origin = self.origin.cuda(device)
-        self.xlen = self.xlen.cuda(device)
-        self.ylen = self.ylen.cuda(device)
-        self.zlen = self.zlen.cuda(device)
-        if self.range is not None:
-            self.range = self.range.cuda(device)
-        if self.corner is not None:
-            self.corner = self.corner.cuda(device)
-        if self.grid_pts is not None:
-            self.grid_pts = self.grid_pts.cuda(device)
-        if self.volume_pts is not None:
-            self.volume_pts = self.volume_pts.cuda(device)
 
     @torch.no_grad()
     def set_len(self, side, xlen, ylen, zlen):
@@ -122,7 +92,8 @@ class Volume(nn.Module):
         """Cal the xyz range(min, max) from origin and sides. range is (3, 2) tensor"""
         xyz_min = self.origin - torch.cat([self.xlen, self.ylen, self.zlen]) / 2.0
         xyz_max = self.origin + torch.cat([self.xlen, self.ylen, self.zlen]) / 2.0
-        self.range = torch.cat([xyz_min[:, None], xyz_max[:, None]], dim=-1)
+        v_range = torch.cat([xyz_min[:, None], xyz_max[:, None]], dim=-1)
+        self.range = nn.Parameter(v_range.clone().detach(), requires_grad=self.requires_grad)
 
     def get_range(self):
         """Get the xyz range in (3, 2)"""
@@ -172,7 +143,8 @@ class Volume(nn.Module):
     def cal_corner(self):
         """Cal the eight corner pts given origin and sides. corner is (8, 3) tensor """
         x, y, z = self.range[0][:, None], self.range[1][:, None], self.range[2][:, None]  # (2, 1)
-        self.corner = self.get_eight_permutation(x, y, z)
+        corner = self.get_eight_permutation(x, y, z)
+        self.corner = nn.Parameter(corner.clone().detach(), requires_grad=self.requires_grad)
 
     def get_corner(self, in_grid=False):
         """Get the eight corner. tensor (8, 3). If in_grid, return (2, 2, 2, 3) """
@@ -188,7 +160,8 @@ class Volume(nn.Module):
         z = torch.linspace(float(self.range[2, 0]), float(self.range[2, 1]), self.n_grid + 1)  # (n+1)
 
         grid_pts = torch.stack(torch.meshgrid(x, y, z), -1)  # (n+1, n+1, n+1, 3)
-        self.grid_pts = grid_pts.view(-1, 3)  # (n+1^3, 3)
+        grid_pts = grid_pts.view(-1, 3)  # (n+1^3, 3)
+        self.grid_pts = nn.Parameter(grid_pts.clone().detach(), requires_grad=self.requires_grad)
 
     def get_grid_pts(self, in_grid=False):
         """Get ((self.n_grid+1)^3, 3) grid pts. If in_grid, return (n_grid+1, n_grid+1, n_grid+1, 3) """
@@ -205,7 +178,8 @@ class Volume(nn.Module):
         z = torch.linspace(float(self.range[2, 0]) + 0.5 * v_z, float(self.range[2, 1]) - 0.5 * v_z, self.n_grid)  # (n)
 
         volume_pts = torch.stack(torch.meshgrid(x, y, z), -1)  # (n, n, n, 3)
-        self.volume_pts = volume_pts.view(-1, 3)  # (n^3, 3)
+        volume_pts = volume_pts.view(-1, 3)  # (n^3, 3)
+        self.volume_pts = nn.Parameter(volume_pts.clone().detach(), requires_grad=self.requires_grad)
 
     def get_volume_pts(self, in_grid=False):
         """Get ((self.n_grid)^3, 3) volume pts. If in_grid, return (n_grid, n_grid, n_grid, 3) """

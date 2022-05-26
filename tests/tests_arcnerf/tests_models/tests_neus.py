@@ -20,40 +20,45 @@ class TestNeusDict(TestModelDict):
         os.makedirs(self.result_dir, exist_ok=True)
 
     def tests_model(self):
-        cfgs, logger = self.get_cfgs_logger('neus.yaml', 'neus.txt')
-        model = self.build_model_to_cuda(cfgs, logger)
+        # multiple choice
+        model_cfgs = ['neus.yaml', 'neus_dv_withnn.yaml']
+        model_logs = [name.split('.')[0] + '.txt' for name in model_cfgs]
 
-        feed_in = self.create_feed_in_to_cuda()
-        self.log_model_info(logger, model, feed_in, cfgs)
+        for model_cfg, model_log in zip(model_cfgs, model_logs):
+            cfgs, logger = self.get_cfgs_logger(model_cfg, model_log)
+            model = self.build_model_to_cuda(cfgs, logger)
 
-        # test forward
-        self._test_forward(model, feed_in, extra_keys=['normal'], extra_bn3=[True])
+            feed_in = self.create_feed_in_to_cuda()
+            self.log_model_info(logger, model, feed_in, cfgs)
 
-        # test params
-        self._test_forward_params_in(model, feed_in, ['scale'])
+            # test forward
+            self._test_forward(model, feed_in, extra_keys=['normal'], extra_bn3=[True])
 
-        # inference only
-        self._test_forward_inference_only(model, feed_in)
+            # test params
+            self._test_forward_params_in(model, feed_in, ['scale'])
 
-        # get progress
-        n_sample = cfgs.model.rays.n_sample
-        n_importance = (cfgs.model.rays.n_importance // cfgs.model.rays.n_iter) * cfgs.model.rays.n_iter
-        n_total = n_sample + n_importance
-        progress_shape = (self.batch_size, self.n_rays, n_total - 1)
-        self._test_forward_progress(model, feed_in, progress_shape)
+            # inference only
+            self._test_forward_inference_only(model, feed_in)
 
-        # direct inference
-        pts, view_dir = self.create_pts_dir_to_cuda()
-        self._test_pts_dir_forward(model, pts, view_dir)
+            # get progress
+            n_sample = cfgs.model.rays.n_sample
+            n_importance = (cfgs.model.rays.n_importance // cfgs.model.rays.n_iter) * cfgs.model.rays.n_iter
+            n_total = n_sample + n_importance
+            progress_shape = (self.batch_size, self.n_rays, n_total - 1)
+            self._test_forward_progress(model, feed_in, progress_shape)
 
-        # test sdf_to_alpha
-        self._test_sdf_to_alpha()
+            # direct inference
+            pts, view_dir = self.create_pts_dir_to_cuda()
+            self._test_pts_dir_forward(model, pts, view_dir)
 
-        # test weight
-        self._test_sdf_weight()
+            # test sdf_to_alpha
+            self._test_sdf_to_alpha()
 
-        # surface render
-        self._test_surface_render(model, feed_in, extra_keys=['normal'], extra_bn3=[True])
+            # test weight
+            self._test_sdf_weight()
+
+            # surface render
+            self._test_surface_render(model, feed_in, extra_keys=['normal'], extra_bn3=[True])
 
     def _test_forward_inference_only(self, model, feed_in):
         """Test that all keys are not started with progress_"""

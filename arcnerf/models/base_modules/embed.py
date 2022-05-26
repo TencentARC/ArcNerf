@@ -11,7 +11,16 @@ class Embedder(nn.Module):
         ref: https://github.com/ventusff/neurecon/blob/main/models/base.py
     """
 
-    def __init__(self, input_dim, n_freqs, log_sampling=True, include_input=True, periodic_fns=(torch.sin, torch.cos)):
+    def __init__(
+        self,
+        input_dim,
+        n_freqs,
+        log_sampling=True,
+        include_input=True,
+        periodic_fns=(torch.sin, torch.cos),
+        *args,
+        **kwargs
+    ):
         """
         Args:
             input_dim: dimension of input to be embedded. For example, xyz is dim=3

@@ -304,7 +304,7 @@ class RadianceNet(BaseRadianceNet):
             geo_feat: (B, W_feat_in)
 
         Returns:
-            tensor in shape (B, 3) for radiance value(rgb).
+            out: tensor in shape (B, 3) for radiance value(rgb).
         """
         inputs = []
         if 'p' in self.mode:

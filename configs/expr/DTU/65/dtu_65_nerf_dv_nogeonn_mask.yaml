@@ -1,0 +1,155 @@
+name: dtu_65_nerf_dv_nogeonn_mask
+
+resume: None
+
+debug:
+    debug_mode: False
+    print_all_grad: False
+    get_progress: False
+
+dir:
+    expr_dir: None
+    data_dir: '/group/30042/leoyluo/Immerse/data'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_65_nerf_dv_nogeonn_mask'
+
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_65_nerf_dv_nogeonn_mask/checkpoints/final.pt.tar'
+
+gpu_ids: -1
+
+dist:
+    local_rank: 0
+    rank: 0
+    world_size: 1
+    distributed_backend: nccl
+    random_seed: None
+    slurm: False
+
+batch_size: 2
+n_rays: 4096
+worker: 4
+
+optim:
+    lr: 5e-4
+    optim_type: adam
+    weight_decay: 0.0
+    lr_scheduler:
+        type: ExponentialLR
+        lr_gamma: 0.1
+        lr_steps: [200000]
+
+    clip_gradients: 0.0
+    clip_warmup: -1
+    clip_gradients_warmup: 0.0
+
+progress:
+    start_epoch: -1
+    epoch: 300000
+    save_time: 1800
+
+    epoch_loss: 10
+    iter_loss: 1
+    save_progress: True
+    epoch_save_progress: 50000
+    iter_save_progress: 1
+
+    epoch_val: 100
+    save_progress_val: True
+    max_samples_val: 1
+
+    epoch_save_checkpoint: 100000
+    local_progress: False
+
+    init_eval: False
+    epoch_eval: 200
+    max_samples_eval: 3
+
+dataset:
+    train:
+        type: DTU
+        scan_id: 65
+        img_scale: 1.0
+        scale_radius: 3.0
+        align_cam: True
+        precache: True
+        augmentation:
+            shuffle: True
+
+    val:
+        type: DTU
+        scan_id: 65
+        img_scale: 0.25
+        scale_radius: 3.0
+        align_cam: True
+        precache: False
+
+    eval:
+        eval_batch_size: 1
+        eval_max_sample: 3
+        type: DTU
+        scan_id: 65
+        img_scale: 1.0
+        scale_radius: 3.0
+        align_cam: True
+        precache: True
+
+inference:
+    render:
+        type: [swing]
+        n_cam: [20]
+        repeat: [3]
+        radius: 3.0
+        u_range: [0.65, 0.85]
+        v_range: [0, 0]
+        n_rot: 1
+        fps: 5
+
+    volume:
+        n_grid: 512
+        side: 1.5
+        level: 50.0
+        chunk_pts_factor: 32
+        render_mesh:
+            backend: pytorch3d
+
+model:
+    type: NeRF
+    rays:
+        bounding_radius: 3.0
+        near: 1.0
+        far: 4.5
+        n_sample: 64
+        n_importance: 128
+        inverse_linear: False
+        perturb: True
+        add_inf_z: True
+        noise_std: 1.0
+        white_bkg: False
+    chunk_rays: 32768
+    chunk_pts: 131072
+    geometry:
+        type: VolGeoNet               # Dense Volume network
+        W_vol: 1                      # No geo value since use nn
+        W_feat_vol: 0                 # no feat from volume, only network process
+        n_grid: 128                   # num of grid
+        side: 1.5                     # volume length
+        use_nn: False                  # use nn
+        geometric_init: False         # whether to use geometric init. need radius_init
+    radiance:
+        type: VolRadianceNet          # Dense Volume network
+        mode: 'v'                     # view_dir only
+        n_grid: 128                   # num of grid
+        side: 1.5                     # volume length
+        use_nn: True                  # use nn
+        W: 128                        # linear hidden dim
+        D: 4                          # num of linear, not include final
+        input_ch_view: 3              # view input channel
+        embed_freq_view: 4            # view embed freq
+
+loss:
+    ImgCFMaskLoss:
+        weight: 1.0
+    MaskCFLoss:
+        weight: 1.0
+
+metric:
+    MaskPSNR:

@@ -7,6 +7,7 @@ import unittest
 from thop import profile
 import torch
 
+from arcnerf.geometry.transformation import normalize
 from arcnerf.models import build_model
 from common.utils.cfgs_utils import obj_to_dict, load_configs, dict_to_obj
 from common.utils.logger import log_nested_dict, Logger
@@ -83,15 +84,17 @@ class TestModelDict(unittest.TestCase):
         return model
 
     def create_feed_in_to_cuda(self):
+        rays_o = torch.rand(self.batch_size, self.n_rays, 3) * 3.0
+        rays_d = -normalize(rays_o)  # point to origin
         feed_in = {
             'img':
             torch.ones(self.batch_size, self.n_rays, 3),
             'mask':
             torch.ones(self.batch_size, self.n_rays),
             'rays_o':
-            torch.rand(self.batch_size, self.n_rays, 3),
+            rays_o,
             'rays_d':
-            torch.rand(self.batch_size, self.n_rays, 3),
+            rays_d,
             'near':
             torch.ones(self.batch_size * self.n_rays, 1) * 2.0,
             'far':
@@ -105,14 +108,15 @@ class TestModelDict(unittest.TestCase):
                 dim=-1
             ),
         }
+
         for k, v in feed_in.items():
             feed_in[k] = self.to_cuda(v)
 
         return feed_in
 
     def create_pts_dir_to_cuda(self, num_pts=3):
-        pts = torch.ones(self.n_rays, num_pts)
-        view_dir = torch.ones(self.n_rays, 3)
+        pts = torch.rand(self.n_rays, num_pts)
+        view_dir = -normalize(pts[:, :3])  # point to origin
         pts = self.to_cuda(pts)
         view_dir = self.to_cuda(view_dir)
 

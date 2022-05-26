@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+from itertools import combinations
 import os
 import os.path as osp
 import unittest
@@ -9,7 +10,7 @@ import torch
 
 from arcnerf.geometry.mesh import extract_mesh, get_verts_by_faces
 from arcnerf.geometry.volume import Volume
-from arcnerf.models.base_modules import VolGeoNet
+from arcnerf.models.base_modules import VolGeoNet, VolRadianceNet
 from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.torch_utils import torch_to_np, chunk_processing
 from common.utils.logger import Logger
@@ -76,8 +77,8 @@ class TestDict(unittest.TestCase):
         self.assertTrue(y.is_cuda)
         self.assertTrue(feat.is_cuda)
 
-    def tests_geo_volnet_detail(self):
-        n_grid = 16
+    def tests_geovolnet_detail(self):
+        n_grid = 128
         model = VolGeoNet(n_grid=n_grid, side=1.5)
         logger = Logger(path=osp.join(RESULT_DIR, 'geo_volnet.txt'), keep_console=False)
         n_pts = 4096 * 128
@@ -163,3 +164,25 @@ class TestDict(unittest.TestCase):
                 plotly=True,
                 plotly_html=True
             )
+
+    def tests_radiancevolnet(self):
+        xyz = torch.rand((self.batch_size, 3)) * 0.5
+        view_dirs = torch.rand((self.batch_size, 3))
+        normals = torch.rand((self.batch_size, 3))
+        feat = torch.rand((self.batch_size, 256))
+        modes = ['p', 'v', 'n', 'f']
+        modes = sum([list(map(list, combinations(modes, i))) for i in range(len(modes) + 1)], [])
+        for mode in modes:
+            if len(mode) == 0:
+                continue
+            mode = ''.join(mode)
+            # volume base
+            model = VolRadianceNet(mode=mode)
+            y = model(xyz, view_dirs, normals, feat)
+            self.assertEqual(y.shape, (self.batch_size, 3))
+            self.assertTrue(torch.all(torch.logical_and(y >= 0, y <= 1)))
+            # nn base
+            model = VolRadianceNet(mode=mode, use_nn=True)
+            y = model(xyz, view_dirs, normals, feat)
+            self.assertEqual(y.shape, (self.batch_size, 3))
+            self.assertTrue(torch.all(torch.logical_and(y >= 0, y <= 1)))

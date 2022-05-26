@@ -20,6 +20,7 @@ class VolSDF(SdfModel):
         Model SDF and convert it to density.
         ref: https://github.com/lioryariv/volsdf
              https://github.com/ventusff/neurecon#volume-rendering--3d-implicit-surface
+        TODO: The performance does not reach the original one. Where's the problem?
     """
 
     def __init__(self, cfgs):

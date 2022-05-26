@@ -68,21 +68,6 @@ class TestDict(unittest.TestCase):
         feed_in = torch.ones((n_pts, 3))
         log_base_model_info(logger, model, feed_in, n_pts)
 
-    def tests_radiancenet(self):
-        xyz = torch.ones((self.batch_size, 3))
-        view_dirs = torch.ones((self.batch_size, 3))
-        normals = torch.ones((self.batch_size, 3))
-        feat = torch.ones((self.batch_size, 256))
-        modes = ['p', 'v', 'n', 'f']
-        modes = sum([list(map(list, combinations(modes, i))) for i in range(len(modes) + 1)], [])
-        for mode in modes:
-            if len(mode) == 0:
-                continue
-            mode = ''.join(mode)
-            model = RadianceNet(mode=mode, W=128, D=8, W_feat_in=256)
-            y = model(xyz, view_dirs, normals, feat)
-            self.assertEqual(y.shape, (self.batch_size, 3))
-
     def tests_geonet_geo_siren_init(self):
         GEOINIT_DIR = osp.abspath(osp.join(RESULT_DIR, 'geo_init'))
         os.makedirs(GEOINIT_DIR, exist_ok=True)
@@ -172,6 +157,22 @@ class TestDict(unittest.TestCase):
                 plotly=True,
                 plotly_html=True
             )
+
+    def tests_radiancenet(self):
+        xyz = torch.rand((self.batch_size, 3))
+        view_dirs = torch.rand((self.batch_size, 3))
+        normals = torch.rand((self.batch_size, 3))
+        feat = torch.rand((self.batch_size, 256))
+        modes = ['p', 'v', 'n', 'f']
+        modes = sum([list(map(list, combinations(modes, i))) for i in range(len(modes) + 1)], [])
+        for mode in modes:
+            if len(mode) == 0:
+                continue
+            mode = ''.join(mode)
+            model = RadianceNet(mode=mode, W=128, D=8, W_feat_in=256)
+            y = model(xyz, view_dirs, normals, feat)
+            self.assertEqual(y.shape, (self.batch_size, 3))
+            self.assertTrue(torch.all(torch.logical_and(y >= 0, y <= 1)))
 
 
 if __name__ == '__main__':

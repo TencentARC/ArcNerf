@@ -10,14 +10,34 @@ Embed inputs like xyz/view_dir into higher dimension using periodic funcs(sin, c
 ## linear
 - DenseLayer: Linear with custom activation function.
 - SirenLayer: Linear with sin() activation and respective initialization.
-## implicit network
-implicit network for mapping xyz -> sigma/sdf/rgb, etc.
-### GeoNet
+
+## BaseGeoNet/BaseRadianceNetwork
+This models serve as the basic block for modeling obj geometry and radiance. It can be pure linear networks, pure volume,
+mix of volume and network, sparse octree, multi-res volume with hashing, tensorRF etc. All the blocks can be select from
+`geometry/radiance` part in `cfgs.model`.
+
+### Linear Network Model
+implicit network for mapping xyz -> sigma/sdf/rgb, etc. Pure linear network
+Specify the type as `GeoNet/RadianceNet`(or leave it blank, which will be default)
+#### GeoNet
 Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
 - geometric_init: If True, init the geonet such that represent a sdf of sphere with radius_init(inner sdf < 0).
 siren layer will use pretrain, dense layer will use weight/bias init(But like an oval than sphere).
-### RadianceNet
+#### RadianceNet
 Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
+
+### Dense Volume Model
+Explicit volume for mapping xyz -> sigma/sdf/rgb, etc, using voxel interpolation. Pure volume or mix of volume/network.
+Specify the type as `VolGeoNet/VolRadianceNet`. We support dense volume with pruning in torch implementation.
+#### VolGeoNet
+Volume with value/feature on grid, network is optional to used. For details, ref to the implementation.
+- geometric_init: If True, init the geonet such that represent a sdf of sphere with radius_init(inner sdf < 0).
+- W_feat_vol: If this > 0, the model interpolate feature from grid_pts. With a dense implementation, it could be slow.
+Try to not use W_feat_vol(use network with xyz input, or directly use pure volume).
+#### RadianceNet
+Volume with value/feature on grid, network is optional to used. For details, ref to the implementation.
+## use_nn
+Set this to make linear layers after volume grid output. But it could increase the time used.
 
 # chunk_size
 ## chunk_rays
