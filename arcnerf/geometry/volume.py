@@ -290,8 +290,6 @@ class Volume(nn.Module):
                        if not in any voxel, return (-1, -1, -1) for this pts. torch.long
             valid_idx: (B, ) mask that pts are in the volume. torch.BoolTensor
         """
-        assert sum([(self.n_grid >> i) & 1 for i in range(64)]) == 1, 'only support volume that has side in pow of 2'
-
         dtype = pts.dtype
         device = pts.device
 
