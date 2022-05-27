@@ -72,16 +72,17 @@ class SdfModel(Base3dModel):
             rays_o, rays_d, geo_net.forward_geo_value, method, near, far, n_step, n_iter, threshold, level, grad_dir
         )
 
-        # forward mask pts/dir for color
-        _, rgb_mask, normal_mask = self._forward_pts_dir(geo_net, radiance_net, pts[mask], rays_d[mask])
-
-        # get full result
-        depth = zvals  # at max zvals after far
-        mask_float = mask.type(dtype)
         rgb = torch.ones((n_rays, 3), dtype=dtype).to(device)  # white bkg
         normal = torch.zeros((n_rays, 3), dtype=dtype).to(device)
-        rgb[mask] = rgb_mask
-        normal[mask] = normal_mask
+        depth = zvals  # at max zvals after far
+        mask_float = mask.type(dtype)
+
+        # in case all rays do not hit the surface
+        if torch.any(mask):
+            _, rgb_mask, normal_mask = self._forward_pts_dir(geo_net, radiance_net, pts[mask], rays_d[mask])
+            # forward mask pts/dir for color and normal
+            rgb[mask] = rgb_mask
+            normal[mask] = normal_mask
 
         output = {
             'rgb': rgb,  # (B, 3)
