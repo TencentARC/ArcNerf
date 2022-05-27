@@ -7,6 +7,7 @@ import numpy as np
 
 from .colmap_lib import read_model
 from .colmap_wrapper import run_colmap, run_colmap_dense
+from common.utils.img_utils import get_n_img_in_dir
 
 
 def estimate_poses(scene_dir, logger, match_type, factors=None):
@@ -38,6 +39,10 @@ def estimate_poses(scene_dir, logger, match_type, factors=None):
     # post processing
     logger.add_log('Post process sparse result...')
     poses, pts3d, perm = load_colmap_data(scene_dir, logger)
+
+    # check consistency
+    if poses['n_cam'] != get_n_img_in_dir(os.path.join(scene_dir, 'images')):
+        raise RuntimeError('Num of cam does not match num of images... Please check or select subset...')
 
     save_poses(scene_dir, poses, pts3d, perm, logger)
 

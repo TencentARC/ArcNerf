@@ -6,7 +6,11 @@ python tools/extract_video.py --configs configs/default.yaml \
 --data.image_downsample 4
 
 # run colmap to extract poses from frames
-python tools/extract_video.py --configs configs/default.yaml \
+python tools/run_poses.py --configs configs/default.yaml \
 --data.scene_name qq_tiger \
 --data.colmap.match_type 'sequential_matcher' \
 --data.colmap.dense_reconstruct False
+
+# You can make a yaml file in configs/dataset/Capture first, and run
+python tools/extract_video.py --configs configs/datasets/Capture/scene_name.yaml
+python tools/run_poses.py --configs configs/datasets/Capture/scene_name.yaml

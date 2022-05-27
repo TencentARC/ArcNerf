@@ -1,0 +1,43 @@
+dir:
+    data_dir:  '/Users/leoyluo/Desktop/Immerse/data'   # It is the main dataset address containing all dataset
+
+data:
+    video_path: '/Users/leoyluo/leoyluo/Immerse/data/Capture/qq_tiger.MOV'
+    scene_name: qqtiger
+    video_downsample: 15            # fps downsample ratio, default 15 (fps=30, each second 2 image)
+    image_downsample: 4             # image rescale downsample ratio, default 4 (each length 1/4)
+    colmap:
+        match_type: 'sequential_matcher'        # ['sequential_matcher', 'exhaustive_matcher']
+        dense_reconstruct: False                # run for dense reconstruction with point cloud and mesh
+
+dataset:
+    train:
+        type: Capture
+        scene_name: qqtiger
+        img_scale: 1.0               # scale image and intrinsic, < 1 means scale_down
+        scale_radius: 3.0            # norm the camera within a sphere with such radius(actual radius litter smaller)
+        pc_radius: 2.0               # only keep point cloud in a fix radius ball, scale after cam norm
+        precache: False              # precache all the rays at once
+
+model:
+    rays:
+        # bounding_radius: 3.0
+        # far: 8.0
+        n_sample: 64
+        n_importance: 128
+        inverse_linear: False
+        perturb: True
+        add_inf_z: True
+        noise_std: 1.0
+
+inference:
+    render:
+        type: [circle]
+        n_cam: [20]
+        radius: 2.0     # cam distribution is different in front and back
+        u_start: 0.75
+        v_ratio: -0.2
+
+    volume:
+        n_grid: 4       # just for visual purpose
+        side: 1.5

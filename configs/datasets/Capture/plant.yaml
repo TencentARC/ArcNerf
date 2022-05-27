@@ -1,10 +1,19 @@
 dir:
-    data_dir:  '/Users/leoyluo/Desktop/Immerse/data'   # It is the main dataset address containing all dataset
+    data_dir:  '/group/30042/leoyluo/Immerse/data'   # It is the main dataset address containing all dataset
+
+data:
+    video_path: '/group/30042/leoyluo/Immerse/data/Capture/plant.mp4'
+    scene_name: plant
+    video_downsample: 10            # fps downsample ratio, default 15 (fps=30, each second 2 image)
+    image_downsample: 2             # image rescale downsample ratio, default 4 (each length 1/4)
+    colmap:
+        match_type: 'sequential_matcher'        # ['sequential_matcher', 'exhaustive_matcher']
+        dense_reconstruct: False                # run for dense reconstruction with point cloud and mesh
 
 dataset:
     train:
         type: Capture
-        scene_name: qqtiger
+        scene_name: plant
         img_scale: 1.0               # scale image and intrinsic, < 1 means scale_down
         scale_radius: 3.0            # norm the camera within a sphere with such radius(actual radius litter smaller)
         pc_radius: 2.0               # only keep point cloud in a fix radius ball, scale after cam norm

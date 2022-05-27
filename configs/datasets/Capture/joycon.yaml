@@ -1,6 +1,15 @@
 dir:
     data_dir:  '/Users/leoyluo/Desktop/Immerse/data'   # It is the main dataset address containing all dataset
 
+data:
+    video_path: '/Users/leoyluo/leoyluo/Immerse/data/Capture/joycon.MOV'
+    scene_name: joycon
+    video_downsample: 15            # fps downsample ratio, default 15 (fps=30, each second 2 image)
+    image_downsample: 4             # image rescale downsample ratio, default 4 (each length 1/4)
+    colmap:
+        match_type: 'sequential_matcher'        # ['sequential_matcher', 'exhaustive_matcher']
+        dense_reconstruct: False                # run for dense reconstruction with point cloud and mesh
+
 dataset:
     train:
         type: Capture
