@@ -55,7 +55,7 @@ class TestDict(unittest.TestCase):
 
     @classmethod
     def load_images(cls):
-        img_list, _ = cls.dataset.get_image_list()
+        img_list, _ = cls.dataset.get_image_list(MODE)
         imgs = [cv2.imread(path) for path in img_list]
 
         return imgs
@@ -198,7 +198,7 @@ class TestDict(unittest.TestCase):
             )
 
     def tests_ray_points(self):
-        n_rays_w, n_rays_h = 4, 3
+        n_rays_w, n_rays_h = 2, 2
         n_rays = n_rays_w * n_rays_h
         index = equal_sample(n_rays_w, n_rays_h, self.W, self.H)
 
@@ -354,6 +354,28 @@ class TestDict(unittest.TestCase):
             points=pts,
             point_colors=pts_colors,
             point_size=5.0,
+            rays=(ray_bundle[0], ray_bundle[1]),
+            ray_colors=ray_colors,
+            title='Cam ray at corner(lt: blue/lb: green/rt: yellow/rb: maroon)',
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True,
+        )
+
+    def tests_single_cam_ray(self):
+        cam = self.c2w[:1, ...]
+        index = np.array([[0, 0], [0, self.H - 1], [self.W - 1, 0], [self.W - 1, self.H - 1]])
+        ray_bundle = self.cameras[0].get_rays(index=index, to_np=True)
+        ray_colors = get_combine_colors(['blue', 'green', 'yellow', 'maroon'], [1] * 4)
+
+        center_point = np.array([[0.0, 0.0, 0.0]])
+
+        file_path = osp.join(self.spec_result_dir, 'single_cam_ray.png')
+        draw_3d_components(
+            cam,
+            intrinsic=self.intrinsic,
+            points=center_point,
+            point_size=25.0,
             rays=(ray_bundle[0], ray_bundle[1]),
             ray_colors=ray_colors,
             title='Cam ray at corner(lt: blue/lb: green/rt: yellow/rb: maroon)',

@@ -23,7 +23,7 @@ class Capture(Base3dPCDataset):
         self.identifier = self.cfgs.scene_name
 
         # get image
-        img_list, self.n_imgs = self.get_image_list()
+        img_list, self.n_imgs = self.get_image_list(mode)
         self.images = self.read_image_list(img_list)
         self.H, self.W = self.images[0].shape[:2]
 
@@ -65,8 +65,8 @@ class Capture(Base3dPCDataset):
         if self.precache:
             self.precache_ray()
 
-    def get_image_list(self):
-        """Get image list"""
+    def get_image_list(self, mode=None):
+        """Get image list."""
         img_dir = osp.join(self.data_spec_dir, 'images')
         img_list = sorted(glob.glob(img_dir + '/*.png'))
 

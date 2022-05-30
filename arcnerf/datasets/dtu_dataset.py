@@ -53,8 +53,8 @@ class DTU(Base3dDataset):
         if self.precache:
             self.precache_ray()
 
-    def get_image_list(self):
-        """Get image list"""
+    def get_image_list(self, mode=None):
+        """Get image list."""
         img_dir = osp.join(self.data_spec_dir, 'image')
         img_list = sorted(glob.glob(img_dir + '/*.png'))
 
@@ -63,8 +63,8 @@ class DTU(Base3dDataset):
 
         return img_list, n_imgs
 
-    def get_mask_list(self):
-        """Get mask list"""
+    def get_mask_list(self, mode=None):
+        """Get image list."""
         mask_dir = osp.join(self.data_spec_dir, 'mask')
         mask_list = sorted(glob.glob(mask_dir + '/*.png'))
 

@@ -25,3 +25,17 @@
   - dynamic
   - neural volume
   - nex (mpi, msi, etc)
+
+
+# Ref
+- https://github.com/kwea123/nerf_pl
+- https://github.com/yenchenlin/nerf-pytorch
+- https://github.com/ventusff/neurecon
+- https://github.com/Kai-46/nerfplusplus
+- https://github.com/Totoro97/NeuS
+- https://github.com/lioryariv/volsdf
+- https://github.com/yashbhalgat/HashNeRF-pytorch
+
+# dataset
+- nerf/LLFF: https://drive.google.com/drive/folders/128yBriW1IG_3NJ5Rp7APSTZsJqdJdfc1
+- DTU/BlenderMVS: https://www.dropbox.com/sh/oum8dyo19jqdkwu/AAAxpIifYjjotz_fIRBj1Fyla

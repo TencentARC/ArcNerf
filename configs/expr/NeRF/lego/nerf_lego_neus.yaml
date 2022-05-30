@@ -1,4 +1,4 @@
-name: dtu_65_volsdf_mask
+name: nerf_lego_neus
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_65_volsdf_mask'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_neus'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_65_volsdf_mask/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_neus/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -25,7 +25,7 @@ dist:
     slurm: False
 
 batch_size: 2
-n_rays: 1024     # follow original repo
+n_rays: 512     # follow original repo
 worker: 4
 
 optim:
@@ -33,9 +33,9 @@ optim:
     optim_type: adam
     weight_decay: 0.0
     lr_scheduler:
-        type: ExponentialLR    # follow original repo
-        lr_gamma: 0.1
-        lr_steps: [200000]
+        type: WarmUpCosineLR        # follow the original implementation
+        lr_steps: [5000]
+        min_factor: 0.05
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -65,42 +65,38 @@ progress:
 
 dataset:
     train:
-        type: DTU
-        scan_id: 65
+        type: NeRF
+        scene_name: lego
         img_scale: 1.0
         scale_radius: 3.0
-        align_cam: True
-        precache: True
+        precache: False
         augmentation:
             shuffle: True
 
     val:
-        type: DTU
-        scan_id: 65
-        img_scale: 0.25
+        type: NeRF
+        scene_name: lego
+        img_scale: 0.5
         scale_radius: 3.0
-        align_cam: True
         precache: False
 
     eval:
         eval_batch_size: 1
         eval_max_sample: 3
-        type: DTU
-        scan_id: 65
+        type: NeRF
+        scene_name: lego
         img_scale: 1.0
         scale_radius: 3.0
-        align_cam: True
         precache: True
 
 inference:
     render:
-        type: [swing]
+        type: [circle]
         n_cam: [20]
         repeat: [3]
         radius: 3.0
-        u_range: [0.65, 0.85]
-        v_range: [0, 0]
-        n_rot: 1
+        u_start: 0.5
+        v_ratio: -0.4
         fps: 5
         surface_render:
             chunk_rays_factor: 1024
@@ -108,7 +104,7 @@ inference:
 
     volume:
         n_grid: 512
-        side: 1.5
+        side: 2.0
         level: 0.0
         grad_dir: ascent
         chunk_pts_factor: 1
@@ -116,26 +112,23 @@ inference:
             backend: pytorch3d
 
 model:
-    type: VolSDF
+    type: Neus
     rays:
         bounding_radius: 3.0
         near: 1.0
-        # far: 4.5
+        far: 5.0
         n_sample: 64
-        n_importance: 32
-        n_eval: 128
-        n_iter: 5
-        beta_iter: 10
-        eps: 0.1
+        n_importance: 64
+        n_iter: 4
         inverse_linear: False
         perturb: True
         add_inf_z: False
         noise_std: 1.0
         white_bkg: True
     params:
-        speed_factor: 10              # factor for ln_beta = np.log(init_beta)/speed, beta = exp(ln_beta*speed)
-        beta_min: 0.0001              # min beta offset
-        init_beta: 0.1                # init beta, when it approaches 0, cdf more close
+        speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
+        init_var: 0.05                # init var, when it approaches 0, cdf more close
+        anneal_end: 50000             # for anneal param, only set during training. please
     chunk_rays: 4096
     chunk_pts: 131072
     geometry:
@@ -165,12 +158,10 @@ model:
         weight_norm: True
 
 loss:
-    ImgMaskL1Loss:
-        weight: 1.0
-    MaskBCELoss:
+    ImgL1Loss:
         weight: 1.0
     EikonalPTLoss:
         weight: 0.1
 
 metric:
-    MaskPSNR:
+    PSNR:

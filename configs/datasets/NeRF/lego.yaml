@@ -1,0 +1,34 @@
+dir:
+    data_dir:  '/Users/leoyluo/Desktop/Immerse/data'   # It is the main dataset address containing all dataset
+
+dataset:
+    train:
+        type: NeRF
+        scene_name: lego
+        img_scale: 1.0
+        scale_radius: 3.0
+        precache: False
+
+model:
+    rays:
+        bounding_radius: 3.0
+        near: 1.0
+        # far: 4.0
+        n_sample: 64
+        n_importance: 128
+        inverse_linear: False
+        perturb: True
+        add_inf_z: True
+        noise_std: 1.0
+
+inference:
+    render:
+        type: [circle]
+        n_cam: [20]
+        radius: 3.0
+        u_start: 0.5
+        v_ratio: -0.4
+
+    volume:
+        n_grid: 4       # just for visual purpose
+        side: 2.0

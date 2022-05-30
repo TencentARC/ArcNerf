@@ -84,6 +84,12 @@ cam is on surface with `scale_radius`. Only scale and translation is applied, do
 Specified by scan_id, read image/mask/camera.
 - scan_id: int num for item selection. Use it to be identifier.
 
+## NeRF
+Specified by scene_name, read image/camera. Since NeRF split the dataset into train/val/eval, we
+load all the camera from all split together, process cameras, and keep the cam for any split. This make the
+transformation of camera(like norm_pose) consistent over all split.
+- scene_name: scene_name that is the folder name under `NeRF`. Use it to be identifier.
+- poses: for the poses, we do transform so that it matches the coord system in our proj.
 
 # Train/Val/Eval/Inference
 
