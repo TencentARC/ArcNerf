@@ -5,9 +5,9 @@ data:
     video_path: '/group/30042/leoyluo/Immerse/data/Capture/plant.mp4'
     scene_name: plant
     video_downsample: 10            # fps downsample ratio, default 15 (fps=30, each second 2 image)
-    image_downsample: 2             # image rescale downsample ratio, default 4 (each length 1/4)
+    image_downsample: 1             # image rescale downsample ratio, default 4 (each length 1/4)
     colmap:
-        match_type: 'sequential_matcher'        # ['sequential_matcher', 'exhaustive_matcher']
+        match_type: 'exhaustive_matcher'        # ['sequential_matcher', 'exhaustive_matcher']
         dense_reconstruct: False                # run for dense reconstruction with point cloud and mesh
 
 dataset:
