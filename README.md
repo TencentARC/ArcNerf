@@ -26,6 +26,8 @@
   - neural volume
   - nex (mpi, msi, etc)
 
+- thinking:
+  - progressive training with sampling on errorous rays?
 
 # Ref
 - https://github.com/kwea123/nerf_pl

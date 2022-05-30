@@ -1,4 +1,5 @@
 ffmpeg-python
+imageio
 kaleido
 loguru
 matplotlib

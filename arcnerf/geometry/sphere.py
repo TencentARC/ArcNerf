@@ -209,7 +209,7 @@ def get_spiral_line(radius, u_start=0, v_range=(-1, 0), origin=(0, 0, 0), n_rot=
     assert 0 <= u_start <= 1, 'Invalid u_start, (0, 1) only'
     assert -1 <= v_range[0] <= 1 and -1 <= v_range[0] <= 1, 'Invalid v range, start and end all in (-1, 1) only'
     n_pts_per_rot = math.ceil(float(n_pts) / float(n_rot))
-    u = np.linspace(0, 1, n_pts_per_rot) + u_start
+    u = np.linspace(0, 1, n_pts_per_rot + 1)[:n_pts_per_rot] + u_start  # do not close
     u[u > 1.0] -= 1.0
     u *= (2 * np.pi)
     u = np.concatenate([u] * n_rot)[:n_pts]

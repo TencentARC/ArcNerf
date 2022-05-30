@@ -91,12 +91,12 @@ dataset:
 
 inference:
     render:
-        type: [circle]
-        n_cam: [20]
-        repeat: [3]
+        type: [spiral]
+        n_cam: [60]
+        repeat: [1]
         radius: 3.0
         u_start: 0.5
-        v_ratio: -0.4
+        v_range: [-0.6, -0.2]
         fps: 5
         surface_render:
             chunk_rays_factor: 1024
@@ -159,6 +159,8 @@ model:
 
 loss:
     ImgL1Loss:
+        weight: 1.0
+    MaskBCELoss:
         weight: 1.0
     EikonalPTLoss:
         weight: 0.1

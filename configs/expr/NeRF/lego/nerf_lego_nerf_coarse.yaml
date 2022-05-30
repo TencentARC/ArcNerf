@@ -91,12 +91,12 @@ dataset:
 
 inference:
     render:
-        type: [circle]
-        n_cam: [20]
-        repeat: [3]
+        type: [spiral]
+        n_cam: [60]
+        repeat: [1]
         radius: 3.0
         u_start: 0.5
-        v_ratio: -0.4
+        v_range: [-0.6, -0.2]
         fps: 5
 
     volume:
@@ -140,6 +140,8 @@ model:
 
 loss:
     ImgCFLoss:
+        weight: 1.0
+    MaskCFLoss:
         weight: 1.0
 
 metric:

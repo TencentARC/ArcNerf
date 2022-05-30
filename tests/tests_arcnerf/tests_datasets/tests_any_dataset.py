@@ -19,6 +19,7 @@ from arcnerf.render.camera import PerspectiveCamera
 from arcnerf.render.ray_helper import equal_sample, get_rays, get_near_far_from_rays, get_zvals_from_near_far
 from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.cfgs_utils import get_value_from_cfgs_field, valid_key_in_cfgs
+from common.utils.img_utils import img_to_uint8
 from common.utils.torch_utils import np_wrapper, torch_to_np
 from common.utils.video_utils import write_video
 from common.visual import get_combine_colors
@@ -129,6 +130,19 @@ class TestDict(unittest.TestCase):
 
     def tests_get_dataset(self):
         self.assertIsInstance(self.dataset[0], dict)
+
+    def tests_save_image(self):
+        # rgb
+        file_path = osp.join(self.spec_result_dir, 'img.png')
+        img = self.dataset[0]['img'].reshape(self.H, self.W, -1)
+        img = img_to_uint8(torch_to_np(img))
+        cv2.imwrite(file_path, img)
+        # mask
+        if self.dataset[0]['mask'] is not None:
+            file_path = osp.join(self.spec_result_dir, 'mask.png')
+            mask = self.dataset[0]['mask'].reshape(self.H, self.W)
+            mask = (torch_to_np(mask) * 255.0).astype(np.uint8)
+            cv2.imwrite(file_path, mask)
 
     def tests_vis_cameras(self):
         origin = (0, 0, 0)

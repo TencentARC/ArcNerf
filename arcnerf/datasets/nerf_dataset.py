@@ -5,6 +5,7 @@ import json
 import os.path as osp
 import re
 
+import imageio
 import numpy as np
 
 from .base_3d_dataset import Base3dDataset
@@ -29,6 +30,9 @@ class NeRF(Base3dDataset):
         img_list, self.n_imgs = self.get_image_list(mode)
         self.images = self.read_image_list(img_list)
         self.H, self.W = self.images[0].shape[:2]
+        # mask as image 4th channel
+        mask_list = self.get_image_list(mode)[0]
+        self.masks = self.read_mask_list(mask_list)
 
         # load all camera together in all split for consistent camera normalization
         self.cam_file = osp.join(self.data_spec_dir, 'transforms_{}.json'.format(self.convert_mode(mode)))
@@ -76,6 +80,9 @@ class NeRF(Base3dDataset):
         n_imgs = len(img_list)
         assert n_imgs > 0, 'No image exists in {}'.format(img_dir)
 
+        # sort by name
+        img_list = [osp.join(img_dir, 'r_{}.png'.format(i)) for i in range(n_imgs)]
+
         return img_list, n_imgs
 
     def get_image_list_with_key(self, mode, key='depth'):
@@ -89,7 +96,35 @@ class NeRF(Base3dDataset):
         n_imgs = len(img_list)
         assert n_imgs > 0, 'No {} image exists in {}'.format(key, img_dir)
 
+        # sort by name
+        img_list = [osp.join(img_dir, 'r_{}_{}_0001.png'.format(i, key)) for i in range(n_imgs)]
+
         return img_list, n_imgs
+
+    @staticmethod
+    def read_image_list(img_list):
+        """Read image from list. Original bkg is black, change it to white"""
+        images = []
+        for path in img_list:
+            img = imageio.imread(path).astype(np.float32) / 255.0
+            mask = img[:, :, -1] > 0.5
+            # bkg as white image
+            img[~mask] = 1.0
+            images.append(img[:, :, :3])
+
+        return images
+
+    @staticmethod
+    def read_mask_list(mask_list):
+        """Read mask from list. """
+        masks = []
+        for path in mask_list:
+            img = imageio.imread(path).astype(np.float32) / 255.0
+            mask = img[:, :, -1]
+            # mask
+            masks.append(mask)
+
+        return masks
 
     def load_cam_json(self, mode):
         """Load the camera json file in any split"""
