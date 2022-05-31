@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 
 from torchgeometry.losses.ssim import SSIM as _SSIM
+from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import METRIC_REGISTRY
 from common.utils.torch_utils import mean_tensor_by_mask
 
@@ -13,15 +14,22 @@ class PSNR(nn.Module):
     """PSNR for image and gt"""
 
     def __init__(self, cfgs=None):
+        """
+        Args:
+            cfgs: a obj with following attributes:
+                key: key used for loss sum. By default 'rgb'.
+                      'rgb_coarse'/'rgb_fine' for two stage network
+                use_mask: use mask for average calculation. By default False.
+        """
         super(PSNR, self).__init__()
+        self.key = get_value_from_cfgs_field(cfgs, 'key', 'rgb')
         self.mse = nn.MSELoss(reduction='none')
-        self.key = 'rgb'
         self.use_mask = False
 
     def forward(self, data, output):
         """
         Args:
-            output['rgb']: (B, N_rays, 3). img output
+            output['rgb'/'rgb_coarse'/'rgb_fine']: (B, N_rays, 3). img output based on key
             data['img']: (B, N_rays, 3)
             data['mask']: (B, N_rays), only if used mask
 
@@ -46,47 +54,11 @@ class PSNR(nn.Module):
 
 
 @METRIC_REGISTRY.register()
-class PSNRCoarse(PSNR):
-    """PSNR for coarse image output and gt"""
-
-    def __init__(self, cfgs=None):
-        super(PSNRCoarse, self).__init__(cfgs)
-        self.key = 'rgb_coarse'
-
-
-@METRIC_REGISTRY.register()
-class PSNRFine(PSNR):
-    """PSNR for fine image output and gt"""
-
-    def __init__(self, cfgs=None):
-        super(PSNRFine, self).__init__(cfgs)
-        self.key = 'rgb_fine'
-
-
-@METRIC_REGISTRY.register()
 class MaskPSNR(PSNR):
     """PSNR for image and gt with mask"""
 
     def __init__(self, cfgs=None):
         super(MaskPSNR, self).__init__(cfgs)
-        self.use_mask = True
-
-
-@METRIC_REGISTRY.register()
-class MaskPSNRCoarse(PSNRCoarse):
-    """PSNR for coarse image and gt with mask"""
-
-    def __init__(self, cfgs=None):
-        super(MaskPSNRCoarse, self).__init__(cfgs)
-        self.use_mask = True
-
-
-@METRIC_REGISTRY.register()
-class MaskPSNRFine(PSNRFine):
-    """PSNR for fine image and gt with mask"""
-
-    def __init__(self, cfgs=None):
-        super(MaskPSNRFine, self).__init__(cfgs)
         self.use_mask = True
 
 
@@ -97,15 +69,22 @@ class SSIM(nn.Module):
     """
 
     def __init__(self, cfgs=None):
+        """
+        Args:
+            cfgs: a obj with following attributes:
+                key: key used for loss sum. By default 'rgb'.
+                      'rgb_coarse'/'rgb_fine' for two stage network
+                use_mask: use mask for average calculation. By default False.
+        """
         super(SSIM, self).__init__()
         self.ssim = _SSIM(window_size=3, reduction='none')
-        self.key = 'rgb'
-        self.use_mask = False
+        self.key = get_value_from_cfgs_field(cfgs, 'key', 'rgb')
+        self.use_mask = get_value_from_cfgs_field(cfgs, 'use_mask', False)
 
     def forward(self, data, output):
         """
         Args:
-            output['rgb']: (B, N_rays, 3). img output
+            output['rgb'/'rgb_coarse'/'rgb_fine']: (B, N_rays, 3). img output based on key
             data['img']: (B, N_rays, 3)
             data['mask']: (B, N_rays), only if used mask
             data['H']: (B,) image height
@@ -139,45 +118,9 @@ class SSIM(nn.Module):
 
 
 @METRIC_REGISTRY.register()
-class SSIMCoarse(SSIM):
-    """SSIM for coarse image output and gt"""
-
-    def __init__(self, cfgs=None):
-        super(SSIMCoarse, self).__init__()
-        self.key = 'rgb_coarse'
-
-
-@METRIC_REGISTRY.register()
-class SSIMFine(SSIM):
-    """SSIM for fine image output and gt"""
-
-    def __init__(self, cfgs=None):
-        super(SSIMFine, self).__init__()
-        self.key = 'rgb_fine'
-
-
-@METRIC_REGISTRY.register()
 class MaskSSIM(SSIM):
     """SSIM for image and gt with mask"""
 
     def __init__(self, cfgs=None):
         super(MaskSSIM, self).__init__(cfgs)
-        self.use_mask = True
-
-
-@METRIC_REGISTRY.register()
-class MaskSSIMCoarse(SSIMCoarse):
-    """SSIM for coarse image and gt with mask"""
-
-    def __init__(self, cfgs=None):
-        super(MaskSSIMCoarse, self).__init__(cfgs)
-        self.use_mask = True
-
-
-@METRIC_REGISTRY.register()
-class MaskSSIMFine(SSIMFine):
-    """SSIM for fine image and gt with mask"""
-
-    def __init__(self, cfgs=None):
-        super(MaskSSIMFine, self).__init__(cfgs)
         self.use_mask = True

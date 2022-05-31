@@ -161,11 +161,15 @@ model:
         weight_norm: True
 
 loss:
-    ImgL1Loss:
+    ImgLoss:
+        loss_type: L1
+        use_mask: True
         weight: 1.0
-    MaskBCELoss:
+    MaskLoss:
+        loss_type: BCE
         weight: 1.0
-    EikonalPTLoss:
+    EikonalLoss:
+        key: normal_pts
         weight: 0.1
 
 metric:

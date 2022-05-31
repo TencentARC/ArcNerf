@@ -5,9 +5,8 @@ import unittest
 
 import torch
 
-from arcnerf.loss.img_loss import (
-    ImgLoss, ImgL1Loss, ImgMaskLoss, ImgMaskL1Loss, ImgCFLoss, ImgCFL1Loss, ImgCFMaskLoss, ImgCFMaskL1Loss
-)
+from arcnerf.loss.img_loss import ImgLoss
+from common.utils.cfgs_utils import dict_to_obj
 
 
 class TestDict(unittest.TestCase):
@@ -22,45 +21,50 @@ class TestDict(unittest.TestCase):
     def tests_imgloss(self):
         data = {'img': self.bn3_tensor.clone()}
         output = {'rgb': self.bn3_tensor.clone()}
-        loss = ImgLoss()
+        loss = ImgLoss(dict_to_obj({}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
-        l1loss = ImgL1Loss()
+        loss = ImgLoss(dict_to_obj({'do_mean': False}))
+        res = loss(data, output)
+        self.assertEqual(res.shape, (self.batch_size, self.n_rays, 3))
+        l1loss = ImgLoss(dict_to_obj({'loss_type': 'L1'}))
         res = l1loss(data, output)
         self.assertEqual(res.shape, ())
 
     def tests_imgcfloss(self):
         data = {'img': self.bn3_tensor.clone()}
         output = {'rgb_coarse': self.bn3_tensor.clone()}
-        loss = ImgCFLoss()
+        loss = ImgLoss(dict_to_obj({'keys': ['rgb_coarse']}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
         output['rgb_fine'] = self.bn3_tensor.clone()
+        loss = ImgLoss(dict_to_obj({'keys': ['rgb_coarse', 'rgb_fine']}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
-        l1loss = ImgCFL1Loss()
+        l1loss = ImgLoss(dict_to_obj({'keys': ['rgb_coarse', 'rgb_fine'], 'loss_type': 'L1'}))
         res = l1loss(data, output)
         self.assertEqual(res.shape, ())
 
     def tests_imgmaskloss(self):
         data = {'img': self.bn3_tensor.clone(), 'mask': self.bn_tensor.clone()}
         output = {'rgb': self.bn3_tensor.clone()}
-        loss = ImgMaskLoss()
+        loss = ImgLoss(dict_to_obj({'use_mask': True}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
-        l1loss = ImgMaskL1Loss()
+        l1loss = ImgLoss(dict_to_obj({'use_mask': True, 'loss_type': 'L1'}))
         res = l1loss(data, output)
         self.assertEqual(res.shape, ())
 
     def tests_imgcfmaskloss(self):
         data = {'img': self.bn3_tensor.clone(), 'mask': self.bn_tensor.clone()}
         output = {'rgb_coarse': self.bn3_tensor.clone()}
-        loss = ImgCFMaskLoss()
+        loss = ImgLoss(dict_to_obj({'keys': ['rgb_coarse'], 'use_mask': True}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
         output['rgb_fine'] = self.bn3_tensor.clone()
+        loss = ImgLoss(dict_to_obj({'keys': ['rgb_coarse', 'rgb_fine'], 'use_mask': True}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
-        l1loss = ImgCFMaskL1Loss()
+        l1loss = ImgLoss(dict_to_obj({'keys': ['rgb_coarse', 'rgb_fine'], 'use_mask': True, 'loss_type': 'L1'}))
         res = l1loss(data, output)
         self.assertEqual(res.shape, ())

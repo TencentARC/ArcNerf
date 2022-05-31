@@ -146,9 +146,12 @@ model:
         embed_freq_view: 4            # view embed freq
 
 loss:
-    ImgCFMaskLoss:
+    ImgLoss:
+        keys: ['rgb_coarse', 'rgb_fine']
+        use_mask: True
         weight: 1.0
-    MaskCFLoss:
+    MaskLoss:
+        keys: ['mask_coarse', 'mask_fine']
         weight: 1.0
 
 metric:

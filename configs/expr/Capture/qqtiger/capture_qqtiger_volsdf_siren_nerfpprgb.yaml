@@ -190,9 +190,11 @@ model:
             W_feat_in: 256
 
 loss:
-    ImgL1Loss:
+    ImgLoss:
+        loss_type: L1
         weight: 1.0
-    EikonalPTLoss:
+    EikonalLoss:
+        key: normal_pts
         weight: 0.1
 
 metric:

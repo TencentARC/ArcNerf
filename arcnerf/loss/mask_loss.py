@@ -2,113 +2,66 @@
 
 import torch.nn as nn
 
+from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import LOSS_REGISTRY
 
 
 @LOSS_REGISTRY.register()
-class MaskCFLoss(nn.Module):
-    """MSE loss for mask and coarse/fine output. Use for two stage network"""
-
-    def __init__(self, cfgs=None):
-        super(MaskCFLoss, self).__init__()
-        self.loss = nn.MSELoss(reduction='none')
-        self.clip_output = False  # for BCE Loss
-
-    def forward(self, data, output):
-        """
-        Args:
-            output['mask_coarse']: (B, N_rays). Coarse mask output
-            output['mask_fine']: (B, N_rays), optional. Fine mask output
-            data['mask']: (B, N_rays)
-
-        Returns:
-            loss: (1, ) mean loss. error value in (0~1)
-        """
-        device = output['mask_coarse'].device
-        gt = data['mask'].to(device)
-
-        # coarse
-        if self.clip_output:
-            loss = self.loss(output['mask_coarse'].clip(1e-3, 1.0 - 1e-3), gt)
-        else:
-            loss = self.loss(output['mask_coarse'], gt)
-
-        # fine
-        if 'mask_fine' in output:
-            if self.clip_output:
-                loss += self.loss(output['mask_fine'].clip(1e-3, 1.0 - 1e-3), gt)
-            else:
-                loss += self.loss(output['mask_fine'], gt)
-
-        loss = loss.mean()
-
-        return loss
-
-
-@LOSS_REGISTRY.register()
-class MaskCFL1Loss(MaskCFLoss):
-    """L1 loss for mask and coarse/fine output. Use for two stage network"""
-
-    def __init__(self, cfgs=None):
-        super(MaskCFL1Loss, self).__init__()
-        self.loss = nn.L1Loss(reduction='none')
-
-
-@LOSS_REGISTRY.register()
-class MaskCFBCELoss(MaskCFLoss):
-    """BCE loss for mask and coarse/fine output. Use for two stage network"""
-
-    def __init__(self, cfgs=None):
-        super(MaskCFBCELoss, self).__init__()
-        self.loss = nn.BCELoss(reduction='none')
-        self.clip_output = True
-
-
-@LOSS_REGISTRY.register()
 class MaskLoss(nn.Module):
-    """Simple MSE loss for Mask"""
+    """loss for mask"""
 
     def __init__(self, cfgs=None):
+        """
+        Args:
+            cfgs: a obj with following attributes:
+                keys: key used for loss sum. By default 'mask'.
+                      'mask_coarse'/'mask_fine' for two stage network
+                loss_type: select loss type such as 'MSE'/'L1'/'BCE'. By default MSE
+                use_mask: use mask for average calculation. By default False.
+                do_mean: calculate the mean of loss. By default True.
+        """
         super(MaskLoss, self).__init__()
-        self.loss = nn.MSELoss(reduction='none')
-        self.clip_output = False  # for BCE Loss
+        self.keys = get_value_from_cfgs_field(cfgs, 'keys', ['mask'])
+        self.loss, self.clip_output = self.parse_loss(cfgs)
+        self.do_mean = get_value_from_cfgs_field(cfgs, 'do_mean', True)
+
+    @staticmethod
+    def parse_loss(cfgs):
+        clip_output = False
+        loss_type = get_value_from_cfgs_field(cfgs, 'loss_type', 'MSE')
+        if loss_type == 'MSE':
+            loss = nn.MSELoss(reduction='none')
+        elif loss_type == 'L1':
+            loss = nn.L1Loss(reduction='none')
+        elif loss_type == 'BCE':
+            loss = nn.BCELoss(reduction='none')
+            clip_output = True
+        else:
+            raise NotImplementedError('Loss type {} not support in mask loss...'.format(loss_type))
+
+        return loss, clip_output
 
     def forward(self, data, output):
         """
         Args:
-            output['mask']: (B, N_rays). mask output
+            output['mask'/'mask_fine'/'mask_coarse']: (B, N_rays). output mask depends on keys
             data['mask']: (B, N_rays)
 
         Returns:
             loss: (1, ) mean loss. error value in (0~1)
+                    if not do_mean, return (B, N_rays, ) loss
         """
-        device = output['mask'].device
+        device = output[self.keys[0]].device
         gt = data['mask'].to(device)
 
-        if self.clip_output:
-            loss = self.loss(output['mask'].clip(1e-3, 1.0 - 1e-3), gt)  # in case explode
-        else:
-            loss = self.loss(output['mask'], gt)
+        loss = 0.0
+        for k in self.keys:
+            if self.clip_output:
+                loss = self.loss(output[k].clip(1e-3, 1.0 - 1e-3), gt)
+            else:
+                loss = self.loss(output[k], gt)
 
-        loss = loss.mean()
+        if self.do_mean:
+            loss = loss.mean()
 
         return loss
-
-
-@LOSS_REGISTRY.register()
-class MaskL1Loss(MaskLoss):
-    """L1 loss for mask and coarse/fine output. Use for two stage network"""
-
-    def __init__(self, cfgs=None):
-        super(MaskLoss, self).__init__()
-        self.loss = nn.L1Loss(reduction='none')
-
-
-@LOSS_REGISTRY.register()
-class MaskBCELoss(MaskLoss):
-    """BCE loss for mask and coarse/fine output. Use for two stage network"""
-
-    def __init__(self, cfgs=None):
-        super(MaskLoss, self).__init__()
-        self.loss = nn.BCELoss(reduction='none')
-        self.clip_output = True

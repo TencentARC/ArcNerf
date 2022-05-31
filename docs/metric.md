@@ -1,17 +1,12 @@
 # img_metric
 Metric for evaluating image quality
 ## PSNR
-For general image
-### PSNRCoarse
-For coarse image
-### PSNRFine
-For fine image
+PSNR between images, calculate from mean mse loss.
+- key: used for selecting rgb from output. By default rgb. Can be 'rgb_fine/coarse' if needed.
+- use_mask: eval on mask area only. False here.
 ## MaskPSNR
-For general image, with mask
-### MaskPSNRCoarse
-For coarse image, with mask
-### MaskPSNRFine
-For fine image, with mask
+Child of PSNR.
+- use_mask: Set to True
 
-## SSIM / MaskSSIM
-Same layout as PSNR, but use SSIM core calculation.
+## SSIM/MaskSSIM
+Same as PSNR but use different metric.

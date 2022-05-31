@@ -33,6 +33,7 @@ def build_loss(cfgs, logger):
     if logger is not None:
         logger.add_log('Loss types : {}'.format(loss_names))
         logger.add_log('Loss Weights: {}'.format(loss_weights))
+        logger.add_log('Loss dict: ', cfgs.loss.__dict__)
 
     return loss_factory
 

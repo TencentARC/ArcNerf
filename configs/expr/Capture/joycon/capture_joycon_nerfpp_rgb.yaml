@@ -170,7 +170,8 @@ model:
             W_feat_in: 256
 
 loss:
-    ImgCFLoss:
+    ImgLoss:
+        keys: ['rgb_coarse', 'rgb_fine']
         weight: 1.0
 
 metric:

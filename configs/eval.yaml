@@ -64,4 +64,5 @@ model:
         W_feat_in: 256                # dim for feature from geometry
 
 metric:
-    PSNRFine:
+    PSNR:
+        key: rgb_fine

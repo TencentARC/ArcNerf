@@ -2,133 +2,67 @@
 
 import torch.nn as nn
 
+from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import LOSS_REGISTRY
 from common.utils.torch_utils import mean_tensor_by_mask
 
 
 @LOSS_REGISTRY.register()
-class ImgCFLoss(nn.Module):
-    """MSE loss for image and coarse/fine output. Use for two stage network"""
-
-    def __init__(self, cfgs=None):
-        super(ImgCFLoss, self).__init__()
-        self.loss = nn.MSELoss(reduction='none')
-        self.use_mask = False
-
-    def forward(self, data, output):
-        """
-        Args:
-            output['rgb_coarse']: (B, N_rays, 3). Coarse output
-            output['rgb_fine']: (B, N_rays, 3), optional. Fine output
-            data['img']: (B, N_rays, 3)
-            data['mask']: (B, N_rays), only if used mask
-
-        Returns:
-            loss: (1, ) mean loss. RGB value in (0~1)
-        """
-        device = output['rgb_coarse'].device
-        gt = data['img'].to(device)
-        if self.use_mask:
-            mask = data['mask'].to(device)
-
-        loss = self.loss(output['rgb_coarse'], gt)  # (B, N_rays, 3)
-        if 'rgb_fine' in output:
-            loss += self.loss(output['rgb_fine'], gt)
-
-        if self.use_mask:
-            loss = mean_tensor_by_mask(loss.mean(-1), mask)
-        else:
-            loss = loss.mean()
-
-        return loss
-
-
-@LOSS_REGISTRY.register()
-class ImgCFL1Loss(ImgCFLoss):
-    """L1 loss for image and coarse/fine output with mask. Use for two stage network"""
-
-    def __init__(self, cfgs=None):
-        super(ImgCFL1Loss, self).__init__()
-        self.loss = nn.L1Loss(reduction='none')
-
-
-@LOSS_REGISTRY.register()
-class ImgCFMaskLoss(ImgCFLoss):
-    """MSE loss for image and coarse/fine output with mask. Use for two stage network"""
-
-    def __init__(self, cfgs=None):
-        super(ImgCFMaskLoss, self).__init__(cfgs)
-        self.loss = nn.MSELoss(reduction='none')
-        self.use_mask = True
-
-
-@LOSS_REGISTRY.register()
-class ImgCFMaskL1Loss(ImgCFLoss):
-    """L1 loss for image and coarse/fine output with mask. Use for two stage network"""
-
-    def __init__(self, cfgs=None):
-        super(ImgCFMaskL1Loss, self).__init__(cfgs)
-        self.loss = nn.L1Loss(reduction='none')
-        self.use_mask = True
-
-
-@LOSS_REGISTRY.register()
 class ImgLoss(nn.Module):
-    """Simple MSE loss for rgb"""
+    """loss for image. """
 
     def __init__(self, cfgs=None):
+        """
+        Args:
+            cfgs: a obj with following attributes:
+                keys: key used for loss sum. By default 'rgb'.
+                      'rgb_coarse'/'rgb_fine' for two stage network
+                loss_type: select loss type such as 'MSE'/'L1'. By default MSE
+                use_mask: use mask for average calculation. By default False.
+                do_mean: calculate the mean of loss. By default True.
+        """
         super(ImgLoss, self).__init__()
-        self.loss = nn.MSELoss(reduction='none')
-        self.use_mask = False
+        self.keys = get_value_from_cfgs_field(cfgs, 'keys', ['rgb'])
+        self.loss = self.parse_loss(cfgs)
+        self.use_mask = get_value_from_cfgs_field(cfgs, 'use_mask', False)
+        self.do_mean = get_value_from_cfgs_field(cfgs, 'do_mean', True)
+
+    @staticmethod
+    def parse_loss(cfgs):
+        loss_type = get_value_from_cfgs_field(cfgs, 'loss_type', 'MSE')
+        if loss_type == 'MSE':
+            loss = nn.MSELoss(reduction='none')
+        elif loss_type == 'L1':
+            loss = nn.L1Loss(reduction='none')
+        else:
+            raise NotImplementedError('Loss type {} not support in img loss...'.format(loss_type))
+
+        return loss
 
     def forward(self, data, output):
         """
         Args:
-            output['rgb']: (B, N_rays, 3). img output
+            output['rgb'/'rgb_fine'/'rgb_coarse']: (B, N_rays, 3). output rgb depends on keys
             data['img']: (B, N_rays, 3)
             data['mask']: (B, N_rays), only if used mask
 
         Returns:
             loss: (1, ) mean loss. RGB value in (0~1)
+                   if not do_mean, return (B, N_rays, 3) loss
         """
-        device = output['rgb'].device
+        device = output[self.keys[0]].device
         gt = data['img'].to(device)
         if self.use_mask:
             mask = data['mask'].to(device)
 
-        loss = self.loss(output['rgb'], gt)
-        if self.use_mask:
-            loss = mean_tensor_by_mask(loss.mean(-1), mask)
-        else:
-            loss = loss.mean()
+        loss = 0.0
+        for k in self.keys:
+            loss = self.loss(output[k], gt)  # (B, N_rays, 3)
+
+        if self.do_mean:  # (1,)
+            if self.use_mask:
+                loss = mean_tensor_by_mask(loss.mean(-1), mask)
+            else:
+                loss = loss.mean()
 
         return loss
-
-
-@LOSS_REGISTRY.register()
-class ImgL1Loss(ImgLoss):
-    """Simple L1 loss for rgb"""
-
-    def __init__(self, cfgs=None):
-        super(ImgL1Loss, self).__init__()
-        self.loss = nn.L1Loss(reduction='none')
-
-
-@LOSS_REGISTRY.register()
-class ImgMaskLoss(ImgLoss):
-    """Simple MSE loss for rgb with mask"""
-
-    def __init__(self, cfgs=None):
-        super(ImgMaskLoss, self).__init__(cfgs)
-        self.loss = nn.MSELoss(reduction='none')
-        self.use_mask = True
-
-
-@LOSS_REGISTRY.register()
-class ImgMaskL1Loss(ImgLoss):
-    """Simple L1 loss for rgb with mask"""
-
-    def __init__(self, cfgs=None):
-        super(ImgMaskL1Loss, self).__init__(cfgs)
-        self.loss = nn.L1Loss(reduction='none')
-        self.use_mask = True

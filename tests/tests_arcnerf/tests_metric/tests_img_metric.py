@@ -5,10 +5,8 @@ import unittest
 
 import torch
 
-from arcnerf.metric.img_metric import (
-    PSNR, PSNRCoarse, PSNRFine, MaskPSNR, MaskPSNRCoarse, MaskPSNRFine, SSIM, SSIMCoarse, SSIMFine, MaskSSIM,
-    MaskSSIMCoarse, MaskSSIMFine
-)
+from arcnerf.metric.img_metric import PSNR, MaskPSNR, SSIM, MaskSSIM
+from common.utils.cfgs_utils import dict_to_obj
 
 
 class TestDict(unittest.TestCase):
@@ -26,63 +24,63 @@ class TestDict(unittest.TestCase):
     def tests_psnr(self):
         data = {'img': self.bn3_tensor.clone()}
         output = {'rgb': self.bn3_tensor.clone()}
-        psnr = PSNR()
+        psnr = PSNR(dict_to_obj({}))
         metric = psnr(data, output)
         self.assertEqual(metric.shape, ())
 
     def tests_psnrcoarse(self):
         data = {'img': self.bn3_tensor.clone()}
         output = {'rgb_coarse': self.bn3_tensor.clone()}
-        psnr = PSNRCoarse()
+        psnr = PSNR(dict_to_obj({'key': 'rgb_coarse'}))
         metric = psnr(data, output)
         self.assertEqual(metric.shape, ())
 
     def tests_psnrfine(self):
         data = {'img': self.bn3_tensor.clone()}
         output = {'rgb_fine': self.bn3_tensor.clone()}
-        psnr = PSNRFine()
+        psnr = PSNR(dict_to_obj({'key': 'rgb_fine'}))
         metric = psnr(data, output)
         self.assertEqual(metric.shape, ())
 
     def tests_maskpsnr(self):
         data = {'img': self.bn3_tensor.clone(), 'mask': self.bn_tensor.clone()}
         output = {'rgb': self.bn3_tensor.clone()}
-        psnr = MaskPSNR()
+        psnr = MaskPSNR(dict_to_obj({}))
         metric = psnr(data, output)
         self.assertEqual(metric.shape, ())
 
     def tests_maskpsnrcoarse(self):
         data = {'img': self.bn3_tensor.clone(), 'mask': self.bn_tensor.clone()}
         output = {'rgb_coarse': self.bn3_tensor.clone()}
-        psnr = MaskPSNRCoarse()
+        psnr = MaskPSNR(dict_to_obj({'key': 'rgb_coarse'}))
         metric = psnr(data, output)
         self.assertEqual(metric.shape, ())
 
     def tests_maskpsnrfine(self):
         data = {'img': self.bn3_tensor.clone(), 'mask': self.bn_tensor.clone()}
         output = {'rgb_fine': self.bn3_tensor.clone()}
-        psnr = MaskPSNRFine()
+        psnr = MaskPSNR(dict_to_obj({'key': 'rgb_fine'}))
         metric = psnr(data, output)
         self.assertEqual(metric.shape, ())
 
     def tests_ssim(self):
         data = {'img': self.bn3_tensor.clone(), 'H': self.b_tensor * self.H, 'W': self.b_tensor * self.W}
         output = {'rgb': self.bn3_tensor.clone()}
-        ssim = SSIM()
+        ssim = SSIM(dict_to_obj({}))
         metric = ssim(data, output)
         self.assertEqual(metric.shape, ())
 
     def tests_ssimcoarse(self):
         data = {'img': self.bn3_tensor.clone(), 'H': self.b_tensor * self.H, 'W': self.b_tensor * self.W}
         output = {'rgb_coarse': self.bn3_tensor.clone()}
-        ssim = SSIMCoarse()
+        ssim = SSIM(dict_to_obj({'key': 'rgb_coarse'}))
         metric = ssim(data, output)
         self.assertEqual(metric.shape, ())
 
     def tests_ssimfine(self):
         data = {'img': self.bn3_tensor.clone(), 'H': self.b_tensor * self.H, 'W': self.b_tensor * self.W}
         output = {'rgb_fine': self.bn3_tensor.clone()}
-        ssim = SSIMFine()
+        ssim = SSIM(dict_to_obj({'key': 'rgb_fine'}))
         metric = ssim(data, output)
         self.assertEqual(metric.shape, ())
 
@@ -94,7 +92,7 @@ class TestDict(unittest.TestCase):
             'mask': self.bn_tensor.clone()
         }
         output = {'rgb': self.bn3_tensor.clone()}
-        ssim = MaskSSIM()
+        ssim = MaskSSIM(dict_to_obj({}))
         metric = ssim(data, output)
         self.assertEqual(metric.shape, ())
 
@@ -106,7 +104,7 @@ class TestDict(unittest.TestCase):
             'mask': self.bn_tensor.clone()
         }
         output = {'rgb_coarse': self.bn3_tensor.clone()}
-        ssim = MaskSSIMCoarse()
+        ssim = MaskSSIM(dict_to_obj({'key': 'rgb_coarse'}))
         metric = ssim(data, output)
         self.assertEqual(metric.shape, ())
 
@@ -118,6 +116,6 @@ class TestDict(unittest.TestCase):
             'mask': self.bn_tensor.clone()
         }
         output = {'rgb_fine': self.bn3_tensor.clone()}
-        ssim = MaskSSIMFine()
+        ssim = MaskSSIM(dict_to_obj({'key': 'rgb_fine'}))
         metric = ssim(data, output)
         self.assertEqual(metric.shape, ())
