@@ -29,6 +29,19 @@ class ArcNerfTrainer(BasicTrainer):
     """Trainer for Customized case"""
 
     def __init__(self, cfgs):
+        # cfgs for n_rays in training
+        self.train_count = 0
+        self.total_samples = None
+        self.shuffle_count = -1
+        self.n_rays = 0
+
+        # for inference only
+        self.intrinsic = None
+        self.wh = None
+        # for progress save
+        self.radius = None
+        self.volume_dict = None
+
         super(ArcNerfTrainer, self).__init__(cfgs)
         self.get_progress = get_value_from_cfgs_field(self.cfgs.debug, 'get_progress', False)
         self.total_epoch = self.cfgs.progress.epoch
@@ -48,22 +61,14 @@ class ArcNerfTrainer(BasicTrainer):
     def prepare_data(self):
         """Prepare dataset for train, val, eval, inference. Gets data loader and sampler"""
         self.logger.add_log('-' * 60)
-
-        # cfgs for n_rays in training
-        self.train_count = 0
-        self.total_samples = None
         self.n_rays = get_value_from_cfgs_field(self.cfgs, 'n_rays', 1024)
         self.logger.add_log('Num of rays for each training batch: {}'.format(self.n_rays))
-        # for inference only
-        self.intrinsic = None
-        self.wh = None
-        # for progress save
-        self.radius = None
-        self.volume_dict = None
 
         data = {}
         # train
         data['train'] = self.set_train_dataset()
+        # train data process cfgs
+        data['train_scheduler'] = get_value_from_cfgs_field(self.cfgs.dataset.train, 'scheduler', None)
 
         # val. Only eval one sample per epoch.
         tkwargs_val = {'batch_size': 1, 'num_workers': self.cfgs.worker, 'pin_memory': True, 'drop_last': True}
@@ -90,6 +95,7 @@ class ArcNerfTrainer(BasicTrainer):
             self.logger.add_log('-' * 60)
             self.logger.add_log('Setting Inference data...')
             data['inference'] = set_inference_data(self.cfgs.inference, self.intrinsic, self.wh)
+
             if data['inference']['render'] is not None:
                 self.logger.add_log(
                     'Render novel view - type: {}, n_cam {}, resolution: wh({}/{})'.format(
@@ -97,6 +103,9 @@ class ArcNerfTrainer(BasicTrainer):
                         data['inference']['render']['wh'][0], data['inference']['render']['wh'][1]
                     )
                 )
+                if 'surface_render' in data['inference'] and data['inference']['surface_render'] is not None:
+                    self.logger.add_log('Do surface rendering.')
+
             if data['inference']['volume'] is not data['inference']:
                 self.logger.add_log(
                     'Extracting geometry from volume - n_grid {}'.format(data['inference']['volume']['cfgs']['n_grid'])
@@ -115,9 +124,7 @@ class ArcNerfTrainer(BasicTrainer):
         return data
 
     def set_train_dataset(self, epoch=0):
-        """We will call this every time all rays have been trained.
-        Every time we reset the dataset, make train_count as 0. And reset sampler by epoch
-        """
+        """Set train dataset by collecting all rays together"""
         assert self.cfgs.dataset.train is not None, 'Please input train dataset...'
         tkwargs = {
             'batch_size': 1,  # does not matter
@@ -129,7 +136,7 @@ class ArcNerfTrainer(BasicTrainer):
         if sampler is not None:  # in case sample can not be distributed equally among machine, do not want miss
             self.reset_sampler(sampler, epoch)
 
-        # concat all batch
+        # concat all batch. Just do it once in beginning.
         data = self.concat_train_batch(loader)
 
         return data
@@ -139,56 +146,101 @@ class ArcNerfTrainer(BasicTrainer):
         self.logger.add_log('Concat all training rays...')
         potential_keys = ['img', 'mask', 'rays_o', 'rays_d', 'bounds']
 
-        concat_data = {'H': [0], 'W': [0]}  # will not write progress image during training
+        concat_data = {}
         total_item = len(loader)
+        # append all dict from different image
         all_item = []
         for data in loader:
             all_item.append(data)
+            concat_data['H'] = int(data['H'][0])
+            concat_data['W'] = int(data['W'][0])
 
+        # randomly get the image sample idx
         rand_idx = list(range(total_item))
         random.shuffle(rand_idx)
+        # init sample, just keep potential_keys
         init_idx = rand_idx[0]
         for key in potential_keys:
             if key in all_item[init_idx]:
                 concat_data[key] = all_item[init_idx][key]
-
+        # cat other sample tensors
         for idx in rand_idx[1:]:
             for key in potential_keys:
                 if key in all_item[idx]:
                     concat_data[key] = torch.cat([concat_data[key], all_item[idx][key]], dim=0)
 
+        # resize samples from (n_img, n_rays, ...) into (1, n_img * n_rays, ...)
         for k, v in concat_data.items():
             if isinstance(v, torch.Tensor):
                 v_shape = v.shape
+                # Any tensor will be in (n, hw, ...) shape
+                # TODO: do not support point cloud or other tensor not in (nhw, ...) now
                 if self.total_samples is None:
                     self.total_samples = v_shape[0] * v_shape[1]
-                else:  # TODO: do not support point cloud or other tensor not in (nhw, ...) now
+                else:
                     assert self.total_samples == v_shape[0] * v_shape[1], 'Invalid input dim...'
                 concat_data[k] = v.view(v_shape[0] * v_shape[1], *v_shape[2:])[None, :]  # (1, n_img * n_rays, ...)
 
         return concat_data
 
     def shuffle_train_data(self):
-        """Shuffle all training data"""
+        """Shuffle all training data when total_count > total_samples.
+           Scheduler perform in each new shuffle.
+           TODO: Allow other inputs like rgb loss for other importance selection
+        """
         self.train_count = 0
+        self.shuffle_count += 1
 
-        self.logger.add_log('Shuffling training samples... ')
-        random_idx = torch.randint(0, self.total_samples, size=[self.total_samples])
-        for k, v in self.data['train'].items():
-            if isinstance(v, torch.Tensor):
-                self.data['train'][k] = self.data['train'][k][:, random_idx, ...]
+        # this is the real train data to collect in each shuffle
+        self.data['_train'] = {}
+
+        # scheduler cfgs
+        scheduler_cfg = self.data['train_scheduler']
+        self.logger.add_log('Shuffling training samples... Shuffle count - {}'.format(self.shuffle_count))
+
+        # crop center image
+        if scheduler_cfg is not None and valid_key_in_cfgs(scheduler_cfg, 'precrop') \
+            and get_value_from_cfgs_field(scheduler_cfg.precrop, 'ratio', 1.0) < 1.0 and \
+                self.shuffle_count <= get_value_from_cfgs_field(scheduler_cfg.precrop, 'max_shuffle', -1):
+            keep_ratio = get_value_from_cfgs_field(scheduler_cfg.precrop, 'ratio', 1.0)
+            self.logger.add_log('Crop training samples...keep ratio - {}'.format(keep_ratio))
+            h, w = self.data['train']['H'], self.data['train']['W']
+            for k, v in self.data['train'].items():
+                if isinstance(v, torch.Tensor):
+                    full_tensor = v.view(-1, h, w, *v.shape[2:])  # (N, H, W, ...)
+                    dh, dw = int((1 - keep_ratio) * h / 2.0), int((1 - keep_ratio) * w / 2.0)
+                    crop_tensor = full_tensor[:, dh:-dh, dw:-dw, ...]  # (N, H_c, W_c, ...)
+                    self.total_samples = crop_tensor.shape[0] * crop_tensor.shape[1] * crop_tensor.shape[2]
+                    self.data['_train'][k] = crop_tensor.reshape(1, self.total_samples, *crop_tensor.shape[3:])
+        else:
+            for k, v in self.data['train'].items():
+                if isinstance(v, torch.Tensor):
+                    self.data['_train'][k] = self.data['train'][k]  # get all (1, n_img*n_rays, ...)
+                    self.total_samples = self.data['_train'][k].shape[1]
+
+        # random shuffle of remaining.
+        if scheduler_cfg is None or get_value_from_cfgs_field(scheduler_cfg, 'random_shuffle', True):
+            self.logger.add_log('Random shuffle all training samples...')
+            random_idx = torch.randint(0, self.total_samples, size=[self.total_samples])
+            for k, v in self.data['_train'].items():
+                if isinstance(v, torch.Tensor):
+                    self.data['_train'][k] = self.data['_train'][k][:, random_idx, ...]
 
         self.logger.add_log(
             'Need {} epoch to run all the rays...'.format(math.ceil(float(self.total_samples) / float(self.n_rays)))
         )
+
+        # set h/w as 0 to avoid writing of process image
+        self.data['_train']['H'] = [0]
+        self.data['_train']['W'] = [0]
 
     def get_train_batch(self):
         """Get the train batch base on self.train_count"""
         assert self.train_count < self.total_samples, 'All rays have been sampled, please reset train dataset...'
 
         data_batch = {}
-        for k, v in self.data['train'].items():
-            if isinstance(v, torch.Tensor):
+        for k, v in self.data['_train'].items():
+            if isinstance(v, torch.Tensor):  # tensor in (1, n_images * n_rays_per_image, ...)
                 data_batch[k] = v[:, self.train_count:self.train_count + self.n_rays, ...]
             else:
                 data_batch[k] = v
@@ -416,7 +468,7 @@ class ArcNerfTrainer(BasicTrainer):
 
     def train_epoch(self, epoch):
         """Train for one epoch. Each epoch return the final sum of loss and total num of iter in epoch"""
-        step_in_epoch = 1
+        step_in_epoch = 1  # in nerf, each epoch is sampling of all rays in all training samples
 
         if self.train_count >= self.total_samples:
             self.shuffle_train_data()
@@ -435,6 +487,8 @@ class ArcNerfTrainer(BasicTrainer):
         """
         self.logger.add_log('-' * 60)
         self.logger.add_log('Total num of epoch: {}'.format(self.cfgs.progress.epoch))
+
+        # init eval/inference
         if self.cfgs.progress.init_eval and self.data['eval'] is not None:
             self.eval_epoch(self.cfgs.progress.start_epoch)
         if self.cfgs.progress.init_eval and self.data['inference'] is not None:
@@ -447,6 +501,7 @@ class ArcNerfTrainer(BasicTrainer):
         for epoch in range(self.cfgs.progress.start_epoch, self.cfgs.progress.epoch):
             # train and record speed
             self.model.train()
+
             t_start = time.time()
             loss_all, step_in_epoch = self.train_epoch(epoch)
             epoch_time = time.time() - t_start

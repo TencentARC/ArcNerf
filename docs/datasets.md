@@ -20,8 +20,17 @@ Will not touch intrinsic. If point cloud exists, rescale them by same factor to 
 - pc_radius(base_3d_pc_dataset): Remove point cloud that are outside such absolute radius(all scaled by extra `1.05`).
 Done after camera `scale_radius`. The radius is restricted within `scale_radius` range.
 ## Augmentation:
+The augmentation is for all image process in all time.
 - n_rays: Sample `n_rays` instead of using all. But calling it every time may sample overlapping rays, not use in train.
 - shuffle: shuffle all the rays from the same image together
+## Scheduler:
+The scheduler handles train data only. It can customize the ray selection every time when all rays have been trained.
+Add `scheduler` in `data.train` for specification.
+- precrop: precrop and keep only the center rays.
+  - max_shuffle: Only crop when n_shuffle <= max_shuffle. By default -1. Set 0 to use it in the init shuffle.
+  - ratio: Ratio to keep in each dim.
+- random_shuffle: Do random shuffle for all pixel together in `(1, NHW, ...)` shape.
+If you do set it as `False`, it will always be performed.
 ## rgb and mask
 - All color are in `rgb` order and normed by `255` into `0~1` range.
 - All masks should be binary masks with `{0,1}` values. Can be [] if not exist.
@@ -99,6 +108,8 @@ Use all images for training. Same resolution as required.
 For training, we should read all rays from all images together, shuffle each image pixels(rays), shuffle images,
 concat all the image, sample in batch with `n_rays`. Each epoch just trained on batch. When all rays from all images
 have been chosen, shuffle again.
+
+For training, `scheduler` will handle special requirement in each shuffle of all rays.
 
 
 ## Val

@@ -193,9 +193,9 @@ def parse_volume(cfgs):
             'render_backend': get_value_from_cfgs_field(cfgs.volume.render_mesh, 'backend'),
         }
         if any([length is None for length in [volume_cfgs['xlen'], volume_cfgs['ylen'], volume_cfgs['zlen']]]):
-            volume_cfgs['side'] = get_value_from_cfgs_field(volume_cfgs, 'side', 1.5)  # make sure volume exist
+            volume_cfgs['side'] = get_value_from_cfgs_field(cfgs.volume, 'side', 1.5)  # make sure volume exist
         else:
-            volume_cfgs['side'] = get_value_from_cfgs_field(volume_cfgs, 'side', None)
+            volume_cfgs['side'] = get_value_from_cfgs_field(cfgs.volume, 'side', None)
 
     return volume_cfgs
 

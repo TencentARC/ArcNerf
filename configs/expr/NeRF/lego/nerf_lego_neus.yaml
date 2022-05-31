@@ -69,9 +69,12 @@ dataset:
         scene_name: lego
         img_scale: 1.0
         scale_radius: 3.0
-        precache: False
-        augmentation:
-            shuffle: True
+        precache: True
+        scheduler:
+            precrop:
+                max_shuffle: 0
+                ratio: 0.5
+            random_shuffle: True
 
     val:
         type: NeRF
@@ -115,14 +118,14 @@ model:
     type: Neus
     rays:
         bounding_radius: 3.0
-        near: 1.0
-        far: 5.0
+        near: 0.0
+        # far: 5.0
         n_sample: 64
         n_importance: 64
         n_iter: 4
         inverse_linear: False
         perturb: True
-        add_inf_z: False
+        add_inf_z: True
         noise_std: 1.0
         white_bkg: True
     params:

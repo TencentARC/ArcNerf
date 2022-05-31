@@ -86,8 +86,13 @@ dataset:
         pc_radius: 2.0               # only keep point cloud in a fix radius ball, scale after cam norm
         align_cam: False             # whether to use avg pose to adjust cam rotation. Only for cam that are not horizontally distributed.
         precache: True               # precache all the rays at once
-        augmentation:
-            shuffle: True
+        augmentation:                # augmentation is for rays on a single image. Do not change in whole progress
+            shuffle: True            # shuffle all rays on a single image
+        scheduler:                   # scheduler handles sampling during training in different stage
+            precrop:                 # crop the image to keep center rays
+                max_shuffle: 0       # only crop when num of shuffle <= max_shuffle (0-based index)
+                ratio: 0.5           # num of ratio keep on each dim
+            random_shuffle: True     # shuffle sample in overall (1, nhw, ...) rays
 
     val:
         type: Capture
