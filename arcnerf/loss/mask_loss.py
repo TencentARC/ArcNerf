@@ -49,7 +49,7 @@ class MaskLoss(nn.Module):
 
         Returns:
             loss: (1, ) mean loss. error value in (0~1)
-                    if not do_mean, return (B, N_rays, ) loss
+                    if not do_mean, return (B, N_rays) loss
         """
         device = output[self.keys[0]].device
         gt = data['mask'].to(device)
@@ -57,9 +57,9 @@ class MaskLoss(nn.Module):
         loss = 0.0
         for k in self.keys:
             if self.clip_output:
-                loss = self.loss(output[k].clip(1e-3, 1.0 - 1e-3), gt)
+                loss = self.loss(output[k].clip(1e-3, 1.0 - 1e-3), gt)  # (B, N_rays)
             else:
-                loss = self.loss(output[k], gt)
+                loss = self.loss(output[k], gt)  # (B, N_rays)
 
         if self.do_mean:
             loss = loss.mean()

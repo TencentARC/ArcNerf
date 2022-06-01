@@ -20,6 +20,7 @@ from arcnerf.visual.render_img import render_progress_imgs, write_progress_imgs
 from common.loss.loss_dict import LossDictCounter
 from common.trainer.basic_trainer import BasicTrainer
 from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
+from common.utils.registry import LOSS_REGISTRY
 from common.utils.torch_utils import torch_to_np
 from common.utils.train_utils import master_only
 from common.visual.plot_2d import draw_2d_components
@@ -34,6 +35,10 @@ class ArcNerfTrainer(BasicTrainer):
         self.total_samples = None
         self.shuffle_count = -1
         self.n_rays = 0
+        # for importance sampling
+        self.sample_mask = None
+        self.sample_loss = None
+        self.importance_sample = None
 
         # for inference only
         self.intrinsic = None
@@ -184,9 +189,8 @@ class ArcNerfTrainer(BasicTrainer):
         return concat_data
 
     def shuffle_train_data(self):
-        """Shuffle all training data when total_count > total_samples.
+        """Shuffle all training data when total_count >= total_samples.
            Scheduler perform in each new shuffle.
-           TODO: Allow other inputs like rgb loss for other importance selection
         """
         self.train_count = 0
         self.shuffle_count += 1
@@ -196,11 +200,12 @@ class ArcNerfTrainer(BasicTrainer):
 
         # scheduler cfgs
         scheduler_cfg = self.data['train_scheduler']
+        self.logger.add_log('-' * 60)
         self.logger.add_log('Shuffling training samples... Shuffle count - {}'.format(self.shuffle_count))
 
         # crop center image
-        if scheduler_cfg is not None and valid_key_in_cfgs(scheduler_cfg, 'precrop') \
-            and get_value_from_cfgs_field(scheduler_cfg.precrop, 'ratio', 1.0) < 1.0 and \
+        if scheduler_cfg is not None and valid_key_in_cfgs(scheduler_cfg, 'precrop') and \
+                get_value_from_cfgs_field(scheduler_cfg.precrop, 'ratio', 1.0) < 1.0 and \
                 self.shuffle_count <= get_value_from_cfgs_field(scheduler_cfg.precrop, 'max_shuffle', -1):
             keep_ratio = get_value_from_cfgs_field(scheduler_cfg.precrop, 'ratio', 1.0)
             self.logger.add_log('Crop training samples...keep ratio - {}'.format(keep_ratio))
@@ -218,7 +223,7 @@ class ArcNerfTrainer(BasicTrainer):
                     self.data['_train'][k] = self.data['train'][k]  # get all (1, n_img*n_rays, ...)
                     self.total_samples = self.data['_train'][k].shape[1]
 
-        # random shuffle of remaining.
+        # random shuffle of all remaining rays.
         if scheduler_cfg is None or get_value_from_cfgs_field(scheduler_cfg, 'random_shuffle', True):
             self.logger.add_log('Random shuffle all training samples...')
             random_idx = torch.randint(0, self.total_samples, size=[self.total_samples])
@@ -226,9 +231,47 @@ class ArcNerfTrainer(BasicTrainer):
                 if isinstance(v, torch.Tensor):
                     self.data['_train'][k] = self.data['_train'][k][:, random_idx, ...]
 
+        # importance sampling based on loss
+        if scheduler_cfg is not None and valid_key_in_cfgs(scheduler_cfg, 'sample_loss') and \
+                self.shuffle_count >= get_value_from_cfgs_field(scheduler_cfg.sample_loss, 'min_sample', -1):
+            loss_keys = [k for k in list(scheduler_cfg.sample_loss.__dict__.keys()) if 'Loss' in k]
+            sample_loss_key = loss_keys[0]  # you should have only one loss
+            self.logger.add_log('Importance sampling on Loss {}'.format(sample_loss_key))
+            self.sample_loss = LOSS_REGISTRY.get(sample_loss_key)(getattr(scheduler_cfg.sample_loss, sample_loss_key))
+
+            if self.sample_mask is None or self.sample_mask.shape != (self.total_samples,) \
+                    or not valid_key_in_cfgs(scheduler_cfg.sample_loss, 'sampling'):
+                self.sample_mask = torch.zeros(self.total_samples)  # init a new loss mask
+                self.importance_sample = torch.ones(self.total_samples).type(torch.BoolTensor)  # (n_img * n_rays)
+            else:
+                self.logger.add_log(
+                    'Importance Sampling loss stat (min-{:.3f}/mean-{:.3f}/max-{:.3f})'.format(
+                        self.sample_mask.min(), self.sample_mask.mean(), self.sample_mask.max()
+                    )
+                )
+                # sample on all rays with large threshold, small error with random probability
+                error_threshold = get_value_from_cfgs_field(scheduler_cfg.sample_loss.sampling, 'threshold', 0.0)
+                random_ratio = get_value_from_cfgs_field(scheduler_cfg.sample_loss.sampling, 'random_ratio', 1.0)
+                error_sample = torch.BoolTensor(self.sample_mask > error_threshold)  # (n_img * n_rays)
+                random_sample = torch.logical_and(~error_sample, torch.rand(error_sample.shape) < random_ratio)
+                self.importance_sample = torch.logical_or(error_sample, random_sample)  # (n_img * n_rays)
+                # update the new selected batch
+                for k, v in self.data['_train'].items():
+                    if isinstance(v, torch.Tensor):
+                        self.data['_train'][k] = self.data['_train'][k][:, self.importance_sample]
+                        self.total_samples = self.data['_train'][k].shape[1]
+                self.logger.add_log(
+                    'Importance Sampling reduced sample num from {} to {}'.format(
+                        self.sample_mask.shape[0], self.total_samples
+                    )
+                )
+
         self.logger.add_log(
-            'Need {} epoch to run all the rays...'.format(math.ceil(float(self.total_samples) / float(self.n_rays)))
+            'Need {} epoch to run all the {} rays...'.format(
+                math.ceil(float(self.total_samples) / float(self.n_rays)), self.total_samples
+            )
         )
+        self.logger.add_log('-' * 60)
 
         # set h/w as 0 to avoid writing of process image
         self.data['_train']['H'] = [0]
@@ -304,6 +347,15 @@ class ArcNerfTrainer(BasicTrainer):
         output = self.model(feed_in, get_progress=self.get_progress, cur_epoch=epoch, total_epoch=self.total_epoch)
         loss = self.calculate_loss(inputs, output)
 
+        # update loss by mask
+        if self.sample_mask is not None:
+            with torch.no_grad():
+                loss_sample = self.sample_loss(inputs, output)
+                reduce_dim = tuple(range(2, len(loss_sample.shape)))
+                loss_sample = torch.mean(loss_sample, dim=reduce_dim)[0]  # (N_rays)
+                update_idx = self.importance_sample.nonzero()[self.train_count - self.n_rays:self.train_count, 0]
+                self.sample_mask[update_idx] = loss_sample.detach().cpu()
+
         self.optimizer.zero_grad()
         loss['sum'].backward()
 
@@ -322,7 +374,7 @@ class ArcNerfTrainer(BasicTrainer):
            Remember to set eval mode at beginning and set train mode at the end.
 
            For object reconstruction, only one valid sample in each epoch. Shuffle sampler all the time.
-           get_progress for writting if debug.get_progress is True
+           get_progress for writing if debug.get_progress is True
         """
         self.logger.add_log('Valid on data...')
 

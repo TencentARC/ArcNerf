@@ -4,6 +4,7 @@ import importlib
 import os.path as osp
 from copy import deepcopy
 
+from common.utils.cfgs_utils import obj_to_dict
 from common.utils.file_utils import scan_dir
 from common.utils.registry import LOSS_REGISTRY
 
@@ -33,7 +34,7 @@ def build_loss(cfgs, logger):
     if logger is not None:
         logger.add_log('Loss types : {}'.format(loss_names))
         logger.add_log('Loss Weights: {}'.format(loss_weights))
-        logger.add_log('Loss dict: ', cfgs.loss.__dict__)
+        logger.add_log('Loss dict: {}'.format(obj_to_dict(cfgs.loss)))
 
     return loss_factory
 

@@ -1,0 +1,176 @@
+name: nerf_lego_neus_longercrop
+
+resume: None
+
+debug:
+    debug_mode: False
+    print_all_grad: False
+    get_progress: False
+
+dir:
+    expr_dir: None
+    data_dir: '/group/30042/leoyluo/Immerse/data'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_neus_longercrop'
+
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_neus_longercrop/checkpoints/final.pt.tar'
+
+gpu_ids: -1
+
+dist:
+    local_rank: 0
+    rank: 0
+    world_size: 1
+    distributed_backend: nccl
+    random_seed: None
+    slurm: False
+
+batch_size: 2
+n_rays: 512     # follow original repo
+worker: 4
+
+optim:
+    lr: 5e-4
+    optim_type: adam
+    weight_decay: 0.0
+    lr_scheduler:
+        type: WarmUpCosineLR        # follow the original implementation
+        lr_steps: [5000]
+        min_factor: 0.05
+
+    clip_gradients: 0.0
+    clip_warmup: -1
+    clip_gradients_warmup: 0.0
+
+progress:
+    start_epoch: -1
+    epoch: 300000
+    save_time: 1800
+
+    epoch_loss: 100
+    iter_loss: 1
+    save_progress: True
+    epoch_save_progress: 50000
+    iter_save_progress: 1
+
+    epoch_val: 50000
+    save_progress_val: True
+    max_samples_val: 1
+
+    epoch_save_checkpoint: 100000
+    local_progress: False
+
+    init_eval: False
+    epoch_eval: 100000
+    max_samples_eval: 3
+
+dataset:
+    train:
+        type: NeRF
+        scene_name: lego
+        img_scale: 1.0
+        scale_radius: 3.0
+        precache: True
+        scheduler:
+            precrop:
+                max_shuffle: 30
+                ratio: 0.75
+            random_shuffle: True
+
+    val:
+        type: NeRF
+        scene_name: lego
+        img_scale: 0.5
+        scale_radius: 3.0
+        precache: False
+
+    eval:
+        eval_batch_size: 1
+        eval_max_sample: 3
+        type: NeRF
+        scene_name: lego
+        img_scale: 1.0
+        scale_radius: 3.0
+        precache: True
+
+inference:
+    render:
+        type: [spiral]
+        n_cam: [60]
+        repeat: [1]
+        radius: 3.0
+        u_start: 0.5
+        v_range: [-0.6, -0.2]
+        fps: 5
+        surface_render:
+            chunk_rays_factor: 1024
+            method: sphere_tracing
+
+    volume:
+        n_grid: 512
+        side: 2.0
+        level: 0.0
+        grad_dir: ascent
+        chunk_pts_factor: 1
+        render_mesh:
+            backend: pytorch3d
+
+model:
+    type: Neus
+    rays:
+        bounding_radius: 3.0
+        near: 0.0
+        # far: 5.0
+        n_sample: 64
+        n_importance: 64
+        n_iter: 4
+        inverse_linear: False
+        perturb: True
+        add_inf_z: True
+        noise_std: 1.0
+        white_bkg: True
+    params:
+        speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
+        init_var: 0.05                # init var, when it approaches 0, cdf more close
+        anneal_end: 50000             # for anneal param, only set during training. please
+    chunk_rays: 4096
+    chunk_pts: 131072
+    geometry:
+        W: 256
+        D: 8
+        skips: [4]
+        input_ch: 3
+        embed_freq: 6
+        W_feat: 256
+        geometric_init: True          # use geometric init. need radius_init
+        radius_init: 0.5              # geometric init sphere radius
+        weight_norm: True
+        skip_reduce_output: True
+        norm_skip: True
+        act_cfg:                      # activation function for dense layer
+            type: softplus
+            beta: 100
+    radiance:
+        mode: 'pvnf'
+        W: 256
+        D: 4
+        input_ch_pts: 3
+        embed_freq_pts: 0             # pts embed freq, not embedding performed
+        input_ch_view: 3
+        embed_freq_view: 4
+        W_feat_in: 256
+        weight_norm: True
+
+loss:
+    ImgLoss:
+        loss_type: L1
+        use_mask: True
+        weight: 1.0
+    MaskLoss:
+        loss_type: BCE
+        weight: 1.0
+    EikonalLoss:
+        key: normal_pts
+        weight: 0.1
+
+metric:
+    PSNR:
