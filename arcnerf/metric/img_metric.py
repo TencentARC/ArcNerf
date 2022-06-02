@@ -11,7 +11,12 @@ from common.utils.torch_utils import mean_tensor_by_mask
 
 @METRIC_REGISTRY.register()
 class PSNR(nn.Module):
-    """PSNR for image and gt"""
+    """PSNR for image and gt
+
+    PSNR = -10*log10(MSE) /  MSE = 10 ** (-PSRN/10)
+    PSNR:    10,   20,    23,    25,     28,    30,     32,     35
+    MSE:    0.1, 0.01, 0.005, 0.003, 0.0016, 0.001, 0.0006, 0.0003
+    """
 
     def __init__(self, cfgs=None):
         """

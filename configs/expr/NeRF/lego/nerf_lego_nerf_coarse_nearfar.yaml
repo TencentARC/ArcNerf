@@ -1,4 +1,4 @@
-name: nerf_lego_nerf_nearfar
+name: nerf_lego_nerf_coarse_nearfar
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_nearfar'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_coarse_nearfar'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_nearfar/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_coarse_nearfar/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -117,7 +117,7 @@ model:
         near: 1.4
         far: 4.3
         n_sample: 64
-        n_importance: 128
+        n_importance: 0
         inverse_linear: False
         perturb: True
         add_inf_z: False
@@ -143,7 +143,7 @@ model:
 
 loss:
     ImgLoss:
-        keys: ['rgb_coarse', 'rgb_fine']
+        keys: ['rgb_coarse']
         weight: 1.0
 
 metric:
@@ -151,4 +151,4 @@ metric:
 
 train_metric:
     PSNR:
-        key: 'rgb_fine'
+        key: 'rgb_coarse'

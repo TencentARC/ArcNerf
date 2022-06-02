@@ -372,6 +372,15 @@ class ArcNerfTrainer(BasicTrainer):
             for k, v in output['params'][0].items():
                 self.monitor.add_scalar(k, v, global_step, mode='train')
 
+    @master_only
+    def print_loss_msg(self, epoch, step, step_in_epoch, loss, learning_rate):
+        """Get the loss msg info and show in logger"""
+        loss_msg = 'Epoch {:06d} - Iter {}/{} - lr {:.8f}: '.format(epoch, step, step_in_epoch - 1, learning_rate)
+        for key in loss['names']:
+            loss_msg += '{} [{:.4f}] | '.format(key, float(loss[key]))
+        loss_msg += '--> Loss Sum [{:.4f}]'.format(float(loss['sum']))
+        self.logger.add_log(loss_msg)
+
     def step_optimize(self, epoch, step, feed_in, inputs):
         """Set get progress for training"""
         output = self.model(feed_in, get_progress=self.get_progress, cur_epoch=epoch, total_epoch=self.total_epoch)

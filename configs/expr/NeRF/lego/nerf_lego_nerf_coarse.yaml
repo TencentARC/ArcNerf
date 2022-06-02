@@ -1,4 +1,4 @@
-name: nerf_lego_nerf_coarse_debug
+name: nerf_lego_nerf_coarse
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_coarse_debug'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_coarse'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_coarse_debug/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_coarse/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -25,7 +25,7 @@ dist:
     slurm: False
 
 batch_size: 2
-n_rays: 1024
+n_rays: 4096
 worker: 4
 
 optim:
@@ -35,7 +35,7 @@ optim:
     lr_scheduler:
         type: ExponentialLR
         lr_gamma: 0.1
-        lr_steps: [500000]
+        lr_steps: [200000]
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -43,7 +43,7 @@ optim:
 
 progress:
     start_epoch: -1
-    epoch: 500000
+    epoch: 300000
     save_time: 1800
 
     epoch_loss: 100
@@ -85,7 +85,7 @@ dataset:
 
     eval:
         eval_batch_size: 1
-        eval_max_sample: 3
+        eval_max_sample: 10
         type: NeRF
         scene_name: lego
         img_scale: 1.0
@@ -114,14 +114,14 @@ model:
     type: NeRF
     rays:
         bounding_radius: 3.0
-        near: 0.0
+        near: 1.0
         # far: 5.0
         n_sample: 64
         n_importance: 0
         inverse_linear: False
         perturb: True
-        add_inf_z: True
-        noise_std: 0.0
+        add_inf_z: False
+        noise_std: 1.0
         white_bkg: True
     chunk_rays: 32768
     chunk_pts: 131072
@@ -148,3 +148,7 @@ loss:
 
 metric:
     PSNR:
+
+train_metric:
+    PSNR:
+        key: 'rgb_coarse'
