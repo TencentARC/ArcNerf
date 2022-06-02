@@ -126,20 +126,6 @@ class VolGeoNet(BaseGeoNet):
                 W, D, W_feat_vol, W_feat, act_cfg, include_input, input_ch, embed_freq, *args, **kwargs
             )
 
-    def to(self, device=None):
-        """Move self volume to device"""
-        super().to(device)
-        self.volume.to(device)
-
-        return self
-
-    def cuda(self, device=None):
-        """Move self volume to cuda"""
-        super().cuda(device)
-        self.volume.cuda(device)
-
-        return self
-
     def get_volume(self):
         """Get the dense volume"""
         return self.volume
@@ -244,7 +230,8 @@ class VolGeoNet(BaseGeoNet):
 
         # select feature by index, this could be slow for large tensor multiplication even in gpu
         if self.W_feat_vol > 0:
-            out_feat = torch.zeros((n_pts, self.W_feat_vol), dtype=dtype).to(device)  # (B, W_feat_vol)
+            # large feat transfer from cpu to gpu takes time. Use clone save time.
+            out_feat = (x.clone() * 0.0)[:, :1].repeat(1, self.W_feat_vol)  # (B, W_feat_vol)
             if torch.any(valid_idx):  # any points in volume
                 out_feat[valid_idx] = self.volume.interpolate(
                     self.grid_feature_param, grid_pts_weights_valid, voxel_idx[valid_idx]

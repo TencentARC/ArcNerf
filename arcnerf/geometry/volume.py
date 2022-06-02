@@ -92,8 +92,7 @@ class Volume(nn.Module):
         """Cal the xyz range(min, max) from origin and sides. range is (3, 2) tensor"""
         xyz_min = self.origin - torch.cat([self.xlen, self.ylen, self.zlen]) / 2.0
         xyz_max = self.origin + torch.cat([self.xlen, self.ylen, self.zlen]) / 2.0
-        v_range = torch.cat([xyz_min[:, None], xyz_max[:, None]], dim=-1)
-        self.range = nn.Parameter(v_range.clone().detach(), requires_grad=self.requires_grad)
+        self.range = torch.cat([xyz_min[:, None], xyz_max[:, None]], dim=-1)
 
     def get_range(self):
         """Get the xyz range in (3, 2)"""
@@ -143,8 +142,7 @@ class Volume(nn.Module):
     def cal_corner(self):
         """Cal the eight corner pts given origin and sides. corner is (8, 3) tensor """
         x, y, z = self.range[0][:, None], self.range[1][:, None], self.range[2][:, None]  # (2, 1)
-        corner = self.get_eight_permutation(x, y, z)
-        self.corner = nn.Parameter(corner.clone().detach(), requires_grad=self.requires_grad)
+        self.corner = self.get_eight_permutation(x, y, z)
 
     def get_corner(self, in_grid=False):
         """Get the eight corner. tensor (8, 3). If in_grid, return (2, 2, 2, 3) """
@@ -160,8 +158,7 @@ class Volume(nn.Module):
         z = torch.linspace(float(self.range[2, 0]), float(self.range[2, 1]), self.n_grid + 1)  # (n+1)
 
         grid_pts = torch.stack(torch.meshgrid(x, y, z), -1)  # (n+1, n+1, n+1, 3)
-        grid_pts = grid_pts.view(-1, 3)  # (n+1^3, 3)
-        self.grid_pts = nn.Parameter(grid_pts.clone().detach(), requires_grad=self.requires_grad)
+        self.grid_pts = grid_pts.view(-1, 3)  # (n+1^3, 3)
 
     def get_grid_pts(self, in_grid=False):
         """Get ((self.n_grid+1)^3, 3) grid pts. If in_grid, return (n_grid+1, n_grid+1, n_grid+1, 3) """
@@ -178,8 +175,7 @@ class Volume(nn.Module):
         z = torch.linspace(float(self.range[2, 0]) + 0.5 * v_z, float(self.range[2, 1]) - 0.5 * v_z, self.n_grid)  # (n)
 
         volume_pts = torch.stack(torch.meshgrid(x, y, z), -1)  # (n, n, n, 3)
-        volume_pts = volume_pts.view(-1, 3)  # (n^3, 3)
-        self.volume_pts = nn.Parameter(volume_pts.clone().detach(), requires_grad=self.requires_grad)
+        self.volume_pts = volume_pts.view(-1, 3)  # (n^3, 3)
 
     def get_volume_pts(self, in_grid=False):
         """Get ((self.n_grid)^3, 3) volume pts. If in_grid, return (n_grid, n_grid, n_grid, 3) """
@@ -262,12 +258,14 @@ class Volume(nn.Module):
         Returns:
             pts_in_boundary: (B, ) whether each pts is in boundary
         """
+        device = pts.device
+        _grid_pts = grid_pts.to(device)
         n_pts = pts.shape[0]
 
-        if len(grid_pts.shape) == 2:
-            grid_pts_expand = torch.repeat_interleave(grid_pts.unsqueeze(0), n_pts, 0)
+        if len(_grid_pts.shape) == 2:
+            grid_pts_expand = torch.repeat_interleave(_grid_pts.unsqueeze(0), n_pts, 0)
         else:
-            grid_pts_expand = grid_pts
+            grid_pts_expand = _grid_pts
 
         assert grid_pts_expand.shape[0] == n_pts, 'Invalid num of grid_pts, should be in (B, 8, 3) or (8, 3)'
 
@@ -295,7 +293,7 @@ class Volume(nn.Module):
 
         x_s, y_s, z_s = self.get_voxel_size()
         voxel_size = torch.Tensor([x_s, y_s, z_s]).type(dtype).to(device).unsqueeze(0)  # (1, 3)
-        start_point = self.get_range()[:, 0].unsqueeze(0)  # min xyz (1, 3)
+        start_point = self.get_range()[:, 0].unsqueeze(0).to(device)  # min xyz (1, 3)
         voxel_idx = (pts - start_point) / voxel_size  # (B, 3)
 
         valid_idx = torch.logical_and(
@@ -336,7 +334,7 @@ class Volume(nn.Module):
         Returns:
             grid_pts_by_voxel_idx: select grid_pts xyz values by voxel_idx, (B, 8, 3), each pts of grid
         """
-        grid_pts = self.get_grid_pts()  # (n+1^3, 3)
+        grid_pts = self.get_grid_pts().to(voxel_idx.device)  # (n+1^3, 3)
         grid_pts_idx = self.get_grid_pts_idx_by_voxel_idx(voxel_idx)  # (B, 8)
 
         # select by idx
@@ -363,9 +361,11 @@ class Volume(nn.Module):
             weights: weights to each grid pts in (B, 8) in (0~1). Order corresponding to grid_pts order.
         """
         n_pts = pts.shape[0]
+        device = pts.device
         assert grid_pts.shape == (n_pts, 8, 3), 'Shape not match'
+        _grid_pts = grid_pts.to(device)
 
-        w_xyz = (pts - grid_pts[:, 0, :]) / (grid_pts[:, -1, :] - grid_pts[:, 0, :])  # (B, 3)
+        w_xyz = (pts - _grid_pts[:, 0, :]) / (_grid_pts[:, -1, :] - _grid_pts[:, 0, :])  # (B, 3)
         w_xyz = w_xyz.clip(0.0, 1.0)  # in case some pts out of grid
 
         # linear interpolation
@@ -377,12 +377,13 @@ class Volume(nn.Module):
                 (permute_index[idx][1] * (w_xyz[:, 1:2]) + (1 - permute_index[idx][1]) * (1 - w_xyz[:, 1:2])) *
                 (permute_index[idx][2] * (w_xyz[:, 2:3]) + (1 - permute_index[idx][2]) * (1 - w_xyz[:, 2:3]))
             )
-        weights = torch.cat(weights, dim=-1)  # (B, 8)
+        weights = torch.cat(weights, dim=-1).to(device)  # (B, 8)
 
         return weights
 
     def interpolate(self, values, weights, voxel_idx):
         """Interpolate values by getting value on grid_pts in each voxel and multiply weights
+        You should assume the values are on the same device.
 
         Args:
             values:  (n_grid+1^3, ...) values
