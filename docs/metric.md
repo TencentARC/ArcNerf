@@ -10,3 +10,7 @@ Child of PSNR.
 
 ## SSIM/MaskSSIM
 Same as PSNR but use different metric.
+
+
+# train_metric
+You can specify the train_metric to get the current training eval metric.

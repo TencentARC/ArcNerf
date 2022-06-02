@@ -20,7 +20,7 @@ from arcnerf.visual.render_img import render_progress_imgs, write_progress_imgs
 from common.loss.loss_dict import LossDictCounter
 from common.trainer.basic_trainer import BasicTrainer
 from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
-from common.utils.registry import LOSS_REGISTRY
+from common.utils.registry import LOSS_REGISTRY, METRIC_REGISTRY
 from common.utils.torch_utils import torch_to_np
 from common.utils.train_utils import master_only
 from common.visual.plot_2d import draw_2d_components
@@ -50,6 +50,11 @@ class ArcNerfTrainer(BasicTrainer):
         super(ArcNerfTrainer, self).__init__(cfgs)
         self.get_progress = get_value_from_cfgs_field(self.cfgs.debug, 'get_progress', False)
         self.total_epoch = self.cfgs.progress.epoch
+
+        # set eval metric during training
+        self.train_metric = None
+        if valid_key_in_cfgs(self.cfgs, 'train_metric'):
+            self.train_metric = self.set_train_metric()
 
         # pretrain siren layer in implicit model
         self.logger.add_log('-' * 60)
@@ -319,6 +324,19 @@ class ArcNerfTrainer(BasicTrainer):
 
         return loss_factory
 
+    def set_train_metric(self):
+        """Set eval metric used in training"""
+        self.logger.add_log('-' * 60)
+        metric = [k for k in list(self.cfgs.train_metric.__dict__.keys())]
+        train_metric_key = metric[0]  # you should have only one metric
+        self.logger.add_log('Train Metric {}'.format(train_metric_key))
+        train_metric = {
+            'name': train_metric_key,
+            'metric': METRIC_REGISTRY.get(train_metric_key)(getattr(self.cfgs.train_metric, train_metric_key))
+        }
+
+        return train_metric
+
     def set_eval_metric(self):
         """Set eval metric which will be used for evaluation"""
         self.logger.add_log('-' * 60)
@@ -336,6 +354,16 @@ class ArcNerfTrainer(BasicTrainer):
         super().train_step_writer(
             epoch, step, step_in_epoch, loss, learning_rate, global_step, inputs, output, **kwargs
         )
+
+        # write psnr
+        if self.train_metric is not None:
+            if epoch % self.cfgs.progress.epoch_loss == 0 and step % self.cfgs.progress.iter_loss == 0:
+                metric_msg = 'Epoch {:06d} - Iter {}/{} - lr {:.8f}: '.format(
+                    epoch, step, step_in_epoch - 1, learning_rate
+                )
+                metric = self.train_metric['metric'](inputs, output)
+                metric_msg += '{} [{:.3f}] '.format(self.train_metric['name'], metric)
+                self.logger.add_log(metric_msg)
 
         # write params
         if 'params' in output:
