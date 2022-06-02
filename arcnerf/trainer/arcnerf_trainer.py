@@ -361,9 +361,11 @@ class ArcNerfTrainer(BasicTrainer):
                 metric_msg = 'Epoch {:06d} - Iter {}/{} - lr {:.8f}: '.format(
                     epoch, step, step_in_epoch - 1, learning_rate
                 )
-                metric = self.train_metric['metric'](inputs, output)
+                metric = float(self.train_metric['metric'](inputs, output))
                 metric_msg += '{} [{:.3f}] '.format(self.train_metric['name'], metric)
                 self.logger.add_log(metric_msg)
+
+                self.monitor.add_scalar(self.train_metric['name'], metric, global_step)
 
         # write params
         if 'params' in output:

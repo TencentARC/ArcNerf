@@ -1,4 +1,4 @@
-name: nerf_lego_nerf
+name: nerf_lego_nerf_nearfar
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_nearfar'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_nearfar/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -114,8 +114,8 @@ model:
     type: NeRF
     rays:
         bounding_radius: 3.0
-        near: 1.0
-        # far: 5.0
+        near: 1.4
+        far: 4.3
         n_sample: 64
         n_importance: 128
         inverse_linear: False
@@ -151,3 +151,4 @@ metric:
 
 train_metric:
     PSNR:
+        key: 'rgb_fine'
