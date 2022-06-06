@@ -92,6 +92,7 @@ dataset:
             precrop:                 # crop the image to keep center rays
                 max_shuffle: 0       # only crop when num of shuffle <= max_shuffle (0-based index)
                 ratio: 0.5           # num of ratio keep on each dim
+                max_epoch: 500       # max epoch
             random_shuffle: True     # shuffle sample in overall (1, nhw, ...) rays
 
     val:
@@ -163,8 +164,8 @@ model:
         add_inf_z: True               # Add inf zval for ray marching, do not applied for background
         noise_std: 1.0                # noise for sigma in training
         white_bkg: False              # cast the background as white
-    chunk_rays: 32768                 # each chunk to process 1024*32(rays), full nerf takes more momory
-    chunk_pts: 131072                 # each chunk to progress 4096*32(pts), full nerf takes more momory
+    chunk_rays: 32768                 # each chunk to process 1024*32(rays), full nerf takes more memory
+    chunk_pts: 131072                 # each chunk to progress 4096*32(pts), full nerf takes more memory
     geometry:
         W: 256                        # linear hidden neuron
         D: 8                          # num of linear, not include final
@@ -188,3 +189,7 @@ loss:
 
 metric:
     PSNR:
+
+train_metric:
+    PSNR:
+        key: 'rgb_fine'

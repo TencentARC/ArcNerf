@@ -34,6 +34,7 @@ class ArcNerfTrainer(BasicTrainer):
         self.train_count = 0
         self.total_samples = None
         self.shuffle_count = -1
+        self.crop_max_epoch = None
         self.n_rays = 0
         # for importance sampling
         self.sample_mask = None
@@ -215,6 +216,9 @@ class ArcNerfTrainer(BasicTrainer):
             keep_ratio = get_value_from_cfgs_field(scheduler_cfg.precrop, 'ratio', 1.0)
             self.logger.add_log('Crop training samples...keep ratio - {}'.format(keep_ratio))
             h, w = self.data['train']['H'], self.data['train']['W']
+            self.crop_max_epoch = get_value_from_cfgs_field(scheduler_cfg.precrop, 'max_epoch', None)
+            if self.crop_max_epoch is not None:
+                self.logger.add_log('Crop sample on first {} epoch'.format(self.crop_max_epoch))
             for k, v in self.data['train'].items():
                 if isinstance(v, torch.Tensor):
                     full_tensor = v.view(-1, h, w, *v.shape[2:])  # (N, H, W, ...)
@@ -227,6 +231,7 @@ class ArcNerfTrainer(BasicTrainer):
                 if isinstance(v, torch.Tensor):
                     self.data['_train'][k] = self.data['train'][k]  # get all (1, n_img*n_rays, ...)
                     self.total_samples = self.data['_train'][k].shape[1]
+            self.crop_max_epoch = None
 
         # random shuffle of all remaining rays.
         if scheduler_cfg is None or get_value_from_cfgs_field(scheduler_cfg, 'random_shuffle', True):
@@ -561,7 +566,7 @@ class ArcNerfTrainer(BasicTrainer):
         """Train for one epoch. Each epoch return the final sum of loss and total num of iter in epoch"""
         step_in_epoch = 1  # in nerf, each epoch is sampling of all rays in all training samples
 
-        if self.train_count >= self.total_samples:
+        if self.train_count >= self.total_samples or (self.crop_max_epoch is not None and epoch >= self.crop_max_epoch):
             self.shuffle_train_data()
 
         loss_all = self.train_step(epoch, 0, step_in_epoch, self.get_train_batch())
