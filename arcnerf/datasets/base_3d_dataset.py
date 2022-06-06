@@ -29,6 +29,8 @@ class Base3dDataset(BaseDataset):
         self.masks = []
         self.point_cloud = None
         self.bounds = []
+        # set for skip
+        self.skip = get_value_from_cfgs_field(cfgs, 'skip', 1)
         # set for eval
         self.eval_max_sample = get_value_from_cfgs_field(cfgs, 'eval_max_sample')
 
@@ -39,6 +41,15 @@ class Base3dDataset(BaseDataset):
     def get_wh(self):
         """Get the image shape"""
         return self.W, self.H
+
+    def skip_samples(self):
+        """For any mode, you can skip the samples in order. This is used in NeRF dataset to keep consistent eval"""
+        if self.skip > 1:
+            self.images = self.images[::self.skip]
+            self.cameras = self.cameras[::self.skip]
+            self.masks = self.masks[::self.skip]
+            self.bounds = self.bounds[::self.skip]
+            self.n_imgs = len(self.images)
 
     def keep_eval_samples(self):
         """For eval model, only keep a small number of samples. Which are closer to the avg pose

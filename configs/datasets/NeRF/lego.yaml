@@ -5,15 +5,16 @@ dataset:
     train:
         type: NeRF
         scene_name: lego
+        skip: 8
         img_scale: 1.0
         scale_radius: 3.0
         precache: False
 
 model:
     rays:
-        bounding_radius: 3.0
-        near: 1.0
-        # far: 4.0
+        #bounding_radius: 3.0
+        near: 1.5
+        far: 4.5
         n_sample: 64
         n_importance: 128
         inverse_linear: False

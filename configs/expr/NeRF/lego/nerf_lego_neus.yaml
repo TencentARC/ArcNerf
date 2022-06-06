@@ -1,4 +1,4 @@
-name: nerf_lego_nerf
+name: nerf_lego_neus
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_neus'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_neus/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -25,7 +25,7 @@ dist:
     slurm: False
 
 batch_size: 2
-n_rays: 4096
+n_rays: 512
 worker: 4
 
 optim:
@@ -33,9 +33,9 @@ optim:
     optim_type: adam
     weight_decay: 0.0
     lr_scheduler:
-        type: ExponentialLR
-        lr_gamma: 0.1
-        lr_steps: [200000]
+        type: WarmUpCosineLR        # follow the original implementation
+        lr_steps: [ 5000 ]
+        min_factor: 0.05
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -61,7 +61,7 @@ progress:
 
     init_eval: False
     epoch_eval: 100000
-    max_samples_eval: 3
+    max_samples_eval: 25
 
 dataset:
     train:
@@ -77,6 +77,7 @@ dataset:
             random_shuffle: True
 
     val:
+        skip: 8
         type: NeRF
         scene_name: lego
         img_scale: 0.5
@@ -85,7 +86,7 @@ dataset:
 
     eval:
         eval_batch_size: 1
-        eval_max_sample: 10
+        skip: 8
         type: NeRF
         scene_name: lego
         img_scale: 1.0
@@ -111,44 +112,64 @@ inference:
             backend: pytorch3d
 
 model:
-    type: NeRF
+    type: Neus
     rays:
-        bounding_radius: 3.0
-        near: 1.0
-        # far: 5.0
+        #bounding_radius: 3.0
+        near: 1.5
+        far: 4.5
         n_sample: 64
-        n_importance: 128
+        n_importance: 64
+        n_iter: 4
         inverse_linear: False
         perturb: True
         add_inf_z: False
         noise_std: 1.0
         white_bkg: True
-    chunk_rays: 32768
+    params:
+        speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
+        init_var: 0.05                # init var, when it approaches 0, cdf more close
+        anneal_end: 50000             # for anneal param, only set during training. please
+    chunk_rays: 4096
     chunk_pts: 131072
     geometry:
         W: 256
         D: 8
         skips: [4]
         input_ch: 3
-        embed_freq: 10
+        embed_freq: 6
         W_feat: 256
-        geometric_init: False
+        geometric_init: True          # use geometric init. need radius_init
+        radius_init: 0.5              # geometric init sphere radius
+        weight_norm: True
+        skip_reduce_output: True
+        norm_skip: True
+        act_cfg: # activation function for dense layer
+            type: softplus
+            beta: 100
     radiance:
-        mode: 'vf'
-        W: 128
-        D: 1
+        mode: 'pvnf'
+        W: 256
+        D: 4
+        input_ch_pts: 3
+        embed_freq_pts: 0             # pts embed freq, not embedding performed
         input_ch_view: 3
         embed_freq_view: 4
         W_feat_in: 256
+        weight_norm: True
 
 loss:
     ImgLoss:
-        keys: ['rgb_coarse', 'rgb_fine']
+        loss_type: L1
         weight: 1.0
+    MaskLoss:
+        loss_type: BCE
+        weight: 1.0
+    EikonalLoss:
+        key: normal_pts
+        weight: 0.1
 
 metric:
     PSNR:
 
 train_metric:
     PSNR:
-        key: 'rgb_fine'

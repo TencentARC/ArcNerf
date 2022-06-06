@@ -43,7 +43,8 @@ class DTU(Base3dDataset):
         # rescale image, call from parent class
         self.rescale_img_and_pose()
 
-        # set eval mode, keep less samples
+        # skip image and keep less samples
+        self.skip_samples()
         self.keep_eval_samples()
 
         # precache_all rays

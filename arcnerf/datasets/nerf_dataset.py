@@ -51,7 +51,8 @@ class NeRF(Base3dDataset):
         self.cameras = [self.cameras[idx] for idx in cam_split_idx]
         assert self.n_imgs == len(self.cameras), 'Camera num not match the image number'
 
-        # set eval mode, keep less samples
+        # skip image and keep less samples
+        self.skip_samples()
         self.keep_eval_samples()
 
         # precache_all rays
@@ -107,10 +108,9 @@ class NeRF(Base3dDataset):
         images = []
         for path in img_list:
             img = imageio.imread(path).astype(np.float32) / 255.0
-            mask = img[:, :, -1] > 0.5
-            # bkg as white image
-            img[~mask] = 1.0
-            images.append(img[:, :, :3])
+            mask = img[:, :, -1:]
+            img = img[..., :3] * mask + (1.0 - mask)
+            images.append(img)
 
         return images
 
