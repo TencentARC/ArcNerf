@@ -9,8 +9,9 @@ import imageio
 import numpy as np
 
 from .base_3d_dataset import Base3dDataset
-from ..datasets import DATASET_REGISTRY
 from arcnerf.render.camera import PerspectiveCamera
+from common.utils.cfgs_utils import get_value_from_cfgs_field
+from common.utils.registry import DATASET_REGISTRY
 
 
 @DATASET_REGISTRY.register()
@@ -57,7 +58,7 @@ class NeRF(Base3dDataset):
 
         # precache_all rays
         self.ray_bundles = None
-        self.precache = self.cfgs.precache
+        self.precache = get_value_from_cfgs_field(self.cfgs, 'precache', False)
 
         if self.precache:
             self.precache_ray()

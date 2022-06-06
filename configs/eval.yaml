@@ -65,4 +65,3 @@ model:
 
 metric:
     PSNR:
-        key: rgb_fine

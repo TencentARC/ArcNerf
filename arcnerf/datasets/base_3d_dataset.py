@@ -111,7 +111,7 @@ class Base3dDataset(BaseDataset):
         """Return a list of render.camera with c2w and intrinsic"""
         raise NotImplementedError('Please implement the detail function in child class....')
 
-    def read_cameras_by_model(self, mode):
+    def read_cameras_by_mode(self, mode):
         """Return a list of render.camera with c2w and intrinsic in all split. Return the camera index of split"""
         raise NotImplementedError('Please implement the detail function in child class....')
 

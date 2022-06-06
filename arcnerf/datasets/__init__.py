@@ -8,7 +8,7 @@ from common.utils.cfgs_utils import obj_to_dict
 from common.utils.file_utils import scan_dir
 from common.utils.registry import DATASET_REGISTRY
 
-__all__ = ['get_dataset', 'get_model_feed_in', 'DATASET_REGISTRY']
+__all__ = ['get_dataset', 'get_model_feed_in']
 
 datasets_folder = osp.dirname(osp.abspath(__file__))
 datasets_filenames = [osp.splitext(osp.basename(v))[0] for v in scan_dir(datasets_folder) if v.endswith('_dataset.py')]
