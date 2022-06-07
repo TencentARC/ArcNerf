@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 
 import os
+import shutil
 from subprocess import check_output
 
 import numpy as np
 
 from .colmap_lib import read_model
 from .colmap_wrapper import run_colmap, run_colmap_dense
-from common.utils.img_utils import get_n_img_in_dir
+from common.utils.img_utils import get_n_img_in_dir, is_img_ext
 
 
 def estimate_poses(scene_dir, logger, match_type, factors=None):
@@ -38,13 +39,12 @@ def estimate_poses(scene_dir, logger, match_type, factors=None):
 
     # post processing
     logger.add_log('Post process sparse result...')
-    poses, pts3d, perm = load_colmap_data(scene_dir, logger)
+    poses, pts3d, perm, image_names = load_colmap_data(scene_dir, logger)
 
-    # check consistency
-    if poses['n_cam'] != get_n_img_in_dir(os.path.join(scene_dir, 'images')):
-        raise RuntimeError('Num of cam does not match num of images... Please check or select subset...')
+    # remove unregistered images
+    image_ids_mapping = handle_unregistered_images(scene_dir, logger, poses, pts3d, image_names)
 
-    save_poses(scene_dir, poses, pts3d, perm, logger)
+    save_poses(scene_dir, poses, pts3d, perm, logger, image_ids_mapping)
 
     if factors is not None:
         logger.add_log('Factor process by: {}'.format(factors))
@@ -106,10 +106,68 @@ def load_colmap_data(scene_dir, logger):
         'n_cam': r_mats.shape[0]
     }
 
-    return poses_dict, pts3d, perm
+    return poses_dict, pts3d, perm, names
 
 
-def save_poses(scene_dir, poses, pts3d, perm, logger):
+def handle_unregistered_images(scene_dir, logger, poses, pts3d, image_names):
+    """Colmap some times do not give pose estimation to some images.
+     Move them to unreg_dir, and change the visible image_ids to remaining images.
+
+    Args:
+        scene_dir: scene_dir contains image and poses
+        logger: logger
+
+    Returns:
+        pts3d: with adjusted image_ids to remaining
+    """
+    unreg_dir = os.path.join(scene_dir, 'unreg_images')
+
+    if os.path.exists(unreg_dir) and get_n_img_in_dir(unreg_dir):
+        logger.add_log('Already move unreg images to {}'.format(unreg_dir))
+        reg_image_names = [name for name in os.listdir(os.path.join(scene_dir, 'images')) if is_img_ext(name)]
+        unreg_image_names = [name for name in os.listdir(unreg_dir) if is_img_ext(name)]
+        all_image_names = reg_image_names + unreg_image_names
+
+    elif poses['n_cam'] < get_n_img_in_dir(os.path.join(scene_dir, 'images')):
+        os.makedirs(unreg_dir, exist_ok=True)
+        logger.add_log(
+            'Only get {}/{} images registered... Other images move to {}'.format(
+                poses['n_cam'], get_n_img_in_dir(os.path.join(scene_dir, 'images')), unreg_dir
+            )
+        )
+        all_image_names = [name for name in os.listdir(os.path.join(scene_dir, 'images')) if is_img_ext(name)]
+
+    else:
+        return None
+
+    # new image mapping, assume the idx is given in python sorted order
+    all_image_names = sorted(all_image_names)
+    reg_image_name = sorted(image_names)
+    image_ids_mapping = {}
+    for i, name in enumerate(all_image_names):
+        if name in reg_image_name:
+            image_ids_mapping[i + 1] = reg_image_name.index(name) + 1
+
+    # check old ids in pts3d
+    old_image_ids = []
+    for k in pts3d:
+        old_image_ids.extend(pts3d[k].image_ids.tolist())
+    old_image_ids = list(dict.fromkeys(old_image_ids))
+    old_image_ids = sorted(old_image_ids)
+    assert all([old_id in image_ids_mapping.keys() for old_id in old_image_ids]), 'Order not matched.., Please check'
+
+    # move unreg files
+    if poses['n_cam'] < get_n_img_in_dir(os.path.join(scene_dir, 'images')):
+        unreg_image_names = [name for name in all_image_names if name not in image_names]
+        unreg_image_files = [os.path.join(scene_dir, 'images', name) for name in unreg_image_names]
+        dst_files = [os.path.join(unreg_dir, name) for name in unreg_image_names]
+        for file, dst_file in zip(unreg_image_files, dst_files):
+            shutil.move(file, dst_file)
+
+    return image_ids_mapping
+
+
+def save_poses(scene_dir, poses, pts3d, perm, logger, image_ids_mapping=None):
     """Save to npy file"""
     pts_arr = []
     vis_arr = []
@@ -119,6 +177,8 @@ def save_poses(scene_dir, poses, pts3d, perm, logger):
         rgb_arr.append(pts3d[k].rgb)
         cams = [0] * poses['n_cam']  # N_cam
         for ind in pts3d[k].image_ids:
+            if image_ids_mapping is not None:
+                ind = image_ids_mapping[ind]
             if len(cams) < ind - 1:
                 raise RuntimeError('ERROR: the correct camera poses for current points cannot be accessed')
             cams[ind - 1] = 1

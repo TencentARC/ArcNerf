@@ -35,7 +35,7 @@ optim:
     lr_scheduler:
         type: ExponentialLR
         lr_gamma: 0.1
-        lr_steps: [200000]
+        lr_steps: [500000]
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -70,10 +70,13 @@ dataset:
         img_scale: 1.0
         scale_radius: 3.0
         precache: True
+        augmentation:
+            shuffle: True
         scheduler:
             precrop:
                 max_shuffle: 0
                 ratio: 0.5
+                max_epoch: 500
             random_shuffle: True
 
     val:
@@ -121,8 +124,8 @@ model:
         n_importance: 128
         inverse_linear: False
         perturb: True
-        add_inf_z: False
-        noise_std: 1.0
+        add_inf_z: True
+        noise_std: 0.0
         white_bkg: True
     chunk_rays: 32768
     chunk_pts: 131072

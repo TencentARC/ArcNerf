@@ -19,8 +19,8 @@ model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqt
 data:
     video_path: '/group/30042/leoyluo/Immerse/data/Capture/qq_tiger.MOV'
     scene_name: qqtiger
-    video_downsample: 10            # fps downsample ratio, default 15 (fps=30, each second 3 image)
-    image_downsample: 1             # image rescale downsample ratio, default 4 (each length 1/4)
+    video_downsample: 1             # fps downsample ratio, default 1
+    image_downsample: 1             # image rescale downsample ratio, default 1
     colmap:
         match_type: 'sequential_matcher'        # ['sequential_matcher', 'exhaustive_matcher']
         dense_reconstruct: False                # run for dense reconstruction with point cloud and mesh

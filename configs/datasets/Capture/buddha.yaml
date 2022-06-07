@@ -2,10 +2,7 @@ dir:
     data_dir:  '/Users/leoyluo/Desktop/Immerse/data'   # It is the main dataset address containing all dataset
 
 data:
-    video_path: '/Users/leoyluo/Desktop/Immerse/data/Capture/plant.mp4'
-    scene_name: plant
-    video_downsample: 1             # fps downsample ratio, default 1
-    image_downsample: 1             # image rescale downsample ratio, default 1
+    scene_name: buddha
     colmap:
         match_type: 'exhaustive_matcher'        # ['sequential_matcher', 'exhaustive_matcher']
         dense_reconstruct: False                # run for dense reconstruction with point cloud and mesh
@@ -13,8 +10,7 @@ data:
 dataset:
     train:
         type: Capture
-        scene_name: plant
-        skip: 4                      # reduce num of image in sequence
+        scene_name: buddha
         img_scale: 0.25              # scale image and intrinsic, < 1 means scale_down
         scale_radius: 3.0            # norm the camera within a sphere with such radius(actual radius litter smaller)
         pc_radius: 2.0               # only keep point cloud in a fix radius ball, scale after cam norm
@@ -23,17 +19,15 @@ dataset:
 model:
     rays:
         bounding_radius: 3.0
-        near: 1.0
 
 inference:
     render:
-        type: [circle]
-        n_cam: [20]
+        type: [spiral]
+        n_cam: [60]
         radius: 2.5     # cam distribution is different in front and back
-        u_start: 0.75
-        v_ratio: -0.2
+        u_start: 0.7
+        v_range: [-0.5, 0.5]
 
     volume:
         n_grid: 4       # just for visual purpose
-        origin: [0.0, 0.2, 0.4]
-        side: 2
+        side: 2.5

@@ -35,6 +35,15 @@ class Base3dPCDataset(Base3dDataset):
         """string identifier of a dataset like scan_id/scene_name"""
         return self.identifier
 
+    def skip_samples(self):
+        """For any mode, you can skip the samples in order.
+        Skip pts_vis as well
+        """
+        super().skip_samples()
+        if self.skip > 1:
+            if 'vis' in self.point_cloud:
+                self.point_cloud['vis'] = self.point_cloud['vis'][::self.skip, :]
+
     def keep_eval_samples(self):
         """For eval model, only keep a small number of samples. Which are closer to the avg pose
          It should be done before precache_rays in child class to avoid full precache.

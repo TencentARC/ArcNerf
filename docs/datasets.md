@@ -76,8 +76,10 @@ If you capture video, you can follow `scripts/data_process.sh` to use `extract_v
 extract video into images. Will write data to `cfgs.dir.data_dir/Capture/scene_name`
 - video_path: actual video path
 - scene_name: specify the scene name. Image will be written to `cfgs.dir.data_dir/Capture/scene_name/images`.
-- video_downsample: downsample video frames by such factor. By default `15`.
-- image_downsample: downsample each frame by such factor. By default `4`.
+- video_downsample: downsample video frames by such factor. By default `1`.
+- image_downsample: downsample each frame by such factor. By default `1`.
+We suggest you to run extract/colmap on full image size and length to allow more accurate pose estimation. You can reduce
+the image for training by setting config in dataset.
 ### Colmap Run_poses
 You should install [colmap](https://colmap.github.io/) by yourself. We provide python script for processing.
 you can follow `scripts/data_process.sh` to use `run_poses` to get colmap with poses and dense reconstruction.

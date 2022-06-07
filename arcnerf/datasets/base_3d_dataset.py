@@ -43,7 +43,7 @@ class Base3dDataset(BaseDataset):
         return self.W, self.H
 
     def skip_samples(self):
-        """For any mode, you can skip the samples in order. This is used in NeRF dataset to keep consistent eval"""
+        """For any mode, you can skip the samples in order."""
         if self.skip > 1:
             self.images = self.images[::self.skip]
             self.cameras = self.cameras[::self.skip]

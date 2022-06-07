@@ -37,8 +37,8 @@ class TestDict(unittest.TestCase):
         cls.cfgs = setup_test_config()
         cls.dataset_type = getattr(cls.cfgs.dataset, MODE).type
         cls.dataset = cls.setup_dataset()
-        cls.images = cls.load_images()
         cls.H, cls.W = int(cls.dataset[0]['H']), int(cls.dataset[0]['W'])
+        cls.images = cls.load_images()
         cls.c2w, cls.intrinsic, cls.cameras = cls.get_cameras()
         cls.n_cam = cls.c2w.shape[0]
         radius = get_value_from_cfgs_field(cls.cfgs.model.rays, 'bounding_radius')
@@ -56,8 +56,12 @@ class TestDict(unittest.TestCase):
 
     @classmethod
     def load_images(cls):
-        img_list, _ = cls.dataset.get_image_list(MODE)
-        imgs = [cv2.imread(path) for path in img_list]
+        """img in bgr order"""
+        imgs = []
+        for data in cls.dataset:
+            img = data['img'].clone().reshape(cls.H, cls.W, -1)
+            img = img_to_uint8(torch_to_np(img))
+            imgs.append(img)
 
         return imgs
 
@@ -138,7 +142,7 @@ class TestDict(unittest.TestCase):
         img = img_to_uint8(torch_to_np(img))
         cv2.imwrite(file_path, img)
         # mask
-        if self.dataset[0]['mask'] is not None:
+        if 'mask' in self.dataset[0]:
             file_path = osp.join(self.spec_result_dir, 'mask.png')
             mask = self.dataset[0]['mask'].reshape(self.H, self.W)
             mask = (torch_to_np(mask) * 255.0).astype(np.uint8)
@@ -323,7 +327,7 @@ class TestDict(unittest.TestCase):
             pts_pixels = np_wrapper(self.cameras[idx].proj_world_to_pixel, pts)
             pts_vis_cam = pts_vis[idx, :]
             pts_pixels = pts_pixels if pts_vis is None else pts_pixels[pts_vis_cam == 1, :]
-            proj_imgs.append(draw_vert_on_img(self.images[idx], pts_pixels, color='green'))
+            proj_imgs.append(draw_vert_on_img(self.images[idx].copy(), pts_pixels, color='green'))
 
         video_path = osp.join(self.spec_result_dir, 'reproj_pc.mp4')
         write_video(proj_imgs, video_path, fps=5)
@@ -347,12 +351,14 @@ class TestDict(unittest.TestCase):
             intrinsic=self.intrinsic,
             points=pts,
             point_colors=pts_colors,
-            point_size=1.0,
+            point_size=5.0,
             volume=self.volume_dict,
             sphere_radius=self.radius,
             sphere_origin=(0, 0, 0),
             title='Cams with all point cloud',
-            save_path=file_path
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True
         )
 
         # single camera visual
