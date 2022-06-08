@@ -311,8 +311,8 @@ class RadianceNet(BaseRadianceNet):
             x_embed = self.embed_fn_pts(x)  # input_ch_pts -> embed_pts_dim
             inputs.append(x_embed)
         if 'v' in self.mode:
-            view_dirs = self.embed_fn_view(view_dirs)  # input_ch_view -> embed_view_dim
-            inputs.append(view_dirs)
+            view_embed = self.embed_fn_view(view_dirs)  # input_ch_view -> embed_view_dim
+            inputs.append(view_embed)
         if 'n' in self.mode:
             inputs.append(normals)
         if 'f' in self.mode:

@@ -3,7 +3,7 @@
 import torch
 import torchvision.transforms as transforms
 
-from common.utils.cfgs_utils import valid_key_in_cfgs
+from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
 
 
 def get_transforms(cfgs):
@@ -12,11 +12,13 @@ def get_transforms(cfgs):
     aug_info = ''
 
     if valid_key_in_cfgs(cfgs, 'augmentation'):
-        if valid_key_in_cfgs(cfgs.augmentation, 'n_rays'):
+        if valid_key_in_cfgs(cfgs.augmentation, 'n_rays') and \
+                get_value_from_cfgs_field(cfgs.augmentation, 'n_rays', 0) > 0:
             transforms_list.append(SampleRays(cfgs.augmentation.n_rays))
             aug_info += '  Add SampleRays with N_rays {}\n'.format(cfgs.augmentation.n_rays)
 
-        if valid_key_in_cfgs(cfgs.augmentation, 'shuffle'):
+        if valid_key_in_cfgs(cfgs.augmentation, 'shuffle') and \
+                get_value_from_cfgs_field(cfgs.augmentation, 'shuffle', False):
             transforms_list.append(ShuffleRays())
             aug_info += '  Add Rays shuffle\n'
 
@@ -30,9 +32,7 @@ class SampleRays(object):
         self.n_rays = n_rays
 
     def __call__(self, inputs):
-        n_total = inputs['img'].shape[0]
-        device = inputs['img'].device
-        select_idx = torch.randint(0, n_total, size=[self.n_rays]).to(device)
+        select_idx = torch.randperm(inputs['img'].shape[0])
 
         inputs['img'] = inputs['img'][select_idx, :]
         inputs['rays_o'] = inputs['rays_o'][select_idx, :]
@@ -51,9 +51,7 @@ class ShuffleRays(object):
         return
 
     def __call__(self, inputs):
-        n_total = inputs['img'].shape[0]
-        device = inputs['img'].device
-        select_idx = torch.randint(0, n_total, size=[n_total]).to(device)
+        select_idx = torch.randperm(inputs['img'].shape[0])
 
         inputs['img'] = inputs['img'][select_idx, :]
         inputs['rays_o'] = inputs['rays_o'][select_idx, :]

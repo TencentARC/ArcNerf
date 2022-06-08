@@ -224,6 +224,7 @@ class ArcNerfTrainer(BasicTrainer):
                     full_tensor = v.view(-1, h, w, *v.shape[2:])  # (N, H, W, ...)
                     dh, dw = int((1 - keep_ratio) * h / 2.0), int((1 - keep_ratio) * w / 2.0)
                     crop_tensor = full_tensor[:, dh:-dh, dw:-dw, ...]  # (N, H_c, W_c, ...)
+                    self.data['_train']['H'], self.data['_train']['W'] = crop_tensor.shape[1], crop_tensor.shape[2]
                     self.total_samples = crop_tensor.shape[0] * crop_tensor.shape[1] * crop_tensor.shape[2]
                     self.data['_train'][k] = crop_tensor.reshape(1, self.total_samples, *crop_tensor.shape[3:])
         else:
@@ -231,17 +232,18 @@ class ArcNerfTrainer(BasicTrainer):
                 if isinstance(v, torch.Tensor):
                     self.data['_train'][k] = self.data['train'][k]  # get all (1, n_img*n_rays, ...)
                     self.total_samples = self.data['_train'][k].shape[1]
+            self.data['_train']['H'], self.data['_train']['W'] = self.data['train']['H'], self.data['train']['W']
             self.crop_max_epoch = None
 
         # random shuffle of all remaining rays.
         if scheduler_cfg is None or get_value_from_cfgs_field(scheduler_cfg, 'random_shuffle', True):
             self.logger.add_log('Random shuffle all training samples...')
-            random_idx = torch.randint(0, self.total_samples, size=[self.total_samples])
+            random_idx = torch.randperm(self.total_samples)
             for k, v in self.data['_train'].items():
                 if isinstance(v, torch.Tensor):
                     self.data['_train'][k] = self.data['_train'][k][:, random_idx, ...]
 
-        # importance sampling based on loss
+        # importance sampling based on loss  TODO: seems the order has changed after shuffle.
         if scheduler_cfg is not None and valid_key_in_cfgs(scheduler_cfg, 'sample_loss') and \
                 self.shuffle_count >= get_value_from_cfgs_field(scheduler_cfg.sample_loss, 'min_sample', -1):
             loss_keys = [k for k in list(scheduler_cfg.sample_loss.__dict__.keys()) if 'Loss' in k]
@@ -318,7 +320,9 @@ class ArcNerfTrainer(BasicTrainer):
             sampler = torch.utils.data.distributed.DistributedSampler(
                 dataset, num_replicas=self.cfgs.dist.world_size, rank=self.cfgs.dist.rank
             )
-        loader = torch.utils.data.DataLoader(dataset, sampler=sampler, shuffle=(sampler is None), **tkwargs)
+        loader = torch.utils.data.DataLoader(
+            dataset, sampler=sampler, shuffle=(sampler is None and mode != 'eval'), **tkwargs
+        )
 
         return loader, sampler
 
