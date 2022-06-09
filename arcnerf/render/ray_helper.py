@@ -92,7 +92,7 @@ def get_rays(
     return rays_o, rays_d, index
 
 
-def get_ndc_rays(rays_o: torch.Tensor, rays_d: torch.Tensor, W, H, intrinsic: torch.Tensor, near):
+def get_ndc_rays(rays_o: torch.Tensor, rays_d: torch.Tensor, W, H, intrinsic: torch.Tensor, near=1.0):
     """Change rays in original space to ndc space
 
     Args:
