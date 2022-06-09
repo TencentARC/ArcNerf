@@ -57,7 +57,7 @@ class ImgLoss(nn.Module):
 
         loss = 0.0
         for k in self.keys:
-            loss = self.loss(output[k], gt)  # (B, N_rays, 3)
+            loss += self.loss(output[k], gt)  # (B, N_rays, 3)
 
         if self.do_mean:  # (1,)
             if self.use_mask:
