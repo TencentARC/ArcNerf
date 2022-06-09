@@ -44,28 +44,6 @@ You need to get_rays by setting `wh_order=False` to change the order.
 - For the near/far, you can also set in `cfgs.rays.near/far`, or use ray-sphere intersection
 for near/far calculation by setting `cfgs.rays.bounding_radius`.
 
-## Train data shuffle Scheduler:
-The scheduler handles train data only. It can customize the ray selection every time when all rays have been trained.
-Add `scheduler` in `data.train` for specification.
-
-- precrop: precrop and keep only the center rays.
-  - max_shuffle: Only crop when n_shuffle <= max_shuffle. By default -1. Set 0 to use it in the init shuffle.
-  - ratio: Ratio to keep in each dim.
-
-- random_shuffle: Do random shuffle for all pixel together in `(1, NHW, ...)` shape.
-If you do set it as `False`, it will always be performed.
-
-- sample_loss: This use loss to do importance sampling during training. Which will keep all rays with large loss,
-and randomly select rays with smaller loss.
-    - min_sample: only use when n_shuffle >= min_sample. Set 0 to use in the very beginning.
-    - ImgLoss/MaskLoss:  What loss to used.
-      - loss_type: type of loss, MSE/L1/etc...
-      - do_mean: Must be False to keep dim.
-    - sampling: Controls how to do the importance sampling
-      - threshold: min error to filter the large loss. depends on the actual loss type(mse, l1, etc)
-      - random_ratio: num of ratio that select rays with small error.
-
-
 # Dataset Class
 Below are supported dataset class.
 ## Capture

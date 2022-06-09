@@ -1,0 +1,13 @@
+dir:
+    data_dir:  '/Users/leoyluo/Desktop/Immerse/data'   # It is the main dataset address containing all dataset
+
+dataset:
+    train:
+        type: LLFF
+        scene_name: fern
+        img_scale: 0.125
+        precache: False
+
+model:
+    rays:
+        # this ray from llff depends on its bound(no uni-sphere)

@@ -96,15 +96,14 @@ class TestDict(unittest.TestCase):
 
         if infer_cfgs is not None and valid_key_in_cfgs(infer_cfgs, 'volume'):
             cls.parse_volume(infer_cfgs.volume)
+            cls.volume = Volume(cls.n_grid, cls.origin, cls.side, cls.xlen, cls.ylen, cls.zlen)
+            cls.volume_dict = {
+                'grid_pts': torch_to_np(cls.volume.get_grid_pts()),
+                'lines': cls.volume.get_dense_lines()
+            }
         else:
-            cls.n_grid = 4
-            cls.origin = (0.0, 0.0, 0.0)
-            cls.side = 1.0
-            cls.xlen, cls.ylen, cls.zlen = None, None, None
-
-        # set the volume
-        cls.volume = Volume(cls.n_grid, cls.origin, cls.side, cls.xlen, cls.ylen, cls.zlen)
-        cls.volume_dict = {'grid_pts': torch_to_np(cls.volume.get_grid_pts()), 'lines': cls.volume.get_dense_lines()}
+            cls.volume = None
+            cls.volume_dict = None
 
     @classmethod
     def parse_render(cls, render_cfgs):
