@@ -86,6 +86,7 @@ dataset:
         pc_radius: 2.0               # only keep point cloud in a fix radius ball, scale after cam norm
         align_cam: False             # whether to use avg pose to adjust cam rotation. Only for cam that are not horizontally distributed.
         # exchange_coord: [y, z, x]  # exchange and flip coord. Generally not use
+        ndc_space: False             # change the rays into ndc_space. You must assure the near is 1.0 before that. You should set near/far as 1 if used ndc_space
         precache: True               # precache all the rays at once
         augmentation:                # augmentation is for rays on a single image. Do not change in whole progress
             shuffle: False           # shuffle all rays on a single image

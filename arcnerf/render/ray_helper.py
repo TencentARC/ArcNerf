@@ -10,7 +10,16 @@ from common.utils.torch_utils import torch_to_np
 
 
 def get_rays(
-    W, H, intrinsic: torch.Tensor, c2w: torch.Tensor, wh_order=True, index: np.ndarray = None, n_rays=-1, to_np=False
+    W,
+    H,
+    intrinsic: torch.Tensor,
+    c2w: torch.Tensor,
+    wh_order=True,
+    index=None,
+    n_rays=-1,
+    to_np=False,
+    ndc=False,
+    ndc_near=1.0
 ):
     """Get rays in world coord from camera.
     No batch processing allow. Rays are produced by setting z=1 and get location.
@@ -26,6 +35,8 @@ def get_rays(
                 first index is X and second is Y, any index should be in range (0, W-1) and (0, H-1)
         n_rays: random sample ray by such num if it > 0
         to_np: if to np, return np array instead of torch.tensor
+        ndc: If True, change rays to ndc space, you can then change near far to 0,1. By default False
+        ndc_near: near zvals. By default 1.0.
 
     Returns:
         a ray_bundle with rays_o and rays_d. Each is in dim (N_ray, 3).
@@ -70,11 +81,52 @@ def get_rays(
     rays_d = normalize(rays_d)[0]  # (WH/N_rays, 3)
     rays_o = torch.repeat_interleave(cam_loc, rays_d.shape[0], dim=0)  # (WH/N_rays, 3)
 
+    # chang to ndc
+    if ndc:
+        rays_o, rays_d = get_ndc_rays(rays_o, rays_d, W, H, intrinsic, ndc_near)
+
     if to_np:
         rays_o = torch_to_np(rays_o)
         rays_d = torch_to_np(rays_d)
 
     return rays_o, rays_d, index
+
+
+def get_ndc_rays(rays_o: torch.Tensor, rays_d: torch.Tensor, W, H, intrinsic: torch.Tensor, near):
+    """Change rays in original space to ndc space
+
+    Args:
+        rays_o: rays origin in original world space
+        rays_d: rays direction in original world space
+        W: img_width
+        H: img_height
+        intrinsic: torch.tensor(3, 3) intrinsic matrix
+        near: near zvals. By default 1.0.
+
+    Returns:
+        a ray_bundle with rays_o and rays_d. Each is in dim (N_ray, 3).
+    """
+    # Shift ray origins to near plane
+    t = -(near + rays_o[..., 2]) / rays_d[..., 2]
+    rays_o = rays_o + t[..., None] * rays_d
+
+    f_x, f_y = intrinsic[0, 0], intrinsic[1, 1]
+    # Projection
+    o0 = -1. / (W / (2. * f_x)) * rays_o[..., 0] / rays_o[..., 2]
+    o1 = -1. / (H / (2. * f_y)) * rays_o[..., 1] / rays_o[..., 2]
+    o2 = 1. + 2. * near / rays_o[..., 2]
+
+    d0 = -1. / (W / (2. * f_x)) * (rays_d[..., 0] / rays_d[..., 2] - rays_o[..., 0] / rays_o[..., 2])
+    d1 = -1. / (H / (2. * f_y)) * (rays_d[..., 1] / rays_d[..., 2] - rays_o[..., 1] / rays_o[..., 2])
+    d2 = -2. * near / rays_o[..., 2]
+
+    rays_o = torch.stack([o0, o1, o2], -1)
+    rays_d = torch.stack([d0, d1, d2], -1)
+
+    # normalize rays
+    rays_d = normalize(rays_d)  # (WH/N_rays, 3)
+
+    return rays_o, rays_d
 
 
 def equal_sample(n_rays_w, n_rays_h, W, H):

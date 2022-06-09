@@ -97,7 +97,7 @@ class LLFF(Base3dDataset):
         # bounds
         bounds = self.poses[:, -2:]  # (N, 2)
 
-        # norm by bound
+        # norm by bound. This make the near zvals as 1.0
         factor = 1.0 / (bounds.min() * 0.75)
         c2w[:, :3, 3] *= factor
         bounds *= factor

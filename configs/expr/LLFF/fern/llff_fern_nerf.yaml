@@ -61,19 +61,21 @@ progress:
 
     init_eval: False
     epoch_eval: 100000
-    max_samples_eval: 25
+    max_samples_eval: 3
 
 dataset:
     train:
         type: LLFF
         scene_name: fern
         img_scale: 0.125
+        ndc_space: True
         precache: True
 
     val:
         type: LLFF
         scene_name: fern
         img_scale: 0.125
+        ndc_space: True
         precache: False
 
     eval:
@@ -81,6 +83,7 @@ dataset:
         type: LLFF
         scene_name: fern
         img_scale: 0.125
+        ndc_space: True
         precache: True
 
 model:

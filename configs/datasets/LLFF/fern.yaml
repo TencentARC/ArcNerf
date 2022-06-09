@@ -5,9 +5,12 @@ dataset:
     train:
         type: LLFF
         scene_name: fern
-        img_scale: 0.125
+        img_scale: 1
         precache: False
+        ndc_space: True
 
 model:
     rays:
-        # this ray from llff depends on its bound(no uni-sphere)
+        # Use near far as 0/1 if in ndc_space by default
+#        near: 0.0
+#        far: 1.0

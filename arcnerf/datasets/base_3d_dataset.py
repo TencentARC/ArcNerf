@@ -34,6 +34,9 @@ class Base3dDataset(BaseDataset):
         # set for eval
         self.eval_max_sample = get_value_from_cfgs_field(cfgs, 'eval_max_sample')
 
+        # whether in ndc space
+        self.ndc_space = get_value_from_cfgs_field(cfgs, 'ndc_space', False)
+
     def get_identifier(self):
         """string identifier of a dataset like scan_id/scene_name"""
         return self.identifier
@@ -204,7 +207,7 @@ class Base3dDataset(BaseDataset):
         if self.ray_bundles is None:
             self.ray_bundles = []
             for i in range(self.n_imgs):
-                self.ray_bundles.append(self.cameras[i].get_rays(wh_order=False))
+                self.ray_bundles.append(self.cameras[i].get_rays(wh_order=False, ndc=self.ndc_space))
 
     def __len__(self):
         """Len of dataset"""
@@ -224,10 +227,15 @@ class Base3dDataset(BaseDataset):
             bounds = torch.FloatTensor(bounds).unsqueeze(0)
             bounds = torch.repeat_interleave(bounds, img.shape[0], dim=0)
 
+        # force the bounds to be 0-1 in ndc_space
+        if self.ndc_space:
+            bounds = torch.FloatTensor([[0.0, 1.0]])  # (1, 2)
+            bounds = torch.repeat_interleave(bounds, img.shape[0], dim=0)
+
         if self.precache:
             ray_bundle = self.ray_bundles[idx]
         else:
-            ray_bundle = self.cameras[idx].get_rays(wh_order=False)  # We don't sample rays here
+            ray_bundle = self.cameras[idx].get_rays(wh_order=False, ndc=self.ndc_space)  # We don't sample rays here
 
         inputs = {
             'img': img,  # (hw, 3), in rgb order / (n_rays, 3) if sample rays
