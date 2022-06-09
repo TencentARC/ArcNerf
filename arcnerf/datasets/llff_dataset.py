@@ -15,6 +15,7 @@ from common.utils.registry import DATASET_REGISTRY
 class LLFF(Base3dDataset):
     """LLFF Dataset. Use colmap to process but do not save pointcloud.
     This dataset do not have a foreground object, only used for view synthesis
+    Ref: https://github.com/Fyusion/LLFF and https://github.com/bmild/nerf
     """
 
     def __init__(self, cfgs, data_dir, mode, transforms):

@@ -1,0 +1,31 @@
+dir:
+    data_dir:  '/Users/leoyluo/Desktop/Immerse/data'   # It is the main dataset address containing all dataset
+
+dataset:
+    train:
+        type: BlendedMVS
+        scene_name: scan6
+        img_scale: 1.0
+        scale_radius: 3.0
+        align_cam: True     #  scan6 need to adjust
+        exchange_coord: [z, y, x]  # make it stand up
+        precache: False
+
+model:
+    rays:
+        bounding_radius: 3.0
+        near: 1.5
+        far: 4.5
+
+inference:
+    render:
+        type: [spiral]
+        n_cam: [60]
+        radius: 2.5
+        u_start: 0.25
+        v_range: [-0.75, 0]
+        n_rot: 3
+
+    volume:
+        n_grid: 4       # just for visual purpose
+        side: 2.5

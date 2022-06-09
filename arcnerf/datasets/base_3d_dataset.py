@@ -190,6 +190,15 @@ class Base3dDataset(BaseDataset):
 
         return rot_mat
 
+    def exchange_coord(self):
+        """Exchange any two coord"""
+        if get_value_from_cfgs_field(self.cfgs, 'exchange_coord', None) is not None:
+            src = get_value_from_cfgs_field(self.cfgs, 'exchange_coord')[0]
+            dst = get_value_from_cfgs_field(self.cfgs, 'exchange_coord')[1]
+            flip = get_value_from_cfgs_field(self.cfgs, 'exchange_coord')[2]
+            for idx in range(len(self.cameras)):
+                self.cameras[idx].exchange_coord(src, dst, flip)
+
     def precache_ray(self):
         """Precache all the rays for all images first"""
         if self.ray_bundles is None:

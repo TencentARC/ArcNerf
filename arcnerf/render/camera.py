@@ -58,6 +58,31 @@ class PerspectiveCamera(object):
         else:
             return self.intrinsic
 
+    def exchange_coord(self, src, dst, flip):
+        """exchange any two of xyz coord, negative is allow in dst
+        eg: x->y or x->-y
+
+        Args:
+            src: any of x, y, z
+            dst: any of x, y, z
+            flip: any of xyz or nan
+        """
+        assert src in ['x', 'y', 'z'], 'Only xyz allow'
+        assert dst in ['x', 'y', 'z'], 'Only xyz allow'
+
+        _flip = (flip != 'nan')
+        if _flip:
+            assert flip in ['x', 'y', 'z'], 'Only xyz allow'
+
+        mapping = {'x': 0, 'y': 1, 'z': 2}
+        new_order = [0, 1, 2, 3]
+        new_order[mapping[src]], new_order[mapping[dst]] = new_order[mapping[dst]], new_order[mapping[src]]
+        # change order
+        self.c2w = self.c2w[new_order, :]
+        # change sign
+        if _flip:
+            self.c2w[mapping[flip], :] *= -1
+
     def reset_pose(self, c2w):
         """reset the c2w (4, 4)"""
         self.c2w = c2w.copy()

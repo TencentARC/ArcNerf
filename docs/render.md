@@ -5,6 +5,7 @@ A Perspective Camera with `intrinsic(3x3)` and `c2w(4x4)` with get/set function.
 - get_rays: get rays from cam, support index and random sample.
 - proj_world_to_pixel: project points in world space to pixel.
 - proj_world_to_cam: project points in world space to cam space.
+- Allow you to set/get the `intrinsic/c2w/w2c` matrix easily.
 
 # ray_helper
 Ray function in rendering, or helper function for sampling. Other geometric function are in `geometry.ray`.

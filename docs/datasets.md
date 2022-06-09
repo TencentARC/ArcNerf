@@ -18,6 +18,8 @@ Will not touch intrinsic. If point cloud exists, rescale them by same factor to 
   good for ray-sphere computation(forbid nan).
 - precache: If True, will precache all the rays for all pixels at once.
 - pc_radius(base_3d_pc_dataset): Remove point cloud that are outside such absolute radius(all scaled by extra `1.05`).
+- align_cam: Sometimes it can be used to align cam in a horizontal way.
+- exchange_coord: Flexible to exchange/flip the coord to a standard system.
 Done after camera `scale_radius`. The radius is restricted within `scale_radius` range.
 ## Augmentation:
 The augmentation is for all image process in all time.
@@ -83,9 +85,12 @@ which is close to object center, adjust cam/pc by this offset.
 We test and show that the method is robust to make the coordinate system such that object is centered at (0,0,0),
 cam is on surface with `scale_radius`. Only scale and translation is applied, do not affect the intrinsic.
 
-## DTU
-Specified by scan_id, read image/mask/camera.
-- scan_id: int num for item selection. Use it to be identifier.
+## LLFF
+This is a forward facing dataset. Not object extraction is performed. Only used to view synthesis.
+For fair comparsion, test/val images have not overlapping with train images.
+- The camera are aligned flatten. Adjust the poses/bounds by range to avoid large xyz values.
+- scene_name: scene_name that is the folder name under `LLFF`. Use it to be identifier.
+- NDC: TO BE implemented
 
 ## NeRF
 Specified by scene_name, read image/camera. Since NeRF split the dataset into train/val/eval, we
@@ -93,6 +98,18 @@ load all the camera from all split together, process cameras, and keep the cam f
 transformation of camera(like norm_pose) consistent over all split.
 - scene_name: scene_name that is the folder name under `NeRF`. Use it to be identifier.
 - poses: for the poses, we do transform so that it matches the coord system in our proj.
+- images: The image are in `RGBA` channels, needs to blend rgb by alpha.
+
+## DTU
+Good for object reconstruction. Specified by scan_id, read image/mask/camera.
+- scan_id: int num for item selection. Use it to be identifier.
+- eval_max_sample: Select the closest samples for eval. It has overlapping with training view.
+
+## BlendedMVS
+Good for object reconstruction. Specified by scene_name, read image/camera.
+- scene_name: scene_name that is the folder name under `BlendedMVS`. Use it to be identifier.
+- eval_max_sample: Select the closest samples for eval. It has overlapping with training view.
+- In some case it uses `align_cam` and `exchange_coord` for changing the coordinate into a standard one.
 
 # Train/Val/Eval/Inference
 

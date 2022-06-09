@@ -85,15 +85,25 @@ dataset:
         scale_radius: 3.0            # norm the camera within a sphere with such radius(actual radius litter smaller)
         pc_radius: 2.0               # only keep point cloud in a fix radius ball, scale after cam norm
         align_cam: False             # whether to use avg pose to adjust cam rotation. Only for cam that are not horizontally distributed.
+        # exchange_coord: [y, z, x]  # exchange and flip coord. Generally not use
         precache: True               # precache all the rays at once
         augmentation:                # augmentation is for rays on a single image. Do not change in whole progress
-            shuffle: True            # shuffle all rays on a single image
+            shuffle: False           # shuffle all rays on a single image
         scheduler:                   # scheduler handles sampling during training in different stage
+            ray_sample:
+                mode: 'random'       # ['full', 'random'], full takes all rays, random is sample with replacement
+                cross_view: False    # used in both mode. If True, each sample takes rays from different image. Else on in one image.
             precrop:                 # crop the image to keep center rays
-                max_shuffle: 0       # only crop when num of shuffle <= max_shuffle (0-based index)
                 ratio: 0.5           # num of ratio keep on each dim
-                max_epoch: 500       # max epoch
-            random_shuffle: True     # shuffle sample in overall (1, nhw, ...) rays
+                max_epoch: 500       # max epoch for precropping
+            sample_loss:             # it only served for ray_sample.mode == 'full'
+                ImgLoss:             # loss used for importance sampling.
+                    keys: ['rgb_fine']
+                    loss_type: MSE
+                    do_mean: False   # must set False
+                sampling:
+                    threshold: 0.02  # min error to filter the large loss. depends on the actual loss type(mse, l1, etc)
+                    ratio: 0.5       # num of ratio that select rays with small error.
 
     val:
         type: Capture
