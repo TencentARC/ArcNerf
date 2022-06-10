@@ -5,9 +5,10 @@ dataset:
     train:
         type: LLFF
         scene_name: fern
-        img_scale: 1
+        img_scale: 0.125
         precache: False
         ndc_space: True
+        center_pose: False
 
 model:
     rays:

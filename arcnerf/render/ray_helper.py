@@ -77,13 +77,15 @@ def get_rays(
 
     cam_loc = c2w[:3, 3].unsqueeze(0)  # (1, 3)
     rays_d = xyz_world - cam_loc.unsqueeze(0)  # (1, WH/N_rays, 3)
-    # normalized dir
-    rays_d = normalize(rays_d)[0]  # (WH/N_rays, 3)
+    rays_d = rays_d[0]  # (WH/N_rays, 3)
     rays_o = torch.repeat_interleave(cam_loc, rays_d.shape[0], dim=0)  # (WH/N_rays, 3)
 
     # chang to ndc
     if ndc:
         rays_o, rays_d = get_ndc_rays(rays_o, rays_d, W, H, intrinsic, ndc_near)
+
+    # normalize rays
+    rays_d = normalize(rays_d)  # (WH/N_rays, 3)
 
     if to_np:
         rays_o = torch_to_np(rays_o)
@@ -122,9 +124,6 @@ def get_ndc_rays(rays_o: torch.Tensor, rays_d: torch.Tensor, W, H, intrinsic: to
 
     rays_o = torch.stack([o0, o1, o2], -1)
     rays_d = torch.stack([d0, d1, d2], -1)
-
-    # normalize rays
-    rays_d = normalize(rays_d)  # (WH/N_rays, 3)
 
     return rays_o, rays_d
 

@@ -6,6 +6,7 @@ import os.path as osp
 import numpy as np
 
 from .base_3d_dataset import Base3dDataset
+from arcnerf.geometry.poses import average_poses
 from arcnerf.render.camera import PerspectiveCamera
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import DATASET_REGISTRY
@@ -90,10 +91,6 @@ class LLFF(Base3dDataset):
         c2w = c2w[:, [1, 0, 2, 3], :]
         c2w[:, 2, :] *= -1
 
-        cameras = []
-        for idx in range(self.n_imgs):  # read only first n_imgs
-            cameras.append(PerspectiveCamera(intrinsic=intrinsic, c2w=c2w[idx], W=self.W, H=self.H))
-
         # bounds
         bounds = self.poses[:, -2:]  # (N, 2)
 
@@ -101,6 +98,14 @@ class LLFF(Base3dDataset):
         factor = 1.0 / (bounds.min() * 0.75)
         c2w[:, :3, 3] *= factor
         bounds *= factor
+
+        # center pose
+        if get_value_from_cfgs_field(self.cfgs, 'center_pose', False):
+            c2w = self.center_pose(c2w)
+
+        cameras = []
+        for idx in range(self.n_imgs):
+            cameras.append(PerspectiveCamera(intrinsic=intrinsic, c2w=c2w[idx], W=self.W, H=self.H))
 
         return cameras, bounds
 
@@ -114,3 +119,11 @@ class LLFF(Base3dDataset):
         intrinsic[1, 2] = hwf[0] / 2.0
 
         return intrinsic
+
+    @staticmethod
+    def center_pose(c2w):
+        """Center the pose of (N, 4, 4) """
+        c2w_avg = average_poses(c2w)  # (4, 4)
+        c2w = np.linalg.inv(c2w_avg) @ c2w  # (N, 4, 4)
+
+        return c2w
