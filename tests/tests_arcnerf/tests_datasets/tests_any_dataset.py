@@ -215,7 +215,7 @@ class TestDict(unittest.TestCase):
             )
 
     def tests_ray_points(self):
-        n_rays_w, n_rays_h = 2, 2
+        n_rays_w, n_rays_h = 4, 3
         n_rays = n_rays_w * n_rays_h
         index = equal_sample(n_rays_w, n_rays_h, self.W, self.H)
 

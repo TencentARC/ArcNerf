@@ -11,6 +11,7 @@ from .activation import get_activation
 from .base_netwok import BaseGeoNet, BaseRadianceNet
 from .embed import Embedder
 from .linear import DenseLayer, SirenLayer
+from arcnerf.geometry.transformation import normalize
 
 
 @MODULE_REGISTRY.register()
@@ -82,7 +83,7 @@ class GeoNet(BaseGeoNet):
             # input dim for each fc
             if i == 0:
                 in_dim = embed_dim
-            elif not skip_reduce_output and i in skips:  # skip at current layer, add input
+            elif not skip_reduce_output and i > 0 and (i - 1) in skips:  # skip at current layer, add input
                 in_dim = embed_dim + W
             else:
                 in_dim = W
@@ -93,7 +94,7 @@ class GeoNet(BaseGeoNet):
                     out_dim = 1 + W_feat
                 else:
                     out_dim = 1
-            elif skip_reduce_output and (i + 1) in skips:  # skip at next, reduce current output
+            elif skip_reduce_output and i in skips:  # skip at next, reduce current output
                 out_dim = W - embed_dim
             else:
                 out_dim = W
@@ -117,7 +118,7 @@ class GeoNet(BaseGeoNet):
                     if i == 0:  # first layer, [x, embed_x], do not init for embed_x
                         torch.nn.init.constant_(layer.weight[:, input_ch:], 0.0)
                         torch.nn.init.normal_(layer.weight[:, :input_ch], 0.0, np.sqrt(2) / np.sqrt(out_dim))
-                    elif i in skips:  # skip layer, [feature, x, embed_x], do not init for embed_x
+                    elif i > 0 and (i - 1) in skips:  # skip layer, [feature, x, embed_x], do not init for embed_x
                         torch.nn.init.normal_(layer.weight, 0.0, np.sqrt(2) / np.sqrt(out_dim))
                         torch.nn.init.constant_(layer.weight[:, -(embed_dim - input_ch):], 0.0)
                     else:
@@ -154,11 +155,11 @@ class GeoNet(BaseGeoNet):
         out = x_embed
 
         for i in range(self.D + 1):
+            out = self.layers[i](out)
             if i in self.skips:
                 out = torch.cat([out, x_embed], dim=-1)  # cat at last
                 if self.norm_skip:
                     out = out / math.sqrt(2)
-            out = self.layers[i](out)
 
         if self.W_feat <= 0:  # (B, 1), None
             return out, None
@@ -299,7 +300,7 @@ class RadianceNet(BaseRadianceNet):
         Args:
             any of x/view_dir/normals/geo_feat are optional, based on mode
             x: torch.tensor (B, input_ch_pts)
-            view_dirs: (B, input_ch_view)
+            view_dirs: (B, input_ch_view), may not be normalized
             normals: (B, 3)
             geo_feat: (B, W_feat_in)
 
@@ -310,8 +311,8 @@ class RadianceNet(BaseRadianceNet):
         if 'p' in self.mode:
             x_embed = self.embed_fn_pts(x)  # input_ch_pts -> embed_pts_dim
             inputs.append(x_embed)
-        if 'v' in self.mode:
-            view_embed = self.embed_fn_view(view_dirs)  # input_ch_view -> embed_view_dim
+        if 'v' in self.mode:  # always normalize view_dirs
+            view_embed = self.embed_fn_view(normalize(view_dirs))  # input_ch_view -> embed_view_dim
             inputs.append(view_embed)
         if 'n' in self.mode:
             inputs.append(normals)

@@ -34,7 +34,7 @@ optim:
     weight_decay: 0.0
     lr_scheduler:
         type: WarmUpCosineLR        # follow the original implementation
-        lr_steps: [ 5000 ]
+        lr_steps: [5000]
         min_factor: 0.05
 
     clip_gradients: 0.0
@@ -72,9 +72,7 @@ dataset:
         precache: True
         scheduler:
             precrop:
-                max_shuffle: 0
                 ratio: 0.5
-            random_shuffle: True
 
     val:
         skip: 8
@@ -102,12 +100,16 @@ inference:
         u_start: 0.5
         v_range: [-0.6, -0.2]
         fps: 5
+        surface_render:
+            chunk_rays_factor: 1024
+            method: sphere_tracing
 
     volume:
         n_grid: 512
         side: 2.0
-        level: 50.0
-        chunk_pts_factor: 32
+        level: 0.0
+        grad_dir: ascent
+        chunk_pts_factor: 1
         render_mesh:
             backend: pytorch3d
 

@@ -71,8 +71,6 @@ dataset:
         scale_radius: 3.0
         pc_radius: 1.0
         precache: True
-        augmentation:
-            shuffle: True
 
     val:
         type: Capture

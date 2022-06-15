@@ -97,14 +97,6 @@ dataset:
             precrop:                 # crop the image to keep center rays
                 ratio: 0.5           # num of ratio keep on each dim
                 max_epoch: 500       # max epoch for precropping
-            sample_loss:             # it only served for ray_sample.mode == 'full'
-                ImgLoss:             # loss used for importance sampling.
-                    keys: ['rgb_fine']
-                    loss_type: MSE
-                    do_mean: False   # must set False
-                sampling:
-                    threshold: 0.02  # min error to filter the large loss. depends on the actual loss type(mse, l1, etc)
-                    ratio: 0.5       # num of ratio that select rays with small error.
 
     val:
         type: Capture

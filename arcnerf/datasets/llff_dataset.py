@@ -88,8 +88,8 @@ class LLFF(Base3dDataset):
         bottom = np.repeat(np.array([0, 0, 0, 1.]).reshape([1, 4])[None, ...], c2w.shape[0], axis=0)  # (N, 1, 4)
         c2w = np.concatenate([c2w, bottom], axis=1)  # (N, 4, 4)
         # correct the pose in our system
-        c2w = c2w[:, [1, 0, 2, 3], :]
-        c2w[:, 2, :] *= -1
+        c2w = c2w[:, :, [1, 0, 2, 3]]
+        c2w[:, :, 1] *= -1
 
         # bounds
         bounds = self.poses[:, -2:]  # (N, 2)
@@ -100,8 +100,10 @@ class LLFF(Base3dDataset):
         bounds *= factor
 
         # center pose
-        if get_value_from_cfgs_field(self.cfgs, 'center_pose', False):
-            c2w = self.center_pose(c2w)
+        c2w = self.center_pose(c2w)
+
+        # adjust the system for get_rays
+        c2w[:, :, 1:3] *= -1.0
 
         cameras = []
         for idx in range(self.n_imgs):

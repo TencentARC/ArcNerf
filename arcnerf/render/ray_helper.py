@@ -83,9 +83,9 @@ def get_rays(
     # chang to ndc
     if ndc:
         rays_o, rays_d = get_ndc_rays(rays_o, rays_d, W, H, intrinsic, ndc_near)
-
-    # normalize rays
-    rays_d = normalize(rays_d)  # (WH/N_rays, 3)
+    else:
+        # normalize rays for non_ndc case
+        rays_d = normalize(rays_d)  # (WH/N_rays, 3)
 
     if to_np:
         rays_o = torch_to_np(rays_o)
@@ -458,7 +458,7 @@ def ray_marching(
     if _radiance is not None:
         rgb = torch.sum(weights.unsqueeze(-1) * _radiance, -2)  # (N_rays, 3)
         if white_bkg:  # where mask = 0, rgb = 1
-            rgb = torch.clamp_max(rgb + (1.0 - mask[:, None]), 1.0)
+            rgb = rgb + (1.0 - mask[:, None])
     else:
         rgb = None
 

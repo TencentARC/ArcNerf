@@ -123,7 +123,7 @@ class NeRF(Base3dModel):
         Returns:
             zvals: tensor (B, N_sample + N_importance), up-sample zvals near the surface
         """
-        weights_coarse = weights[:, :self.get_ray_cfgs('n_sample') - 2]  # (B, N_sample-2)
+        weights_coarse = weights[:, 1:self.get_ray_cfgs('n_sample') - 1]  # (B, N_sample-2)
         zvals_mid = 0.5 * (zvals[..., 1:] + zvals[..., :-1])  # (B, N_sample-1)
         _zvals = sample_pdf(
             zvals_mid, weights_coarse, self.get_ray_cfgs('n_importance'),

@@ -1,4 +1,4 @@
-name: capture_qqtiger_nerfpp_rgb
+name: capture_buddha_nerf
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_nerfpp_rgb'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_buddha_nerf'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_nerfpp_rgb/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_buddha_nerf/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -35,7 +35,7 @@ optim:
     lr_scheduler:
         type: ExponentialLR
         lr_gamma: 0.1
-        lr_steps: [200000]
+        lr_steps: [500000]
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -48,7 +48,7 @@ progress:
 
     epoch_loss: 100
     iter_loss: 1
-    save_progress: True
+    save_progress: False
     epoch_save_progress: 50000
     iter_save_progress: 1
 
@@ -66,16 +66,16 @@ progress:
 dataset:
     train:
         type: Capture
-        scene_name: qqtiger
-        img_scale: 1.0
+        scene_name: buddha
+        img_scale: 0.25
         scale_radius: 3.0
         pc_radius: 2.0
         precache: True
 
     val:
         type: Capture
-        scene_name: qqtiger
-        img_scale: 0.5
+        scene_name: buddha
+        img_scale: 0.125
         scale_radius: 3.0
         pc_radius: 2.0
         precache: False
@@ -84,25 +84,25 @@ dataset:
         eval_batch_size: 1
         eval_max_sample: 3
         type: Capture
-        scene_name: qqtiger
-        img_scale: 1.0
+        scene_name: buddha
+        img_scale: 0.25
         scale_radius: 3.0
         pc_radius: 2.0
         precache: True
 
 inference:
     render:
-        type: [circle]
-        n_cam: [20]
-        repeat: [3]
-        radius: 2.0
-        u_start: 0.75
-        v_ratio: -0.2
+        type: [spiral]
+        n_cam: [60]
+        repeat: [1]
+        radius: 2.5
+        u_start: 0.7
+        v_range: [-0.5, 0.5]
         fps: 5
 
     volume:
         n_grid: 512
-        side: 1.5
+        side: 2.5
         level: 50.0
         chunk_pts_factor: 32
         render_mesh:
@@ -112,13 +112,12 @@ model:
     type: NeRF
     rays:
         bounding_radius: 3.0
-        near: 1.0
-        # far: 4.5
+        far: 8.0
         n_sample: 64
         n_importance: 128
         inverse_linear: False
         perturb: True
-        add_inf_z: False    # should not use inf for foreground rgb ray_marching
+        add_inf_z: True
         noise_std: 1.0
         white_bkg: False
     chunk_rays: 32768
@@ -138,38 +137,15 @@ model:
         input_ch_view: 3
         embed_freq_view: 4
         W_feat_in: 256
-    background:
-        type: NeRFPP
-        bkg_blend: 'rgb'
-        rays:
-            bounding_radius: 3.0
-            n_sample: 32
-            perturb: True
-            add_inf_z: True         # must set to be True
-            noise_std: 1.0
-            white_bkg: False
-        chunk_rays: 32768
-        chunk_pts: 131072
-        geometry:
-            W: 256
-            D: 8
-            skips: [4]
-            input_ch: 4     # (xyz/r, 1/r)
-            embed_freq: 10
-            W_feat: 256
-            geometric_init: False
-        radiance:
-            mode: 'vf'
-            W: 128
-            D: 1
-            input_ch_view: 3
-            embed_freq_view: 4
-            W_feat_in: 256
 
 loss:
     ImgLoss:
-        keys: [ 'rgb_coarse', 'rgb_fine' ]
+        keys: ['rgb_coarse', 'rgb_fine']
         weight: 1.0
 
 metric:
     PSNR:
+
+train_metric:
+    PSNR:
+        key: 'rgb_fine'

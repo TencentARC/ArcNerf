@@ -1,4 +1,4 @@
-name: capture_joycon_neus_nerfpprgb
+name: capture_buddha_neus_nerfpprgb
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_joycon_neus_nerfpprgb'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_buddha_neus_nerfpprgb'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_joycon_neus_nerfpprgb/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_buddha_neus_nerfpprgb/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -66,47 +66,46 @@ progress:
 dataset:
     train:
         type: Capture
-        scene_name: joycon
-        img_scale: 1.0
+        scene_name: buddha
+        img_scale: 0.25
         scale_radius: 3.0
-        pc_radius: 1.0
+        pc_radius: 2.0
         precache: True
 
     val:
         type: Capture
-        scene_name: joycon
-        img_scale: 0.5
+        scene_name: buddha
+        img_scale: 0.125
         scale_radius: 3.0
-        pc_radius: 1.0
+        pc_radius: 2.0
         precache: False
 
     eval:
         eval_batch_size: 1
         eval_max_sample: 3
         type: Capture
-        scene_name: joycon
-        img_scale: 1.0
+        scene_name: buddha
+        img_scale: 0.25
         scale_radius: 3.0
-        pc_radius: 1.0
+        pc_radius: 2.0
         precache: True
 
 inference:
     render:
-        type: [swing]
-        n_cam: [20]
-        repeat: [3]
-        radius: 3.0
-        u_range: [0.7, 0.9]
-        v_range: [-0.12, -0.12]
-        n_rot: 1
+        type: [spiral]
+        n_cam: [60]
+        repeat: [1]
+        radius: 2.5
+        u_start: 0.7
+        v_range: [-0.5, 0.5]
         fps: 5
         surface_render:
-            chunk_rays_factor: 1024
+            chunk_rays_factor: 16
             method: sphere_tracing
 
     volume:
         n_grid: 512
-        side: 1.5
+        side: 2.5
         level: 0.0
         grad_dir: ascent
         chunk_pts_factor: 1
@@ -117,7 +116,7 @@ model:
     type: Neus
     rays:
         bounding_radius: 3.0
-        near: 1.0
+        # near: 1.0
         # far: 4.5
         n_sample: 64
         n_importance: 64
@@ -141,7 +140,7 @@ model:
         embed_freq: 6
         W_feat: 256
         geometric_init: True          # use geometric init. need radius_init
-        radius_init: 0.5             # geometric init sphere radius
+        radius_init: 0.75             # geometric init sphere radius
         weight_norm: True
         skip_reduce_output: True
         norm_skip: True
@@ -195,4 +194,7 @@ loss:
         weight: 0.1
 
 metric:
+    PSNR:
+
+train_metric:
     PSNR:

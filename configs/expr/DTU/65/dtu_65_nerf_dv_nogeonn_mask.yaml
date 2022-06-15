@@ -71,8 +71,6 @@ dataset:
         scale_radius: 3.0
         align_cam: True
         precache: True
-        augmentation:
-            shuffle: True
 
     val:
         type: DTU
