@@ -14,7 +14,7 @@ dataset:
     train:
         type: Capture
         scene_name: qqtiger
-        skip: 4                      # reduce num of image in sequence
+        skip: 10                     # reduce num of image in sequence
         img_scale: 0.25              # scale image and intrinsic, < 1 means scale_down
         scale_radius: 3.0            # norm the camera within a sphere with such radius(actual radius litter smaller)
         pc_radius: 2.0               # only keep point cloud in a fix radius ball, scale after cam norm

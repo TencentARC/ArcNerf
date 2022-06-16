@@ -135,8 +135,16 @@ Here are the class of fg_model, which concentrates on building the foreground ob
 Nerf model with single forward(NeRF), and hierarchical sampling(NeRFFull).
 
 It is combination of GeoNet and RadianceNet, with ray sampling, resample pdf, ray marching, etc.
-### Neus
-Neus model sdf as geo value and up-sample pts.
+
+### sdf_model
+SDF model is a class of fg_model that model the volumetric field as sdf. Compared to density field, it is better to
+extract geometric information of the object.
+- For sdf, we are easy to touch the surface. Instead of volume rendering, we provide a simple usage of surface rendering
+by finding the surface xyz directly and use surface pts as the pixel rgb.
+A simple tutorial is in `notebooks/surface_render.ipynb`.
+
+#### Neus
+Neus models sdf as geo value and up-sample pts.
 
 It is combination of GeoNet and RadianceNet, with up sample, resample pdf, ray marching, etc.
 
@@ -146,6 +154,10 @@ Since it gets sdf value instead of sigma, we do not support sigma mode for blend
 - init_var: use to init the inv_s param. By default `inv_s = -np.log(init_var)/speed_factor`, init as `0.05`
 - speed_factor: use to init the inv_s, and get scale by `exp(inv_s * speed_factor``. By default `10`.
 - anneal_end: num of epoch for slope blending. In infer model, the factor is `1`, else `min(epoch/anneal_end, 1)`
+
+### VolSDF
+VolSDF models sdf as well but used different sdf_to_density function and sampling method compared with NeuS.
+
 
 
 ## bkg_model

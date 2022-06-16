@@ -67,17 +67,21 @@ dataset:
     train:
         type: Capture
         scene_name: joycon
-        img_scale: 1.0
+        img_scale: 0.25
         scale_radius: 3.0
         pc_radius: 1.0
+        skip: 8
+        center_by_view_dirs: True
         precache: True
 
     val:
         type: Capture
         scene_name: joycon
-        img_scale: 0.5
+        img_scale: 0.125
         scale_radius: 3.0
         pc_radius: 1.0
+        skip: 8
+        center_by_view_dirs: True
         precache: False
 
     eval:
@@ -85,9 +89,11 @@ dataset:
         eval_max_sample: 3
         type: Capture
         scene_name: joycon
-        img_scale: 1.0
+        img_scale: 0.25
         scale_radius: 3.0
         pc_radius: 1.0
+        skip: 8
+        center_by_view_dirs: True
         precache: True
 
 inference:

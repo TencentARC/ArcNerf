@@ -5,7 +5,7 @@ dataset:
     train:
         type: NeRF
         scene_name: lego
-        skip: 8
+        skip: 4
         img_scale: 1.0
         scale_radius: 3.0
         precache: False

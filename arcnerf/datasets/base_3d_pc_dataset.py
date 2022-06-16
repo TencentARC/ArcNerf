@@ -79,11 +79,11 @@ class Base3dPCDataset(Base3dDataset):
         # adjust point cloud as well
         self.point_cloud['pts'] -= pts_mean[None]
 
-    def center_cam_poses_by_view_dir(self):
+    def center_cam_poses_by_view_dirs(self):
         """Recenter camera pose by setting the common view point center at (0,0,0)
         The common view point is the closest point to all rays.
         """
-        view_point_mean = super().center_cam_poses_by_view_dir()
+        view_point_mean = super().center_cam_poses_by_view_dirs()
         if view_point_mean is not None:
             self.point_cloud['pts'] -= view_point_mean
 

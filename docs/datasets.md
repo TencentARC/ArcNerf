@@ -45,6 +45,11 @@ You need to get_rays by setting `wh_order=False` to change the order.
 - If exists, help the ray sampling in modeling progress. Can be [] if not exist.
 - For the near/far, you can also set in `cfgs.rays.near/far`, or use ray-sphere intersection
 for near/far calculation by setting `cfgs.rays.bounding_radius`.
+- Since we use normalized rays for each image, it means that the given the same distance, the ray in center is extended
+further than corner ones. It makes the sampling in roughly a sphere, when the cameras aligned on sphere surface.
+If you want all the rays extended the same z-distance, you should not normalize the rays, this may be good for the case
+of large scene but not object.
+
 
 # Dataset Class
 Below are supported dataset class.
@@ -76,7 +81,7 @@ Use `Capture` class for this dataset. It is specified by scene_name.
 Since we need to rescale the point_cloud and cam so that object(pc) is centered at (0,0,0). If we directly set pc.mean()
 as (0,0,0), noise not on object will make the center incorrect. We do the following:
 - Use all camera and ray from center image plane to get a closely approximate common view point,
-which is close to object center, adjust cam/pc by this offset.
+which is close to object center, adjust cam/pc by this offset. This is optional by setting `center_by_view_dirs=True`.
 - Norm cam and point by `scale_radius` to make them within a sphere with known range.
 - Filter point cloud by `pc_radius` and remove point outside.
 - Recenter cam and point by setting the filtered point cloud center as (0,0,0).
@@ -85,14 +90,19 @@ which is close to object center, adjust cam/pc by this offset.
 We test and show that the method is robust to make the coordinate system such that object is centered at (0,0,0),
 cam is on surface with `scale_radius`. Only scale and translation is applied, do not affect the intrinsic.
 
-## LLFF
+
+
+## Standard benchmarks
+### LLFF
 This is a forward facing dataset. Not object extraction is performed. Only used to view synthesis.
 For fair comparsion, test/val images have not overlapping with train images.
 - The camera are aligned flatten. Adjust the poses/bounds by range to avoid large xyz values.
 - scene_name: scene_name that is the folder name under `LLFF`. Use it to be identifier.
-- NDC: TO BE implemented
+- NDC: We support NDC Space conversion if you set `ndc_space=True` in dataset.
+  - In the original implementation, even they use `ndc_space` rays for sampling, the view_dirs sent to radianceNet is
+still in non-ndc space. We don't follow it here but only used `ndc rays_d` as view_dirs.
 
-## NeRF
+### NeRF
 Specified by scene_name, read image/camera. Since NeRF split the dataset into train/val/eval, we
 load all the camera from all split together, process cameras, and keep the cam for any split. This make the
 transformation of camera(like norm_pose) consistent over all split.
@@ -100,16 +110,17 @@ transformation of camera(like norm_pose) consistent over all split.
 - poses: for the poses, we do transform so that it matches the coord system in our proj.
 - images: The image are in `RGBA` channels, needs to blend rgb by alpha.
 
-## DTU
+### DTU
 Good for object reconstruction. Specified by scan_id, read image/mask/camera.
 - scan_id: int num for item selection. Use it to be identifier.
 - eval_max_sample: Select the closest samples for eval. It has overlapping with training view.
 
-## BlendedMVS
+### BlendedMVS
 Good for object reconstruction. Specified by scene_name, read image/camera.
 - scene_name: scene_name that is the folder name under `BlendedMVS`. Use it to be identifier.
 - eval_max_sample: Select the closest samples for eval. It has overlapping with training view.
 - In some case it uses `align_cam` and `exchange_coord` for changing the coordinate into a standard one.
+
 
 # Train/Val/Eval/Inference
 
@@ -137,6 +148,8 @@ use same resolution(Or scale if image really too large), and use custom cam path
 - eval_batch_size: batch size for eval
 - eval_max_sample: max num of sample in eval dataset.
 only those will be fully rendered can calculate metric.
+
+For some standard benchmark(`NeRF`/`LLFF`), we follow the same split as they used for common comparsion.
 
 
 ## inference

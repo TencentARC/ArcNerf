@@ -7,7 +7,7 @@ import time
 
 import torch
 
-from arcnerf.datasets import get_dataset, get_model_feed_in
+from arcnerf.datasets import get_dataset, get_model_feed_in, POTENTIAL_KEYS
 from arcnerf.datasets.transform.augmentation import get_transforms
 from arcnerf.eval.eval_func import run_eval
 from arcnerf.eval.infer_func import set_inference_data, run_infer, write_infer_files
@@ -150,8 +150,6 @@ class ArcNerfTrainer(BasicTrainer):
         The concat tensor should be in (N_img, HW, ...) shape
         """
         self.logger.add_log('Concat all training rays...')
-        potential_keys = ['img', 'mask', 'rays_o', 'rays_d', 'bounds']
-
         concat_data = {}
         total_item = len(loader)
         # append all dict from different image
@@ -165,12 +163,12 @@ class ArcNerfTrainer(BasicTrainer):
         img_idx = list(range(total_item))
         # init sample, just keep potential_keys
         init_idx = img_idx[0]
-        for key in potential_keys:
+        for key in POTENTIAL_KEYS:
             if key in all_item[init_idx]:
                 concat_data[key] = all_item[init_idx][key]
         # cat other sample tensors
         for idx in img_idx[1:]:
-            for key in potential_keys:
+            for key in POTENTIAL_KEYS:
                 if key in all_item[idx]:
                     concat_data[key] = torch.cat([concat_data[key], all_item[idx][key]], dim=0)
 
@@ -465,20 +463,31 @@ class ArcNerfTrainer(BasicTrainer):
                 count += batch_size
                 loss = self.calculate_loss(inputs, output)
                 loss_summary(loss, batch_size)
+
+                # psnr
+                val_metric = None
+                if self.train_metric is not None:
+                    val_metric = float(self.train_metric['metric'](inputs, output))
+
                 break  # only one batch per val epoch
 
-        if count == 0:
-            self.logger.add_log('Not batch was sent to valid...')
-            self.model.train()
-            return
+            if count == 0:
+                self.logger.add_log('Not batch was sent to valid...')
+                self.model.train()
+                return
 
-        # get epoch average
-        loss_summary.cal_average()
+            # get epoch average
+            loss_summary.cal_average()
 
-        if loss_summary.get_avg_summary() is not None:
-            self.monitor.add_loss(loss_summary.get_avg_summary(), global_step, mode='val')
-            loss_msg = 'Validation Avg Loss --> Sum [{:.3f}]'.format(loss_summary.get_avg_sum())
-            self.logger.add_log(loss_msg)
+            if loss_summary.get_avg_summary() is not None:
+                self.monitor.add_loss(loss_summary.get_avg_summary(), global_step, mode='val')
+                val_msg = 'Validation Avg Loss --> Sum [{:.3f}]'.format(loss_summary.get_avg_sum())
+
+                if val_metric is not None:
+                    self.monitor.add_scalar(self.train_metric['name'], val_metric, global_step, mode='val')
+                    val_msg += ' | {} --> [{:.3f}] '.format(self.train_metric['name'], val_metric)
+
+                self.logger.add_log(val_msg)
 
         # release gpu memory
         if self.device == 'gpu':
@@ -586,7 +595,7 @@ class ArcNerfTrainer(BasicTrainer):
         # shuffle again only after cropping mode, or full rays been sampled
         full_mode = self.train_sample_info['sample_mode'] == 'full'
         full_run_up = self.train_sample_info['sample_total_count'] >= self.train_sample_info['total_samples']
-        full_shuffle = (full_mode and full_run_up)
+        full_shuffle = full_mode and full_run_up
         crop_shuffle = self.crop_max_epoch is not None and epoch >= self.crop_max_epoch
         if crop_shuffle or full_shuffle:
             self.process_train_data()

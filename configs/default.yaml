@@ -81,7 +81,9 @@ dataset:
     train:
         type: Capture
         scene_name: qqtiger
-        img_scale: 1.0               # scale image and intrinsic, < 1 means scale_down
+        img_scale: 0.25              # scale image and intrinsic, < 1 means scale_down
+        center_by_view_dirs: False   # Whether to center the poses first by view dirs center. Useful when the obj is not in center
+        skip: 10                     # skip training samples
         scale_radius: 3.0            # norm the camera within a sphere with such radius(actual radius litter smaller)
         pc_radius: 2.0               # only keep point cloud in a fix radius ball, scale after cam norm
         align_cam: False             # whether to use avg pose to adjust cam rotation. Only for cam that are not horizontally distributed.
@@ -101,9 +103,10 @@ dataset:
     val:
         type: Capture
         scene_name: qqtiger
-        img_scale: 0.5
+        img_scale: 0.125
         scale_radius: 3.0
         pc_radius: 2.0
+        skip: 10
         align_cam: False
         precache: False
 
@@ -112,10 +115,11 @@ dataset:
         eval_max_sample: 3
         type: Capture
         scene_name: qqtiger
-        img_scale: 1.0
+        img_scale: 0.25
         scale_radius: 3.0
-        align_cam: False
         pc_radius: 2.0
+        skip: 10
+        align_cam: False
         precache: True
 
 inference:

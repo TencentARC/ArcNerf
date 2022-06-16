@@ -38,7 +38,7 @@ class Capture(Base3dPCDataset):
         self.point_cloud = self.get_sparse_point_cloud()
 
         # roughly center the cameras by common view point
-        self.center_cam_poses_by_view_dir()
+        self.center_cam_poses_by_view_dirs()
         # norm camera_pose to restrict pc range
         self.norm_cam_pose()
         # filter point outside sphere

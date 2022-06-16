@@ -154,8 +154,20 @@ class TestDict(unittest.TestCase):
         c2w = np.concatenate([self.c2w, avg_pose], axis=0)  # (n+1, 4, 4)
         cam_colors = get_combine_colors(['red', 'maroon'], [self.n_cam, 1])  # (n+1, 3)
         cam_loc = np.concatenate([self.c2w[:, :3, 3], avg_pose[:, :3, 3]])  # (n+1, 3)
-        rays_d = normalize(np.array(origin)[None, :] - cam_loc)  # (n+1, 3)
+
+        # rays_d is central ray from each camera
+        rays_d = []
+        center_index = np.array([[int(self.W / 2.0), int(self.H / 2.0)]])  # (1, 2)
+        for i in range(self.c2w.shape[0]):
+            ray_bundle = np_wrapper(get_rays, self.W, self.H, self.intrinsic, self.c2w[i], True, center_index)
+            rays_d.append(ray_bundle[1])  # (1, 3)
+        rays_d = np.concatenate(rays_d, axis=0)
+        avg_rays_d = normalize(np.array(origin)[None, :] - avg_pose[:, :3, 3])  # (1, 3)
+        rays_d = np.concatenate([rays_d, avg_rays_d], axis=0)  # (n+1, 3)
         rays_colors = get_combine_colors(['blue', 'navy'], [self.n_cam, 1])  # (n+1, 3)
+
+        # max z as far
+        z = np.linalg.norm(c2w[:, :3, 3], axis=-1).max()
 
         file_path = osp.join(self.spec_result_dir, '{}_vis_camera.png'.format(self.dataset_type))
         draw_3d_components(
@@ -163,7 +175,7 @@ class TestDict(unittest.TestCase):
             intrinsic=self.intrinsic,
             cam_colors=cam_colors,
             points=np.array(origin)[None, :],
-            rays=(cam_loc, rays_d),
+            rays=(cam_loc, rays_d * z),
             ray_colors=rays_colors,
             sphere_radius=self.radius,
             sphere_origin=origin,

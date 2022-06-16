@@ -8,11 +8,13 @@ from common.utils.cfgs_utils import obj_to_dict
 from common.utils.file_utils import scan_dir
 from common.utils.registry import DATASET_REGISTRY
 
-__all__ = ['get_dataset', 'get_model_feed_in']
+__all__ = ['get_dataset', 'get_model_feed_in', 'POTENTIAL_KEYS']
 
 datasets_folder = osp.dirname(osp.abspath(__file__))
 datasets_filenames = [osp.splitext(osp.basename(v))[0] for v in scan_dir(datasets_folder) if v.endswith('_dataset.py')]
 _dataset_modules = [importlib.import_module(f'arcnerf.datasets.{file_name}') for file_name in datasets_filenames]
+
+POTENTIAL_KEYS = ['img', 'mask', 'rays_o', 'rays_d', 'bounds']
 
 
 def get_mode_cfgs(cfgs, mode='train'):
@@ -44,9 +46,8 @@ def get_model_feed_in(inputs, device):
     """Get the core model feed in and put it to the model's device
     device is only 'cpu' or 'gpu'
     """
-    potential_keys = ['img', 'mask', 'rays_o', 'rays_d', 'bounds']
     feed_in = {}
-    for key in potential_keys:
+    for key in POTENTIAL_KEYS:
         if key in inputs:
             feed_in[key] = inputs[key]
             if device == 'gpu':

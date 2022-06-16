@@ -15,3 +15,7 @@ Add `scheduler` in `data.train` for specification.
     - 'full' mode takes all the rays for training. It will shuffle every time all rays have been processed
     - 'random': random sample rays in batch randomly with replacement. Some rays may not be sampled in this mode.
   - cross_view: used in both mode. If True, each sample takes rays from different image. Else on in one image.
+
+
+## Common_Trainer
+The details of how to use the trainer please ref to `docs/common_trainer.md`.

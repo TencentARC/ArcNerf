@@ -20,9 +20,10 @@ dataset:
         eval_max_sample: 1
         type: Capture
         scene_name: qqtiger
-        img_scale: 1.0
+        img_scale: 0.25
         scale_radius: 3.0
         pc_radius: 2.0
+        skip: 10
         align_cam: False
         precache: False
 

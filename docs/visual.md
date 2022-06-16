@@ -1,5 +1,5 @@
 # plot3d
-We provide a `draw_3d_components` that is helpful to plot camera/points/rays/lines/sphere
+We provide a `draw_3d_components` that is helpful to plot camera/points/rays/lines/sphere/meshes/volume
 with customized color in all.
 
 For all point, it should be in world space, or transformed to world space.
@@ -66,5 +66,5 @@ regroup each face to 2 triangles for visual
 In `common.visual`, we provide a `draw_2d_components` that is
 helpful to plot points/lines in defined colors with legends. We use `matplotlib` as backend.
 
-# TODO:
-- Write a python notebook showing how to use
+# Notebook:
+- We provide the python notebook in `notebooks/draw_3d_examples.ipynb` to use the render.

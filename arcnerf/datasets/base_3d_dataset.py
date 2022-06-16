@@ -98,7 +98,7 @@ class Base3dDataset(BaseDataset):
 
     @staticmethod
     def read_image_list(img_list):
-        """Read image from list."""
+        """Read image from list, all image should be in `rgb` order"""
         images = [read_img(path, norm_by_255=True) for path in img_list]
 
         return images
@@ -153,27 +153,28 @@ class Base3dDataset(BaseDataset):
 
         return max_cam_norm_t
 
-    def center_cam_poses_by_view_dir(self):
+    def center_cam_poses_by_view_dirs(self):
         """Recenter camera pose by setting the common view point center at (0,0,0)
         The common view point is the closest point to all rays.
         """
         view_point_mean = None
-        assert len(self.cameras) > 0, 'Not camera in dataset, do not use this func'
-        c2ws = self.get_poses(torch_tensor=False, concat=True)
-        # use ray from image center to represent cam view dir
-        center_idx = np.array([[int(self.W / 2.0), int(self.H / 2.0)]])
-        rays_o = []
-        rays_d = []
-        for idx in range(len(self.cameras)):
-            ray = self.cameras[idx].get_rays(index=center_idx, to_np=True)
-            rays_o.append(ray[0])
-            rays_d.append(ray[1])
-        rays = (np.concatenate(rays_o, axis=0), np.concatenate(rays_d, axis=0))
-        # calculate mean view point
-        view_point_mean, _, _ = np_wrapper(closest_point_to_rays, rays[0], rays[1])  # (1, 3)
-        center_c2w = center_poses(c2ws, view_point_mean[0])
-        for idx in range(len(self.cameras)):
-            self.cameras[idx].reset_pose(center_c2w[idx])
+        if get_value_from_cfgs_field(self.cfgs, 'center_by_view_dirs', False):
+            assert len(self.cameras) > 0, 'Not camera in dataset, do not use this func'
+            c2ws = self.get_poses(torch_tensor=False, concat=True)
+            # use ray from image center to represent cam view dir
+            center_idx = np.array([[int(self.W / 2.0), int(self.H / 2.0)]])
+            rays_o = []
+            rays_d = []
+            for idx in range(len(self.cameras)):
+                ray = self.cameras[idx].get_rays(index=center_idx, to_np=True)
+                rays_o.append(ray[0])
+                rays_d.append(ray[1])
+            rays = (np.concatenate(rays_o, axis=0), np.concatenate(rays_d, axis=0))
+            # calculate mean view point
+            view_point_mean, _, _ = np_wrapper(closest_point_to_rays, rays[0], rays[1])  # (1, 3)
+            center_c2w = center_poses(c2ws, view_point_mean[0])
+            for idx in range(len(self.cameras)):
+                self.cameras[idx].reset_pose(center_c2w[idx])
 
         return view_point_mean
 

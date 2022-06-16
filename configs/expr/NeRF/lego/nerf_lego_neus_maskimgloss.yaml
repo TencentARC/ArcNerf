@@ -1,4 +1,4 @@
-name: capture_joycon_neus_nerfpprgb
+name: nerf_lego_neus_maskimgloss
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_joycon_neus_nerfpprgb'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_neus_maskimgloss'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_joycon_neus_nerfpprgb/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_neus_maskimgloss/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -25,7 +25,7 @@ dist:
     slurm: False
 
 batch_size: 2
-n_rays: 512     # follow original repo
+n_rays: 512
 worker: 4
 
 optim:
@@ -48,9 +48,9 @@ progress:
 
     epoch_loss: 100
     iter_loss: 1
-    save_progress: True
+    save_progress: False
     epoch_save_progress: 50000
-    iter_save_progress: 1
+    iter_save_progress: 5
 
     epoch_val: 50000
     save_progress_val: True
@@ -61,50 +61,41 @@ progress:
 
     init_eval: False
     epoch_eval: 100000
-    max_samples_eval: 3
+    max_samples_eval: 25
 
 dataset:
     train:
-        type: Capture
-        scene_name: joycon
-        img_scale: 0.25
+        type: NeRF
+        scene_name: lego
+        img_scale: 1.0
         scale_radius: 3.0
-        pc_radius: 1.0
-        skip: 8
-        center_by_view_dirs: True
         precache: True
 
     val:
-        type: Capture
-        scene_name: joycon
-        img_scale: 0.125
-        scale_radius: 3.0
-        pc_radius: 1.0
         skip: 8
-        center_by_view_dirs: True
+        type: NeRF
+        scene_name: lego
+        img_scale: 0.5
+        scale_radius: 3.0
         precache: False
 
     eval:
         eval_batch_size: 1
-        eval_max_sample: 3
-        type: Capture
-        scene_name: joycon
-        img_scale: 0.25
-        scale_radius: 3.0
-        pc_radius: 1.0
         skip: 8
-        center_by_view_dirs: True
+        type: NeRF
+        scene_name: lego
+        img_scale: 1.0
+        scale_radius: 3.0
         precache: True
 
 inference:
     render:
-        type: [swing]
-        n_cam: [20]
-        repeat: [3]
+        type: [spiral]
+        n_cam: [60]
+        repeat: [1]
         radius: 3.0
-        u_range: [0.7, 0.9]
-        v_range: [-0.12, -0.12]
-        n_rot: 1
+        u_start: 0.5
+        v_range: [-0.6, -0.2]
         fps: 5
         surface_render:
             chunk_rays_factor: 1024
@@ -112,7 +103,7 @@ inference:
 
     volume:
         n_grid: 512
-        side: 1.5
+        side: 2.0
         level: 0.0
         grad_dir: ascent
         chunk_pts_factor: 1
@@ -122,9 +113,9 @@ inference:
 model:
     type: Neus
     rays:
-        bounding_radius: 3.0
-        near: 1.0
-        # far: 4.5
+        #bounding_radius: 3.0
+        near: 1.5
+        far: 4.5
         n_sample: 64
         n_importance: 64
         n_iter: 4
@@ -132,7 +123,7 @@ model:
         perturb: True
         add_inf_z: False
         noise_std: 1.0
-        white_bkg: False
+        white_bkg: True
     params:
         speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
         init_var: 0.05                # init var, when it approaches 0, cdf more close
@@ -147,11 +138,11 @@ model:
         embed_freq: 6
         W_feat: 256
         geometric_init: True          # use geometric init. need radius_init
-        radius_init: 0.5             # geometric init sphere radius
+        radius_init: 0.5              # geometric init sphere radius
         weight_norm: True
         skip_reduce_output: True
         norm_skip: True
-        act_cfg:                      # activation function for dense layer
+        act_cfg: # activation function for dense layer
             type: softplus
             beta: 100
     radiance:
@@ -164,41 +155,21 @@ model:
         embed_freq_view: 4
         W_feat_in: 256
         weight_norm: True
-    background:
-        type: NeRFPP
-        bkg_blend: 'rgb'
-        rays:
-            bounding_radius: 3.0
-            n_sample: 32
-            perturb: True
-            add_inf_z: True         # must set to be True
-            noise_std: 1.0
-            white_bkg: False
-        chunk_rays: 4096
-        chunk_pts: 131072
-        geometry:
-            W: 256
-            D: 8
-            skips: [4]
-            input_ch: 4     # (xyz/r, 1/r)
-            embed_freq: 10
-            W_feat: 256
-            geometric_init: False
-        radiance:
-            mode: 'vf'
-            W: 128
-            D: 1
-            input_ch_view: 3
-            embed_freq_view: 4
-            W_feat_in: 256
 
 loss:
     ImgLoss:
         loss_type: L1
+        use_mask: True
+        weight: 1.0
+    MaskLoss:
+        loss_type: BCE
         weight: 1.0
     EikonalLoss:
         key: normal_pts
         weight: 0.1
 
 metric:
+    PSNR:
+
+train_metric:
     PSNR:
