@@ -74,7 +74,7 @@ class Neus(SdfModel):
         mid_pts = get_ray_points_by_zvals(rays_o, rays_d, mid_zvals)  # (B, N_total-1, 3)
         mid_pts = mid_pts.view(-1, 3)  # (B*N_total-1, 3)
 
-        # get sdf, rgb and normal, expand rays_d to all pts. shape in (B*N_total, ...)
+        # get sdf, rgb and normal, expand rays_d to all pts. shape in (B*N_total-1, ...)
         rays_d_repeat = torch.repeat_interleave(rays_d, int(mid_pts.shape[0] / n_rays), dim=0)
         sdf, radiance, normal_pts = chunk_processing(
             self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, mid_pts, rays_d_repeat
@@ -143,9 +143,9 @@ class Neus(SdfModel):
 
             zeros_pad = torch.zeros([n_rays, 1], dtype=dtype).to(device)
             prev_slope = torch.cat([zeros_pad, slope[:, :-1]], dim=-1)  # (B, N_pts-1)
-            slope = torch.cat([prev_slope, slope], dim=-1)  # (B, 2*N_pts-2)
-            slope, _ = torch.min(slope, dim=-1, keepdim=True)
-            slope = slope.clamp(-10.0, 0.0)  # (B, )
+            slope = torch.stack([prev_slope, slope], dim=-1)  # (B, N_pts-1, 2)
+            slope, _ = torch.min(slope, dim=-1, keepdim=False)  # (B, N_pts-1)
+            slope = slope.clamp(-10.0, 0.0)  # (B, N_pts-1)
 
             # upsample by alpha from cdf. eq.13 of paper.
             alpha = sdf_to_alpha(mid_sdf, zvals, slope, s * (2**(i + 1)))  # (s * 2^i for i=1,2,3)
@@ -187,7 +187,7 @@ def sdf_to_alpha(mid_sdf: torch.Tensor, zvals: torch.Tensor, mid_slope: torch.Te
     Args:
         mid_sdf: tensor (B, N_pts-1) of mid pts
         zvals: tensor (B, N_pts)
-        mid_slope: tensor (B, N_pts-1)/(B, ) of mid pts
+        mid_slope: tensor (B, N_pts-1) of mid pts
         s: scale factor
 
     Returns:
