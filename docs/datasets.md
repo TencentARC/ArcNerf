@@ -100,7 +100,10 @@ For fair comparsion, test/val images have not overlapping with train images.
 - scene_name: scene_name that is the folder name under `LLFF`. Use it to be identifier.
 - NDC: We support NDC Space conversion if you set `ndc_space=True` in dataset.
   - In the original implementation, even they use `ndc_space` rays for sampling, the view_dirs sent to radianceNet is
-still in non-ndc space. We don't follow it here but only used `ndc rays_d` as view_dirs.
+still in non-ndc space. We don't follow it here but only used `ndc rays_d` as view_dirs. But notice that this affects
+the performance, use `non-ndc rays_d` gets better result.
+
+Ref: https://github.com/Fyusion/LLFF & https://github.com/bmild/nerf
 
 ### NeRF
 Specified by scene_name, read image/camera. Since NeRF split the dataset into train/val/eval, we
@@ -110,16 +113,22 @@ transformation of camera(like norm_pose) consistent over all split.
 - poses: for the poses, we do transform so that it matches the coord system in our proj.
 - images: The image are in `RGBA` channels, needs to blend rgb by alpha.
 
+Ref: https://github.com/bmild/nerf
+
 ### DTU
 Good for object reconstruction. Specified by scan_id, read image/mask/camera.
 - scan_id: int num for item selection. Use it to be identifier.
 - eval_max_sample: Select the closest samples for eval. It has overlapping with training view.
+
+Ref: https://github.com/lioryariv/idr/blob/main/code/datasets/scene_dataset.py
 
 ### BlendedMVS
 Good for object reconstruction. Specified by scene_name, read image/camera.
 - scene_name: scene_name that is the folder name under `BlendedMVS`. Use it to be identifier.
 - eval_max_sample: Select the closest samples for eval. It has overlapping with training view.
 - In some case it uses `align_cam` and `exchange_coord` for changing the coordinate into a standard one.
+
+Ref: https://github.com/YoYo000/BlendedMVS & https://lioryariv.github.io/volsdf/
 
 
 # Train/Val/Eval/Inference
@@ -153,7 +162,31 @@ For some standard benchmark(`NeRF`/`LLFF`), we follow the same split as they use
 
 
 ## inference
-Inference will be performed based on eval dataset params(intrinsic, img shape).
+Inference will be performed based on eval dataset params(intrinsic, img shape). If you do not set
+the eval dataset, inference will not be performed.
 
-- render: controls the params of render novel view, like the camera path
-- volume: controls the params of volume estimation and mesh extraction/rendering.
+### Render
+Controls the params of render novel view(volume rendering), like the camera path. Check `geometry/poses.py` for detail.
+  - type: list render cam move type. Support `circle`/`spiral`/`regular`/`swing`.
+  - n_cam: list of cam for each type
+  - repeat: list of repeat num for each type. In case you don't want to render repeatedly(in `swing`/`circle`).
+  - radius: radius of cam path, single value
+  - u_start/u_range/v_ratio/v_range/normal/n_rot/reverse: for placing the cameras. Chech `poses` for details.
+  - fps: render video fps.
+
+#### surface_render
+If you set this, also render the view by finding the surface pts and render. Good for sdf models like Neus and volsdf.
+- chunk_rays_factor: In surface_render mode, you can progress more rays in a batch, set a factor to allow large rays batch.
+- method: method to find the surface pts. Support `sphere_tracing`(sdf)/and `secant_root_finding`(any).
+- n_step/n_iter/threshold: params to find root. Check the `geometry/rays.py` for detail.
+- level/grad_dir: Determine the value flow. SDF is 0.0/ascent(inside smaller), density is +level/descent(inside larger).
+
+### Volume
+Controls the params of volume estimation and mesh extraction/rendering.
+
+We support extract the mesh from volume field and getting the colors of mesh/verts by normal direction.
+
+- origin/n_grid/side/xlen/ylen: params for volume position and size. Check `geometry/volume.py` for detail.
+- level/grad_dir: Determine the value flow. SDF is 0.0/ascent(inside smaller), density is +level/descent(inside larger).
+- chunk_pts_factor: In extract_mesh mode, you can progress more pts in a batch, set a factor to allow large pts batch.
+- render_mesh: For rasterization of mesh only. You can use `pytorch3d` or `open3d` as backend.

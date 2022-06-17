@@ -219,7 +219,7 @@ def mean_tensor_by_mask(tensor: torch.Tensor, mask: torch.Tensor, keep_batch=Fal
 
     tensor_mask = tensor * mask
     tensor_mask_sum = torch.sum(tensor_mask, dim=reduce_dim)  # (B, )
-    mask_sum = torch.sum(mask, dim=reduce_dim)  # (B, )
+    mask_sum = torch.sum(mask, dim=reduce_dim) + 1e-5  # (B, )  in case 0
     tensor_mean = tensor_mask_sum / mask_sum  # (B, )
 
     if not keep_batch:

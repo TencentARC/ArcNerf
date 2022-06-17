@@ -68,14 +68,14 @@ dataset:
         type: LLFF
         scene_name: fern
         img_scale: 0.125
-        ndc_space: True
+        ndc_space: False   # do not use ndc in arcnerf
         precache: True
 
     val:
         type: LLFF
         scene_name: fern
         img_scale: 0.125
-        ndc_space: True
+        ndc_space: False  # do not use ndc in arcnerf
         precache: False
 
     eval:
@@ -83,7 +83,7 @@ dataset:
         type: LLFF
         scene_name: fern
         img_scale: 0.125
-        ndc_space: True
+        ndc_space: False  # do not use ndc in arcnerf
         precache: True
 
 model:

@@ -193,8 +193,8 @@ def get_near_far_from_rays(
         near = torch.ones(size=(n_rays, 1), dtype=dtype).to(device) * near_hardcode  # (N_rays, 1)
         far = torch.ones(size=(n_rays, 1), dtype=dtype).to(device) * far_hardcode  # (N_rays, 1)
 
-    # in case near > far, cast far as near
-    far[far < near] = near[far < near]
+    # in case near >= far, cast far as near + 1e-5
+    far[far <= near] = near[far <= near] + 1e-5
 
     return near, far
 
