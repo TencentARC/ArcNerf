@@ -7,6 +7,7 @@ A Perspective Camera with `intrinsic(3x3)` and `c2w(4x4)` with get/set function.
 - proj_world_to_cam: project points in world space to cam space.
 - Allow you to set/get the `intrinsic/c2w/w2c` matrix easily.
 
+------------------------------------------------------------------------
 # ray_helper
 Ray function in rendering, or helper function for sampling. Other geometric function are in `geometry.ray`.
 - get_rays: core get_ray function, lift pixel to world space and get rays_d(norm). TAKE CARE ABOUT THE FLATTEN ORDER!
@@ -18,6 +19,7 @@ Ray function in rendering, or helper function for sampling. Other geometric func
 - ray_marching: ray marching function and get color, will output intermediate result for debug.
 - sample_ray_marching_output_by_index: sample ray marching intermediate result for 2d visual
 
+------------------------------------------------------------------------
 # render
 Several renderers have been provided for rendered mesh/color mesh.
 ## open3d

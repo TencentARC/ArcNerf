@@ -1,6 +1,6 @@
 # ArcNerf
 
-
+------------------------------------------------------------------------
 # TODO:
 - cuda实现的geometry函数和数据结构
 - tetrahedra相关
@@ -29,15 +29,51 @@
 - thinking:
   - progressive training with sampling on errorous rays?
 
-# Ref
-- https://github.com/kwea123/nerf_pl
-- https://github.com/yenchenlin/nerf-pytorch
-- https://github.com/ventusff/neurecon
-- https://github.com/Kai-46/nerfplusplus
-- https://github.com/Totoro97/NeuS
-- https://github.com/lioryariv/volsdf
-- https://github.com/yashbhalgat/HashNeRF-pytorch
+------------------------------------------------------------------------
+# Installation
 
-# dataset
-- nerf/LLFF: https://drive.google.com/drive/folders/128yBriW1IG_3NJ5Rp7APSTZsJqdJdfc1
-- DTU/BlenderMVS: https://www.dropbox.com/sh/oum8dyo19jqdkwu/AAAxpIifYjjotz_fIRBj1Fyla
+## Colmap
+
+------------------------------------------------------------------------
+# Usage
+
+------------------------------------------------------------------------
+# What is special in this project?
+
+------------------------------------------------------------------------
+## Datasets and Benchmarks
+
+### Self-Capture data and Colmap
+
+------------------------------------------------------------------------
+## Models
+
+
+### full_model
+
+
+### Base_3d_model
+
+------------------------------------------------------------------------
+## Geometry
+
+------------------------------------------------------------------------
+## Visualization
+
+------------------------------------------------------------------------
+## Code and Tests
+Sufficient docs, detail shape of each tensor
+
+------------------------------------------------------------------------
+## Trainer
+
+
+
+------------------------------------------------------------------------
+# Citation
+Please see [Citation](docs/citation.md) for citations.
+
+If you find this project useful, please consider to cite:
+```
+TODO:
+```

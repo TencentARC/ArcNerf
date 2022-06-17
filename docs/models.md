@@ -11,6 +11,7 @@ Embed inputs like xyz/view_dir into higher dimension using periodic funcs(sin, c
 - DenseLayer: Linear with custom activation function.
 - SirenLayer: Linear with sin() activation and respective initialization.
 
+------------------------------------------------------------------------
 ## BaseGeoNet/BaseRadianceNetwork
 This models serve as the basic block for modeling obj geometry and radiance. It can be pure linear networks, pure volume,
 mix of volume and network, sparse octree, multi-res volume with hashing, tensorRF etc. All the blocks can be select from
@@ -26,6 +27,7 @@ siren layer will use pretrain, dense layer will use weight/bias init(But like an
 #### RadianceNet
 Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
 
+
 ### Dense Volume Model
 Explicit volume for mapping xyz -> sigma/sdf/rgb, etc, using voxel interpolation. Pure volume or mix of volume/network.
 Specify the type as `VolGeoNet/VolRadianceNet`. We support dense volume with pruning in torch implementation.
@@ -34,11 +36,12 @@ Volume with value/feature on grid, network is optional to used. For details, ref
 - geometric_init: If True, init the geonet such that represent a sdf of sphere with radius_init(inner sdf < 0).
 - W_feat_vol: If this > 0, the model interpolate feature from grid_pts. With a dense implementation, it could be slow.
 Try to not use W_feat_vol(use network with xyz input, or directly use pure volume).
-#### RadianceNet
+#### VolRadianceNet
 Volume with value/feature on grid, network is optional to used. For details, ref to the implementation.
-## use_nn
+#### use_nn
 Set this to make linear layers after volume grid output. But it could increase the time used.
 
+------------------------------------------------------------------------
 # chunk_size
 ## chunk_rays
 The model is hard to process `batch_size * n_rays_per_sample * n_pts_per_ray` in a single
@@ -67,7 +70,12 @@ You just need to keep the tensors in cpu and set `gpu_on_func` and it will bring
 Generally we don't use this mode but put everything on GPU together. You need to carefully specify the chunk size
 when input size is huge(like 512^3).
 
-# Rays
+------------------------------------------------------------------------
+# Model Configs
+To see the model configs, you can go to `configs/models`. They are also used in unittest to check the correctness and give
+information.
+
+## Rays
 The dataset only provides `rays_o` and `rays_d`, but the actual sampling procedure is in model. Dataset may provide
 `bounds` for sampling guidance, which is generally coming from point_cloud in cam space.
 - near: Hard reset the near zvals for all rays
@@ -89,6 +97,7 @@ For ray marching(color blending):
 - noise_std: if >0.0, add to sigma when ray marching. good for training.
 - white_bkg: If True, will make the rays with mask = 0 as rgb = 1.0
 
+------------------------------------------------------------------------
 # background
 There are four ways to handle background
 - (1) Set a far zvals in rays for sampling. It will combine obj+background together for rendering.
@@ -103,6 +112,7 @@ For color. `ImgLoss` and be applied on the combined image. `MaskLoss` and `MaskI
 
 The first three methods do not require a separate model, but the final one does.
 
+------------------------------------------------------------------------
 # Models
 Below are the models we support.
 - inference_only: Use in eval/infer mode. If True, only keep 'rgb/depth/mask',
@@ -125,13 +135,15 @@ Method two merge bkg_model with fg_mdeol.
   - In this mode `add_inf_z` in `background.rays` must be False to get correct zvals to merge.
   `add_inf_z` in `model.rays` is suggested be True to avoid merge inf zvals for color computation.
 
-## Base_3d_Model
+------------------------------------------------------------------------
+# Base_3d_Model
 Base_3d_Model is the class for all fg_model and bkg_model. bkg_model is able to used as fg_model
 if you actually need it. It generally contains geo_net and radiance_net for geometry/rgb reconstrunction.
 
+------------------------------------------------------------------------
 ## fg_model
 Here are the class of fg_model, which concentrates on building the foreground object part.
-### Nerf
+### NeRF
 Nerf model with single forward(NeRF), and hierarchical sampling(NeRFFull).
 
 It is combination of GeoNet and RadianceNet, with ray sampling, resample pdf, ray marching, etc.
@@ -158,8 +170,7 @@ Since it gets sdf value instead of sigma, we do not support sigma mode for blend
 ### VolSDF
 VolSDF models sdf as well but used different sdf_to_density function and sampling method compared with NeuS.
 
-
-
+------------------------------------------------------------------------
 ## bkg_model
 Here are the class of bkg_model, which concentrates on building the background.
 The model is also able to model foreground together if you set the parameters well.

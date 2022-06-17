@@ -14,7 +14,7 @@ Required input/output:
   - 'rgb/rgb_coarse/rgb_fine': one or several rgb values by keys. `(B, N_rays, 3)`
   - 'mask': if use_mask. `(B, N_rays)`
 
-
+------------------------------------------------------------------------
 # mask_loss
 Loss for comparing mask. Used for view systhesis and object area prediction.
 ## MaskLoss
@@ -30,7 +30,7 @@ Required input/output:
 - Output:
   - 'mask/mask_coarse/mask_fine': one or several mask values by keys. `(B, N_rays)`
 
-
+------------------------------------------------------------------------
 # geo_loss
 Loss for geometric regularization
 ## EikonalLoss

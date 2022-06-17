@@ -9,6 +9,11 @@ Based on `base_3d_dataset`, it provides functions mainly on point cloud adjustme
 Points are in world coordinate.
 - point_cloud: a dict with 'pts'/'color'/'vis'. Last two are optional.
 
+------------------------------------------------------------------------
+# Samples
+For some dataset sample, please see `configs/datasets` for samples. They can be used in unittest for visualization.
+
+------------------------------------------------------------------------
 # Some configs in data processing:
 - img_scale: Resize image by this scale. `>1` means larger image.
 Will change intrinsic for actual re-projection as well, but not change extrinsic.
@@ -50,9 +55,11 @@ further than corner ones. It makes the sampling in roughly a sphere, when the ca
 If you want all the rays extended the same z-distance, you should not normalize the rays, this may be good for the case
 of large scene but not object.
 
-
+------------------------------------------------------------------------
 # Dataset Class
 Below are supported dataset class.
+
+------------------------------------------------------------------------
 ## Capture
 This class provides dataset from your capture data.
 You need to run colmap to extract corresponding poses and train.
@@ -91,8 +98,10 @@ We test and show that the method is robust to make the coordinate system such th
 cam is on surface with `scale_radius`. Only scale and translation is applied, do not affect the intrinsic.
 
 
-
+------------------------------------------------------------------------
 ## Standard benchmarks
+
+
 ### LLFF
 This is a forward facing dataset. Not object extraction is performed. Only used to view synthesis.
 For fair comparsion, test/val images have not overlapping with train images.
@@ -130,7 +139,13 @@ Good for object reconstruction. Specified by scene_name, read image/camera.
 
 Ref: https://github.com/YoYo000/BlendedMVS & https://lioryariv.github.io/volsdf/
 
+### Download address
 
+- NeRF/LLFF: https://drive.google.com/drive/folders/128yBriW1IG_3NJ5Rp7APSTZsJqdJdfc1
+- DTU/BlenderMVS: https://www.dropbox.com/sh/oum8dyo19jqdkwu/AAAxpIifYjjotz_fIRBj1Fyla
+
+
+------------------------------------------------------------------------
 # Train/Val/Eval/Inference
 
 ## Train
@@ -149,7 +164,7 @@ Use all images for validation, downsampled by 2/4 depends on shape.
 Each valid epoch just input one image for rendering, so the batch_size for val is cast to be 1.
 
 
-## eval
+## Eval
 Use several closest camera(to avg_cam) for metric evaluation,
 
 use same resolution(Or scale if image really too large), and use custom cam paths for rendering video
@@ -160,8 +175,8 @@ only those will be fully rendered can calculate metric.
 
 For some standard benchmark(`NeRF`/`LLFF`), we follow the same split as they used for common comparsion.
 
-
-## inference
+------------------------------------------------------------------------
+## Inference
 Inference will be performed based on eval dataset params(intrinsic, img shape). If you do not set
 the eval dataset, inference will not be performed.
 
@@ -174,7 +189,7 @@ Controls the params of render novel view(volume rendering), like the camera path
   - u_start/u_range/v_ratio/v_range/normal/n_rot/reverse: for placing the cameras. Chech `poses` for details.
   - fps: render video fps.
 
-#### surface_render
+#### Surface_render
 If you set this, also render the view by finding the surface pts and render. Good for sdf models like Neus and volsdf.
 - chunk_rays_factor: In surface_render mode, you can progress more rays in a batch, set a factor to allow large rays batch.
 - method: method to find the surface pts. Support `sphere_tracing`(sdf)/and `secant_root_finding`(any).

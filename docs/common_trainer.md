@@ -1,6 +1,7 @@
 # A pytorch template for deep learning project
 An easy to use template for pytorch dl projects.
 
+------------------------------------------------------------------------
 ## Start a new proj
 - Use `python start_new_proj.py --proj_name xx --proj_loc /path/to/proj_parent_dir` to extent to a new project.
 What you need to implement are the data, model, loss, metric, progress_img_saver.
@@ -8,14 +9,17 @@ All other func for training and evaluation have been provided.
 - When you start a new proj with proj_name, the custom lib will be renamed by your proj_name. Recommend to use
 Camel-Case like (ProjName).
 
+------------------------------------------------------------------------
 ## Installation
 - Install required lib by `pip install -r requirements`. Major lib are: torch, numpy, loguru, tensorboard, pyyaml
 - `pre-commit install` to install pre-commit for formatting. `pre-commit run --all-files` for checking all files.
 
+------------------------------------------------------------------------
 ## Main Function
 Use `python train.py --config configs/default.yaml` to start training.
 All params should be referred to `configs/default.yaml`
 
+------------------------------------------------------------------------
 ## CPU training
 - Setting `--gpu_ids -1` will only use cpu, good for debugging. Refer `scripts/cpu.sh` for more detail.
 
@@ -27,15 +31,18 @@ Single/Multi-gpu with local machine and distributed machines are allowed.
 
 `@master_only` in all functions allows only the `rank=0` node performing func.
 
+------------------------------------------------------------------------
 ## Config
 - Use yaml to save configs. Mainly saved at `configs/`. If you want to set or update
 by argument, you can directly add `--arg value` during input.
 
 - All arguments in yaml are in levels, and input arguments should be `--level1.level2...`
 
+------------------------------------------------------------------------
 ## Logging
 - We use `loguru` to save and show the log. Only `rank=0` process shows the log. You can `add_log` and set msg_level
 
+------------------------------------------------------------------------
 ## Resume training
 - You can set `--resume` as the checkpoint_path, or the checkpoint folder which will load the `lastest.pt.tar`.
 But this only reads the model, you have to set `--configs xxx` as the configs in the existing exper folder.
@@ -45,11 +52,13 @@ But this only reads the model, you have to set `--configs xxx` as the configs in
 - If `progress.start_epoch` is `0`, it will load the weight and finetune from epoch 0. You should set
 a different expr name like `xxx_finetune` for separation.
 
+------------------------------------------------------------------------
 ## Reproduce an old experiment
 - All updated configs will be saved in the experiment. You just need to run `job.sh` in the exp to reproduce result.
 
 - The script is for starting cpu training. You need to modify the `job.sh` to use gpu.
 
+------------------------------------------------------------------------
 ## Model
 - You can add your model at `custom.models` with `xxx_model.py`.
 
@@ -57,6 +66,7 @@ a different expr name like `xxx_finetune` for separation.
 
 - Some backbones/compents are provided in `common.models`.
 
+------------------------------------------------------------------------
 ## Dataset
 - `dir.data_dir` in config is the main data_dir for all dataset. Should not specify it for any single dataset.
 You should modify you `custom.xx_dataset.py` to make the address specified for you dataset.
@@ -82,6 +92,7 @@ Missing val/eval will not do validation and eval during training.
 
 - Some basic function are provided in `common.dataset.transform.augmentation`.
 
+------------------------------------------------------------------------
 ## Loss
 - You can add your loss at `custom.loss` with `xxx_loss.py`.
 
@@ -113,6 +124,7 @@ loss:
     sum: xx.xx
 ```
 
+------------------------------------------------------------------------
 ## Metric
 - Similar to Loss to calculate all metrics in once. But you don't need to set weights here, and no 'sum' is calculated.
 -
@@ -129,10 +141,12 @@ metric:
     ...
 ```
 
+------------------------------------------------------------------------
 ## Grad clip
 - Support grad on the whole model by `clip_gradients`.
 You can set `clip_warm` as positive number in order to use `clip_gradients_warmup` after warmup period.
 
+------------------------------------------------------------------------
 ## Valid
 - Validation will be performed on `val` dataset every `progress.epoch_val` epoch. Monitor will record result like loss, imgs.
 
@@ -140,6 +154,7 @@ You can set `clip_warm` as positive number in order to use `clip_gradients_warmu
 
 - If `progress.save_progress_val` is `True`, will save `progress.max_samples_val` result into `experiments/expr_name/progress/val`.
 
+------------------------------------------------------------------------
 ## Eval
 - Evaluation will be performed on `eval` dataset every `progress.epoch_eval` dataset.
 All result will be locally recorded in `experiments/expr_name/eval` for each epoch.
@@ -156,11 +171,13 @@ But generally you should not make it in training progress. Local evaluation is b
 
 - `eval.yaml` should contain param for `--dataset.eval`, `--model`, `--metric`.
 
+------------------------------------------------------------------------
 ## Tests
 - Tests for `common` class and `custom` are in `tests`. You should implement you tests for `custom` class when needed.
 
 - We use unittest. You can run `python -m unittest test_file` or `python -m unittest discover test_dir` for unittest.
 
+------------------------------------------------------------------------
 ## Monitor and Progress saver
 - A tensorboard monitor will be used during training to record train/val loss, vals, images, etc.
 
@@ -170,6 +187,7 @@ But generally you should not make it in training progress. Local evaluation is b
 
 - Change `render_progress_img` in `custom_trainer` for different visual results.
 
+------------------------------------------------------------------------
 ## More to do:
 - cuda/c++ extension template
 - inference, demo
@@ -179,6 +197,7 @@ But generally you should not make it in training progress. Local evaluation is b
 - colab
 - setup.py
 
+------------------------------------------------------------------------
 ## Acknowledge
 This project template refers to:
 - https://github.com/xinntao/ProjectTemplate-Python

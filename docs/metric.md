@@ -13,7 +13,7 @@ Child of PSNR. Only eval masked area.
 ## SSIM/MaskSSIM
 Same as PSNR but use different metric.
 
-
+------------------------------------------------------------------------
 # train_metric
 You can specify the train_metric to get the current training eval metric. But only use one
 metric in train mode.
