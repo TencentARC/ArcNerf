@@ -124,7 +124,7 @@ model:
         inverse_linear: False
         perturb: True
         add_inf_z: False
-        noise_std: 1.0
+        noise_std: 0.0
         white_bkg: False
     params:
         speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
@@ -165,7 +165,7 @@ model:
             n_sample: 32
             perturb: True
             add_inf_z: True         # must set to be True
-            noise_std: 1.0
+            noise_std: 0.0
             white_bkg: False
         chunk_rays: 4096
         chunk_pts: 131072

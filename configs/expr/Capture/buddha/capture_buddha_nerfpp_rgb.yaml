@@ -119,7 +119,7 @@ model:
         inverse_linear: False
         perturb: True
         add_inf_z: False    # should not use inf for foreground rgb ray_marching
-        noise_std: 1.0
+        noise_std: 0.0
         white_bkg: False
     chunk_rays: 32768
     chunk_pts: 131072
@@ -146,7 +146,7 @@ model:
             n_sample: 32
             perturb: True
             add_inf_z: True         # must set to be True
-            noise_std: 1.0
+            noise_std: 0.0
             white_bkg: False
         chunk_rays: 32768
         chunk_pts: 131072

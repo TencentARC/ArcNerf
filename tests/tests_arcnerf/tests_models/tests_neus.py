@@ -44,7 +44,7 @@ class TestNeusDict(TestModelDict):
             n_sample = cfgs.model.rays.n_sample
             n_importance = (cfgs.model.rays.n_importance // cfgs.model.rays.n_iter) * cfgs.model.rays.n_iter
             n_total = n_sample + n_importance
-            progress_shape = (self.batch_size, self.n_rays, n_total - 1)
+            progress_shape = (self.batch_size, self.n_rays, n_total)
             self._test_forward_progress(model, feed_in, progress_shape)
 
             # direct inference

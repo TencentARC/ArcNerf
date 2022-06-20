@@ -120,7 +120,7 @@ model:
         n_importance: 128
         inverse_linear: False
         perturb: True
-        add_inf_z: False
+        add_inf_z: True
         noise_std: 0.0
         white_bkg: True
     chunk_rays: 32768

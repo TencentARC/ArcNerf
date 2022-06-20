@@ -125,7 +125,7 @@ model:
         inverse_linear: False
         perturb: True
         add_inf_z: False
-        noise_std: 1.0
+        noise_std: 0.0
         white_bkg: True
     params:
         speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
