@@ -10,7 +10,7 @@ from common.utils.cfgs_utils import parse_configs
 from common.utils.logger import Logger
 from common.utils.model_io import load_model
 from arcnerf.datasets import get_dataset, get_model_feed_in
-from arcnerf.eval.infer_func import set_inference_data, run_infer, write_infer_files
+from arcnerf.eval.infer_func import Inferencer
 from arcnerf.models import build_model
 
 if __name__ == '__main__':
@@ -26,13 +26,13 @@ if __name__ == '__main__':
         device = 'gpu'
         torch.cuda.set_device(cfgs.gpu_ids)
 
-    # set eval_dir
+    # set infer_dir
     assert cfgs.dir.eval_dir is not None, 'Please specify the eval_dir for saving results...'
-    eval_dir = cfgs.dir.eval_dir
-    os.makedirs(eval_dir, exist_ok=True)
+    infer_dir = cfgs.dir.eval_dir
+    os.makedirs(infer_dir, exist_ok=True)
 
     # set logger
-    logger = Logger(rank=0, path=osp.join(eval_dir, 'infer_log.txt'))
+    logger = Logger(rank=0, path=osp.join(infer_dir, 'infer_log.txt'))
     logger.add_log('Inference on model... Result write to {}...'.format(cfgs.dir.eval_dir))
 
     # only for getting intrinsic, c2w. Use eval dataset for setting
@@ -50,23 +50,25 @@ if __name__ == '__main__':
 
     # prepare inference data
     logger.add_log('Setting Inference data...')
-    data = set_inference_data(cfgs.inference, intrinsic, wh)
-    if data is None:
+    inferencer = Inferencer(cfgs.inference, intrinsic, wh, device, logger)
+    if inferencer.is_none():
         logger.add_log('You did not add any valid configs for inference, please check the configs...')
         exit()
 
-    if data['render'] is not None:
+    if inferencer.get_render_data() is not None:
+        render_cfgs = inferencer.get_render_cfgs()
+        wh = inferencer.get_wh()
         logger.add_log(
             'Render novel view - type: {}, n_cam {}, resolution: wh({}/{})'.format(
-                data['render']['cfgs']['type'], data['render']['cfgs']['n_cam'], data['render']['wh'][0],
-                data['render']['wh'][1]
+                render_cfgs['type'], render_cfgs['n_cam'], wh[0], wh[1]
             )
         )
-    if data['volume'] is not None:
-        logger.add_log('Extracting geometry from volume - n_grid {}'.format(data['volume']['cfgs']['n_grid']))
+        if 'surface_render' in inferencer.get_render_data() \
+                and inferencer.get_render_data()['surface_render'] is not None:
+            logger.add_log('Do surface rendering.')
 
-    # process data with model and get output
-    files = run_infer(data, get_model_feed_in, model, logger, device)
+    if inferencer.get_volume_data() is not None:
+        logger.add_log('Extracting geometry from volume - n_grid {}'.format(inferencer.get_volume_cfgs()['n_grid']))
 
-    # write output
-    write_infer_files(files, eval_dir, data, logger)
+    # process data with model and get output and write output
+    inferencer.run_infer(model, get_model_feed_in, infer_dir)

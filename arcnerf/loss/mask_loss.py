@@ -17,7 +17,6 @@ class MaskLoss(nn.Module):
                 keys: key used for loss sum. By default 'mask'.
                       'mask_coarse'/'mask_fine' for two stage network
                 loss_type: select loss type such as 'MSE'/'L1'/'BCE'. By default MSE
-                use_mask: use mask for average calculation. By default False.
                 do_mean: calculate the mean of loss. By default True.
         """
         super(MaskLoss, self).__init__()

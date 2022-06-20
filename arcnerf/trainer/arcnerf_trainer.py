@@ -10,7 +10,7 @@ import torch
 from arcnerf.datasets import get_dataset, get_model_feed_in, POTENTIAL_KEYS
 from arcnerf.datasets.transform.augmentation import get_transforms
 from arcnerf.eval.eval_func import run_eval
-from arcnerf.eval.infer_func import set_inference_data, run_infer, write_infer_files
+from arcnerf.eval.infer_func import Inferencer
 from arcnerf.loss import build_loss
 from arcnerf.metric import build_metric
 from arcnerf.models import build_model
@@ -20,7 +20,6 @@ from common.loss.loss_dict import LossDictCounter
 from common.trainer.basic_trainer import BasicTrainer
 from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
 from common.utils.registry import METRIC_REGISTRY
-from common.utils.torch_utils import torch_to_np
 from common.utils.train_utils import master_only
 from common.visual.plot_2d import draw_2d_components
 
@@ -98,32 +97,37 @@ class ArcNerfTrainer(BasicTrainer):
         if valid_key_in_cfgs(self.cfgs, 'inference') and self.intrinsic is not None and self.wh is not None:
             self.logger.add_log('-' * 60)
             self.logger.add_log('Setting Inference data...')
-            data['inference'] = set_inference_data(self.cfgs.inference, self.intrinsic, self.wh)
+            data['inference'] = Inferencer(self.cfgs.inference, self.intrinsic, self.wh, self.device, self.logger)
 
-            if data['inference']['render'] is not None:
-                self.logger.add_log(
-                    'Render novel view - type: {}, n_cam {}, resolution: wh({}/{})'.format(
-                        data['inference']['render']['cfgs']['type'], data['inference']['render']['cfgs']['n_cam'],
-                        data['inference']['render']['wh'][0], data['inference']['render']['wh'][1]
+            if data['inference'].is_none():
+                data['inference'] = None
+            else:
+                if data['inference'].get_render_data() is not None:
+                    render_cfgs = data['inference'].get_render_cfgs()
+                    wh = data['inference'].get_wh()
+                    self.logger.add_log(
+                        'Render novel view - type: {}, n_cam {}, resolution: wh({}/{})'.format(
+                            render_cfgs['type'], render_cfgs['n_cam'], wh[0], wh[1]
+                        )
                     )
-                )
-                if 'surface_render' in data['inference'] and data['inference']['surface_render'] is not None:
-                    self.logger.add_log('Do surface rendering.')
+                    if 'surface_render' in data['inference'].get_render_data() \
+                            and data['inference'].get_render_data()['surface_render'] is not None:
+                        self.logger.add_log('Do surface rendering.')
 
-            if data['inference']['volume'] is not data['inference']:
-                self.logger.add_log(
-                    'Extracting geometry from volume - n_grid {}'.format(data['inference']['volume']['cfgs']['n_grid'])
-                )
+                if data['inference'].get_volume_data() is not None:
+                    self.logger.add_log(
+                        'Extracting geometry from volume - n_grid {}'.format(
+                            data['inference'].get_volume_cfgs()['n_grid']
+                        )
+                    )
+
         else:
             data['inference'] = None
 
         # set the sphere and volume for rendering
         if data['inference'] is not None:
-            if data['inference']['render'] is not None:
-                self.radius = data['inference']['render']['cfgs']['radius']
-            if data['inference']['volume'] is not None:
-                vol = data['inference']['volume']['Vol']
-                self.volume_dict = {'grid_pts': torch_to_np(vol.get_corner()), 'lines': vol.get_bound_lines()}
+            self.radius = data['inference'].get_radius()
+            self.volume_dict = data['inference'].get_volume_dict()
 
         return data
 
@@ -506,8 +510,7 @@ class ArcNerfTrainer(BasicTrainer):
 
         # inference and save result
         self.model.eval()
-        files = self.inference(self.data['inference'], self.model, self.device)
-        write_infer_files(files, eval_dir_epoch, self.data['inference'], self.logger)
+        self.data['inference'].run_infer(self.model, self.get_model_feed_in, eval_dir_epoch)
 
         # release gpu memory
         if self.device == 'gpu':
@@ -564,12 +567,6 @@ class ArcNerfTrainer(BasicTrainer):
     def write_progress_imgs(self, files, folder, epoch=None, step=None, global_step=None, eval=False):
         """Actual function to write the progress images"""
         write_progress_imgs(files, folder, epoch, step, global_step, eval, self.radius, self.volume_dict)
-
-    def inference(self, data, model, device):
-        """Actual infer function for the model. Use run_infer since we want to run it local as well"""
-        files = run_infer(data, self.get_model_feed_in, model, self.logger, device)
-
-        return files
 
     def evaluate(self, data, model, metric_summary, device, max_samples_eval):
         """Actual eval function for the model. Use run_eval since we want to run it locally as well"""
