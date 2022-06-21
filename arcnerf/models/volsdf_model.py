@@ -37,6 +37,8 @@ class VolSDF(SdfModel):
         # radius init for object
         self.radius_init = get_value_from_cfgs_field(self.cfgs.model.geometry, 'radius_init', 1.0)
         self.ln_beta, self.beta_min, self.speed_factor = self.get_params()
+        # Use bounding radius sampling in NeuS
+        assert self.get_ray_cfgs('bounding_radius') is not None, 'You must set a radius of interest for sampling...'
 
     def get_params(self):
         """Get scale param"""
