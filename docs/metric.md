@@ -7,7 +7,7 @@ PSNR between images, calculate from mean mse loss.
 - use_mask: eval on mask area only. False here.
 
 ## MaskPSNR
-Child of PSNR. Only eval masked area.
+Child of PSNR. Only eval masked area. Separate this so you can eval PSNR/MaskPSNR at the same time.
 - use_mask: Set to True
 
 ## SSIM/MaskSSIM
@@ -15,5 +15,5 @@ Same as PSNR but use different metric.
 
 ------------------------------------------------------------------------
 # train_metric
-You can specify the train_metric to get the current training eval metric. But only use one
+You can specify the `train_metric` to get the current training eval metric. But only use one
 metric in train mode.

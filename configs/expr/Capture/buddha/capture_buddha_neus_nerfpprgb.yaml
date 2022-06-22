@@ -115,8 +115,8 @@ inference:
 model:
     type: Neus
     rays:
-        bounding_radius: 3.0
-        # near: 1.0
+        bounding_radius: 2.0
+        # near: 1.5
         # far: 4.5
         n_sample: 64
         n_importance: 64
@@ -137,7 +137,7 @@ model:
         D: 8
         skips: [4]
         input_ch: 3
-        embed_freq: 6
+        embed_freq: 10
         W_feat: 256
         geometric_init: True          # use geometric init. need radius_init
         radius_init: 0.75             # geometric init sphere radius

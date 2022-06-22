@@ -35,7 +35,7 @@ optim:
     lr_scheduler:
         type: ExponentialLR
         lr_gamma: 0.1
-        lr_steps: [200000]
+        lr_steps: [500000]
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -48,7 +48,7 @@ progress:
 
     epoch_loss: 100
     iter_loss: 1
-    save_progress: False
+    save_progress: True
     epoch_save_progress: 50000
     iter_save_progress: 1
 
@@ -148,3 +148,7 @@ loss:
 
 metric:
     PSNR:
+
+train_metric:
+    PSNR:
+        key: 'rgb_fine'

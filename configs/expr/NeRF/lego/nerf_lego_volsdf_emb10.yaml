@@ -1,4 +1,4 @@
-name: dtu_65_neus_siren_mask_eiknomask
+name: nerf_lego_volsdf_emb10
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_65_neus_siren_mask_eiknomask'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_volsdf_emb10'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/dtu_65_neus_siren_mask_eiknomask/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_volsdf_emb10/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -25,7 +25,7 @@ dist:
     slurm: False
 
 batch_size: 2
-n_rays: 512     # follow original repo
+n_rays: 1024     # follow original repo
 worker: 4
 
 optim:
@@ -33,9 +33,9 @@ optim:
     optim_type: adam
     weight_decay: 0.0
     lr_scheduler:
-        type: WarmUpCosineLR        # follow the original implementation
-        lr_steps: [5000]
-        min_factor: 0.05
+        type: ExponentialLR    # follow original repo
+        lr_gamma: 0.1
+        lr_steps: [500000]
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -61,44 +61,41 @@ progress:
 
     init_eval: False
     epoch_eval: 100000
-    max_samples_eval: 3
+    max_samples_eval: 25
 
 dataset:
     train:
-        type: DTU
-        scan_id: 65
+        type: NeRF
+        scene_name: lego
         img_scale: 1.0
         scale_radius: 3.0
-        align_cam: True
         precache: True
 
     val:
-        type: DTU
-        scan_id: 65
-        img_scale: 0.25
+        skip: 8
+        type: NeRF
+        scene_name: lego
+        img_scale: 0.5
         scale_radius: 3.0
-        align_cam: True
         precache: False
 
     eval:
         eval_batch_size: 1
-        eval_max_sample: 3
-        type: DTU
-        scan_id: 65
+        skip: 8
+        type: NeRF
+        scene_name: lego
         img_scale: 1.0
         scale_radius: 3.0
-        align_cam: True
         precache: True
 
 inference:
     render:
-        type: [swing]
-        n_cam: [20]
-        repeat: [3]
+        type: [spiral]
+        n_cam: [60]
+        repeat: [1]
         radius: 3.0
-        u_range: [0.65, 0.85]
-        v_range: [0, 0]
-        n_rot: 1
+        u_start: 0.5
+        v_range: [-0.6, -0.2]
         fps: 5
         surface_render:
             chunk_rays_factor: 1024
@@ -106,7 +103,7 @@ inference:
 
     volume:
         n_grid: 512
-        side: 1.5
+        side: 2.0
         level: 0.0
         grad_dir: ascent
         chunk_pts_factor: 1
@@ -114,38 +111,43 @@ inference:
             backend: pytorch3d
 
 model:
-    type: Neus
+    type: VolSDF
     rays:
-        bounding_radius: 3.0
-        near: 1.0
-        far: 4.5
+        bounding_radius: 1.5
+        #near: 1.5
+        #far: 4.5
         n_sample: 64
-        n_importance: 64
-        n_iter: 4
+        n_importance: 32
+        n_eval: 128
+        n_iter: 5
+        beta_iter: 10
+        eps: 0.1
         inverse_linear: False
         perturb: True
-        add_inf_z: False
+        add_inf_z: True
         noise_std: 0.0
         white_bkg: True
     params:
-        speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
-        init_var: 0.05                # init var, when it approaches 0, cdf more close
-        anneal_end: 50000             # for anneal param, only set during training. please
+        speed_factor: 10              # factor for ln_beta = np.log(init_beta)/speed, beta = exp(ln_beta*speed)
+        beta_min: 0.0001              # min beta offset
+        init_beta: 0.1                # init beta, when it approaches 0, cdf more close
     chunk_rays: 4096
     chunk_pts: 131072
     geometry:
         W: 256
         D: 8
-        skips: []
+        skips: [4]
         input_ch: 3
-        embed_freq: 0                 # siren do not use
+        embed_freq: 10
         W_feat: 256
         geometric_init: True          # use geometric init. need radius_init
         radius_init: 0.5              # geometric init sphere radius
         weight_norm: True
         skip_reduce_output: True
         norm_skip: True
-        use_siren: True               # use siren layer with geometric_init
+        act_cfg: # activation function for dense layer
+            type: softplus
+            beta: 100
     radiance:
         mode: 'pvnf'
         W: 256
@@ -156,7 +158,6 @@ model:
         embed_freq_view: 4
         W_feat_in: 256
         weight_norm: True
-        use_siren: True               # use siren layer
 
 loss:
     ImgLoss:
@@ -165,10 +166,13 @@ loss:
         weight: 1.0
     MaskLoss:
         loss_type: BCE
-        weight: 1.0
+        weight: 0.1
     EikonalLoss:
         key: normal_pts
         weight: 0.1
 
 metric:
-    MaskPSNR:
+    PSNR:
+
+train_metric:
+    PSNR:

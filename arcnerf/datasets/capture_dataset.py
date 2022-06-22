@@ -23,10 +23,9 @@ class Capture(Base3dPCDataset):
         self.data_spec_dir = osp.join(self.data_dir, 'Capture', self.cfgs.scene_name)
         self.identifier = self.cfgs.scene_name
 
-        # get image
-        img_list, self.n_imgs = self.get_image_list(mode)
-        self.images = self.read_image_list(img_list)
-        self.H, self.W = self.images[0].shape[:2]
+        # get image, read image list first, then read skip images in case too many images.
+        img_list, self.n_imgs = self.get_image_list()
+        self.H, self.W = self.read_image_list(img_list[:1])[0].shape[:2]
 
         # get cameras
         self.cam_file = osp.join(self.data_spec_dir, 'poses_bounds.npy')
@@ -50,15 +49,17 @@ class Capture(Base3dPCDataset):
         # align if required
         self.align_cam_horizontal()
 
+        # skip image and keep less samples
+        img_list = self.skip_samples_no_images(img_list)
+        # read the real image after skip
+        self.images = self.read_image_list(img_list)
+        self.keep_eval_samples()
+
         # rescale image, call from parent class
         self.rescale_img_and_pose()
 
         # get bounds
         self.bounds = self.get_bounds_from_pc()
-
-        # skip image and keep less samples
-        self.skip_samples()
-        self.keep_eval_samples()
 
         # precache_all rays
         self.ray_bundles = None
@@ -67,7 +68,19 @@ class Capture(Base3dPCDataset):
         if self.precache:
             self.precache_ray()
 
-    def get_image_list(self, mode=None):
+    def skip_samples_no_images(self, img_list):
+        """Capture dataset do not real all images at first."""
+        if self.skip > 1:
+            self.cameras = self.cameras[::self.skip]
+            self.bounds = self.bounds[::self.skip]
+            img_list = img_list[::self.skip]
+            self.n_imgs = len(img_list)
+            if 'vis' in self.point_cloud:
+                self.point_cloud['vis'] = self.point_cloud['vis'][::self.skip, :]
+
+        return img_list
+
+    def get_image_list(self):
         """Get image list."""
         img_dir = osp.join(self.data_spec_dir, 'images')
         img_list = sorted(glob.glob(img_dir + '/*.png'))

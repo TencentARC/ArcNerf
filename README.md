@@ -73,7 +73,7 @@ Sufficient docs, detail shape of each tensor
 # Citation
 Please see [Citation](docs/citation.md) for citations.
 
-If you find this project useful, please consider to cite:
+If you find this project useful, please consider citing:
 ```
 TODO:
 ```

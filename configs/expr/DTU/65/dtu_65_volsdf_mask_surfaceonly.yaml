@@ -35,7 +35,7 @@ optim:
     lr_scheduler:
         type: ExponentialLR    # follow original repo
         lr_gamma: 0.1
-        lr_steps: [200000]
+        lr_steps: [500000]
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -117,7 +117,7 @@ model:
     type: VolSDF
     rays:
         bounding_radius: 3.0
-        near: 1.0
+        near: 1.5
         # far: 4.5
         n_sample: 64
         n_importance: 0  # only near surface

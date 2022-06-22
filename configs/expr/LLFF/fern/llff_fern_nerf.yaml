@@ -48,19 +48,19 @@ progress:
 
     epoch_loss: 100
     iter_loss: 1
-    save_progress: False
+    save_progress: True
     epoch_save_progress: 50000
-    iter_save_progress: 5
+    iter_save_progress: 1
 
     epoch_val: 50000
     save_progress_val: True
     max_samples_val: 1
 
-    epoch_save_checkpoint: 100000
+    epoch_save_checkpoint: 50000
     local_progress: False
 
     init_eval: False
-    epoch_eval: 100000
+    epoch_eval: 50000
     max_samples_eval: 3
 
 dataset:

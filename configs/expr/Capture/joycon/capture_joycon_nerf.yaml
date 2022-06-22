@@ -1,4 +1,4 @@
-name: capture_qqtiger_nerf_coarse
+name: capture_joycon_nerf
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_nerf_coarse'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_joycon_nerf'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_nerf_coarse/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_joycon_nerf/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -35,7 +35,7 @@ optim:
     lr_scheduler:
         type: ExponentialLR
         lr_gamma: 0.1
-        lr_steps: [200000]
+        lr_steps: [500000]
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -48,7 +48,7 @@ progress:
 
     epoch_loss: 100
     iter_loss: 1
-    save_progress: False
+    save_progress: True
     epoch_save_progress: 50000
     iter_save_progress: 1
 
@@ -66,41 +66,45 @@ progress:
 dataset:
     train:
         type: Capture
-        scene_name: qqtiger
+        scene_name: joycon
         img_scale: 0.25
         scale_radius: 3.0
-        pc_radius: 2.0
-        skip: 10
+        pc_radius: 1.0
+        skip: 8
+        center_by_view_dirs: True
         precache: True
 
     val:
         type: Capture
-        scene_name: qqtiger
+        scene_name: joycon
         img_scale: 0.125
         scale_radius: 3.0
-        pc_radius: 2.0
-        skip: 10
+        pc_radius: 1.0
+        skip: 8
+        center_by_view_dirs: True
         precache: False
 
     eval:
         eval_batch_size: 1
         eval_max_sample: 3
         type: Capture
-        scene_name: qqtiger
+        scene_name: joycon
         img_scale: 0.25
         scale_radius: 3.0
-        pc_radius: 2.0
-        skip: 10
+        pc_radius: 1.0
+        skip: 8
+        center_by_view_dirs: True
         precache: True
 
 inference:
     render:
-        type: [circle]
+        type: [swing]
         n_cam: [20]
         repeat: [3]
-        radius: 2.0
-        u_start: 0.75
-        v_ratio: -0.2
+        radius: 3.0
+        u_range: [0.7, 0.9]
+        v_range: [-0.12, -0.12]
+        n_rot: 1
         fps: 5
 
     volume:
@@ -115,9 +119,10 @@ model:
     type: NeRF
     rays:
         bounding_radius: 3.0
+        # near: 1.5
         far: 8.0
         n_sample: 64
-        n_importance: 0
+        n_importance: 128
         inverse_linear: False
         perturb: True
         add_inf_z: True
@@ -143,8 +148,12 @@ model:
 
 loss:
     ImgLoss:
-        keys: ['rgb_coarse']
+        keys: ['rgb_coarse', 'rgb_fine']
         weight: 1.0
 
 metric:
     PSNR:
+
+train_metric:
+    PSNR:
+        key: 'rgb_fine'

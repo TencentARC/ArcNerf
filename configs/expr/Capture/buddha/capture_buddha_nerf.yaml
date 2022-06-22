@@ -48,7 +48,7 @@ progress:
 
     epoch_loss: 100
     iter_loss: 1
-    save_progress: False
+    save_progress: True
     epoch_save_progress: 50000
     iter_save_progress: 1
 

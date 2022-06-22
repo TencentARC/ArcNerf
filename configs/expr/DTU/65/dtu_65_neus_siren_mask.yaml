@@ -117,7 +117,7 @@ model:
     type: Neus
     rays:
         bounding_radius: 3.0
-        near: 1.0
+        near: 1.5
         far: 4.5
         n_sample: 64
         n_importance: 64
@@ -165,10 +165,9 @@ loss:
         weight: 1.0
     MaskLoss:
         loss_type: BCE
-        weight: 1.0
+        weight: 0.1
     EikonalLoss:
         key: normal_pts
-        use_mask: True
         weight: 0.1
 
 metric:
