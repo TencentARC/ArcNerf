@@ -186,7 +186,7 @@ def get_near_far_from_rays(
             if bounding_radius is not None:  # restrict the far end bound if radius is set
                 radius = torch.tensor([bounding_radius], dtype=dtype).to(device)
                 _, far_bound, _, mask = sphere_ray_intersection(rays_o, rays_d, radius=radius)  # (N_rays, 1)
-                far[mask] = far_bound[mask]
+                far[far > far_bound] = far_bound[far > far_bound]
 
         # hard set for near/far
         if near_hardcode is not None:
