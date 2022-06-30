@@ -1,4 +1,4 @@
-name: capture_plant_neus_nerfpprgb
+name: capture_plant_nerfpp_sigma
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_plant_neus_nerfpprgb'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_plant_nerfpp_sigma'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_plant_neus_nerfpprgb/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_plant_nerfpp_sigma/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -25,7 +25,7 @@ dist:
     slurm: False
 
 batch_size: 2
-n_rays: 512     # follow original repo
+n_rays: 4096
 worker: 4
 
 optim:
@@ -33,9 +33,9 @@ optim:
     optim_type: adam
     weight_decay: 0.0
     lr_scheduler:
-        type: WarmUpCosineLR        # follow the original implementation
-        lr_steps: [5000]
-        min_factor: 0.05
+        type: ExponentialLR
+        lr_gamma: 0.1
+        lr_steps: [500000]
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -102,39 +102,30 @@ inference:
         u_start: 0.75
         v_ratio: -0.2
         fps: 5
-        surface_render:
-            chunk_rays_factor: 1024
-            method: sphere_tracing
 
     volume:
         n_grid: 512
         origin: [ 0.0, 0.2, 0.4 ]
         side: 2.0
-        level: 0.0
-        grad_dir: ascent
-        chunk_pts_factor: 1
+        level: 50.0
+        chunk_pts_factor: 32
         render_mesh:
             backend: pytorch3d
 
 model:
-    type: Neus
+    type: NeRF
     rays:
-        bounding_radius: 2.0
-        # near: 1.5
+        bounding_radius: 3.0
+        near: 1.0
         # far: 4.5
         n_sample: 64
-        n_importance: 64
-        n_iter: 4
+        n_importance: 128
         inverse_linear: False
         perturb: True
-        add_inf_z: False
+        add_inf_z: True
         noise_std: 0.0
         white_bkg: False
-    params:
-        speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
-        init_var: 0.05                # init var, when it approaches 0, cdf more close
-        anneal_end: 50000             # for anneal param, only set during training. please
-    chunk_rays: 4096
+    chunk_rays: 32768
     chunk_pts: 131072
     geometry:
         W: 256
@@ -143,35 +134,25 @@ model:
         input_ch: 3
         embed_freq: 10
         W_feat: 256
-        geometric_init: True          # use geometric init. need radius_init
-        radius_init: 0.75             # geometric init sphere radius
-        weight_norm: True
-        skip_reduce_output: True
-        norm_skip: True
-        act_cfg:                      # activation function for dense layer
-            type: softplus
-            beta: 100
+        geometric_init: False
     radiance:
-        mode: 'pvnf'
-        W: 256
-        D: 4
-        input_ch_pts: 3
-        embed_freq_pts: 0             # pts embed freq, not embedding performed
+        mode: 'vf'
+        W: 128
+        D: 1
         input_ch_view: 3
         embed_freq_view: 4
         W_feat_in: 256
-        weight_norm: True
     background:
         type: NeRFPP
-        bkg_blend: 'rgb'
+        bkg_blend: 'sigma'
         rays:
             bounding_radius: 3.0
             n_sample: 32
             perturb: True
-            add_inf_z: True         # must set to be True
+            add_inf_z: False
             noise_std: 0.0
             white_bkg: False
-        chunk_rays: 4096
+        chunk_rays: 32768
         chunk_pts: 131072
         geometry:
             W: 256
@@ -191,14 +172,12 @@ model:
 
 loss:
     ImgLoss:
-        loss_type: L1
+        keys: [ 'rgb_coarse', 'rgb_fine' ]
         weight: 1.0
-    EikonalLoss:
-        key: normal_pts
-        weight: 0.1
 
 metric:
     PSNR:
 
 train_metric:
     PSNR:
+        key: 'rgb_fine'

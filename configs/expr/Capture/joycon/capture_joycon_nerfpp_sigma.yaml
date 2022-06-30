@@ -1,4 +1,4 @@
-name: capture_qqtiger_volsdf_siren_nerfpprgb
+name: capture_joycon_nerfpp_sigma
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_volsdf_siren_nerfpprgb'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_joycon_nerfpp_sigma'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_volsdf_siren_nerfpprgb/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_joycon_nerfpp_sigma/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -25,7 +25,7 @@ dist:
     slurm: False
 
 batch_size: 2
-n_rays: 1024     # follow original repo
+n_rays: 4096
 worker: 4
 
 optim:
@@ -33,7 +33,7 @@ optim:
     optim_type: adam
     weight_decay: 0.0
     lr_scheduler:
-        type: ExponentialLR    # follow original repo
+        type: ExponentialLR
         lr_gamma: 0.1
         lr_steps: [500000]
 
@@ -66,113 +66,96 @@ progress:
 dataset:
     train:
         type: Capture
-        scene_name: qqtiger
+        scene_name: joycon
         img_scale: 0.25
         scale_radius: 3.0
-        pc_radius: 2.0
-        skip: 10
+        pc_radius: 1.0
+        skip: 8
+        center_by_view_dirs: True
         precache: True
 
     val:
         type: Capture
-        scene_name: qqtiger
+        scene_name: joycon
         img_scale: 0.125
         scale_radius: 3.0
-        pc_radius: 2.0
-        skip: 10
+        pc_radius: 1.0
+        skip: 8
+        center_by_view_dirs: True
         precache: False
 
     eval:
         eval_batch_size: 1
         eval_max_sample: 3
         type: Capture
-        scene_name: qqtiger
+        scene_name: joycon
         img_scale: 0.25
         scale_radius: 3.0
-        pc_radius: 2.0
-        skip: 10
+        pc_radius: 1.0
+        skip: 8
+        center_by_view_dirs: True
         precache: True
 
 inference:
     render:
-        type: [circle]
+        type: [swing]
         n_cam: [20]
         repeat: [3]
-        radius: 2.0
-        u_start: 0.75
-        v_ratio: -0.2
+        radius: 3.0
+        u_range: [0.7, 0.9]
+        v_range: [-0.12, -0.12]
+        n_rot: 1
         fps: 5
-        surface_render:
-            chunk_rays_factor: 1024
-            method: sphere_tracing
 
     volume:
         n_grid: 512
         side: 1.5
-        level: 0.0
-        grad_dir: ascent
-        chunk_pts_factor: 1
+        level: 50.0
+        chunk_pts_factor: 32
         render_mesh:
             backend: pytorch3d
 
 model:
-    type: VolSDF
+    type: NeRF
     rays:
         bounding_radius: 3.0
         near: 1.5
         # far: 4.5
         n_sample: 64
-        n_importance: 32
-        n_eval: 128
-        n_iter: 5
-        beta_iter: 10
-        eps: 0.1
+        n_importance: 128
         inverse_linear: False
         perturb: True
-        add_inf_z: False
+        add_inf_z: True
         noise_std: 0.0
         white_bkg: False
-    params:
-        speed_factor: 10              # factor for ln_beta = np.log(init_beta)/speed, beta = exp(ln_beta*speed)
-        beta_min: 0.0001              # min beta offset
-        init_beta: 0.1                # init beta, when it approaches 0, cdf more close
-    chunk_rays: 4096
+    chunk_rays: 32768
     chunk_pts: 131072
     geometry:
         W: 256
         D: 8
-        skips: []                     # no skip for siren network
+        skips: [4]
         input_ch: 3
-        embed_freq: 0                 # siren do not use
+        embed_freq: 10
         W_feat: 256
-        geometric_init: True          # use geometric init. need radius_init
-        radius_init: 0.75             # geometric init sphere radius
-        weight_norm: True
-        skip_reduce_output: True
-        norm_skip: True
-        use_siren: True               # use siren layer with geometric_init
+        geometric_init: False
     radiance:
-        mode: 'pvnf'
-        W: 256
-        D: 4
-        input_ch_pts: 3
-        embed_freq_pts: 0             # pts embed freq, not embedding performed
+        mode: 'vf'
+        W: 128
+        D: 1
         input_ch_view: 3
         embed_freq_view: 4
         W_feat_in: 256
-        weight_norm: True
-        use_siren: True               # use siren layer
     background:
         type: NeRFPP
-        bkg_blend: 'rgb'
+        bkg_blend: 'sigma'
         rays:
             bounding_radius: 3.0
             n_sample: 32
             perturb: True
-            add_inf_z: True         # must set to be True
+            add_inf_z: False
             noise_std: 0.0
             white_bkg: False
-        chunk_rays: 4096
+        chunk_rays: 32768
         chunk_pts: 131072
         geometry:
             W: 256
@@ -192,11 +175,12 @@ model:
 
 loss:
     ImgLoss:
-        loss_type: L1
+        keys: ['rgb_coarse', 'rgb_fine']
         weight: 1.0
-    EikonalLoss:
-        key: normal_pts
-        weight: 0.1
 
 metric:
     PSNR:
+
+train_metric:
+    PSNR:
+        key: 'rgb_fine'

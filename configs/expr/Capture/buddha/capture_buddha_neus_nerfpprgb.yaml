@@ -115,7 +115,7 @@ inference:
 model:
     type: Neus
     rays:
-        bounding_radius: 3.0
+        bounding_radius: 2.0
         # near: 1.5
         # far: 4.5
         n_sample: 64
