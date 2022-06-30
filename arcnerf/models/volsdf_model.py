@@ -20,7 +20,6 @@ class VolSDF(SdfModel):
         Model SDF and convert it to density.
         ref: https://github.com/lioryariv/volsdf
              https://github.com/ventusff/neurecon#volume-rendering--3d-implicit-surface
-        TODO: The performance does not reach the original one. Where's the problem?
     """
 
     def __init__(self, cfgs):
@@ -211,7 +210,7 @@ class VolSDF(SdfModel):
             zvals_extra = zvals[:, sample_idx]  # (B, N_importance)
             zvals_sample, _ = torch.sort(torch.cat([zvals_sample, zvals_extra], -1), -1)  # (B, N_sample + N_importance)
 
-        # follow volsdf original repo, sampled on the whole ray TODO: Check correctness
+        # follow volsdf original repo, sampled on the whole ray
         idx = torch.randint(zvals_sample.shape[-1], (zvals_sample.shape[0], )).to(device)
         zvals_surface = torch.gather(zvals_sample, 1, idx.unsqueeze(-1))
 

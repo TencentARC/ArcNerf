@@ -113,7 +113,7 @@ inference:
 model:
     type: VolSDF
     rays:
-        bounding_radius: 1.5
+        bounding_radius: 2.0
         #near: 1.5
         #far: 4.5
         n_sample: 64
@@ -162,11 +162,7 @@ model:
 loss:
     ImgLoss:
         loss_type: L1
-        use_mask: True
         weight: 1.0
-    MaskLoss:
-        loss_type: BCE
-        weight: 0.1
     EikonalLoss:
         key: normal_pts
         weight: 0.1
