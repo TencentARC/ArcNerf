@@ -148,6 +148,10 @@ Nerf model with single forward(NeRF), and hierarchical sampling(NeRFFull).
 
 It is combination of GeoNet and RadianceNet, with ray sampling, resample pdf, ray marching, etc.
 
+### MipNeRF
+MipNerf model do not use the isolated sampled points, but use a gaussian expectation for modeling the interval.
+It is only used for view synthesis rather than geometry extraction.
+
 ### sdf_model
 SDF model is a class of fg_model that model the volumetric field as sdf. Compared to density field, it is better to
 extract geometric information of the object.

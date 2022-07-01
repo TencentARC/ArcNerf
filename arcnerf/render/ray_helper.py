@@ -39,9 +39,11 @@ def get_rays(
         ndc_near: near zvals. By default 1.0.
 
     Returns:
-        a ray_bundle with rays_o and rays_d. Each is in dim (N_ray, 3).
-             If no sampler is used, return (WH, 3) num of rays
-        ind_unroll: sample index in list of (N_ind, ) for index in (WH, ) range
+        rays_o: origin (N_ray, 3) tensor. If no sampler is used, return (WH, 3) num of rays
+        rays_d: direction (N_ray, 3) tensor. If no sampler is used, return (WH, 3) num of rays
+        index: sample index in list of (N_ind, ) for index in (WH, ) range
+        rays_r: rays radius from mip-nerf, (N_ray, 1) tensor.
+
     """
     assert (index is None) or n_rays <= 0, 'You are not allowed to sampled both by index and N_ray'
     device = intrinsic.device
@@ -91,7 +93,21 @@ def get_rays(
         rays_o = torch_to_np(rays_o)
         rays_d = torch_to_np(rays_d)
 
-    return rays_o, rays_d, index
+    # rays_r is the radius introduced in mip-nerf
+    rays_r = None
+    if index is None and n_rays <= 0:  # only in full image mode
+        if wh_order:
+            dirs = rays_d.clone().view(W, H, 3)  # (W, H, 3)
+            dx = torch.sqrt(torch.sum((dirs[:-1, ...] - dirs[1:, ...])**2, -1))  # (W-1, H, 1)
+            dx = torch.cat([dx, dx[-2:-1, ...]], dim=0)  # (W, H, 1)
+        else:
+            dirs = rays_d.clone().view(H, W, 3)  # (H, W, 3)
+            dx = torch.sqrt(torch.sum((dirs[:, :-1, ...] - dirs[:, 1:, ...])**2, -1))  # (H, W-1, 1)
+            dx = torch.cat([dx, dx[:, -2:-1, ...]], dim=1)  # (H, W, 1)
+        rays_r = dx.unsqueeze(-1) * 2 / torch.sqrt(torch.tensor([12], dtype=dx.dtype).to(dx.device))
+        rays_r = rays_r.view(-1, 1)
+
+    return rays_o, rays_d, index, rays_r
 
 
 def get_ndc_rays(rays_o: torch.Tensor, rays_d: torch.Tensor, W, H, intrinsic: torch.Tensor, near=1.0):

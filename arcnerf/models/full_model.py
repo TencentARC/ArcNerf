@@ -283,6 +283,7 @@ class FullModel(nn.Module):
             inputs: a dict of torch tensor:
                 inputs['rays_o']: torch.tensor (B, N, 3), cam_loc/ray_start position
                 inputs['rays_d']: torch.tensor (B, N, 3), view dir(assume normed)
+                inputs['rays_r']: torch.tensor (B, N, 1), radius
                 inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
                 inputs['bounds']: torch.tensor (B, N, 2). optional
 
@@ -293,10 +294,12 @@ class FullModel(nn.Module):
         flat_inputs = {}
         rays_o = inputs['rays_o'].view(-1, 3)  # (BN, 3)
         rays_d = inputs['rays_d'].view(-1, 3)  # (BN, 3)
+        rays_r = inputs['rays_r'].view(-1, 1)  # (BN, 1)
         batch_size, n_rays_per_batch = inputs['rays_o'].shape[:2]
 
         flat_inputs['rays_o'] = rays_o
         flat_inputs['rays_d'] = rays_d
+        flat_inputs['rays_r'] = rays_r
 
         # optional inputs
         bounds = None
@@ -331,6 +334,7 @@ class FullModel(nn.Module):
             inputs: a dict of torch tensor:
                 inputs['rays_o']: torch.tensor (B, N, 3), cam_loc/ray_start position
                 inputs['rays_d']: torch.tensor (B, N, 3), view dir(assume normed)
+                inputs['rays_r']: torch.tensor (B, N, 1), radius
                 inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
                 inputs['bounds']: torch.tensor (B, N, 2). optional
             inference_only: If True, only return the final results(not coarse, no progress).

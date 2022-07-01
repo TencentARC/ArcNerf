@@ -156,6 +156,7 @@ class Inferencer(object):
                         intrinsic: cam intrinsic, (3, 3) np array
                         rays_o: (1, HW, 3) torch tensor
                         rays_d: (1, HW, 3) torch tensor
+                        rays_r: (1, HW, 1) torch tensor
             Return None if not set configs.
         """
         render_data = None
@@ -190,7 +191,8 @@ class Inferencer(object):
                         'c2w': c2w[cam_id],  # (4, 4) np array
                         'intrinsic': self.intrinsic,  # (3, 3) np array
                         'rays_o': ray_bundle[0][None, :],  # (1, HW, 3) torch tensor
-                        'rays_d': ray_bundle[1][None, :]  # (1, HW, 3) torch tensor
+                        'rays_d': ray_bundle[1][None, :],  # (1, HW, 3) torch tensor
+                        'rays_r': ray_bundle[3][None, :]  # (1, HW, 1) torch tensor
                     }
                     input.append(input_per_img)
 

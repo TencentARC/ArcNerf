@@ -245,6 +245,7 @@ class Base3dDataset(BaseDataset):
             'intrinsic': intrinsic,  # (3, 3)
             'rays_o': ray_bundle[0],  # (hw, 3) / (n_rays, 3) if sample rays
             'rays_d': ray_bundle[1],  # (hw, 3) / (n_rays, 3) if sample rays
+            'rays_r': ray_bundle[3],  # (hw, 1) / (n_rays, 1) if sample rays
             'H': self.H,
             'W': self.W,
             'pc': self.point_cloud,  # a dict contains['pts', 'color', 'vis']. Same for all cam

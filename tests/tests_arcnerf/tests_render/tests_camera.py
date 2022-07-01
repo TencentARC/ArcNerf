@@ -104,6 +104,7 @@ class TestDict(unittest.TestCase):
         self.assertEqual(ray_bundle[0].shape, (self.H * self.W, 3))
         self.assertEqual(ray_bundle[1].shape, (self.H * self.W, 3))
         self.assertIsNone(ray_bundle[2])
+        self.assertEqual(ray_bundle[3].shape, (self.H * self.W, 1))
         for n_rays in [1, 10, 100, 1000, 10000]:
             ray_bundle = self.camera.get_rays(n_rays=n_rays)
             self.assertEqual(ray_bundle[0].shape, (n_rays, 3))

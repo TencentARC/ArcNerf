@@ -56,7 +56,7 @@ class NeRF(Base3dModel):
 
         # coarse model
         # get zvals
-        zvals = self.get_zvals_from_near_far(near, far, inference_only)  # (B, N_sample)  # (B, N_sample)
+        zvals = self.get_zvals_from_near_far(near, far, inference_only)  # (B, N_sample)
 
         # get points
         pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (B, N_sample, 3)

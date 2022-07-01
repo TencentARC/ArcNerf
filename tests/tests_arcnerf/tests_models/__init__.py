@@ -86,27 +86,19 @@ class TestModelDict(unittest.TestCase):
     def create_feed_in_to_cuda(self):
         rays_o = torch.rand(self.batch_size, self.n_rays, 3) * 3.0
         rays_d = -normalize(rays_o)  # point to origin
+        rays_r = torch.rand(self.batch_size, self.n_rays, 1)
+        bn3 = torch.ones(self.batch_size, self.n_rays, 3)
+        bn1 = torch.ones(self.batch_size, self.n_rays, 1)
+        bn = torch.ones(self.batch_size, self.n_rays)
         feed_in = {
-            'img':
-            torch.ones(self.batch_size, self.n_rays, 3),
-            'mask':
-            torch.ones(self.batch_size, self.n_rays),
-            'rays_o':
-            rays_o,
-            'rays_d':
-            rays_d,
-            'near':
-            torch.ones(self.batch_size * self.n_rays, 1) * 2.0,
-            'far':
-            torch.ones(self.batch_size * self.n_rays, 1) * 6.0,
-            'bounds':
-            torch.cat(
-                [
-                    torch.ones(self.batch_size, self.n_rays, 1) * 2.0,  # near
-                    torch.ones(self.batch_size, self.n_rays, 1) * 6.0
-                ],  # far
-                dim=-1
-            ),
+            'img': bn3,
+            'mask': bn,
+            'rays_o': rays_o,
+            'rays_d': rays_d,
+            'rays_r': rays_r,
+            'near': bn1 * 2.0,
+            'far': bn1 * 6.0,
+            'bounds': torch.cat([bn1 * 2.0, bn1 * 6.0], dim=-1)
         }
 
         for k, v in feed_in.items():
