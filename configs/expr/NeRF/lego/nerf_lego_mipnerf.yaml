@@ -108,7 +108,8 @@ model:
         # bounding_radius: 3.0
         near: 1.5
         far: 4.5
-        n_sample: 64
+        n_sample: 128
+        n_importance: 128
         gaussian_fn: cone
         ipe_embed_freq: 12
         inverse_linear: False
@@ -136,6 +137,7 @@ model:
 
 loss:
     ImgLoss:
+        keys: ['rgb_coarse', 'rgb_fine']
         weight: 1.0
 
 metric:
@@ -143,3 +145,4 @@ metric:
 
 train_metric:
     PSNR:
+        key: 'rgb_fine'

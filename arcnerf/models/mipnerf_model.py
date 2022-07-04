@@ -4,7 +4,7 @@ import torch
 
 from .base_3d_model import Base3dModel
 from .base_modules import build_geo_model, build_radiance_model
-from arcnerf.render.ray_helper import get_zvals_from_near_far
+from arcnerf.render.ray_helper import get_zvals_from_near_far, sample_pdf
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import MODEL_REGISTRY
 from common.utils.torch_utils import chunk_processing
@@ -23,6 +23,8 @@ class MipNeRF(Base3dModel):
         self.radiance_net = build_radiance_model(self.cfgs.model.radiance)
         # get gaussian fn
         self.gaussian_fn = get_value_from_cfgs_field(self.cfgs.model.rays, 'gaussian_fn', 'cone')
+        # importance sampling
+        self.ray_cfgs['n_importance'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'n_importance', 0)
         # handle embed
         self.ipe_embed_freq = get_value_from_cfgs_field(self.cfgs.model.rays, 'ipe_embed_freq', 12)
         assert self.cfgs.model.geometry.input_ch == 6 * self.ipe_embed_freq, \
@@ -33,6 +35,7 @@ class MipNeRF(Base3dModel):
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)
         rays_r = inputs['rays_r']  # (B, 1)
+        output = {}
 
         # get bounds for object
         near, far = self.get_near_far_from_rays(inputs)  # (B, 1) * 2
@@ -58,12 +61,46 @@ class MipNeRF(Base3dModel):
         sigma = sigma.view(-1, self.get_ray_cfgs('n_sample'))  # (B, N_sample)
         radiance = radiance.view(-1, self.get_ray_cfgs('n_sample'), 3)  # (B, N_sample, 3)
 
-        # ray marching, use mid pts as interval representation
+        # ray marching for coarse network, keep the coarse weights for next stage, use mid pts for interval
         zvals_mid = 0.5 * (zvals[:, 1:] + zvals[:, :-1])
-        output = self.ray_marching(sigma, radiance, zvals_mid, inference_only=inference_only)
+        output_coarse = self.ray_marching(sigma, radiance, zvals_mid, inference_only=inference_only)
+        coarse_weights = output_coarse['weights']
 
         # handle progress
-        output = self.output_get_progress(output, get_progress)
+        output['coarse'] = self.output_get_progress(output_coarse, get_progress)
+
+        # fine model
+        if self.get_ray_cfgs('n_importance') > 0:
+            # get upsampled zvals
+            zvals = self.upsample_zvals(zvals_mid, coarse_weights, inference_only)  # (B, N_importance+1)
+
+            # get conical frustum
+            means, covs = self.get_conical_frustum(rays_o, rays_d, rays_r, zvals)  # (B, N_importance, 3) * 2
+            means = means.view(-1, 3)  # (B*N_importance, 3)
+            covs = covs.view(-1, 3)  # (B*N_importance, 3)
+
+            # integrated_pos_enc
+            pts_embed, _ = self.integrated_pos_enc(means, covs, self.ipe_embed_freq)  # (B*N_importance, 6F)
+
+            # get sigma and rgb, expand rays_d to all pts. shape in (B*N_importance, ...)
+            rays_d_repeat = torch.repeat_interleave(rays_d, self.get_ray_cfgs('n_importance'), dim=0)
+            sigma, radiance = chunk_processing(
+                self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, pts_embed, rays_d_repeat
+            )
+
+            # reshape
+            sigma = sigma.view(-1, self.get_ray_cfgs('n_importance'))  # (B, N_importance)
+            radiance = radiance.view(-1, self.get_ray_cfgs('n_importance'), 3)  # (B, N_importance, 3)
+
+            # ray marching for fine network, keep the coarse weights for next stage, use mid pts for interval
+            zvals_mid = 0.5 * (zvals[:, 1:] + zvals[:, :-1])
+            output_fine = self.ray_marching(sigma, radiance, zvals_mid, inference_only=inference_only)
+
+            # handle progress
+            output['fine'] = self.output_get_progress(output_fine, get_progress)
+
+        # adjust two stage output
+        output = self.adjust_coarse_fine_output(output, inference_only)
 
         return output
 
@@ -149,6 +186,26 @@ class MipNeRF(Base3dModel):
         )
 
         return embed_mean_out, embed_cov_out
+
+    def upsample_zvals(self, zvals: torch.Tensor, weights: torch.Tensor, inference_only=True):
+        """Upsample zvals if N_importance > 0. Similar to nerf. But it returns resampled zvals only
+
+        Args:
+            zvals: tensor (B, N_sample), coarse zvals for all rays
+            weights: tensor (B, N_sample) (B, N_sample(-1))
+            inference_only: affect the sample_pdf deterministic. By default False(For train)
+
+        Returns:
+            zvals: tensor (B, N_importance+1), up-sample zvals near the surface
+        """
+        weights_coarse = weights[:, 1:self.get_ray_cfgs('n_sample') - 1]  # (B, N_sample-2)
+        zvals_mid = 0.5 * (zvals[..., 1:] + zvals[..., :-1])  # (B, N_sample-1)
+        _zvals = sample_pdf(
+            zvals_mid, weights_coarse,
+            self.get_ray_cfgs('n_importance') + 1, not self.get_ray_cfgs('perturb') if not inference_only else True
+        ).detach()
+
+        return _zvals
 
     def surface_render(
         self,
