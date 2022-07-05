@@ -2,6 +2,7 @@
 
 import os
 import os.path as osp
+import time
 import unittest
 
 from thop import profile
@@ -41,6 +42,12 @@ def log_model_info(logger, model, feed_in, cfgs, batch_size, n_rays):
         flops, unit = flops / (1024.0**2), 'M'
     logger.add_log('   Flops: {:.2f}{}'.format(flops, unit))
     logger.add_log('   Params: {:.2f}M'.format(params / (1024.0**2)))
+
+    t0 = time.time()
+    _ = model(feed_in)
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+    logger.add_log('   Forward time {:.5f}s'.format(time.time() - t0))
 
 
 class TestModelDict(unittest.TestCase):

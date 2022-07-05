@@ -5,7 +5,7 @@ import unittest
 
 import torch
 
-from arcnerf.models.base_modules.encoding import FreqEmbedder
+from arcnerf.models.base_modules.encoding import FreqEmbedder, SHEmbedder
 from arcnerf.models.base_modules.encoding.gaussian_encoder import GaussianEmbedder
 
 
@@ -30,6 +30,16 @@ class TestDict(unittest.TestCase):
                     out = model(xyz)
                     out_dim = input_dim * (len(periodic_fns) * freq + include)
                     self.assertEqual(out.shape, (self.batch_size, out_dim))
+
+    def tests_sh_embedder(self):
+        # test freq factors, at most 5
+        for degree in range(1, 6):
+            model = SHEmbedder(n_freqs=degree)
+            xyz = torch.ones((self.batch_size, 3))
+            out = model(xyz)
+            out_dim = model.get_output_dim()
+            self.assertEqual(out_dim, degree**2)
+            self.assertEqual(out.shape, (self.batch_size, degree**2))
 
     def test_gaussian_embedder(self):
         n_interval = 20
