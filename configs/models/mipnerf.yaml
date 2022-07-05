@@ -8,8 +8,9 @@ model:
         far: 8.0                      # hardcode far zvals
         n_sample: 128                 # n_sample for zvals sampling
         n_importance: 128             # resample zvals
-        gaussian_fn: cone             # ['cone', 'cylinder'] to get mean/cov
-        ipe_embed_freq: 12            # for gaussian integrated positional encoding
+        gaussian_encoder:
+            gaussian_fn: cone             # ['cone', 'cylinder'] to get mean/cov
+            ipe_embed_freq: 12            # for gaussian integrated positional encoding
         inverse_linear: False         # inverse_linear make zvals close to near
         perturb: True                 # perturb zvals interval
         add_inf_z: True               # Add inf zval for ray marching
@@ -21,14 +22,19 @@ model:
         W: 256                        # linear hidden neuron
         D: 8                          # num of linear, not include final
         skips: [4]                    # pos to add input embedding
-        input_ch: 72                  # xyz input channel, should be 6 * ipe_embed_freq
-        embed_freq: 0                 # xyz embed freq, must be 0
+        encoder:
+            type: FreqEmbedder        # type of encoder
+            input_dim: 72             # xyz input channel, should be 6 * ipe_embed_freq
+            n_freqs: 0                # xyz embed freq, must be 0
         W_feat: 256                   # extra feature output
         geometric_init: False         # whether to use geometric init. need radius_init
     radiance:
         mode: 'vf'                    # view_dir and feature only
         W: 128                        # linear hidden dim
         D: 1                          # num of linear, not include final
-        input_ch_view: 3              # view input channel
-        embed_freq_view: 4            # view embed freq
+        encoder:
+            view:
+                type: FreqEmbedder    # type of encoder
+                input_dim: 3          # view input channel
+                n_freqs: 4            # view embed freq
         W_feat_in: 256                # dim for feature from geometry

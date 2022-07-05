@@ -11,7 +11,7 @@ from .activation import Sine
 class DenseLayer(nn.Linear):
     """Dense Layer(Linear) with activation"""
 
-    def __init__(self, input_dim, out_dim, activation=nn.ReLU(inplace=True), *args, **kwargs):
+    def __init__(self, input_dim, out_dim, activation=nn.ReLU(inplace=True)):
         """
         Args:
             input_dim: input dim
@@ -21,7 +21,7 @@ class DenseLayer(nn.Linear):
         Returns:
             out: (B, out_dim) tensor
         """
-        super().__init__(input_dim, out_dim, *args, **kwargs)
+        super().__init__(input_dim, out_dim)
         self.activation = activation
 
     def forward(self, x: torch.Tensor):
@@ -38,7 +38,7 @@ class SirenLayer(nn.Linear):
              https://github.com/ventusff/neurecon/blob/main/models/base.py
     """
 
-    def __init__(self, input_dim, out_dim, is_first=False, *args, **kwargs):
+    def __init__(self, input_dim, out_dim, is_first=False):
         """
         Args:
             input_dim: input dim
@@ -52,7 +52,7 @@ class SirenLayer(nn.Linear):
         self.input_dim = input_dim
         self.w0 = 30
         self.c = 6
-        super().__init__(input_dim, out_dim, *args, **kwargs)
+        super().__init__(input_dim, out_dim)
         self.activation = Sine(self.w0)
 
     def reset_parameters(self):

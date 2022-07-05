@@ -31,8 +31,10 @@ model:
         W: 256                        # linear hidden dim
         D: 2                          # num of linear, not include final
         include_input: True           # linear layer include input
-        input_ch: 3                   # xyz input channel
-        embed_freq: 6                 # xyz embed freq
+        encoder:                      # encoder
+            type: FreqEmbedder        # type of encoder
+            input_dim: 3              # xyz input channel
+            n_freqs: 6                # xyz embed freq
         W_feat: 256                   # extra feature output
         geometric_init: True          # whether to use geometric init. need radius_init
         radius_init: 0.75             # geometric init sphere radius
@@ -48,9 +50,14 @@ model:
         use_nn: True                  # use nn
         W: 128                        # linear hidden dim
         D: 4                          # num of linear, not include final
-        input_ch_pts: 3               # pts input channel
-        embed_freq_pts: 0             # pts embed freq, not embedding performed
-        input_ch_view: 3              # view input channel
-        embed_freq_view: 4            # view embed freq
+        encoder:
+            pts:
+                type: FreqEmbedder    # type of encoder
+                input_dim: 3          # xyz input channel
+                n_freqs: 0            # xyz embed freq
+            view:
+                type: FreqEmbedder    # type of encoder
+                input_dim: 3          # view input channel
+                n_freqs: 4            # view embed freq
         W_feat_in: 256                # dim for feature from geometry
         weight_norm: True             # normalize the weights

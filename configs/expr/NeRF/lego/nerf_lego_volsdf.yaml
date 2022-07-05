@@ -137,8 +137,10 @@ model:
         W: 256
         D: 8
         skips: [4]
-        input_ch: 3
-        embed_freq: 6
+        encoder:
+            type: FreqEmbedder
+            input_dim: 3
+            n_freqs: 6
         W_feat: 256
         geometric_init: True          # use geometric init. need radius_init
         radius_init: 0.5              # geometric init sphere radius
@@ -152,10 +154,15 @@ model:
         mode: 'pvnf'
         W: 256
         D: 4
-        input_ch_pts: 3
-        embed_freq_pts: 0             # pts embed freq, not embedding performed
-        input_ch_view: 3
-        embed_freq_view: 4
+        encoder:
+            pts:
+                type: FreqEmbedder
+                input_dim: 3
+                n_freqs: 0            # xyz embed freq, not embedding performed
+            view:
+                type: FreqEmbedder
+                input_dim: 3
+                n_freqs: 4
         W_feat_in: 256
         weight_norm: True
 

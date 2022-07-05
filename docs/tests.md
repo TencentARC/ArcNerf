@@ -67,6 +67,8 @@ Test embedder, implicit function, radiance function, with correct input/output. 
 Test each bkg model like nerf++.
 ### tests_nerf
 Test NeRF model.
+### tests_mipnerf
+Test MipNeRF model.
 ### tests_nerfpp
 Test NeRF model with nerf++ as bkg model.
 ### tests_neus

@@ -7,7 +7,7 @@ import torch.nn as nn
 from . import MODULE_REGISTRY
 from .activation import get_activation
 from .base_netwok import BaseGeoNet, BaseRadianceNet
-from .embed import Embedder
+from .encoding import get_encoder
 from .linear import DenseLayer
 from arcnerf.geometry.volume import Volume
 
@@ -47,8 +47,7 @@ class VolGeoNet(BaseGeoNet):
         W=256,
         D=2,
         include_input=True,
-        input_ch=3,
-        embed_freq=6,
+        encoder=None,
         W_feat=256,
         act_cfg=None,
         weight_norm=False,
@@ -75,9 +74,7 @@ class VolGeoNet(BaseGeoNet):
             W: mlp hidden layer size, by default 256
             D: num of hidden layers, by default 2
             include_input: include input with feat embed from voxels. By default True.
-            input_ch: input channel num, by default 3(xyz). It is the dim before embed.
-            embed_freq: embedding freq. by default 6. (Nerf use 10)
-                        output dim will be input_ch * (freq * 2 + 1). 0 means not embed.
+            encoder: cfgs for encoder.
             W_feat: output feature from
             act_cfg: cfg obj for selecting activation. None for relu.
                      For surface modeling, usually use SoftPlus(beta=100)
@@ -99,6 +96,7 @@ class VolGeoNet(BaseGeoNet):
         self.weight_norm = weight_norm
         self.include_input = include_input
 
+        # for geometric init
         self.radius_init = radius_init
         self.geometric_init = geometric_init
         self.dtype = dtype
@@ -122,22 +120,21 @@ class VolGeoNet(BaseGeoNet):
         # set shallow nn network
         self.layers = None
         if use_nn and D > 0 and (W_feat_vol > 0 or include_input):
-            self.embed_fn, self.layers = self.setup_network(
-                W, D, W_feat_vol, W_feat, act_cfg, include_input, input_ch, embed_freq, *args, **kwargs
-            )
+            self.embed_fn, self.layers = self.setup_network(W, D, W_feat_vol, W_feat, act_cfg, include_input, encoder)
 
     def get_volume(self):
         """Get the dense volume"""
         return self.volume
 
-    def setup_network(self, W, D, W_in, W_feat, act_cfg, include_input, input_ch, embed_freq, *args, **kwargs):
+    def setup_network(self, W, D, W_in, W_feat, act_cfg, include_input, encoder):
         """Set up the nn network"""
         layers = []
+        embed_freq, input_ch = None, None
 
         # input layer
         embed_fn, embed_dim = None, 0
         if include_input:
-            embed_fn = Embedder(input_ch, embed_freq, *args, **kwargs)
+            embed_fn, input_ch, embed_freq = get_encoder(encoder)
             embed_dim = embed_fn.get_output_dim()
 
         for i in range(D + 1):
@@ -289,10 +286,7 @@ class VolRadianceNet(BaseRadianceNet):
         use_nn=False,
         W=256,
         D=4,
-        input_ch_pts=3,
-        input_ch_view=3,
-        embed_freq_pts=6,
-        embed_freq_view=4,
+        encoder=None,
         W_feat_in=256,
         act_cfg=None,
         weight_norm=False,
@@ -316,12 +310,7 @@ class VolRadianceNet(BaseRadianceNet):
                     output final results. By default False
             W: mlp hidden layer size, by default 256
             D: num of hidden layers, by default 4
-            input_ch_pts: input channel num for points, by default 3(xyz). It is the dim before embed.
-            input_ch_view: input channel num for view_dirs, by default 3. It is the dim before embed.
-            embed_freq_pts: embedding freq for pts. by default 6.
-                            output dim will be input_ch * (freq * 2 + 1). 0 means not embed.
-            embed_freq_view: embedding freq for view_dir. by default 4.
-                            output dim will be input_ch * (freq * 2 + 1). 0 means not embed.
+            encoder: cfgs for encoder. Contains 'pts'/'view' fields for different input embedding.
             W_feat_in: Num of feature input if mode contains 'f'. Used to calculate the first layer input dim.
                     By default 256
             act_cfg: cfg obj for selecting activation. None for relu.
@@ -364,16 +353,14 @@ class VolRadianceNet(BaseRadianceNet):
             self.grid_value_param.data = self.grid_value_param.data.clip(0.0, 1.0)  # force in range
         else:
             self.embed_fn_pts, self.embed_fn_view, self.init_input_dim, self.layers = self.setup_network(
-                W, D, W_feat_in, act_cfg, input_ch_pts, input_ch_view, embed_freq_pts, embed_freq_view, *args, **kwargs
+                W, D, W_feat_in, act_cfg, encoder
             )
 
     def get_volume(self):
         """Get the dense volume"""
         return self.volume
 
-    def setup_network(
-        self, W, D, W_feat_in, act_cfg, input_ch_pts, input_ch_view, embed_freq_pts, embed_freq_view, *args, **kwargs
-    ):
+    def setup_network(self, W, D, W_feat_in, act_cfg, encoder):
         """Set up the nn network"""
         layers = []
         embed_fn_pts, embed_fn_view = None, None
@@ -381,11 +368,11 @@ class VolRadianceNet(BaseRadianceNet):
         init_input_dim = 0
         # embedding for pts and view, calculate input shape
         if 'p' in self.mode:
-            embed_fn_pts = Embedder(input_ch_pts, embed_freq_pts, *args, **kwargs)
+            embed_fn_pts, _, _ = get_encoder(encoder.pts if encoder is not None else None)
             embed_pts_dim = embed_fn_pts.get_output_dim()
             init_input_dim += embed_pts_dim
         if 'v' in self.mode:
-            embed_fn_view = Embedder(input_ch_view, embed_freq_view, *args, **kwargs)
+            embed_fn_view, _, _ = get_encoder(encoder.view if encoder is not None else None)
             embed_view_dim = embed_fn_view.get_output_dim()
             init_input_dim += embed_view_dim
         if 'n' in self.mode:

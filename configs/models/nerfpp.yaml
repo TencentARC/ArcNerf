@@ -19,16 +19,21 @@ model:
         W: 256                        # linear hidden neuron
         D: 8                          # num of linear, not include final
         skips: [4]                    # pos to add input embedding
-        input_ch: 3                   # xyz input channel
-        embed_freq: 10                # xyz embed freq
+        encoder:
+            type: FreqEmbedder        # type of encoder
+            input_dim: 3              # xyz input channel
+            n_freqs: 10               # xyz embed freq
         W_feat: 256                   # extra feature output
         geometric_init: False         # whether to use geometric init. need radius_init
     radiance:
         mode: 'vf'                    # view_dir and feature only
         W: 128                        # linear hidden dim
         D: 1                          # num of linear, not include final
-        input_ch_view: 3              # view input channel
-        embed_freq_view: 4            # view embed freq
+        encoder:
+            view:
+                type: FreqEmbedder    # type of encoder
+                input_dim: 3          # view input channel
+                n_freqs: 4            # view embed freq
         W_feat_in: 256                # dim for feature from geometry
     background:
         type: NeRFPP                      # background model type, ['nerf_pp']
@@ -46,14 +51,19 @@ model:
             W: 256                        # linear hidden neuron
             D: 8                          # num of linear, not include final
             skips: [4]                    # pos to add input embedding
-            input_ch: 4                   # xyz+1/r input channel
-            embed_freq: 10                # xyz embed freq
+            encoder:
+                type: FreqEmbedder        # type of encoder
+                input_dim: 4              # xyz+1/r input channel
+                n_freqs: 10               # xyz embed freq
             W_feat: 256                   # extra feature output
             geometric_init: False         # whether to use geometric init. need radius_init
         radiance:
             mode: 'vf'                    # view_dir and feature only
             W: 128                        # linear hidden dim
             D: 1                          # num of linear, not include final
-            input_ch_view: 3              # view input channel
-            embed_freq_view: 4            # view embed freq
+            encoder:
+                view:
+                    type: FreqEmbedder    # type of encoder
+                    input_dim: 3          # view input channel
+                    n_freqs: 4            # view embed freq
             W_feat_in: 256                # dim for feature from geometry

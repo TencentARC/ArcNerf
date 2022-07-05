@@ -136,8 +136,10 @@ model:
         W: 256
         D: 8
         skips: [4]
-        input_ch: 3
-        embed_freq: 10
+        encoder:
+            type: FreqEmbedder
+            input_dim: 3
+            n_freqs: 10
         W_feat: 256
         geometric_init: True          # use geometric init. need radius_init
         radius_init: 0.75             # geometric init sphere radius
@@ -151,10 +153,15 @@ model:
         mode: 'pvnf'
         W: 256
         D: 4
-        input_ch_pts: 3
-        embed_freq_pts: 0             # pts embed freq, not embedding performed
-        input_ch_view: 3
-        embed_freq_view: 4
+        encoder:
+            pts:
+                type: FreqEmbedder
+                input_dim: 3
+                n_freqs: 0            # xyz embed freq, not embedding performed
+            view:
+                type: FreqEmbedder
+                input_dim: 3
+                n_freqs: 4
         W_feat_in: 256
         weight_norm: True
     background:
@@ -173,16 +180,21 @@ model:
             W: 256
             D: 8
             skips: [4]
-            input_ch: 4     # (xyz/r, 1/r)
-            embed_freq: 10
+            encoder:
+                type: FreqEmbedder
+                input_dim: 4              # xyz+1/r input channel
+                n_freqs: 10
             W_feat: 256
             geometric_init: False
         radiance:
             mode: 'vf'
             W: 128
             D: 1
-            input_ch_view: 3
-            embed_freq_view: 4
+            encoder:
+                view:
+                    type: FreqEmbedder
+                    input_dim: 3
+                    n_freqs: 4
             W_feat_in: 256
 
 loss:

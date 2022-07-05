@@ -9,14 +9,14 @@ from common.utils.file_utils import scan_dir
 from common.utils.registry import MODULE_REGISTRY
 
 from .activation import get_activation, Sine
-from .embed import Embedder
+from .encoding import get_encoder, FreqEmbedder
 from .linear_network_module import GeoNet, RadianceNet
 from .linear import DenseLayer, SirenLayer
 from .dense_volume_module import VolGeoNet, VolRadianceNet
 
 __all__ = [
-    'get_activation', 'build_geo_model', 'build_radiance_model', 'Embedder', 'DenseLayer', 'SirenLayer', 'Sine',
-    'GeoNet', 'RadianceNet', 'VolGeoNet', 'VolRadianceNet'
+    'get_activation', 'Sine', 'get_encoder', 'FreqEmbedder', 'DenseLayer', 'SirenLayer', 'build_geo_model',
+    'build_radiance_model', 'GeoNet', 'RadianceNet', 'VolGeoNet', 'VolRadianceNet'
 ]
 
 module_folder = osp.dirname(osp.abspath(__file__))

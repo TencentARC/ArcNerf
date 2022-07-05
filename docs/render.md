@@ -12,6 +12,7 @@ A Perspective Camera with `intrinsic(3x3)` and `c2w(4x4)` with get/set function.
 Ray function in rendering, or helper function for sampling. Other geometric function are in `geometry.ray`.
 - get_rays: core get_ray function, lift pixel to world space and get rays_d(norm). TAKE CARE ABOUT THE FLATTEN ORDER!
   - NDC space is allowed to get rays for unbounded cases.
+  - Following MipNeRF, it returns a radius of rays on the pixel.
 - get_near_far_from_rays: get near/far from rays/near/far/bounding_radius, used in models.
 - get_zvals_from_near_far: get the zvals from near/far by sampling.
 - sample_pdf: resample pts from pdf, will call `sample_cdf` after get cdf from weights.

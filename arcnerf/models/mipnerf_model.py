@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-import numpy as np
+
 import torch
 
 from .base_3d_model import Base3dModel
+from .base_modules.encoding.gaussian_encoder import GaussianEmbedder
 from .base_modules import build_geo_model, build_radiance_model
 from arcnerf.render.ray_helper import get_zvals_from_near_far, sample_pdf
 from common.utils.cfgs_utils import get_value_from_cfgs_field
@@ -21,15 +22,16 @@ class MipNeRF(Base3dModel):
         super(MipNeRF, self).__init__(cfgs)
         self.geo_net = build_geo_model(self.cfgs.model.geometry)
         self.radiance_net = build_radiance_model(self.cfgs.model.radiance)
-        # get gaussian fn
-        self.gaussian_fn = get_value_from_cfgs_field(self.cfgs.model.rays, 'gaussian_fn', 'cone')
         # importance sampling
         self.ray_cfgs['n_importance'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'n_importance', 0)
-        # handle embed
-        self.ipe_embed_freq = get_value_from_cfgs_field(self.cfgs.model.rays, 'ipe_embed_freq', 12)
-        assert self.cfgs.model.geometry.input_ch == 6 * self.ipe_embed_freq, \
+        assert self.cfgs.model.geometry.encoder.n_freqs == 0, 'Should not have extra embedding in geometry model'
+        # get gaussian fn and ipe embed
+        self.gaussian_fn = get_value_from_cfgs_field(self.cfgs.model.rays.gaussian_encoder, 'gaussian_fn', 'cone')
+        self.ipe_embed_freq = get_value_from_cfgs_field(self.cfgs.model.rays.gaussian_encoder, 'ipe_embed_freq', 12)
+        assert self.cfgs.model.geometry.encoder.input_dim == 6 * self.ipe_embed_freq, \
             'Incorrect input ch, should be {}'.format(6 * self.ipe_embed_freq)
-        assert self.cfgs.model.geometry.embed_freq == 0, 'Should not have extra embedding in geometry model'
+        # set encoder
+        self.gaussian_encoder = GaussianEmbedder(self.gaussian_fn, self.ipe_embed_freq)
 
     def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         rays_o = inputs['rays_o']  # (B, 3)
@@ -43,13 +45,9 @@ class MipNeRF(Base3dModel):
         # get zvals for each intervals
         zvals = self.get_zvals_from_near_far(near, far, inference_only)  # (B, N_sample+1)
 
-        # get conical frustum
-        means, covs = self.get_conical_frustum(rays_o, rays_d, rays_r, zvals)  # (B, N_sample, 3) * 2
-        means = means.view(-1, 3)  # (B*N_sample, 3)
-        covs = covs.view(-1, 3)  # (B*N_sample, 3)
-
-        # integrated_pos_enc
-        pts_embed, _ = self.integrated_pos_enc(means, covs, self.ipe_embed_freq)  # (B*N_sample, 6F)
+        # get pts_embed
+        pts_embed = self.gaussian_encoder(zvals, rays_o, rays_d, rays_r)  # (B, N_sample, 6F)
+        pts_embed = pts_embed.view(-1, pts_embed.shape[-1])  # (B*N_sample, 6F)
 
         # get sigma and rgb, expand rays_d to all pts. shape in (B*N_sample, ...)
         rays_d_repeat = torch.repeat_interleave(rays_d, self.get_ray_cfgs('n_sample'), dim=0)
@@ -74,13 +72,9 @@ class MipNeRF(Base3dModel):
             # get upsampled zvals
             zvals = self.upsample_zvals(zvals_mid, coarse_weights, inference_only)  # (B, N_importance+1)
 
-            # get conical frustum
-            means, covs = self.get_conical_frustum(rays_o, rays_d, rays_r, zvals)  # (B, N_importance, 3) * 2
-            means = means.view(-1, 3)  # (B*N_importance, 3)
-            covs = covs.view(-1, 3)  # (B*N_importance, 3)
-
-            # integrated_pos_enc
-            pts_embed, _ = self.integrated_pos_enc(means, covs, self.ipe_embed_freq)  # (B*N_importance, 6F)
+            # get pts_embed
+            pts_embed = self.gaussian_encoder(zvals, rays_o, rays_d, rays_r)  # (B, N_importance, 6F)
+            pts_embed = pts_embed.view(-1, pts_embed.shape[-1])  # (B*N_importance, 6F)
 
             # get sigma and rgb, expand rays_d to all pts. shape in (B*N_importance, ...)
             rays_d_repeat = torch.repeat_interleave(rays_d, self.get_ray_cfgs('n_importance'), dim=0)
@@ -128,65 +122,6 @@ class MipNeRF(Base3dModel):
 
         return zvals
 
-    def get_conical_frustum(self, rays_o, rays_d, rays_r, zvals):
-        """Get the mean/cov representation of the conical frustum
-
-        Args:
-            rays_o: torch.tensor (B, 3) rays origin
-            rays_d: torch.tensor (B, 3) rays direction
-            rays_r: torch.tensor (B, 1) radius
-            zvals: torch.tensor (B, N+1) sample zvals for each intervals.
-
-        Returns:
-            means: means of the ray (B, N, 3)
-            covs: covariances of the ray (B, N, 3)
-        """
-        t_start = zvals[:, :-1]
-        t_end = zvals[:, 1:]
-        if self.gaussian_fn == 'cone':
-            gaussian_fn = conical_frustum_to_gaussian
-        elif self.gaussian_fn == 'cylinder':
-            gaussian_fn = cylinder_to_gaussian
-        else:
-            raise NotImplementedError('Invalid gaussian function {}'.format(self.gaussian_fn))
-        means, covs = gaussian_fn(rays_d, t_start, t_end, rays_r)  # (B, N, 3) * 2
-        means = means + rays_o.unsqueeze(1)  # (B, N, 3)
-
-        return means, covs
-
-    def integrated_pos_enc(self, means, covs, ipe_embed_freq):
-        """Get positional encoding from means/cov representation
-
-        Args:
-            means: means of the ray (B, 3)
-            covs: covariances of the ray (B, 3)
-            ipe_embed_freq: maximum embed freq, F
-
-        Returns:
-            embed_mean_out: embedded of mean xyz, (B, 3F)
-            embed_cov_out: embedded of cov (B, 3F)
-        """
-        scales = [2**i for i in range(0, ipe_embed_freq)]
-        embed_mean = []
-        embed_cov = []
-        for scale in scales:
-            embed_mean.append(means * scale)
-            embed_cov.append(covs * scale**2)
-        embed_mean = torch.cat(embed_mean, dim=-1)  # (N, 3F)
-        embed_cov = torch.cat(embed_cov, dim=-1)  # (N, 3F)
-        embed_mean = torch.cat([embed_mean, embed_mean + 0.5 * np.pi], dim=-1)  # (N, 6F)
-        embed_cov = torch.cat([embed_cov, embed_cov], dim=-1)  # (N, 6F)
-
-        def safe_trig(x, fn, t=100 * np.pi):
-            return fn(torch.where(torch.abs(x) < t, x, x % t))
-
-        embed_mean_out = torch.exp(-0.5 * embed_cov) * safe_trig(embed_mean, torch.sin)
-        embed_cov_out = torch.clamp_min(
-            0.5 * (1 - torch.exp(-2.0 * embed_cov) * safe_trig(2.0 * embed_mean, torch.cos)) - embed_mean_out**2, 0.0
-        )
-
-        return embed_mean_out, embed_cov_out
-
     def upsample_zvals(self, zvals: torch.Tensor, weights: torch.Tensor, inference_only=True):
         """Upsample zvals if N_importance > 0. Similar to nerf. But it returns resampled zvals only
 
@@ -219,73 +154,3 @@ class MipNeRF(Base3dModel):
     ):
         """For density model, the surface is not exactly accurate. Not suggest ot use this func"""
         raise NotImplementedError('Do not support surface render for mipnerf')
-
-
-def conical_frustum_to_gaussian(rays_d, t_start, t_end, rays_r):
-    """Turn conical frustum into gaussian representation
-    Sec 3.1 in paper
-
-    Args:
-        rays_d: torch.tensor (B, 3) rays direction
-        t_start: (B, N) start zvals for each interv
-        t_end: (B, N) end zvals for each interval
-        rays_r: torch.tensor (B, 1) basic radius
-
-    Returns:
-        means: means of the ray (B, N, 3)
-        covs: covariances of the ray (B, N, 3)
-    """
-    mu = (t_start + t_end) / 2.0  # (B, N)
-    hw = (t_end - t_start) / 2.0  # (B, N)
-    common_term = 3.0 * mu**2 + hw**2  # (B, N)
-    t_mean = mu + (2.0 * mu * hw**2) / common_term  # (B, N)
-    t_var = (hw**2) / 3.0 - (4.0 / 15.0) * ((hw**4 * (12.0 * mu**2 - hw**2)) / common_term**2)  # (B, N)
-    r_var = rays_r**2 * ((mu**2) / 4.0 + (5.0 / 12.0) * hw**2 - (4.0 / 15.0) * (hw**4) / common_term)  # (B, N)
-    mean, covs = lift_gaussian(rays_d, t_mean, t_var, r_var)
-
-    return mean, covs
-
-
-def cylinder_to_gaussian(rays_d, t_start, t_end, rays_r):
-    """Turn cylinder frustum into gaussian representation
-
-    Args:
-        rays_d: torch.tensor (B, 3) rays direction
-        t_start: (B, N) start zvals for each interv
-        t_end: (B, N) end zvals for each interval
-        rays_r: torch.tensor (B, 1) radius
-
-    Returns:
-        means: means of the ray (B, N, 3)
-        covs: covariances of the ray (B, N, 3)
-    """
-    t_mean = (t_start + t_end) / 2.0  # (B, N)
-    t_var = (t_end - t_start)**2 / 12.0  # (B, N)
-    r_var = rays_r**2 / 4.0  # (B, N)
-    mean, covs = lift_gaussian(rays_d, t_mean, t_var, r_var)
-
-    return mean, covs
-
-
-def lift_gaussian(rays_d, t_mean, t_var, r_var):
-    """Lift mu/t to rays gaussian mean/var
-
-    Args:
-        rays_d: direction (B, 3)
-        t_mean: mean (B, N) of each interval along ray
-        t_var: variance (B, N) of each interval along ray
-        r_var: variance (B, N) of each interval perpendicular to ray
-
-    Returns:
-        means: means of the ray (B, N, 3)
-        covs: covariances of the ray (B, N, 3)
-    """
-    mean = rays_d.unsqueeze(1) * t_mean.unsqueeze(-1)  # (B, N, 3)
-    d_mag_sq = torch.clamp_min(torch.sum(rays_d**2, dim=-1, keepdim=True), 1e-10)  # (B, 3)
-    d_outer_diag = rays_d**2  # (B, 3)
-    null_outer_diag = 1 - d_outer_diag / d_mag_sq  # (B, 3)
-    t_cov_diag = t_var[..., None] * d_outer_diag[..., None, :]  # (B, N, 3)
-    xy_cov_diag = r_var[..., None] * null_outer_diag[..., None, :]  # (B, N, 3)
-    cov_diag = t_cov_diag + xy_cov_diag  # (B, N, 3)
-
-    return mean, cov_diag

@@ -9,7 +9,7 @@ import torch.nn as nn
 from . import MODULE_REGISTRY
 from .activation import get_activation
 from .base_netwok import BaseGeoNet, BaseRadianceNet
-from .embed import Embedder
+from .encoding import get_encoder
 from .linear import DenseLayer, SirenLayer
 from arcnerf.geometry.transformation import normalize
 
@@ -25,8 +25,7 @@ class GeoNet(BaseGeoNet):
         W=256,
         D=8,
         skips=[4],
-        input_ch=3,
-        embed_freq=6,
+        encoder=None,
         W_feat=256,
         skip_reduce_output=False,
         norm_skip=False,
@@ -44,9 +43,7 @@ class GeoNet(BaseGeoNet):
             D: num of hidden layers, by default 8
             skips: list of skip points to add input directly, by default [4] (at middle). Must in range [0, D-1]
                     For any skip layer, it is concat in [feature, embed] order.
-            input_ch: input channel num, by default 3(xyz). It is the dim before embed.
-            embed_freq: embedding freq. by default 6. (Nerf use 10)
-                        output dim will be input_ch * (freq * 2 + 1). 0 means not embed.
+            encoder: cfgs for encoder.
             W_feat: Num of feature output. If <1, not output any feature. By default 256
             skip_reduce_output: If True, reduce output dim by embed_dim, else cat embed to hidden. By default False.
                                Nerf do not use it. Only for surface modeling methods(idr/neus/volsdf/unisurf)
@@ -75,7 +72,7 @@ class GeoNet(BaseGeoNet):
         if use_siren:
             assert len(skips) == 0, 'do not use skips for siren'
         self.norm_skip = norm_skip
-        self.embed_fn = Embedder(input_ch, embed_freq, *args, **kwargs)
+        self.embed_fn, input_ch, embed_freq = get_encoder(encoder)
         embed_dim = self.embed_fn.get_output_dim()
 
         layers = []
@@ -211,10 +208,7 @@ class RadianceNet(BaseRadianceNet):
         mode='vf',
         W=256,
         D=8,
-        input_ch_pts=3,
-        input_ch_view=3,
-        embed_freq_pts=6,
-        embed_freq_view=4,
+        encoder=None,
         W_feat_in=256,
         act_cfg=None,
         use_siren=False,
@@ -228,12 +222,7 @@ class RadianceNet(BaseRadianceNet):
                   Should be a str combining all used inputs. By default 'vf', use view_dir and geo_feat like nerf.
             W: mlp hidden layer size, by default 256
             D: num of hidden layers, by default 8
-            input_ch_pts: input channel num for points, by default 3(xyz). It is the dim before embed.
-            input_ch_view: input channel num for view_dirs, by default 3. It is the dim before embed.
-            embed_freq_pts: embedding freq for pts. by default 6.
-                            output dim will be input_ch * (freq * 2 + 1). 0 means not embed.
-            embed_freq_view: embedding freq for view_dir. by default 4.
-                            output dim will be input_ch * (freq * 2 + 1). 0 means not embed.
+            encoder: cfgs for encoder. Contains 'pts'/'view' fields for different input embedding.
             W_feat_in: Num of feature input if mode contains 'f'. Used to calculate the first layer input dim.
                     By default 256
             act_cfg: cfg obj for selecting activation. None for relu.
@@ -252,11 +241,11 @@ class RadianceNet(BaseRadianceNet):
         self.init_input_dim = 0
         # embedding for pts and view, calculate input shape
         if 'p' in mode:
-            self.embed_fn_pts = Embedder(input_ch_pts, embed_freq_pts, *args, **kwargs)
+            self.embed_fn_pts, _, _ = get_encoder(encoder.pts if encoder is not None else None)
             embed_pts_dim = self.embed_fn_pts.get_output_dim()
             self.init_input_dim += embed_pts_dim
         if 'v' in mode:
-            self.embed_fn_view = Embedder(input_ch_view, embed_freq_view, *args, **kwargs)
+            self.embed_fn_view, _, _ = get_encoder(encoder.view if encoder is not None else None)
             embed_view_dim = self.embed_fn_view.get_output_dim()
             self.init_input_dim += embed_view_dim
         if 'n' in mode:

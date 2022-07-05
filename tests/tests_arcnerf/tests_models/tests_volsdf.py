@@ -42,7 +42,9 @@ class TestVolsdfDict(TestModelDict):
         n_sample = cfgs.model.rays.n_sample
         n_importance = cfgs.model.rays.n_importance
         n_total = n_sample + n_importance
-        zvals = get_zvals_from_near_far(feed_in['near'], feed_in['far'], cfgs.model.rays.n_eval)  # (B, N_eval)
+        zvals = get_zvals_from_near_far(
+            feed_in['near'].view(-1, 1), feed_in['far'].view(-1, 1), cfgs.model.rays.n_eval
+        )  # (BN, 3)
         zvals, zvals_surface = model.get_fg_model().sample_zvals(
             feed_in['rays_o'].view(-1, 3), feed_in['rays_d'].view(-1, 3), zvals, False,
             model.get_fg_model().forward_pts

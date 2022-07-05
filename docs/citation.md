@@ -66,6 +66,53 @@ Thanks to the authors for their works.
 }
 ```
 
+- [mipnerf](https://github.com/google/mipnerf)
+```
+@misc{barron2021mipnerf,
+      title={Mip-NeRF: A Multiscale Representation for Anti-Aliasing Neural Radiance Fields},
+      author={Jonathan T. Barron and Ben Mildenhall and Matthew Tancik and Peter Hedman and Ricardo Martin-Brualla and Pratul P. Srinivasan},
+      year={2021},
+      eprint={2103.13415},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```
+
+
+------------------------------------------------------------------------
+Below is the several implementations of `instant-ngp`.
+
+- [tiny-cuda-nn](https://github.com/NVlabs/tiny-cuda-nn/)
+```
+@misc{tiny-cuda-nn,
+    Author = {Thomas M\"uller},
+    Year = {2021},
+    Note = {https://github.com/nvlabs/tiny-cuda-nn},
+    Title = {Tiny {CUDA} Neural Network Framework}
+}
+```
+
+- [instant-ngp](https://github.com/NVlabs/instant-ngp)
+```
+@article{mueller2022instant,
+    author = {Thomas M\"uller and Alex Evans and Christoph Schied and Alexander Keller},
+    title = {Instant Neural Graphics Primitives with a Multiresolution Hash Encoding},
+    journal = {ACM Trans. Graph.},
+    issue_date = {July 2022},
+    volume = {41},
+    number = {4},
+    month = jul,
+    year = {2022},
+    pages = {102:1--102:15},
+    articleno = {102},
+    numpages = {15},
+    url = {https://doi.org/10.1145/3528223.3530127},
+    doi = {10.1145/3528223.3530127},
+    publisher = {ACM},
+    address = {New York, NY, USA},
+}
+```
+
 - [HashNeRF](https://github.com/yashbhalgat/HashNeRF-pytorch)
 ```
 @misc{bhalgat2022hashnerfpytorch,
@@ -78,6 +125,28 @@ Thanks to the authors for their works.
 }
 ```
 
+- [ngp_pl](https://github.com/kwea123/ngp_pl)
+```
+@misc{ngp_pl,
+    Author = {Quei-An, Chen},
+    Year = {2022},
+    Note = {https://github.com/kwea123/ngp_pl},
+    Title = {ngp_pl}
+}
+```
+
+- [torch-ngp](https://github.com/ashawkey/torch-ngp)
+```
+@misc{torch-ngp,
+    Author = {Jiaxiang Tang},
+    Year = {2022},
+    Note = {https://github.com/ashawkey/torch-ngp},
+    Title = {Torch-ngp: a PyTorch implementation of instant-ngp}
+}
+```
+
+
+------------------------------------------------------------------------
 Thanks Xintao for the project template
 https://github.com/xinntao/ProjectTemplate-Python/
 ```

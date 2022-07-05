@@ -16,12 +16,16 @@
   - nerf(nerfpl) - DONE
   - nerf++ - DONE
   - neus/volsdf (sdf/occpancy) - neurcon - DONE
-
-  - nsvf/plenoxel/plenoctree + instangp/hash_nerf
+  - mip-nerf - Implemented. Benchmark not reach
+  - instangp/hash_nerf
+    - ff_mlp/gridencoder/shencoder/raychingmarching（torch版本， tinycudann版本， torchngp版本）
+  - nsvf/plenoxel/plenoctree
+  - tensroRF
+  - mip-nerf-360
+  - diver (voxel interval representation)
   - neuraltex
   - marching/deftet, demtet
   - nerfFactor/nerd
-  - mip-nerf
   - dynamic
   - neural volume
   - nex (mpi, msi, etc)
@@ -44,6 +48,12 @@
 ## Datasets and Benchmarks
 
 ### Self-Capture data and Colmap
+
+
+### to add
+- synthetic nsvf
+- tanks and temples
+- mip-360
 
 ------------------------------------------------------------------------
 ## Models

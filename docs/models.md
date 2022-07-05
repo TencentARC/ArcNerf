@@ -10,6 +10,11 @@ Embed inputs like xyz/view_dir into higher dimension using periodic funcs(sin, c
 ## linear
 - DenseLayer: Linear with custom activation function.
 - SirenLayer: Linear with sin() activation and respective initialization.
+## encoding
+This layer makes embedding for xyz/view dir by different method
+- FreqEmbedder: Positional encoding introduced in original NeRF.
+- GaussianEmbedder: Integrated Positional encoding introduced in Mip-NeRF.
+It takes zvals and rays info directly, and embed the whole interval. So it does not follow the same api as other encoding.
 
 ------------------------------------------------------------------------
 ## BaseGeoNet/BaseRadianceNetwork

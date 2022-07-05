@@ -25,8 +25,10 @@ model:
         W: 256                        # linear hidden dim
         D: 2                          # num of linear, not include final
         include_input: True           # linear layer include input
-        input_ch: 3                   # xyz input channel
-        embed_freq: 10                # xyz embed freq
+        encoder:                      # encoder
+            type: FreqEmbedder        # type of encoder
+            input_dim: 3              # xyz input channel
+            n_freqs: 10               # xyz embed freq
         W_feat: 256                   # extra feature output
         geometric_init: False         # whether to use geometric init. need radius_init
     radiance:
@@ -37,6 +39,9 @@ model:
         use_nn: True                  # use nn
         W: 128                        # linear hidden dim
         D: 4                          # num of linear, not include final
-        input_ch_view: 3              # view input channel
-        embed_freq_view: 4            # view embed freq
+        encoder:
+            view:
+                type: FreqEmbedder    # type of encoder
+                input_dim: 3          # view input channel
+                n_freqs: 4            # view embed freq
         W_feat_in: 256                # dim for feature from geometry

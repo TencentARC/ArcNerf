@@ -4,9 +4,9 @@ import torch
 import torch.nn as nn
 
 
-class Embedder(nn.Module):
+class FreqEmbedder(nn.Module):
     """
-        Embedding module. Embed inputs into higher dimensions.
+        FreqEmbedder module. Embed inputs into higher dimensions.
         For example, x = sin(2**N * x) or sin(N * x) for N in range(0, 10)
         ref: https://github.com/ventusff/neurecon/blob/main/models/base.py
     """
@@ -36,7 +36,7 @@ class Embedder(nn.Module):
             For example, inputs_dim = 3, using (sin, cos) encoding, N_freq = 10, include_input, will results at
                 3 * 2 * 10 + 3 = 63 output shape.
         """
-        super(Embedder, self).__init__()
+        super(FreqEmbedder, self).__init__()
 
         self.input_dim = input_dim
         self.include_input = include_input
