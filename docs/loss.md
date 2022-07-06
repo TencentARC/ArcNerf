@@ -4,6 +4,7 @@ Loss for comparing image. Used for view systhesis.
 - keys: list of key to calculate, used sum of them. By default `['rgb']`.
 `['rgb_coarse/fine']` for two stage model.
 - loss_type: select loss type such as 'MSE'/'L1'. By default MSE
+- internal_weights: If set, will multiply factors to each weights. By default None.
 - use_mask: use mask for average calculation. By default False.
 - do_mean: calculate the mean of loss. By default True.
 

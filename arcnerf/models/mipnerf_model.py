@@ -3,7 +3,7 @@
 import torch
 
 from .base_3d_model import Base3dModel
-from .base_modules.encoding.gaussian_encoder import GaussianEmbedder
+from .base_modules.encoding.gaussian_encoder import Gaussian
 from .base_modules import build_geo_model, build_radiance_model
 from arcnerf.render.ray_helper import get_zvals_from_near_far, sample_pdf
 from common.utils.cfgs_utils import get_value_from_cfgs_field
@@ -24,14 +24,9 @@ class MipNeRF(Base3dModel):
         self.radiance_net = build_radiance_model(self.cfgs.model.radiance)
         # importance sampling
         self.ray_cfgs['n_importance'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'n_importance', 0)
-        assert self.cfgs.model.geometry.encoder.n_freqs == 0, 'Should not have extra embedding in geometry model'
-        # get gaussian fn and ipe embed
-        self.gaussian_fn = get_value_from_cfgs_field(self.cfgs.model.rays.gaussian_encoder, 'gaussian_fn', 'cone')
-        self.ipe_embed_freq = get_value_from_cfgs_field(self.cfgs.model.rays.gaussian_encoder, 'ipe_embed_freq', 12)
-        assert self.cfgs.model.geometry.encoder.input_dim == 6 * self.ipe_embed_freq, \
-            'Incorrect input ch, should be {}'.format(6 * self.ipe_embed_freq)
-        # set encoder
-        self.gaussian_encoder = GaussianEmbedder(self.gaussian_fn, self.ipe_embed_freq)
+        # set gaussian
+        gaussian_fn = get_value_from_cfgs_field(self.cfgs.model.rays.gaussian, 'gaussian_fn', 'cone')
+        self.gaussian = Gaussian(gaussian_fn)
 
     def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         rays_o = inputs['rays_o']  # (B, 3)
@@ -45,14 +40,14 @@ class MipNeRF(Base3dModel):
         # get zvals for each intervals
         zvals = self.get_zvals_from_near_far(near, far, inference_only)  # (B, N_sample+1)
 
-        # get pts_embed
-        pts_embed = self.gaussian_encoder(zvals, rays_o, rays_d, rays_r)  # (B, N_sample, 6F)
-        pts_embed = pts_embed.view(-1, pts_embed.shape[-1])  # (B*N_sample, 6F)
+        # get mean/cov representation of intervals
+        intervals = self.gaussian(zvals, rays_o, rays_d, rays_r)  # (B, N_sample, 6)
+        intervals = intervals.view(-1, intervals.shape[-1])  # (B*N_sample, 6)
 
         # get sigma and rgb, expand rays_d to all pts. shape in (B*N_sample, ...)
         rays_d_repeat = torch.repeat_interleave(rays_d, self.get_ray_cfgs('n_sample'), dim=0)
         sigma, radiance = chunk_processing(
-            self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, pts_embed, rays_d_repeat
+            self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, intervals, rays_d_repeat
         )
 
         # reshape
@@ -69,17 +64,17 @@ class MipNeRF(Base3dModel):
 
         # fine model
         if self.get_ray_cfgs('n_importance') > 0:
-            # get upsampled zvals
+            # get upsampled zvals, do not concat with original ones
             zvals = self.upsample_zvals(zvals_mid, coarse_weights, inference_only)  # (B, N_importance+1)
 
-            # get pts_embed
-            pts_embed = self.gaussian_encoder(zvals, rays_o, rays_d, rays_r)  # (B, N_importance, 6F)
-            pts_embed = pts_embed.view(-1, pts_embed.shape[-1])  # (B*N_importance, 6F)
+            # get mean/cov representation of intervals
+            intervals = self.gaussian(zvals, rays_o, rays_d, rays_r)  # (B, N_importance, 6)
+            intervals = intervals.view(-1, intervals.shape[-1])  # (B*N_sample, 6)
 
             # get sigma and rgb, expand rays_d to all pts. shape in (B*N_importance, ...)
             rays_d_repeat = torch.repeat_interleave(rays_d, self.get_ray_cfgs('n_importance'), dim=0)
             sigma, radiance = chunk_processing(
-                self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, pts_embed, rays_d_repeat
+                self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, intervals, rays_d_repeat
             )
 
             # reshape

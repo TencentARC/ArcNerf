@@ -3,7 +3,10 @@
 import torch
 import torch.nn as nn
 
+from . import ENCODER_REGISTRY
 
+
+@ENCODER_REGISTRY.register()
 class SHEmbedder(nn.Module):
     """
         Spherical Harmonics Embedder in torch. Embed view dir into higher dimensions.
@@ -11,11 +14,12 @@ class SHEmbedder(nn.Module):
         ref: https://github.com/yashbhalgat/HashNeRF-pytorch/blob/main/hash_encoding.py
     """
 
-    def __init__(self, input_dim=3, n_freqs=4, *args, **kwargs):
+    def __init__(self, input_dim=3, n_freqs=4, include_input=True, *args, **kwargs):
         """
         Args:
             input_dim: dimension of input to be embedded. Must be 3(direction)
             n_freqs: num of degree for embedding
+            include_input: if True, raw input is included in the embedding. Appear at beginning. By default is True
 
         """
         super(SHEmbedder, self).__init__()
@@ -24,7 +28,9 @@ class SHEmbedder(nn.Module):
         assert 1 <= n_freqs <= 5, 'Should have degree 1~5 for encoding...'
         self.input_dim = input_dim
         self.n_freqs = n_freqs
-        self.out_dim = n_freqs**2
+        self.include_input = include_input
+
+        self.out_dim = n_freqs**2 + include_input * input_dim
 
     def get_output_dim(self):
         """Get output dim"""
@@ -75,8 +81,11 @@ class SHEmbedder(nn.Module):
         xx, yy, zz = x**2, y**2, z**2
         xy, yz, xz = x * y, y * z, x * z
 
-        # hardcode the operation
         out = []
+        if self.include_input:
+            out.append(xyz)  # (B, 3)
+
+        # hardcode the operation
         fac_0 = torch.tensor([freq_factors[0][0]], dtype=dtype, device=device).unsqueeze(0)
         fac_0 = torch.repeat_interleave(fac_0, xyz.shape[0], dim=0)  # (B, 1)
         out.append(fac_0)

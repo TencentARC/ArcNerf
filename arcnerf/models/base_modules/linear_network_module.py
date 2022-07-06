@@ -9,7 +9,7 @@ import torch.nn as nn
 from . import MODULE_REGISTRY
 from .activation import get_activation
 from .base_netwok import BaseGeoNet, BaseRadianceNet
-from .encoding import get_encoder
+from .encoding import build_encoder
 from .linear import DenseLayer, SirenLayer
 from arcnerf.geometry.transformation import normalize
 
@@ -72,7 +72,7 @@ class GeoNet(BaseGeoNet):
         if use_siren:
             assert len(skips) == 0, 'do not use skips for siren'
         self.norm_skip = norm_skip
-        self.embed_fn, input_ch, embed_freq = get_encoder(encoder)
+        self.embed_fn, input_ch, embed_freq = build_encoder(encoder)
         embed_dim = self.embed_fn.get_output_dim()
 
         layers = []
@@ -106,6 +106,7 @@ class GeoNet(BaseGeoNet):
                 layer = nn.Linear(in_dim, out_dim)
 
             # geo_init for denseLayer. For any layer inputs, it should be [feature, x, embed_x]
+            # This assumes include_input in enocoder is True
             if geometric_init and not use_siren:
                 if i == D:  # last layer
                     nn.init.normal_(layer.weight, mean=np.sqrt(np.pi) / np.sqrt(in_dim), std=0.0001)
@@ -241,11 +242,11 @@ class RadianceNet(BaseRadianceNet):
         self.init_input_dim = 0
         # embedding for pts and view, calculate input shape
         if 'p' in mode:
-            self.embed_fn_pts, _, _ = get_encoder(encoder.pts if encoder is not None else None)
+            self.embed_fn_pts, _, _ = build_encoder(encoder.pts if encoder is not None else None)
             embed_pts_dim = self.embed_fn_pts.get_output_dim()
             self.init_input_dim += embed_pts_dim
         if 'v' in mode:
-            self.embed_fn_view, _, _ = get_encoder(encoder.view if encoder is not None else None)
+            self.embed_fn_view, _, _ = build_encoder(encoder.view if encoder is not None else None)
             embed_view_dim = self.embed_fn_view.get_output_dim()
             self.init_input_dim += embed_view_dim
         if 'n' in mode:

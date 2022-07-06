@@ -1,31 +1,25 @@
 # -*- coding: utf-8 -*-
 
-import numpy as np
 import torch
 import torch.nn as nn
 
+from . import ENCODER_REGISTRY
 
-class GaussianEmbedder(nn.Module):
+
+class Gaussian(nn.Module):
     """
-        Gaussian Embedder module.
-        Transfer zvals with rays into mean/cov and turn into higher dimensions.
+        Gaussian module.
+        Transfer zvals with rays into mean/cov
         ref: https://github.com/google/mipnerf/blob/main/internal/mip.py
     """
 
-    def __init__(self, gaussian_fn='cone', ipe_embed_freq=12, *args, **kwargs):
+    def __init__(self, gaussian_fn='cone'):
         """
         Args:
             gaussian_fn: 'cone' or 'cylinder' to model the interval
-            ipe_embed_freq: freq for integrated positional encoding
         """
-        super(GaussianEmbedder, self).__init__()
+        super(Gaussian, self).__init__()
         self.gaussian_fn = gaussian_fn
-        self.ipe_embed_freq = ipe_embed_freq
-        assert self.ipe_embed_freq > 0, 'ipe_embed_freq should be non-negative'
-
-    def get_output_dim(self):
-        """Get output dim"""
-        return self.ipe_embed_freq * 6
 
     def forward(self, zvals: torch.Tensor, rays_o: torch.Tensor, rays_d: torch.Tensor, rays_r: torch.Tensor):
         """Get embed from gaussian distribution.
@@ -37,19 +31,12 @@ class GaussianEmbedder(nn.Module):
             rays_r: torch.tensor (B, 1) radius
 
         Returns:
-            pts_embed: embedded of mean xyz in all intervals, (B, N, 6F)
+            mean_cov: gaussian representation of the interval (B, N, 3*2), first 3-mean, second 3-cov
         """
-        batch_size, n_interval = zvals.shape[0], zvals.shape[1] - 1
-        # get conical frustum
         means, covs = self.get_conical_frustum(zvals, rays_o, rays_d, rays_r)  # (B, N, 3) * 2
-        means = means.view(-1, 3)  # (BN, 3)
-        covs = covs.view(-1, 3)  # (BN, 3)
+        mean_cov = torch.cat([means, covs], dim=-1)  # (B, N, 3*2)
 
-        # integrated_pos_enc
-        pts_embed, _ = self.integrated_pos_enc(means, covs)  # (BN, 6F)
-        pts_embed = pts_embed.view(batch_size, n_interval, -1)  # (B, N, 6F)
-
-        return pts_embed
+        return mean_cov
 
     def get_conical_frustum(self, zvals, rays_o, rays_d, rays_r):
         """Get the mean/cov representation of the conical frustum
@@ -72,6 +59,7 @@ class GaussianEmbedder(nn.Module):
             gaussian_fn = self.cylinder_to_gaussian
         else:
             raise NotImplementedError('Invalid gaussian function {}'.format(self.gaussian_fn))
+
         means, covs = gaussian_fn(rays_d, t_start, t_end, rays_r)  # (B, N, 3) * 2
         means = means + rays_o.unsqueeze(1)  # (B, N, 3)
 
@@ -145,34 +133,87 @@ class GaussianEmbedder(nn.Module):
 
         return mean, cov_diag
 
-    def integrated_pos_enc(self, means, covs):
-        """Get positional encoding from means/cov representation
 
+@ENCODER_REGISTRY.register()
+class GaussianEmbedder(nn.Module):
+    """
+        GaussianEmbedder module. Embed gaussian representation(B, G*2) into higher dimensions.
+        For example, x = exp(-0.5*2**2N*cov) * sin(2**N * mean) for N in range(0, 10)
+        ref: https://github.com/ventusff/neurecon/blob/main/models/base.py
+    """
+
+    def __init__(
+        self,
+        input_dim,
+        n_freqs,
+        log_sampling=True,
+        include_input=True,
+        periodic_fns=(torch.sin, torch.cos),
+        *args,
+        **kwargs
+    ):
+        """
         Args:
-            means: means of the ray (B, 3)
-            covs: covariances of the ray (B, 3)
+            input_dim: dimension of input to be embedded. For mean and cov each.
+            n_freqs: number of frequency bands. If 0, will not encode the inputs.
+            log_sampling: if True, use log factor exp(-0.5 * 2**2N * cov) * sin(2**N * x).
+                         Else use scale factor exp(-0.5 * N**2 * cov) sin(N * x). By default is True
+            include_input: if True, raw input is included in the embedding. Appear at beginning. By default is True
+            periodic_fns: a list of periodic functions used to embed input. By default is (sin, cos)
 
         Returns:
-            embed_mean_out: embedded of mean xyz, (B, 6F)
-            embed_cov_out: embedded of cov (B, 6F)
+            Embedded inputs with shape:
+                (inputs_dim * len(periodic_fns) * N_freq + include_input * inputs_dim)
+            For example, inputs_dim = 3, using (sin, cos) encoding, N_freq = 10, include_input, will results at
+                3 * 2 * 10 + 3 = 63 output shape.
         """
-        scales = [2**i for i in range(0, self.ipe_embed_freq)]
-        embed_mean = []
-        embed_cov = []
-        for scale in scales:
-            embed_mean.append(means * scale)
-            embed_cov.append(covs * scale**2)
-        embed_mean = torch.cat(embed_mean, dim=-1)  # (B, 3F)
-        embed_cov = torch.cat(embed_cov, dim=-1)  # (B, 3F)
-        embed_mean = torch.cat([embed_mean, embed_mean + 0.5 * np.pi], dim=-1)  # (B, 6F)
-        embed_cov = torch.cat([embed_cov, embed_cov], dim=-1)  # (B, 6F)
+        super(GaussianEmbedder, self).__init__()
 
-        def safe_trig(x, fn, t=100 * np.pi):
-            return fn(torch.where(torch.abs(x) < t, x, x % t))
+        self.input_dim = input_dim
+        self.include_input = include_input
+        self.periodic_fns = periodic_fns
 
-        embed_mean_out = torch.exp(-0.5 * embed_cov) * safe_trig(embed_mean, torch.sin)  # (B, 6F)
-        embed_cov_out = torch.clamp_min(
-            0.5 * (1 - torch.exp(-2.0 * embed_cov) * safe_trig(2.0 * embed_mean, torch.cos)) - embed_mean_out**2, 0.0
-        )  # (B, 6F)
+        # get output dim
+        self.out_dim = 0
+        if self.include_input:
+            self.out_dim += self.input_dim
+        self.out_dim += self.input_dim * n_freqs * len(self.periodic_fns)
 
-        return embed_mean_out, embed_cov_out
+        if n_freqs == 0 and include_input:  # inputs only
+            self.freq_bands = []
+        else:
+            if log_sampling:
+                self.freq_bands = 2.**torch.linspace(0., n_freqs - 1, n_freqs)
+            else:
+                self.freq_bands = torch.linspace(2.**0., 2.**(n_freqs - 1), n_freqs)
+
+    def get_output_dim(self):
+        """Get output dim"""
+        return self.out_dim
+
+    def forward(self, x: torch.Tensor):
+        """
+        Args:
+            x: tensor of shape [B, input_dim*2], mean/cov combination
+
+        Returns:
+            embed_x: tensor of shape [B, out_dim]
+        """
+        assert (x.shape[-1] == self.input_dim * 2), 'Input shape should be (B, 2*{})'.format(self.input_dim)
+
+        means, covs = x[:, :self.input_dim], x[:, self.input_dim:]
+
+        embed_x = []
+        if self.include_input:
+            embed_x.append(means)
+
+        for freq in self.freq_bands:
+            for fn in self.periodic_fns:
+                embed_x.append(torch.exp(-0.5 * freq**2 * covs) * fn(means * freq))
+
+        if len(embed_x) > 1:
+            embed_x = torch.cat(embed_x, dim=-1)
+        else:
+            embed_x = embed_x[0]
+
+        return embed_x

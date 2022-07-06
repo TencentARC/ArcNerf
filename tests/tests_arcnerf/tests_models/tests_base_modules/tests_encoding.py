@@ -5,8 +5,7 @@ import unittest
 
 import torch
 
-from arcnerf.models.base_modules.encoding import FreqEmbedder, SHEmbedder
-from arcnerf.models.base_modules.encoding.gaussian_encoder import GaussianEmbedder
+from arcnerf.models.base_modules.encoding import FreqEmbedder, GaussianEmbedder, Gaussian, SHEmbedder
 
 
 class TestDict(unittest.TestCase):
@@ -33,17 +32,20 @@ class TestDict(unittest.TestCase):
 
     def tests_sh_embedder(self):
         # test freq factors, at most 5
+        include_inputs = [True, False]
         for degree in range(1, 6):
-            model = SHEmbedder(n_freqs=degree)
-            xyz = torch.ones((self.batch_size, 3))
-            out = model(xyz)
-            out_dim = model.get_output_dim()
-            self.assertEqual(out_dim, degree**2)
-            self.assertEqual(out.shape, (self.batch_size, degree**2))
+            for include in include_inputs:
+                model = SHEmbedder(n_freqs=degree, include_input=include)
+                xyz = torch.ones((self.batch_size, 3))
+                out = model(xyz)
+                out_dim = model.get_output_dim()
+                self.assertEqual(out_dim, degree**2 + include * 3)
+                self.assertEqual(out.shape, (self.batch_size, degree**2 + include * 3))
 
     def test_gaussian_embedder(self):
         n_interval = 20
-        ipe_embed_freqs = [1, 5, 10]
+        n_freqs = [0, 5, 10]
+        include_inputs = [True, False]
         gaussian_fns = ['cone', 'cylinder']
         near, far = 0.0, 2.0
         # prepare inputs
@@ -51,9 +53,16 @@ class TestDict(unittest.TestCase):
         zvals = torch.repeat_interleave(zvals, self.batch_size, 0)  # (B, N+1)
         rays_o = torch.rand((self.batch_size, 3))
         rays_d = torch.rand((self.batch_size, 3))
-        rays_i = torch.rand((self.batch_size, 1))
+        rays_r = torch.rand((self.batch_size, 1))
         for gaussian_fn in gaussian_fns:
-            for ipe_embed_freq in ipe_embed_freqs:
-                model = GaussianEmbedder(gaussian_fn, ipe_embed_freq)
-                out = model(zvals, rays_o, rays_d, rays_i)
-                self.assertEqual(out.shape, (self.batch_size, n_interval, 6 * ipe_embed_freq))
+            for freq in n_freqs:
+                for include in include_inputs:
+                    if freq == 0 and include is False:
+                        continue  # this case is not allowed
+                    gaussian = Gaussian(gaussian_fn=gaussian_fn)
+                    mean_cov = gaussian(zvals, rays_o, rays_d, rays_r)
+                    mean_cov = mean_cov.view(-1, 6)  # (BN, 6)
+                    model = GaussianEmbedder(3, freq, include_input=include)
+                    out = model(mean_cov)
+                    out_dim = 3 * (2 * freq + include)
+                    self.assertEqual(out.shape, (self.batch_size * n_interval, out_dim))

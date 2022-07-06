@@ -1,12 +1,27 @@
 # -*- coding: utf-8 -*-
 
+import importlib
+import os.path as osp
+from copy import deepcopy
+
+from common.utils.cfgs_utils import dict_to_obj, valid_key_in_cfgs
+from common.utils.file_utils import scan_dir
+from common.utils.registry import ENCODER_REGISTRY
+
 from .freq_encoder import FreqEmbedder
+from .gaussian_encoder import GaussianEmbedder, Gaussian
 from .sh_encoder import SHEmbedder
 
-from common.utils.cfgs_utils import get_value_from_cfgs_field, dict_to_obj
+__all__ = ['FreqEmbedder', 'Gaussian', 'GaussianEmbedder', 'SHEmbedder']
+
+encoder_folder = osp.dirname(osp.abspath(__file__))
+encoder_filenames = [osp.splitext(osp.basename(v))[0] for v in scan_dir(encoder_folder) if v.endswith('_encoder.py')]
+_encoder_modules = [
+    importlib.import_module(f'arcnerf.models.base_modules.encoding.{file_name}') for file_name in encoder_filenames
+]
 
 
-def get_encoder(cfgs):
+def build_encoder(cfgs):
     """Select encoder from cfgs.
     For all the encoder here, it should support to embed any input in (B, input_dim) into higher dimension (B, out)
 
@@ -23,13 +38,12 @@ def get_encoder(cfgs):
             'n_freqs': 0  # by default not encode
         })
 
-    encoder_type = get_value_from_cfgs_field(cfgs, 'type', 'FreqEmbedder')
+    cfgs = deepcopy(cfgs)
 
-    if encoder_type == 'FreqEmbedder':
-        encoder = FreqEmbedder(**cfgs.__dict__)
-    elif encoder_type == 'SHEmbedder':
-        encoder = SHEmbedder(**cfgs.__dict__)
+    # default as FreqEmbedder
+    if not valid_key_in_cfgs(cfgs, 'type'):
+        encoder = ENCODER_REGISTRY.get('FreqEmbedder')(**cfgs.__dict__)
     else:
-        raise NotImplementedError('Invalid embeder {}'.format(encoder_type))
+        encoder = ENCODER_REGISTRY.get(cfgs.type)(**cfgs.__dict__)
 
     return encoder, cfgs.input_dim, cfgs.n_freqs

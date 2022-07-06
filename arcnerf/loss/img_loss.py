@@ -18,12 +18,14 @@ class ImgLoss(nn.Module):
                 keys: key used for loss sum. By default 'rgb'.
                       'rgb_coarse'/'rgb_fine' for two stage network
                 loss_type: select loss type such as 'MSE'/'L1'. By default MSE
+                internal_weights: If set, will multiply factors to each weights. By default None.
                 use_mask: use mask for average calculation. By default False.
                 do_mean: calculate the mean of loss. By default True.
         """
         super(ImgLoss, self).__init__()
         self.keys = get_value_from_cfgs_field(cfgs, 'keys', ['rgb'])
         self.loss = self.parse_loss(cfgs)
+        self.internal_weights = get_value_from_cfgs_field(cfgs, 'internal_weights', None)
         self.use_mask = get_value_from_cfgs_field(cfgs, 'use_mask', False)
         self.do_mean = get_value_from_cfgs_field(cfgs, 'do_mean', True)
 
@@ -56,8 +58,11 @@ class ImgLoss(nn.Module):
             mask = data['mask'].to(device)
 
         loss = 0.0
-        for k in self.keys:
-            loss += self.loss(output[k], gt)  # (B, N_rays, 3)
+        for idx, k in enumerate(self.keys):
+            if self.internal_weights is not None:
+                loss += self.internal_weights[idx] * self.loss(output[k], gt)  # (B, N_rays, 3)
+            else:
+                loss += self.loss(output[k], gt)  # (B, N_rays, 3)
 
         if self.do_mean:  # (1,)
             if self.use_mask:

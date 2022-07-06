@@ -3,7 +3,10 @@
 import torch
 import torch.nn as nn
 
+from . import ENCODER_REGISTRY
 
+
+@ENCODER_REGISTRY.register()
 class FreqEmbedder(nn.Module):
     """
         FreqEmbedder module. Embed inputs into higher dimensions.

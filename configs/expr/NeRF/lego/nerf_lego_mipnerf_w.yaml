@@ -1,4 +1,4 @@
-name: nerf_lego_mipnerf
+name: nerf_lego_mipnerf_w
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_mipnerf'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_mipnerf_w'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_mipnerf/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_mipnerf_w/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -143,6 +143,7 @@ model:
 loss:
     ImgLoss:
         keys: ['rgb_coarse', 'rgb_fine']
+        internal_weights: [0.1, 1.0]
         weight: 1.0
 
 metric:

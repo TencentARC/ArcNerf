@@ -7,7 +7,7 @@ import torch.nn as nn
 from . import MODULE_REGISTRY
 from .activation import get_activation
 from .base_netwok import BaseGeoNet, BaseRadianceNet
-from .encoding import get_encoder
+from .encoding import build_encoder
 from .linear import DenseLayer
 from arcnerf.geometry.volume import Volume
 
@@ -134,7 +134,7 @@ class VolGeoNet(BaseGeoNet):
         # input layer
         embed_fn, embed_dim = None, 0
         if include_input:
-            embed_fn, input_ch, embed_freq = get_encoder(encoder)
+            embed_fn, input_ch, embed_freq = build_encoder(encoder)
             embed_dim = embed_fn.get_output_dim()
 
         for i in range(D + 1):
@@ -368,11 +368,11 @@ class VolRadianceNet(BaseRadianceNet):
         init_input_dim = 0
         # embedding for pts and view, calculate input shape
         if 'p' in self.mode:
-            embed_fn_pts, _, _ = get_encoder(encoder.pts if encoder is not None else None)
+            embed_fn_pts, _, _ = build_encoder(encoder.pts if encoder is not None else None)
             embed_pts_dim = embed_fn_pts.get_output_dim()
             init_input_dim += embed_pts_dim
         if 'v' in self.mode:
-            embed_fn_view, _, _ = get_encoder(encoder.view if encoder is not None else None)
+            embed_fn_view, _, _ = build_encoder(encoder.view if encoder is not None else None)
             embed_view_dim = embed_fn_view.get_output_dim()
             init_input_dim += embed_view_dim
         if 'n' in self.mode:
