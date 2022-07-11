@@ -1,18 +1,47 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import os
+import os.path as osp
 import unittest
 
 import torch
 
+from arcnerf.geometry.transformation import normalize
 from arcnerf.models.base_modules.encoding import FreqEmbedder, GaussianEmbedder, Gaussian, SHEmbedder
+from common.utils.logger import Logger
+from tests.tests_arcnerf.tests_ops import log_custom_benchmark
+
+RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results'))
+os.makedirs(RESULT_DIR, exist_ok=True)
 
 
 class TestDict(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.batch_size = 10
+        cls.batch_size = 4096
+        cls.logger = Logger(path=osp.join(RESULT_DIR, './benchmark.txt'), keep_console=False)
+
+    def check_output_and_grad(self, out_torch, out_custom, grad_torch, grad_custom, atol=1e-5):
+        """Check the output and grad"""
+        if out_torch is not None:
+            if isinstance(out_torch, list):
+                for out, _out in zip(out_torch, out_custom):
+                    if isinstance(out, torch.Tensor):
+                        self.assertTrue(torch.allclose(out, _out, atol=atol))
+            else:
+                if isinstance(out_torch, torch.Tensor):
+                    self.assertTrue(torch.allclose(out_torch, out_custom, atol=atol))
+
+        if grad_torch is not None:
+            if isinstance(grad_torch, list):
+                for grad, _grad in zip(grad_torch, grad_custom):
+                    if isinstance(grad, torch.Tensor):
+                        self.assertTrue(torch.allclose(grad, _grad, atol=atol))
+            else:
+                if isinstance(grad_torch, torch.Tensor):
+                    self.assertTrue(torch.allclose(grad_torch, grad_custom, atol=atol))
 
     def tests_freq_embedder(self):
         input_dims = range(1, 10)
@@ -24,7 +53,7 @@ class TestDict(unittest.TestCase):
                 for include in include_inputs:
                     if freq == 0 and include is False:
                         continue  # this case is not allowed
-                    xyz = torch.ones((self.batch_size, input_dim))
+                    xyz = torch.rand((self.batch_size, input_dim))
                     model = FreqEmbedder(input_dim, freq, include_input=include, periodic_fns=periodic_fns)
                     out = model(xyz)
                     out_dim = input_dim * (len(periodic_fns) * freq + include)
@@ -36,11 +65,31 @@ class TestDict(unittest.TestCase):
         for degree in range(1, 6):
             for include in include_inputs:
                 model = SHEmbedder(n_freqs=degree, include_input=include)
-                xyz = torch.ones((self.batch_size, 3))
+                xyz = torch.rand((self.batch_size, 3))
                 out = model(xyz)
                 out_dim = model.get_output_dim()
                 self.assertEqual(out_dim, degree**2 + include * 3)
                 self.assertEqual(out.shape, (self.batch_size, degree**2 + include * 3))
+
+    def tests_sh_embedder_comp(self):
+        if not torch.cuda.is_available():
+            return
+
+        for degree in range(1, 6):
+            sh_torch = SHEmbedder(n_freqs=degree, include_input=True)
+            sh_custom = SHEmbedder(n_freqs=degree, include_input=True, use_cuda_backend=True)
+
+            dirs = torch.rand((self.batch_size, 3), dtype=torch.float32)
+            dirs_norm = dirs / normalize(dirs)
+
+            inputs = [dirs_norm.clone().detach().requires_grad_(True)]
+
+            out_torch, out_custom, grad_torch, grad_custom = log_custom_benchmark(
+                self.logger, 'SH Encode(degree {})'.format(degree), sh_torch, sh_custom, inputs
+            )
+
+            # the accumulate grad gets quite large error
+            self.check_output_and_grad(out_torch, out_custom, grad_torch, grad_custom, atol=1e-5)
 
     def test_gaussian_embedder(self):
         n_interval = 20

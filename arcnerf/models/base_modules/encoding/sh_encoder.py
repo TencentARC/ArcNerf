@@ -4,6 +4,11 @@ import torch
 import torch.nn as nn
 
 from . import ENCODER_REGISTRY
+try:
+    from arcnerf.ops import SHEncode
+    CUDA_BACKEND_AVAILABLE = True
+except ImportError:
+    CUDA_BACKEND_AVAILABLE = False
 
 
 @ENCODER_REGISTRY.register()
@@ -14,12 +19,13 @@ class SHEmbedder(nn.Module):
         ref: https://github.com/yashbhalgat/HashNeRF-pytorch/blob/main/hash_encoding.py
     """
 
-    def __init__(self, input_dim=3, n_freqs=4, include_input=True, *args, **kwargs):
+    def __init__(self, input_dim=3, n_freqs=4, include_input=True, use_cuda_backend=False, *args, **kwargs):
         """
         Args:
             input_dim: dimension of input to be embedded. Must be 3(direction)
-            n_freqs: num of degree for embedding
-            include_input: if True, raw input is included in the embedding. Appear at beginning. By default is True
+            n_freqs: num of degree for embedding.
+            include_input: if True, raw input is included in the embedding. Appear at beginning. By default is True.
+            use_cuda_backend: whether to use the customized cuda backend. By default False, use pure torch version.
 
         """
         super(SHEmbedder, self).__init__()
@@ -29,6 +35,11 @@ class SHEmbedder(nn.Module):
         self.input_dim = input_dim
         self.n_freqs = n_freqs
         self.include_input = include_input
+        self.use_cuda_backend = use_cuda_backend
+
+        # set up cuda backend
+        if self.use_cuda_backend and CUDA_BACKEND_AVAILABLE:
+            self.sh_encode = SHEncode(n_freqs)
 
         self.out_dim = n_freqs**2 + include_input * input_dim
 
@@ -42,7 +53,7 @@ class SHEmbedder(nn.Module):
         Check this: https://en.wikipedia.org/wiki/Table_of_spherical_harmonics
 
         Args:
-            degree: num of degree to expand, generally between 1~4
+            degree: num of degree to expand, generally between 1~5
 
         Returns:
             freq_factors: list of list. Len of list = degree, sum of all list num = degree**2
@@ -67,23 +78,43 @@ class SHEmbedder(nn.Module):
     def forward(self, xyz: torch.Tensor):
         """
         Args:
-            xyz: tensor of shape [B, 3], xyz direction, normalized
+            xyz: tensor of shape (B, 3), xyz direction, normalized
 
         Returns:
-            out: tensor of shape [B, out_dim=n_freqs**2]
+            out: tensor of shape (B, out_dim=n_freqs**2 + include_inputs * input_dim)
+        """
+        assert len(xyz.shape) == 2 and xyz.shape[-1] == 3, 'Must be (B, 3) direction'
+
+        out = []
+        if self.include_input:
+            out.append(xyz)  # (B, 3)
+
+        if self.use_cuda_backend and CUDA_BACKEND_AVAILABLE:
+            sh_embed = self.sh_encode(xyz)
+        else:
+            sh_embed = self.sh_encode_torch(xyz)
+        out.append(sh_embed)  # (B, n_freqs**2)
+
+        return torch.cat(out, dim=-1)  # (B, out_dim)
+
+    def sh_encode_torch(self, xyz: torch.Tensor):
+        """Embed xyz direction into n_freqs**2 feature
+
+        Args:
+            xyz: tensor of shape (B, 3), xyz direction, normalized
+
+        Returns:
+            out: tensor of shape (B, out_dim=n_freqs**2)
         """
         dtype = xyz.dtype
         device = xyz.device
-        assert len(xyz.shape) == 2 and xyz.shape[-1] == 3, 'Must be (B, 3) direction'
+
+        out = []
 
         freq_factors = self.get_factors(self.n_freqs)
         x, y, z = xyz[:, 0:1], xyz[:, 1:2], xyz[:, 2:3]  # (B, 1)
         xx, yy, zz = x**2, y**2, z**2
         xy, yz, xz = x * y, y * z, x * z
-
-        out = []
-        if self.include_input:
-            out.append(xyz)  # (B, 3)
 
         # hardcode the operation
         fac_0 = torch.tensor([freq_factors[0][0]], dtype=dtype, device=device).unsqueeze(0)

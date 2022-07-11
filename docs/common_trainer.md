@@ -188,8 +188,56 @@ But generally you should not make it in training progress. Local evaluation is b
 - Change `render_progress_img` in `custom_trainer` for different visual results.
 
 ------------------------------------------------------------------------
+## CUDA extentsion
+We provide simple samples of CUDA extensions for simple add_matrix function, and a python wrapper
+to use it like a `torch.nn.Module`.
+More detail please see [official doc](https://pytorch.org/tutorials/advanced/cpp_extension.html).
+
+Install it by getting into `custom/ops` and run `python setup.py install`. Or run `sh ./scripts/install_ops.sh`.
+
+Run it by `python custom/ops/add_matrix.py` or
+run tests by `python -m unittest tests/tests_custom/tests_ops/tests_ops.py`.
+
+### Develop new ops
+You need to have a new folder in `custom/ops/` to include the source cpp-wrapper and cuda implementation.
+
+A python wrapper is suggested to put under `custom/ops/func.py` to use the func for usage.
+
+### __global__, __device__, __host__: keywords
+- `__global__`: call by cpu, run on gpu. Function must be `void`.
+- `__device__`: call by gpu, run on gpu
+- `__host__`: call by cpu, run on cpu
+- `__host__ __device__`: both cpu and gpu
+- `__global__ __host__` is not allow.
+
+### grid-block-thread
+`grid - block - thread` is the level structure of GPU computation unit.
+- index = blockIdx.x * blockDim.x + threadIdx.x = the thread id in a grid
+- stride = blockDim.x = total num of thread in a block. Commonly a block can be used to handle one batch.
+- stride = blockDim.x * gridDim.x  = total num of thread in a grid
+  - use this is called `grid-stride loop`
+#### 2d and 1d
+- 2d/1d grid/block are all supported based on your input tensor shape.
+- Ref to [doc1](http://www.mathcs.emory.edu/~cheung/Courses/355/Syllabus/94-CUDA/2D-grids.html) and
+and [doc2](https://blog.csdn.net/canhui_wang/article/details/51730264) for detail.
+
+### PackedAccessor
+To put a tensor into cuda kernel, it uses
+`
+    AT_DISPATCH_FLOATING_TYPES(A.scalar_type(), "sample_cuda",  // this will switch actual scalar type
+    ([&] {
+        kernel_func<scalar_t><<<blocks, threads>>>(
+            A.data_ptr<scalar_t>(), B.data_ptr<scalar_t>(),
+        );
+    }));
+`
+If you use `A.data_ptr<scalar_t>()` to send the pointer, it will be hard to access the elements in kernel func.
+
+You can instead use `PackedAccessor`, which is like
+`torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>()` to allow easier access.
+
+------------------------------------------------------------------------
 ## More to do:
-- cuda/c++ extension template
 - inference, demo
 - onnx or other implementation
 - deploy and web server
@@ -202,3 +250,4 @@ But generally you should not make it in training progress. Local evaluation is b
 This project template refers to:
 - https://github.com/xinntao/ProjectTemplate-Python
 - https://github.com/ventusff/neurecon#volume-rendering--3d-implicit-surface
+- https://github.com/kwea123/pytorch_cppcuda_practice

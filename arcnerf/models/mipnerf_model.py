@@ -27,6 +27,8 @@ class MipNeRF(Base3dModel):
         # set gaussian
         gaussian_fn = get_value_from_cfgs_field(self.cfgs.model.rays.gaussian, 'gaussian_fn', 'cone')
         self.gaussian = Gaussian(gaussian_fn)
+        # blur coarse weights
+        self.blur_coarse_weights = get_value_from_cfgs_field(self.cfgs.model.rays, 'blur_coarse_weights', False)
 
     def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         rays_o = inputs['rays_o']  # (B, 3)
@@ -128,6 +130,11 @@ class MipNeRF(Base3dModel):
         Returns:
             zvals: tensor (B, N_importance+1), up-sample zvals near the surface
         """
+        if self.blur_coarse_weights:
+            weights_pad = torch.cat([weights[..., :1], weights, weights[..., -1:]], dim=-1)  # (B, N_sample+2)
+            weights_max = torch.max(weights_pad[..., :-1], weights_pad[..., 1:])  # (B, N_sample+1)
+            weights = 0.5 * (weights_max[..., :-1] + weights_max[..., 1:])  # (B, N_sample)
+
         weights_coarse = weights[:, 1:self.get_ray_cfgs('n_sample') - 1]  # (B, N_sample-2)
         zvals_mid = 0.5 * (zvals[..., 1:] + zvals[..., :-1])  # (B, N_sample-1)
         _zvals = sample_pdf(
