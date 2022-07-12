@@ -61,9 +61,27 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
     t_forward_torch, t_backward_torch = None, None
     # torch implementation
     if torch_func is not None:
+        # grad
+        out_torch = torch_func(*inputs_gpu)
+        loss = torch.sum((1.0 - out_torch)**2)
+        loss.backward()
+
+        # log the grad
+        grad_torch = []
+        for input in inputs:
+            if isinstance(input, torch.Tensor):
+                grad_torch.append(input.grad.clone())
+            else:
+                grad_torch.append(None)
+
+        # timing
         t_forward_torch = 0.0
         t_backward_torch = 0.0
         for _ in range(n_iter):
+            # zeros the grad
+            for input in inputs:
+                input.grad.zero_()
+
             t0 = get_start_time()
             out_torch = torch_func(*inputs_gpu)
             t_forward_torch += get_end_time(t0)
@@ -80,23 +98,32 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
         t_backward_torch = t_backward_torch / float(n_iter)
         logger.add_log('Torch Backward time {:.6f}s'.format(t_backward_torch))
 
-        # log the grad
-        grad_torch = []
-        for input in inputs:
-            if isinstance(input, torch.Tensor):
-                grad_torch.append(input.grad.clone())
-            else:
-                grad_torch.append(None)
-
         # zeros the grad
         for input in inputs:
             input.grad.zero_()
 
     # custom cuda implementation
+    # log the grad
+    out_custom = custom_fuc(*inputs_gpu)
+    loss = torch.sum((1.0 - out_custom)**2)
+    loss.backward()
+
+    grad_custom = []
+    for input in inputs:
+        if isinstance(input, torch.Tensor):
+            grad_custom.append(input.grad.clone())
+        else:
+            grad_custom.append(None)
+
     out_custom = None
     t_forward_custom = 0.0
     t_backward_custom = 0.0
     for _ in range(n_iter):
+        # zeros the grad
+        for input in inputs:
+            if input.grad is not None:
+                input.grad.zero_()
+
         t0 = get_start_time()
         out_custom = custom_fuc(*inputs_gpu)
         t_forward_custom += get_end_time(t0)
@@ -126,14 +153,6 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
                 t_backward_custom, t_backward_torch / t_backward_custom
             )
         )
-
-    # log the grad
-    grad_custom = []
-    for input in inputs:
-        if isinstance(input, torch.Tensor):
-            grad_custom.append(input.grad.clone())
-        else:
-            grad_custom.append(None)
 
     logger.add_log('_' * 60)
     logger.add_log('\n')
