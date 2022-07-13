@@ -121,7 +121,7 @@ class HashGridEmbedder(nn.Module):
 
         offsets.append(n_total_embed)
         embeddings = nn.Parameter(torch.empty(n_total_embed, self.n_feat_per_entry))
-        embeddings.data.uniform_(-std, std)
+        nn.init.uniform_(embeddings, -std, std)
 
         return embeddings, n_total_embed, offsets, resolutions
 
@@ -133,7 +133,7 @@ class HashGridEmbedder(nn.Module):
         Returns:
             out: tensor of shape (B, out_dim=T*F + include_inputs * input_dim)
         """
-        assert len(xyz.shape) == 2 and xyz.shape[-1] == 3, 'Must be (B, 3) direction'
+        assert len(xyz.shape) == 2 and xyz.shape[-1] == 3, 'Must be (B, 3) tensor'
 
         out = []
         if self.include_input:
@@ -160,7 +160,6 @@ class HashGridEmbedder(nn.Module):
         empty_level_out = (xyz.clone() * 0.0)[:, :1].repeat(1, self.n_feat_per_entry)  # (B, F)
 
         for i, n_grid in enumerate(self.resolutions):
-            print(i, n_grid)
             out_level = empty_level_out.clone()  # (B, F)
 
             self.volume.set_n_grid(n_grid, reset_pts=False)  # reset n_grid, but not the grid_pts
@@ -180,8 +179,8 @@ class HashGridEmbedder(nn.Module):
                 )  # (B_valid, 8)
 
                 # hash the index of the grid pts
-                valid_grid_pts_hash_idx = self.fast_hash(grid_pts_idx_valid, self.offsets[i + 1] - self.offsets[i]
-                                                         ) + self.offsets[i]  # (B_valid, 8), in correct bin
+                valid_grid_pts_hash_idx = self.fast_hash(grid_pts_idx_valid, self.offsets[i + 1] - self.offsets[i])
+                valid_grid_pts_hash_idx += self.offsets[i]  # (B_valid, 8), in correct bin
 
                 # embed on grid
                 valid_embed = self.embeddings[valid_grid_pts_hash_idx.view(-1)]  # (B_valid*8, F)

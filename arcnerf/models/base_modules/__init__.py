@@ -12,11 +12,10 @@ from .activation import get_activation, Sine
 from .encoding import build_encoder, FreqEmbedder
 from .linear_network_module import GeoNet, RadianceNet
 from .linear import DenseLayer, SirenLayer
-from .dense_volume_module import VolGeoNet, VolRadianceNet
 
 __all__ = [
     'get_activation', 'Sine', 'build_encoder', 'FreqEmbedder', 'DenseLayer', 'SirenLayer', 'build_geo_model',
-    'build_radiance_model', 'GeoNet', 'RadianceNet', 'VolGeoNet', 'VolRadianceNet'
+    'build_radiance_model', 'GeoNet', 'RadianceNet'
 ]
 
 module_folder = osp.dirname(osp.abspath(__file__))

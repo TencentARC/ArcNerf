@@ -8,7 +8,9 @@ import unittest
 import torch
 
 from arcnerf.geometry.transformation import normalize
-from arcnerf.models.base_modules.encoding import FreqEmbedder, GaussianEmbedder, Gaussian, HashGridEmbedder, SHEmbedder
+from arcnerf.models.base_modules.encoding import (
+    DenseGridEmbedder, FreqEmbedder, GaussianEmbedder, Gaussian, HashGridEmbedder, SHEmbedder
+)
 from common.utils.logger import Logger
 from tests.tests_arcnerf.tests_ops import log_custom_benchmark
 
@@ -126,3 +128,12 @@ class TestDict(unittest.TestCase):
         out_dim = model.get_output_dim()
         self.assertEqual(out_dim, n_levels * n_feat_per_entry + 3)
         self.assertEqual(out.shape, (self.batch_size, n_levels * n_feat_per_entry + 3))
+
+    def tests_densegrid_encoder(self):
+        for W_feat in [0, 256]:
+            model = DenseGridEmbedder(include_input=True, W_feat=W_feat).cuda()
+            xyz = torch.rand((self.batch_size, 3)).cuda()
+            out = model(xyz)
+            out_dim = model.get_output_dim()
+            self.assertEqual(out_dim, 1 + 3 + W_feat)
+            self.assertEqual(out.shape, (self.batch_size, 1 + 3 + W_feat))

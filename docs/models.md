@@ -1,20 +1,42 @@
 # Base_modules
 Modules like embedder, implicit function, radiance field, etc.
-## embedder
-Embed inputs like xyz/view_dir into higher dimension using periodic funcs(sin, cos).
-- output_dim = (inputs_dim * len(periodic_fns) * N_freq + include_input * inputs_dim)
-- log_sampling: if True, use log factor sin(2**N * x). Else use scale factor sin(N * x).
+
 ## activation
 - Sine: sin() for activation.
 - get_activation: get the activation by cfg
 ## linear
 - DenseLayer: Linear with custom activation function.
 - SirenLayer: Linear with sin() activation and respective initialization.
-## encoding
-This layer makes embedding for xyz/view dir by different method
-- FreqEmbedder: Positional encoding introduced in original NeRF.
-- GaussianEmbedder: Integrated Positional encoding introduced in Mip-NeRF.
-It takes zvals and rays info directly, and embed the whole interval. So it does not follow the same api as other encoding.
+
+------------------------------------------------------------------------
+## encoder
+We provide several encoder to transfer the input xyz/dir into higher freq embeddings.
+
+Some of the customize cuda implementation needed to be install by `sh scripts/install_ops.sh`
+### FreqEmbedder
+Positional encoding introduced in [NeRF](https://arxiv.org/abs/2003.08934).
+
+Embed inputs like xyz/view_dir into higher dimension using periodic funcs(sin, cos).
+### GaussianEmbedder
+Integrated Positional encoding introduced in [MipNeRF](https://arxiv.org/abs/2103.13415).
+
+You need to first get the Gaussian representation of the interval(mean/cov), then embed it into higher freq.
+### HashGridEmbedder
+The multi-res hashing embedding introduced in [Instant-ngp](https://arxiv.org/abs/2201.05989).
+
+It only embed xyz positions rather than direction. It uses multi-res volume grid index, hash them and get the
+embedding of grid_pts from hashmap, and get the embedding by interpolation.
+
+We provide a custom cuda implementation as well by setting `use_cuda_backend` as `True`.
+### SHEmbedder
+The spherical harmonic hashing embedding introduced in [Instant-ngp](https://arxiv.org/abs/2201.05989).
+
+It only embed xyz direction rather than positions.
+
+We provide a custom cuda implementation as well by setting `use_cuda_backend` as `True`
+### DenseGridEmbedder
+The dense grid embedder directly extracts density and feature from a dense volume. It only embed xyz direction rather than positions.
+
 
 ------------------------------------------------------------------------
 ## BaseGeoNet/BaseRadianceNetwork
@@ -149,13 +171,13 @@ if you actually need it. It generally contains geo_net and radiance_net for geom
 ## fg_model
 Here are the class of fg_model, which concentrates on building the foreground object part.
 ### NeRF
-Nerf model with single forward(NeRF), and hierarchical sampling(NeRFFull).
+[NeRF](https://arxiv.org/abs/2003.08934) model with single forward or hierarchical sampling. You can control by `n_importance`.
 
 It is combination of GeoNet and RadianceNet, with ray sampling, resample pdf, ray marching, etc.
 
 ### MipNeRF
-MipNerf model do not use the isolated sampled points, but use a gaussian expectation for modeling the interval.
-It is only used for view synthesis rather than geometry extraction.
+[MipNerf](https://arxiv.org/abs/2103.13415) model do not use the isolated sampled points, but use a gaussian expectation for modeling the interval.
+It is used for view synthesis rather than geometry extraction.
 
 ### sdf_model
 SDF model is a class of fg_model that model the volumetric field as sdf. Compared to density field, it is better to
@@ -165,7 +187,7 @@ by finding the surface xyz directly and use surface pts as the pixel rgb.
 A simple tutorial is in `notebooks/surface_render.ipynb`.
 
 #### Neus
-Neus models sdf as geo value and up-sample pts.
+[Neus](http://arxiv.org/abs/2106.10689) models sdf as geo value and up-sample pts.
 
 It is combination of GeoNet and RadianceNet, with up sample, resample pdf, ray marching, etc.
 
@@ -175,14 +197,28 @@ Since it gets sdf value instead of sigma, we do not support sigma mode for blend
 - init_var: use to init the inv_s param. By default `inv_s = -np.log(init_var)/speed_factor`, init as `0.05`
 - speed_factor: use to init the inv_s, and get scale by `exp(inv_s * speed_factor``. By default `10`.
 - anneal_end: num of epoch for slope blending. In infer model, the factor is `1`, else `min(epoch/anneal_end, 1)`
+- n_iter: num of iter to run upsample algo.
 
 ### VolSDF
-VolSDF models sdf as well but used different sdf_to_density function and sampling method compared with NeuS.
+[VolSDF](https://arxiv.org/abs/2106.12052) models sdf as well but used different sdf_to_density function and sampling method compared with NeuS.
+- init_beta: use to init the ln_beta param. By default `inv_s = np.log(init_beta)/speed_factor`, init as `0.1`
+- speed_factor: use to init the inv_s, and get scale by `exp(ln_beta * speed_factor``. By default `10`.
+- beta_min: min beta offset, by default 1e-4
+- n_iter: num of iter to run upsample algo.
+- n_eval: num of eval pts for upsampling, not used for backward.
+- beta_iter: num of iter to update beta
+- eps: small threshold
+
+The performance is worse than Neus as we test.
+
+### Instant-ngp
+[Instant-ngp](https://arxiv.org/abs/2201.05989) is not a model. It use `HashGridEmbedder` and `SHEmbedder` to
+accelerate the training progress.
 
 ------------------------------------------------------------------------
 ## bkg_model
 Here are the class of bkg_model, which concentrates on building the background.
 The model is also able to model foreground together if you set the parameters well.
 ### NeRFPP(nerf++)
-The nerf++ model use same structure of one stage NeRF model to model the background in Multi-Sphere Image(MSI),
+The [nerf++](http://arxiv.org/abs/2010.07492) model use same structure of one stage NeRF model to model the background in Multi-Sphere Image(MSI),
 and change input to `(x/r, y/r, z/r, 1/r)` for different radius.

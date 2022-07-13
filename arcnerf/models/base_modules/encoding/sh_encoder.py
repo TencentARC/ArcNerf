@@ -16,6 +16,7 @@ class SHEmbedder(nn.Module):
     """Spherical Harmonics Embedder in torch. Embed view dir into higher dimensions.
     Detail introduction is at: https://en.wikipedia.org/wiki/Spherical_harmonics
     ref: https://github.com/yashbhalgat/HashNeRF-pytorch/blob/main/hash_encoding.py
+    This can be only used for xyz direction, but not position
     """
 
     def __init__(self, input_dim=3, n_freqs=4, include_input=True, use_cuda_backend=False, *args, **kwargs):
