@@ -112,6 +112,7 @@ model:
         n_importance: 128
         gaussian:
             gaussian_fn: cone        # ['cone', 'cylinder'] to get mean/cov
+        blur_coarse_weights: True
         inverse_linear: False
         perturb: True
         add_inf_z: True
@@ -143,6 +144,7 @@ model:
 loss:
     ImgLoss:
         keys: ['rgb_coarse', 'rgb_fine']
+        internal_weights: [0.1, 1.0]
         weight: 1.0
 
 metric:

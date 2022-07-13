@@ -10,9 +10,10 @@ from common.utils.registry import ENCODER_REGISTRY
 
 from .freq_encoder import FreqEmbedder
 from .gaussian_encoder import GaussianEmbedder, Gaussian
+from .hashgrid_encoder import HashGridEmbedder
 from .sh_encoder import SHEmbedder
 
-__all__ = ['FreqEmbedder', 'Gaussian', 'GaussianEmbedder', 'SHEmbedder']
+__all__ = ['FreqEmbedder', 'Gaussian', 'GaussianEmbedder', 'HashGridEmbedder', 'SHEmbedder']
 
 encoder_folder = osp.dirname(osp.abspath(__file__))
 encoder_filenames = [osp.splitext(osp.basename(v))[0] for v in scan_dir(encoder_folder) if v.endswith('_encoder.py')]

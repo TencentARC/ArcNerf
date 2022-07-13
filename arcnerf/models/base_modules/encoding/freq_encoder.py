@@ -8,10 +8,9 @@ from . import ENCODER_REGISTRY
 
 @ENCODER_REGISTRY.register()
 class FreqEmbedder(nn.Module):
-    """
-        FreqEmbedder module. Embed inputs into higher dimensions.
-        For example, x = sin(2**N * x) or sin(N * x) for N in range(0, 10)
-        ref: https://github.com/ventusff/neurecon/blob/main/models/base.py
+    """FreqEmbedder module. Embed inputs into higher dimensions.
+    For example, x = sin(2**N * x) or sin(N * x) for N in range(0, 10)
+    ref: https://github.com/ventusff/neurecon/blob/main/models/base.py
     """
 
     def __init__(

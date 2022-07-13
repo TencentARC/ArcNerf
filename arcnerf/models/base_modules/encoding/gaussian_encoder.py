@@ -7,10 +7,9 @@ from . import ENCODER_REGISTRY
 
 
 class Gaussian(nn.Module):
-    """
-        Gaussian module.
-        Transfer zvals with rays into mean/cov
-        ref: https://github.com/google/mipnerf/blob/main/internal/mip.py
+    """Gaussian module.
+    Transfer zvals with rays into mean/cov
+    ref: https://github.com/google/mipnerf/blob/main/internal/mip.py
     """
 
     def __init__(self, gaussian_fn='cone'):
@@ -136,10 +135,9 @@ class Gaussian(nn.Module):
 
 @ENCODER_REGISTRY.register()
 class GaussianEmbedder(nn.Module):
-    """
-        GaussianEmbedder module. Embed gaussian representation(B, G*2) into higher dimensions.
-        For example, x = exp(-0.5*2**2N*cov) * sin(2**N * mean) for N in range(0, 10)
-        ref: https://github.com/ventusff/neurecon/blob/main/models/base.py
+    """GaussianEmbedder module. Embed gaussian representation(B, G*2) into higher dimensions.
+    For example, x = exp(-0.5*2**2N*cov) * sin(2**N * mean) for N in range(0, 10)
+    ref: https://github.com/ventusff/neurecon/blob/main/models/base.py
     """
 
     def __init__(

@@ -13,10 +13,9 @@ except ImportError:
 
 @ENCODER_REGISTRY.register()
 class SHEmbedder(nn.Module):
-    """
-        Spherical Harmonics Embedder in torch. Embed view dir into higher dimensions.
-        Detail introduction is at: https://en.wikipedia.org/wiki/Spherical_harmonics
-        ref: https://github.com/yashbhalgat/HashNeRF-pytorch/blob/main/hash_encoding.py
+    """Spherical Harmonics Embedder in torch. Embed view dir into higher dimensions.
+    Detail introduction is at: https://en.wikipedia.org/wiki/Spherical_harmonics
+    ref: https://github.com/yashbhalgat/HashNeRF-pytorch/blob/main/hash_encoding.py
     """
 
     def __init__(self, input_dim=3, n_freqs=4, include_input=True, use_cuda_backend=False, *args, **kwargs):
@@ -27,6 +26,9 @@ class SHEmbedder(nn.Module):
             include_input: if True, raw input is included in the embedding. Appear at beginning. By default is True.
             use_cuda_backend: whether to use the customized cuda backend. By default False, use pure torch version.
 
+        Returns:
+            Embedded inputs with shape:
+                n_freqs**2 + include_inputs * input_dim
         """
         super(SHEmbedder, self).__init__()
 

@@ -34,6 +34,7 @@ class Volume(nn.Module):
         """
         super(Volume, self).__init__()
         self.requires_grad = requires_grad
+        self.dtype = dtype
 
         # set nn params
         self.n_grid = n_grid
@@ -60,6 +61,15 @@ class Volume(nn.Module):
         self.cal_corner()
         self.cal_grid_pts()
         self.cal_volume_pts()
+
+    def set_n_grid(self, n_grid, reset_pts=True):
+        """Change the n_grid manually and reset the grid_pts"""
+        self.n_grid = n_grid
+
+        # reset grid_pts and volume_pts, the cost here could be large for dense volume
+        if reset_pts:
+            self.cal_grid_pts()
+            self.cal_volume_pts()
 
     @torch.no_grad()
     def set_len(self, side, xlen, ylen, zlen):
@@ -184,12 +194,19 @@ class Volume(nn.Module):
         else:
             return self.volume_pts
 
-    def get_voxel_size(self):
-        """Get each voxel size on each side. Good for marching cube"""
-        xyz_s = self.get_grid_pts(True)[1, 1, 1, :] - self.get_grid_pts(True)[0, 0, 0, :]  # (3,)
-        x_s, y_s, z_s = float(xyz_s[0]), float(xyz_s[1]), float(xyz_s[2])
+    def get_voxel_size(self, to_list=True):
+        """Get each voxel size on each side. Good for marching cube
 
-        return x_s, y_s, z_s
+        Args:
+            to_list: if True, return a tuple of output (x_s, y_s, z_s). Else return a tensor of (3, ). By default False.
+        """
+        xyz_s = (self.get_range()[:, 1] - self.get_range()[:, 0]) / self.n_grid  # (3, )
+
+        if to_list:
+            x_s, y_s, z_s = float(xyz_s[0]), float(xyz_s[1]), float(xyz_s[2])
+            return x_s, y_s, z_s
+        else:
+            return xyz_s
 
     def get_subdivide_grid_pts(self, volume_range):
         """Get the eight subdivided volume grid_pts by voxel index
@@ -305,14 +322,16 @@ class Volume(nn.Module):
 
         return voxel_idx, valid_idx
 
-    def get_grid_pts_idx_by_voxel_idx(self, voxel_idx):
+    def get_grid_pts_idx_by_voxel_idx(self, voxel_idx, flatten=True):
         """Get the grid pts index from voxel idx
 
         Args:
             voxel_idx: (B, 3) tensor of xyz index, should be in (0, n_grid)
+            flatten: If flatten, return the flatten index in (B, 8), else in (B, 8, 3). By default True
 
         Returns:
-            grid_pts_idx_by_idx: select grid_pts index by voxel_idx, (B, 8, 3), each index of grid
+            grid_pts_idx_by_idx: select grid_pts index by voxel_idx, each index of grid
+                                 (B, 8) if flatten, else (B, 8, 3)
         """
         assert 0 <= voxel_idx.min() <= voxel_idx.max() < self.n_grid, 'Voxel idx out of boundary'
 
@@ -321,12 +340,17 @@ class Volume(nn.Module):
         # add 0,1 offset to voxel_idx as grid_pts index
         grid_pts_idx = voxel_idx.unsqueeze(1) + permute_index.unsqueeze(0)  # (B, 8, 3)
         grid_pts_idx = grid_pts_idx.view(-1, 3)  # (B*8, 3)
-        grid_pts_idx = self.convert_xyz_index_to_flatten_index(grid_pts_idx, self.n_grid + 1)  # (B*8, )
 
-        return grid_pts_idx.view(-1, 8)
+        if flatten:
+            grid_pts_idx = self.convert_xyz_index_to_flatten_index(grid_pts_idx, self.n_grid + 1)  # (B*8, )
+            grid_pts_idx = grid_pts_idx.view(-1, 8)  # (B, 8)
+        else:
+            grid_pts_idx = grid_pts_idx.view(-1, 8, 3)
 
-    def get_grid_pts_by_voxel_idx(self, voxel_idx):
-        """Get the grid pts xyz from voxel idx
+        return grid_pts_idx
+
+    def collect_grid_pts_by_voxel_idx(self, voxel_idx):
+        """Get the grid pts xyz from voxel idx. Collect from full grid_pts is smaller than just cal by input
 
         Args:
             voxel_idx: (B, 3) tensor of xyz index, should be in (0, n_grid)
@@ -339,6 +363,26 @@ class Volume(nn.Module):
 
         # select by idx
         grid_pts_by_voxel_idx = self.collect_grid_pts_values(grid_pts, grid_pts_idx)  # (B, 8, 3)
+
+        return grid_pts_by_voxel_idx
+
+    def get_grid_pts_by_voxel_idx(self, voxel_idx):
+        """Get the grid pts xyz from voxel idx, directly calculated from voxel_idx
+
+        Args:
+            voxel_idx: (B, 3) tensor of xyz index, should be in (0, n_grid)
+
+        Returns:
+            grid_pts_by_voxel_idx: select grid_pts xyz values by voxel_idx, (B, 8, 3), each pts of grid
+        """
+        device = voxel_idx.device
+        grid_pts_idx = self.get_grid_pts_idx_by_voxel_idx(voxel_idx, flatten=False)  # (B, 8, 3)
+
+        # base position(xyz_min) and voxel size
+        voxel_size = self.get_voxel_size(to_list=False).to(device)  # (3,)
+        base_pos = self.get_range()[:, 0].to(device)  # (3,)
+
+        grid_pts_by_voxel_idx = grid_pts_idx * voxel_size + base_pos
 
         return grid_pts_by_voxel_idx
 
@@ -399,8 +443,23 @@ class Volume(nn.Module):
         values_on_grid_pts = self.collect_grid_pts_values(values, grid_pts_idx)  # (B, 8, ...)
 
         # multiply weights
-        weights_expand = weights.view(*weights.shape, *(1, ) * (len(values.shape) - 1))  # expand like values
-        values_by_weights = values_on_grid_pts * weights_expand  # (B, 8, ...)
+        values_by_weights = self.interpolate_values_by_weights(values_on_grid_pts, weights)
+
+        return values_by_weights
+
+    @staticmethod
+    def interpolate_values_by_weights(values, weights):
+        """Interpolate the values collect from grid_pts by weights
+
+        Args:
+            values:  (B, 8, ...) values
+            weights: (B, 8), grid weights on each grid pts in voxels, weights in each voxel add up to 1.0.
+
+        Returns:
+            values_by_weights: (B, ...) interpolated values by weights
+        """
+        weights_expand = weights.view(*weights.shape, *(1, ) * (len(values.shape) - 2))  # expand like values
+        values_by_weights = values * weights_expand  # (B, 8, ...)
         values_by_weights = values_by_weights.sum(1)  # (B, ...)
 
         return values_by_weights

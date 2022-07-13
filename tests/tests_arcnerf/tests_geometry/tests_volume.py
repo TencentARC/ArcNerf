@@ -6,6 +6,7 @@ import os.path as osp
 import unittest
 
 import numpy as np
+import torch
 
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.transformation import normalize
@@ -153,3 +154,19 @@ class TestDict(unittest.TestCase):
             plotly=True,
             plotly_html=True
         )
+
+    def tests_get_collect_grid_pts_by_voxel_idx(self):
+        volume = Volume(n_grid=512, side=self.side)
+        batch_size = 4096
+        pts = torch.rand((batch_size, 3))
+
+        # get voxel idx
+        voxel_idx, valid_idx = np_wrapper(volume.get_voxel_idx_from_xyz, pts)
+
+        # collect by voxel_idx
+        grid_pts_1 = np_wrapper(volume.collect_grid_pts_by_voxel_idx, voxel_idx[valid_idx])
+
+        # get by voxel_idx
+        grid_pts_2 = np_wrapper(volume.get_grid_pts_by_voxel_idx, voxel_idx[valid_idx])
+
+        self.assertTrue(np.allclose(grid_pts_1, grid_pts_2))
