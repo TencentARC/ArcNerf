@@ -106,7 +106,7 @@ class GeoNet(BaseGeoNet):
                 layer = nn.Linear(in_dim, out_dim)
 
             # geo_init for denseLayer. For any layer inputs, it should be [feature, x, embed_x]
-            # This assumes include_input in enocoder is True
+            # This assumes include_input in encoder is True
             if geometric_init and not use_siren:
                 if i == D:  # last layer
                     nn.init.normal_(layer.weight, mean=np.sqrt(np.pi) / np.sqrt(in_dim), std=0.0001)

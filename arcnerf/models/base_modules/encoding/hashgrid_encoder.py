@@ -139,7 +139,7 @@ class HashGridEmbedder(nn.Module):
         if self.include_input:
             out.append(xyz)  # (B, 3)
 
-        if self.use_cuda_backend and CUDA_BACKEND_AVAILABLE:
+        if self.use_cuda_backend and CUDA_BACKEND_AVAILABLE and torch.cuda.is_available():
             hashgrid_embed = self.hashgrid_encode(xyz, self.embeddings)
         else:
             hashgrid_embed = self.hashgrid_encode_torch(xyz)

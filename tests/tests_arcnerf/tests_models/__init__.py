@@ -91,7 +91,7 @@ class TestModelDict(unittest.TestCase):
         return model
 
     def create_feed_in_to_cuda(self):
-        rays_o = torch.rand(self.batch_size, self.n_rays, 3) * 3.0
+        rays_o = torch.rand(self.batch_size, self.n_rays, 3) * 2.0
         rays_d = -normalize(rays_o)  # point to origin
         rays_r = torch.rand(self.batch_size, self.n_rays, 1)
         bn3 = torch.ones(self.batch_size, self.n_rays, 3)

@@ -92,7 +92,7 @@ class SHEmbedder(nn.Module):
         if self.include_input:
             out.append(xyz)  # (B, 3)
 
-        if self.use_cuda_backend and CUDA_BACKEND_AVAILABLE:
+        if self.use_cuda_backend and CUDA_BACKEND_AVAILABLE and torch.cuda.is_available():
             sh_embed = self.sh_encode(xyz)
         else:
             sh_embed = self.sh_encode_torch(xyz)

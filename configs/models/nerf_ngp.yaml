@@ -7,6 +7,7 @@ model:
         near: 1.5                     # hardcode near zvals
         far: 4.5                      # hardcode far zvals
         n_sample: 64                  # n_sample for zvals sampling
+        n_importance: 128             # n_importance for zvals for hierarchical sampling
         inverse_linear: False         # inverse_linear make zvals close to near
         perturb: True                 # perturb zvals interval
         add_inf_z: True               # Add inf zval for ray marching
@@ -19,13 +20,15 @@ model:
         D: 1                          # num of linear, not include final
         skips: []                     # pos to add input embedding
         encoder:                      # encoder
-            type: HashEmbedder        # type of encoder
+            type: HashGridEmbedder    # type of encoder
             input_dim: 3              # xyz input channel
-            n_levels: 16
-            n_feat_per_entry: 2
-            hashmap_size: 19
+            n_freqs: 0                # this one controls the geo init
+            n_levels: 16              # num of levels for multi-res hashing
+            n_feat_per_entry: 2       # num of feat in each entry
+            hashmap_size: 19          #
             base_res: 16
             max_res: 512
+            use_cuda_backend: True    # cuda implementation
         W_feat: 16                    # extra feature output
         geometric_init: False         # whether to use geometric init. need radius_init
     radiance:
