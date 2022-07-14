@@ -163,21 +163,12 @@ class HashGridEmbedder(nn.Module):
             out_level = empty_level_out.clone()  # (B, F)
 
             self.volume.set_n_grid(n_grid, reset_pts=False)  # reset n_grid, but not the grid_pts
-            voxel_idx, valid_idx = self.volume.get_voxel_idx_from_xyz(xyz)  # (B, 3), xyz index of volume
-            assert voxel_idx.max() < n_grid, 'Voxel idx exceed boundary...'
+            voxel_grid = self.volume.get_voxel_grid_info_from_xyz(xyz)
 
-            if torch.any(valid_idx):
-                # get valid grid pts position
-                grid_pts_idx_valid = self.volume.get_grid_pts_idx_by_voxel_idx(
-                    voxel_idx[valid_idx], flatten=False
-                )  # (B_valid, 8, 3)
-                grid_pts_valid = self.volume.get_grid_pts_by_voxel_idx(voxel_idx[valid_idx])  # (B_valid, 8, 3)
+            # get used info
+            valid_idx, grid_pts_idx_valid, grid_pts_weights_valid = voxel_grid[1], voxel_grid[2], voxel_grid[-1]
 
-                # calculate weights to 8 grid_pts by inverse distance
-                grid_pts_weights_valid = self.volume.cal_weights_to_grid_pts(
-                    xyz[valid_idx], grid_pts_valid
-                )  # (B_valid, 8)
-
+            if grid_pts_idx_valid is not None:
                 # hash the index of the grid pts
                 valid_grid_pts_hash_idx = self.fast_hash(grid_pts_idx_valid, self.offsets[i + 1] - self.offsets[i])
                 valid_grid_pts_hash_idx += self.offsets[i]  # (B_valid, 8), in correct bin

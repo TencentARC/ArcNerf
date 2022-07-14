@@ -121,6 +121,10 @@ class TestDict(unittest.TestCase):
         grid_pts_weights_valid = np_wrapper(volume.cal_weights_to_grid_pts, pts[valid_idx], grid_pts_valid)  # (n_in, 8)
         self.assertTrue(np.all(grid_pts_weights_valid > 0))
 
+        # check by direct method
+        voxel_grid = np_wrapper(volume.get_voxel_grid_info_from_xyz, pts)
+        self.assertTrue(np.allclose(voxel_grid[-1], grid_pts_weights_valid))
+
         # get lines and draw lines with weights as width
         lines = []
         line_widths = []

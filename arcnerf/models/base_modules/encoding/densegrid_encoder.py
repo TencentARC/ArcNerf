@@ -111,17 +111,11 @@ class DenseGridEmbedder(nn.Module):
         if self.W_feat > 0:
             feat = (xyz.clone() * 0.0)[:, :1].repeat(1, self.W_feat)  # (B, W_feat)
 
-        # get voxel
-        voxel_idx, valid_idx = self.volume.get_voxel_idx_from_xyz(xyz)  # (B, 3), xyz index of volume
-        assert voxel_idx.max() < self.n_grid, 'Voxel idx exceed boundary...'
+        # get voxel grid info
+        voxel_grid = self.volume.get_voxel_grid_info_from_xyz(xyz)
+        voxel_idx, valid_idx, grid_pts_weights_valid = voxel_grid[0], voxel_grid[1], voxel_grid[-1]
 
-        if torch.any(valid_idx):  # any points in volume
-            # get valid grid pts position
-            grid_pts_valid = self.volume.get_grid_pts_by_voxel_idx(voxel_idx[valid_idx])  # (B_valid, 8, 3)
-
-            # calculate weights to 8 grid_pts by inverse distance
-            grid_pts_weights_valid = self.volume.cal_weights_to_grid_pts(xyz[valid_idx], grid_pts_valid)  # (B_valid, 8)
-
+        if grid_pts_weights_valid is not None:  # any points in volume
             geo_value[valid_idx] = self.volume.interpolate(
                 self.grid_value_param, grid_pts_weights_valid, voxel_idx[valid_idx]
             )  # (B_valid, W_vol)

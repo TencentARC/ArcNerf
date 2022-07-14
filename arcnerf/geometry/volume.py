@@ -308,9 +308,8 @@ class Volume(nn.Module):
         dtype = pts.dtype
         device = pts.device
 
-        x_s, y_s, z_s = self.get_voxel_size()
-        voxel_size = torch.Tensor([x_s, y_s, z_s]).type(dtype).to(device).unsqueeze(0)  # (1, 3)
-        start_point = self.get_range()[:, 0].unsqueeze(0).to(device)  # min xyz (1, 3)
+        voxel_size = self.get_voxel_size(to_list=False).type(dtype).to(device)  # (3,)
+        start_point = self.get_range()[:, 0].to(device)  # min xyz (3,)
         voxel_idx = (pts - start_point) / voxel_size  # (B, 3)
 
         valid_idx = torch.logical_and(
@@ -339,13 +338,10 @@ class Volume(nn.Module):
 
         # add 0,1 offset to voxel_idx as grid_pts index
         grid_pts_idx = voxel_idx.unsqueeze(1) + permute_index.unsqueeze(0)  # (B, 8, 3)
-        grid_pts_idx = grid_pts_idx.view(-1, 3)  # (B*8, 3)
 
         if flatten:
-            grid_pts_idx = self.convert_xyz_index_to_flatten_index(grid_pts_idx, self.n_grid + 1)  # (B*8, )
+            grid_pts_idx = self.convert_xyz_index_to_flatten_index(grid_pts_idx.view(-1, 3), self.n_grid + 1)  # (B*8, )
             grid_pts_idx = grid_pts_idx.view(-1, 8)  # (B, 8)
-        else:
-            grid_pts_idx = grid_pts_idx.view(-1, 8, 3)
 
         return grid_pts_idx
 
@@ -380,9 +376,9 @@ class Volume(nn.Module):
 
         # base position(xyz_min) and voxel size
         voxel_size = self.get_voxel_size(to_list=False).to(device)  # (3,)
-        base_pos = self.get_range()[:, 0].to(device)  # (3,)
+        start_pos = self.get_range()[:, 0].to(device)  # (3,)
 
-        grid_pts_by_voxel_idx = grid_pts_idx * voxel_size + base_pos
+        grid_pts_by_voxel_idx = grid_pts_idx * voxel_size + start_pos
 
         return grid_pts_by_voxel_idx
 
@@ -414,16 +410,58 @@ class Volume(nn.Module):
 
         # linear interpolation
         permute_index = self.get_eight_permutation_index()  # (8, 3)
-        weights = []
-        for idx in range(permute_index.shape[0]):
-            weights.append(
-                (permute_index[idx][0] * (w_xyz[:, 0:1]) + (1 - permute_index[idx][0]) * (1 - w_xyz[:, 0:1])) *
-                (permute_index[idx][1] * (w_xyz[:, 1:2]) + (1 - permute_index[idx][1]) * (1 - w_xyz[:, 1:2])) *
-                (permute_index[idx][2] * (w_xyz[:, 2:3]) + (1 - permute_index[idx][2]) * (1 - w_xyz[:, 2:3]))
-            )
-        weights = torch.cat(weights, dim=-1).to(device)  # (B, 8)
+        weights = (permute_index[:, 0] * w_xyz[:, 0:1] + (1 - permute_index[:, 0]) * (1 - w_xyz[:, 0:1])) * \
+                  (permute_index[:, 1] * w_xyz[:, 1:2] + (1 - permute_index[:, 1]) * (1 - w_xyz[:, 1:2])) * \
+                  (permute_index[:, 2] * w_xyz[:, 2:3] + (1 - permute_index[:, 2]) * (1 - w_xyz[:, 2:3]))  # (B, 8)
 
         return weights
+
+    def get_voxel_grid_info_from_xyz(self, pts):
+        """Get the voxel and grid pts info(index, pos) directly from xyz position
+
+        Args:
+            pts: xyz position of points. (B, 3) tensor of xyz
+
+        Returns:
+            voxel_idx: return the voxel index in (B, 3) of each xyz index, range in (0, n_grid).
+                       if not in any voxel, return (-1, -1, -1) for this pts. torch.long
+            valid_idx: (B, ) mask that pts are in the volume. torch.BoolTensor
+            grid_pts_idx: (B_valid, 8), valid grid_pts index. Return None if no valid.
+            grid_pts: (B_valid, 8), valid grid_pts xyz pos. Return None if no valid.
+            grid_pts_weights: (B_valid, 8), weights on valid grid_pts. Return None if no valid.
+        """
+        dtype = pts.dtype
+        device = pts.device
+
+        # get base info
+        voxel_size = self.get_voxel_size(to_list=False).type(dtype).to(device)  # (3,)
+        start_point = self.get_range()[:, 0].to(device)  # min xyz (3,)
+        permute_index = self.get_eight_permutation_index().to(device)  # (8, 3)
+
+        # get voxel and valid info
+        voxel_idx = (pts - start_point) / voxel_size  # (B, 3)
+        valid_idx = torch.logical_and(
+            torch.all(voxel_idx >= 0, dim=1), torch.all(voxel_idx < float(self.n_grid), dim=1)
+        )
+        voxel_idx[~valid_idx] = -1
+        voxel_idx = torch.floor(voxel_idx).type(torch.long)
+
+        grid_pts_idx, grid_pts, grid_pts_weights = None, None, None
+        if torch.any(valid_idx):
+            # for all valid voxel, get grid_pts index and position
+            grid_pts_idx = voxel_idx[valid_idx].unsqueeze(1) + permute_index.unsqueeze(0)  # (B_valid, 8, 3)
+            grid_pts = grid_pts_idx * voxel_size + start_point[0]  # (B_valid, 8, 3)
+
+            # get_weight for valid pts
+            w_xyz = (pts[valid_idx] - grid_pts[:, 0, :]) / (grid_pts[:, -1, :] - grid_pts[:, 0, :])  # (B_valid, 3)
+            w_xyz = w_xyz.clip(0.0, 1.0)  # in case some pts out of grid
+
+            grid_pts_weights = \
+                (permute_index[:, 0] * w_xyz[:, 0:1] + (1 - permute_index[:, 0]) * (1 - w_xyz[:, 0:1])) * \
+                (permute_index[:, 1] * w_xyz[:, 1:2] + (1 - permute_index[:, 1]) * (1 - w_xyz[:, 1:2])) * \
+                (permute_index[:, 2] * w_xyz[:, 2:3] + (1 - permute_index[:, 2]) * (1 - w_xyz[:, 2:3]))  # (B_valid, 8)
+
+        return voxel_idx, valid_idx, grid_pts_idx, grid_pts, grid_pts_weights
 
     def interpolate(self, values, weights, voxel_idx):
         """Interpolate values by getting value on grid_pts in each voxel and multiply weights
