@@ -78,7 +78,7 @@ __global__ void forward_kernel(
    @return: output, torch float tensor of (B, degree**2)
 */
 torch::Tensor sh_encode_forward_cuda(
-    torch::Tensor xyz, const uint32_t degree) {
+    const torch::Tensor xyz, const uint32_t degree) {
     torch::Tensor output = torch::zeros({xyz.size(0), square(degree)}).to(xyz.dtype()).to(xyz.device());
 
     const uint32_t n_row = output.size(0);  // B
@@ -232,7 +232,7 @@ __global__ void backward_kernel(
    @return: grad_xyz, torch float tensor of (B, 3)
 */
 torch::Tensor sh_encode_backward_cuda(
-    torch::Tensor grad_out, torch::Tensor xyz, const uint32_t degree) {
+    const torch::Tensor grad_out, const torch::Tensor xyz, const uint32_t degree) {
     torch::Tensor grad_xyz = torch::zeros_like(xyz);  // (B, 3)
 
     const uint32_t n_row = grad_out.size(0);  // B

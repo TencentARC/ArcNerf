@@ -15,6 +15,10 @@ setup(
         CUDAExtension(  # spherical harmonics embedding
             name='_sh_encode',
             sources=['./src/sh_encode/sh_encode.cpp', './src/sh_encode/sh_encode_kernel.cu']
+        ),
+        CUDAExtension(  # mul-res hashgrid embedding
+            name='_hashgrid_encode',
+            sources=['./src/hashgrid_encode/hashgrid_encode.cpp', './src/hashgrid_encode/hashgrid_encode_kernel.cu']
         )
     ],
     cmdclass={

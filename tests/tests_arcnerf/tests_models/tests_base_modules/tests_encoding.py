@@ -25,7 +25,7 @@ class TestDict(unittest.TestCase):
         cls.batch_size = 4096
         cls.logger = Logger(path=osp.join(RESULT_DIR, './benchmark.txt'), keep_console=False)
 
-    def check_output_and_grad(self, out_torch, out_custom, grad_torch, grad_custom, atol=1e-5):
+    def check_output_and_grad(self, out_torch, out_custom, grad_torch, grad_custom, atol=1e-8):
         """Check the output and grad"""
         if out_torch is not None:
             if isinstance(out_torch, list):
@@ -102,7 +102,8 @@ class TestDict(unittest.TestCase):
         if not torch.cuda.is_available():
             return
 
-        dirs = torch.rand((self.batch_size, 3), dtype=torch.float32)
+        # double gets the check
+        dirs = torch.rand((self.batch_size, 3), dtype=torch.double)
         dirs_norm = dirs / normalize(dirs)
 
         for degree in range(1, 6):
@@ -116,7 +117,7 @@ class TestDict(unittest.TestCase):
             )
 
             # the accumulate grad gets quite large error
-            self.check_output_and_grad(out_torch, out_custom, grad_torch, grad_custom, atol=0.01)  # float32 grad large
+            self.check_output_and_grad(out_torch, out_custom, grad_torch, grad_custom)
 
     def tests_hashgrid_encoder(self):
         n_levels = 16

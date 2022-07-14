@@ -47,9 +47,3 @@ class SHEncode(nn.Module):
         assert xyz.shape[-1] == 3, 'Must be (B, 3)'
 
         return SHEncodeOps.apply(xyz, self.degree)
-
-
-if __name__ == '__main__':
-    func = SHEncode(5)
-    xyz = torch.rand((4096, 3), dtype=torch.float32, requires_grad=True).cuda()
-    out = func(xyz)

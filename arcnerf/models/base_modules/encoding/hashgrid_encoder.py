@@ -140,7 +140,9 @@ class HashGridEmbedder(nn.Module):
             out.append(xyz)  # (B, 3)
 
         if self.use_cuda_backend and CUDA_BACKEND_AVAILABLE and torch.cuda.is_available():
-            hashgrid_embed = self.hashgrid_encode(xyz, self.embeddings)
+            min_xyz = self.volume.get_range()[:, 0].detach().cpu().numpy().tolist()
+            max_xyz = self.volume.get_range()[:, 1].detach().cpu().numpy().tolist()
+            hashgrid_embed = self.hashgrid_encode(xyz, self.embeddings, min_xyz, max_xyz)
         else:
             hashgrid_embed = self.hashgrid_encode_torch(xyz)
         out.append(hashgrid_embed)  # (B, T*F)

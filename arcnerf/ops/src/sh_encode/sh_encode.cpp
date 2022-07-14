@@ -13,7 +13,7 @@
 
 
 // define the real cuda function to be called by c++ wrapper.
-torch::Tensor sh_encode_forward_cuda(torch::Tensor xyz, const uint32_t degree);
+torch::Tensor sh_encode_forward_cuda(const torch::Tensor xyz, const uint32_t degree);
 
 
 /* c++ wrapper of sh_encode forward func
@@ -22,7 +22,7 @@ torch::Tensor sh_encode_forward_cuda(torch::Tensor xyz, const uint32_t degree);
    @param: degree, int num
    @return: output, torch float tensor of (B, degree**2)
 */
-torch::Tensor sh_encode_forward(torch::Tensor xyz, const uint32_t degree) {
+torch::Tensor sh_encode_forward(const torch::Tensor xyz, const uint32_t degree) {
     //checking
     CHECK_INPUT(xyz)
     CHECK_IS_FLOATING(xyz)
@@ -42,7 +42,7 @@ torch::Tensor sh_encode_forward(torch::Tensor xyz, const uint32_t degree) {
 
 // define the real cuda function to be called by c++ wrapper.
 torch::Tensor sh_encode_backward_cuda(
-    torch::Tensor grad_out, torch::Tensor xyz, const uint32_t degree);
+    const torch::Tensor grad_out, const torch::Tensor xyz, const uint32_t degree);
 
 
 /* c++ wrapper of sh_encode backward func
@@ -53,8 +53,8 @@ torch::Tensor sh_encode_backward_cuda(
    @return: grad_xyz, torch float tensor of (B, 3)
 */
 torch::Tensor sh_encode_backward(
-    torch::Tensor grad_out,
-    torch::Tensor xyz,
+    const torch::Tensor grad_out,
+    const torch::Tensor xyz,
     const uint32_t degree) {
     //checking
     CHECK_INPUT(xyz)
