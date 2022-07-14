@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import time
+
 import numpy as np
 import torch
 
@@ -55,6 +57,23 @@ def set_tensor_to_zeros(tensor: torch.Tensor, a_tol=1e-5):
 def is_torch_or_np(tensor):
     """Test whether a tensor is torch or np array"""
     return isinstance(tensor, torch.Tensor) or isinstance(tensor, np.ndarray)
+
+
+def get_start_time():
+    """Get the start time, synchronize gpu"""
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+    t0 = time.time()
+
+    return t0
+
+
+def get_end_time(t0):
+    """Get the end time, synchronize gpu"""
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+
+    return time.time() - t0
 
 
 def chunk_processing(func, chunk_size, gpu_on_func, *args):

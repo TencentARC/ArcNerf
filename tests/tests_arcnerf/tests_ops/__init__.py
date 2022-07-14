@@ -1,25 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import time
-
 import torch
 
-
-def get_start_time():
-    """Get the start time, synchronize gpu"""
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-    t0 = time.time()
-
-    return t0
-
-
-def get_end_time(t0):
-    """Get the end time, synchronize gpu"""
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-
-    return time.time() - t0
+from common.utils.torch_utils import get_start_time, get_end_time
 
 
 def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_iter=100):
