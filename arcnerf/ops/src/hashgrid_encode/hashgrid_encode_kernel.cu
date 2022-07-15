@@ -36,7 +36,7 @@ torch::Tensor hashgrid_encode_forward_cuda(
     const std::vector<float> min_xyz,
     const std::vector<float> max_xyz) {
     // Init the output tensor
-    torch::Tensor output = torch::zeros({offsets[offsets.size()], F}).to(xyz.dtype()).to(xyz.device());
+    torch::Tensor output = torch::zeros({xyz.size(0), L * F}).to(xyz.dtype()).to(xyz.device());
 
     return output;
 }
