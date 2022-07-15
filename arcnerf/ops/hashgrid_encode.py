@@ -13,23 +13,33 @@ class HashGridEncodeOps(torch.autograd.Function):
     def forward(ctx, xyz, embeddings, n_levels, n_feat_per_entry, offsets, resolutions, min_xyz, max_xyz):
         """
         Args:
-            xyz: tensor of shape (B, 3), xyz position
+            xyz: tensor of shape (B, D), xyz position
             embeddings: embeddings vec in shape (n_total_embed, F)
             n_levels: num of levels of embeddings(L), by default 16
             n_feat_per_entry: num of feat for each entry in hashmap(F), by default 2
             offsets: a list of offset of each level, len is L+1
             resolutions: a list of resolution at each level, len is L
-            min_xyz: a list of 3, the min_xyz position of the grid
-            max_xyz: a list of 3, the max_xyz position of the grid
+            min_xyz: a list of D, the min_xyz position of the grid
+            max_xyz: a list of D, the max_xyz position of the grid
 
         Returns:
             output: embed xyz with L*F shape
         """
-        grad_xyz = torch.empty_like(xyz).to(xyz.device)
-        grad_embeddings = torch.empty_like(embeddings).to(xyz.device)
+        dtype = xyz.dtype
+        device = xyz.device
+
+        grad_xyz = torch.empty_like(xyz).to(device)
+        grad_embeddings = torch.empty_like(embeddings).to(device)
+        # change list to tensor
+        _offsets = torch.tensor(offsets, dtype=torch.int).to(device)  # (L+1, )
+        _resolutions = torch.tensor(resolutions, dtype=torch.int).to(device)  # (L, )
+        _min_xyz = torch.tensor(min_xyz, dtype=dtype).to(device)  # (D, )
+        _max_xyz = torch.tensor(max_xyz, dtype=dtype).to(device)  # (D, )
+
+        # forward
         output = _hashgrid_encode.hashgrid_encode_forward(
-            xyz, embeddings, grad_xyz, grad_embeddings, n_levels, n_feat_per_entry, offsets, resolutions, min_xyz,
-            max_xyz
+            xyz, embeddings, grad_xyz, grad_embeddings, n_levels, n_feat_per_entry, _offsets, _resolutions, _min_xyz,
+            _max_xyz
         )
         ctx.save_for_backward(grad_xyz, grad_embeddings)
 
@@ -63,15 +73,15 @@ class HashGridEncode(nn.Module):
     def forward(self, xyz, embeddings, min_xyz, max_xyz):
         """
         Args:
-            xyz: tensor of shape (B, 3), xyz direction, normalized
+            xyz: tensor of shape (B, D), xyz position
             embeddings: embeddings vec in shape (n_total_embed, F)
-            min_xyz: a list of 3, the min_xyz position of the grid
-            max_xyz: a list of 3, the max_xyz position of the grid
+            min_xyz: a list of D, the min_xyz position of the grid
+            max_xyz: a list of D, the max_xyz position of the grid
 
         Returns:
              output: torch tensor with (B, L*F) shape
         """
-        assert xyz.shape[-1] == 3, 'xyz must be (B, 3)'
+        assert len(min_xyz) == xyz.shape[1] and len(max_xyz) == xyz.shape[1], 'Incorrect boundary size'
         assert embeddings.shape == (self.offsets[-1], self.n_feat_per_entry), 'embeddings must be (n_total_embed, F)'
 
         return HashGridEncodeOps.apply(

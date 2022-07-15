@@ -27,11 +27,11 @@ torch::Tensor sh_encode_forward(const torch::Tensor xyz, const uint32_t degree) 
     CHECK_INPUT(xyz)
     CHECK_IS_FLOATING(xyz)
 
-    if (xyz.size(1) != 3){
+    if (xyz.size(1) != 3) {
         throw std::runtime_error{"Input tensor must be (B, 3)."};
     }
 
-    if (degree <= 0 || degree > 5){
+    if (degree <= 0 || degree > 5) {
         throw std::runtime_error{"Only support degree in 1~5."};
     }
 
@@ -63,11 +63,11 @@ torch::Tensor sh_encode_backward(
     CHECK_IS_FLOATING(xyz)
     CHECK_IS_FLOATING(grad_out)
 
-    if (xyz.size(1) != 3){
+    if (xyz.size(1) != 3) {
         throw std::runtime_error{"Input tensor must be (B, 3)."};
     }
 
-    if (degree <= 0 || degree > 5){
+    if (degree <= 0 || degree > 5) {
         throw std::runtime_error{"Only support degree in 1~5."};
     }
 

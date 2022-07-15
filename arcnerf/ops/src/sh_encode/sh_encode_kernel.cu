@@ -25,7 +25,7 @@ __device__ T forward_table(uint32_t c, T x, T y, T z) {
     T yz = y * z;
     T xz = x * z;
 
-	switch(c){
+	switch(c) {
 	    case 0: return 0.28209479177387814; break;
 	    case 1: return -0.4886025119029199 * y; break;
 	    case 2: return 0.4886025119029199 * z; break;
@@ -64,7 +64,7 @@ __device__ void forward_kernel(
     const uint32_t n) {
 
     # pragma unroll
-    for (uint32_t idx = D_START; idx < D_END; idx++){
+    for (uint32_t idx = D_START; idx < D_END; idx++) {
         output[n][idx] = forward_table(idx, xyz[n][0], xyz[n][1], xyz[n][2]);
     }
 }
@@ -79,7 +79,7 @@ __global__ void forward_kernel_wrapper(
     const uint32_t d = blockIdx.x * blockDim.x + threadIdx.x;  // d=0,1,2,3,4,5,6
     const uint32_t n = blockIdx.y * blockDim.y + threadIdx.y;  // row id
 
-    if (d < degree and n < xyz.size(0)) {
+    if (d < degree && n < xyz.size(0)) {
         switch (d) {
             case 0: forward_kernel<scalar_t, 0, 1>(xyz, output, n); break;
             case 1: forward_kernel<scalar_t, 1, 4>(xyz, output, n); break;
@@ -132,8 +132,8 @@ __device__ T backward_table(uint32_t c, uint32_t index, T x, T y, T z) {
     T xz = x * z;
     T xyz = x * y * z;
 
-    if (index == 0){
-        switch(c){
+    if (index == 0) {
+        switch(c) {
             case 0: return 0.0; break;
             case 1: return 0.0; break;
             case 2: return 0.0; break;
@@ -161,8 +161,8 @@ __device__ T backward_table(uint32_t c, uint32_t index, T x, T y, T z) {
 	        case 24: return 0.6258357354491761 * 4.0 * x * (xx - 3.0 * yy); break;
 	        default: return 0.0;
         }
-    } else if (index == 1){
-        switch(c){
+    } else if (index == 1) {
+        switch(c) {
             case 0: return 0.0; break;
             case 1: return -0.4886025119029199; break;
             case 2: return 0.0; break;
@@ -191,7 +191,7 @@ __device__ T backward_table(uint32_t c, uint32_t index, T x, T y, T z) {
 	        default: return 0.0;
         }
     } else if (index == 2) {
-        switch(c){
+        switch(c) {
             case 0: return 0.0; break;
             case 1: return 0.0; break;
             case 2: return 0.4886025119029199; break;
@@ -239,7 +239,7 @@ __device__ void backward_kernel(
     scalar_t z = xyz[n][2];
 
     # pragma unroll
-    for (uint32_t idx = D_START; idx < D_END; idx++){
+    for (uint32_t idx = D_START; idx < D_END; idx++) {
         // Not sure when atomicAdd harms the performance
         atomicAdd(&grad_xyz[n][0], grad_out[n][idx] * backward_table(idx, 0, x, y, z));
         atomicAdd(&grad_xyz[n][1], grad_out[n][idx] * backward_table(idx, 1, x, y, z));
@@ -258,7 +258,7 @@ __global__ void backward_kernel(
     const uint32_t d = blockIdx.x * blockDim.x + threadIdx.x;  // d=0,1,2,3,4,5,6
     const uint32_t n = blockIdx.y * blockDim.y + threadIdx.y;  // row id
 
-    if (d < degree and n < xyz.size(0)) {
+    if (d < degree && n < xyz.size(0)) {
         switch (d) {
             case 0: backward_kernel<scalar_t, 0, 1>(grad_out, xyz, grad_xyz, n); break;
             case 1: backward_kernel<scalar_t, 1, 4>(grad_out, xyz, grad_xyz, n); break;
