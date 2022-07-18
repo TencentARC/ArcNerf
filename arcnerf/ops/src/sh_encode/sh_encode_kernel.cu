@@ -99,7 +99,7 @@ __global__ void forward_kernel_wrapper(
 torch::Tensor sh_encode_forward_cuda(
     const torch::Tensor xyz, const uint32_t degree) {
 
-    torch::Tensor output = torch::zeros({xyz.size(0), square(degree)}).to(xyz.dtype()).to(xyz.device());
+    torch::Tensor output = torch::zeros({xyz.size(0), square(degree)}, xyz.dtype()).to(xyz.device());
 
     const uint32_t n_row = xyz.size(0);  // B
     const uint32_t n_col = xyz.size(1);  // 3

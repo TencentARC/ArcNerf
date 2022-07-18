@@ -23,15 +23,18 @@ class HashGridEncodeOps(torch.autograd.Function):
             max_xyz: a list of D, the max_xyz position of the grid
 
         Returns:
-            output: embed xyz with L*F shape
+            output: embed xyz with (B, L*F) shape
         """
         dtype = xyz.dtype
         device = xyz.device
+
+        # keep dimension
+        ctx.B = xyz.shape[0]
+        ctx.L = n_levels
+        ctx.F = n_feat_per_entry
+
         xyz = xyz.contiguous()  # make it contiguous
         embeddings = embeddings.contiguous()  # make it contiguous
-
-        grad_xyz = torch.empty_like(xyz).to(device)
-        grad_embeddings = torch.empty_like(embeddings).to(device)
         # change list to tensor
         _offsets = torch.tensor(offsets, dtype=torch.int).to(device)  # (L+1, )
         _resolutions = torch.tensor(resolutions, dtype=torch.int).to(device)  # (L, )
@@ -39,17 +42,28 @@ class HashGridEncodeOps(torch.autograd.Function):
         _max_xyz = torch.tensor(max_xyz, dtype=dtype).to(device)  # (D, )
 
         # forward
-        output = _hashgrid_encode.hashgrid_encode_forward(
-            xyz, embeddings, grad_xyz, grad_embeddings, n_levels, n_feat_per_entry, _offsets, _resolutions, _min_xyz,
-            _max_xyz
+        output, weights, hash_idx, valid = _hashgrid_encode.hashgrid_encode_forward(
+            xyz, embeddings, n_levels, n_feat_per_entry, _offsets, _resolutions, _min_xyz, _max_xyz
         )
-        ctx.save_for_backward(grad_xyz, grad_embeddings)
+
+        ctx.save_for_backward(xyz, embeddings, weights, hash_idx, valid)
+
+        # reshape output from (B, L, F) -> (B, L*F)
+        output = output.view(xyz.shape[0], -1)  # (B, L*F)
 
         return output
 
     @staticmethod
     def backward(ctx, grad):
-        grad = grad.contiguous()  # make it contiguous
+        """
+        Args:
+            grad: tensor in (B, L*F) shape, the grad on final output
+
+        Returns:
+            grad_xyz: tensor of shape (B, D), grad on xyz position
+            grad_embeddings: tensor in (n_total_embed, F), grad on embeddings vec
+        """
+        grad = grad.contiguous().view(ctx.B, ctx.L, ctx.F)  # make it contiguous, change to (B, L, F)
         grad_xyz, grad_embeddings = _hashgrid_encode.hashgrid_encode_backward(grad, *ctx.saved_tensors)
 
         return grad_xyz, grad_embeddings, None, None, None, None, None, None

@@ -12,6 +12,7 @@ try:
     CUDA_BACKEND_AVAILABLE = True
 except ImportError:
     CUDA_BACKEND_AVAILABLE = False
+    raise RuntimeWarning('HashGridEncode not import correctly...Possibly not build yet...')
 
 
 @ENCODER_REGISTRY.register()

@@ -57,6 +57,12 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
             else:
                 grad_torch.append(None)
 
+        # grad from model
+        if isinstance(custom_fuc, torch.nn.Module):
+            for n, p in torch_func.named_parameters():
+                if p.grad is not None:
+                    grad_torch.append(p.grad.clone())
+
         # timing
         t_forward_torch = 0.0
         t_backward_torch = 0.0
@@ -98,6 +104,12 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
             grad_custom.append(input.grad.clone())
         else:
             grad_custom.append(None)
+
+    # grad from model
+    if isinstance(custom_fuc, torch.nn.Module):
+        for n, p in custom_fuc.named_parameters():
+            if p.grad is not None:
+                grad_custom.append(p.grad.clone())
 
     t_forward_custom = 0.0
     t_backward_custom = 0.0

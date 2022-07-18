@@ -11,6 +11,13 @@ class SHEncodeOps(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, xyz, degree):
+        """
+        Args:
+            xyz: tensor of shape (B, 3), xyz direction, normalized
+
+        Returns:
+             output: torch tensor with (B, degree**2) shape
+        """
         xyz = xyz.contiguous()  # make it contiguous
         output = _sh_encode.sh_encode_forward(xyz, degree)
         ctx.save_for_backward(xyz)
@@ -20,6 +27,13 @@ class SHEncodeOps(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad):
+        """
+        Args:
+            grad: torch tensor with (B, degree**2) shape, the grad on output
+
+        Returns:
+             grad_xyz: tensor of shape (B, 3), grad on the input xyz
+        """
         grad = grad.contiguous()  # make it contiguous
         grad_xyz = _sh_encode.sh_encode_backward(grad, *ctx.saved_tensors, ctx.degree)
 

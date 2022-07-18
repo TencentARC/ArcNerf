@@ -145,24 +145,27 @@ class TestDict(unittest.TestCase):
 
         n_levels = [8, 16]
         n_feat_per_entry = [2, 4, 8]
+        hashmap_size = 19
         side = 1.5  # to make pts outside the volume
 
         # double gets the check
-        xyz = torch.rand((self.batch_size, 3), dtype=torch.double) / 2.0
+        xyz = torch.rand((self.batch_size, 3), dtype=torch.double)
 
         for level in n_levels:
             for n_feat in n_feat_per_entry:
                 hashgrid_torch = HashGridEmbedder(
-                    n_levels=level,
-                    n_feat_per_entry=n_feat,
-                    side=side,
-                    include_input=False  # True
+                    n_levels=level, n_feat_per_entry=n_feat, hashmap_size=hashmap_size, side=side, include_input=True
                 ).double().cuda()  # embeddings param needs double
                 embeddings_data = hashgrid_torch.get_embeddings()
                 hashgrid_custom = HashGridEmbedder(
-                    n_levels=level, n_feat_per_entry=n_feat, side=side, include_input=False, use_cuda_backend=True
+                    n_levels=level,
+                    n_feat_per_entry=n_feat,
+                    hashmap_size=hashmap_size,
+                    side=side,
+                    include_input=True,
+                    use_cuda_backend=True
                 ).double().cuda()  # embeddings param needs double
-                hashgrid_custom.set_embeddings(embeddings_data)  # make sure use the same embeddings
+                hashgrid_custom.set_embeddings(embeddings_data.clone())  # make sure use the same embeddings
 
                 inputs = [xyz.clone().detach().requires_grad_(True)]
 
