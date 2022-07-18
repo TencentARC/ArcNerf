@@ -125,6 +125,14 @@ class HashGridEmbedder(nn.Module):
 
         return embeddings, n_total_embed, offsets, resolutions
 
+    def get_embeddings(self):
+        """Get the embeddings data"""
+        return self.embeddings.data
+
+    def set_embeddings(self, data):
+        """Set the embeddings data"""
+        self.embeddings.data = data
+
     def forward(self, xyz: torch.Tensor):
         """
         Args:
@@ -195,15 +203,15 @@ class HashGridEmbedder(nn.Module):
         """Hash the corner index
 
         Args:
-            idx: (..., 3) index of xyz
+            idx: (..., 3) index of xyz, long(int64) integer
             hashmap_size: size of the current hashmap
 
         Return:
-            hash_index: (..., ) hash index
+            hash_index: (..., ) hash index, long(int64) integer
         """
         primes = [1, 2654435761, 805459861, 3674653429, 2097192037, 1434869437, 2165219737]  # at most 7
 
-        hash_index = torch.zeros_like(idx[..., 0])  # (B,)
+        hash_index = torch.zeros_like(idx[..., 0], dtype=torch.long)  # (B,)
         for i in range(idx.shape[-1]):
             hash_index ^= idx[..., i] * primes[i]
 

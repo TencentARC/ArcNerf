@@ -14,7 +14,7 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
         torch_func: torch implementation for comparsion. If None, only run on custom_func
         custom_fuc: custom ops in cuda.
         inputs: a list of input. For the tensors, they should be in cpu.
-        n_iter: for average running time. By default 100.
+        n_iter: for average running time. By default 100. If n_iter <= 0, only runs once for output/grad, no timing.
 
     Returns:
         out_torch: list of torch output. Return None if torch_func is None
@@ -76,10 +76,11 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
             t_backward_torch += get_end_time(t0)
 
         # log time
-        t_forward_torch = t_forward_torch / float(n_iter)
-        logger.add_log('Torch Forward time {:.6f}s'.format(t_forward_torch))
-        t_backward_torch = t_backward_torch / float(n_iter)
-        logger.add_log('Torch Backward time {:.6f}s'.format(t_backward_torch))
+        if n_iter > 0:
+            t_forward_torch = t_forward_torch / float(n_iter)
+            logger.add_log('Torch Forward time {:.6f}s'.format(t_forward_torch))
+            t_backward_torch = t_backward_torch / float(n_iter)
+            logger.add_log('Torch Backward time {:.6f}s'.format(t_backward_torch))
 
         # zeros the grad
         for input in inputs:
@@ -98,7 +99,6 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
         else:
             grad_custom.append(None)
 
-    out_custom = None
     t_forward_custom = 0.0
     t_backward_custom = 0.0
     for _ in range(n_iter):
@@ -118,24 +118,27 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
         t_backward_custom += get_end_time(t0)
 
     # log time
-    t_forward_custom = t_forward_custom / float(n_iter)
-    if t_forward_torch is None:
-        logger.add_log('Custom Forward time {:.6f}s'.format(t_forward_custom))
-    else:
-        logger.add_log(
-            'Custom Forward time {:.6f}s. Boost x{:.2f}'.format(t_forward_custom, t_forward_torch / t_forward_custom)
-        )
-
-    t_backward_custom = t_backward_custom / float(n_iter)
-    # log backward
-    if t_backward_torch is None:
-        logger.add_log('Custom Backward time {:.6f}s'.format(t_backward_custom))
-    else:
-        logger.add_log(
-            'Custom Backward time {:.6f}s. Boost x{:.2f}'.format(
-                t_backward_custom, t_backward_torch / t_backward_custom
+    if n_iter > 0:
+        t_forward_custom = t_forward_custom / float(n_iter)
+        if t_forward_torch is None:
+            logger.add_log('Custom Forward time {:.6f}s'.format(t_forward_custom))
+        else:
+            logger.add_log(
+                'Custom Forward time {:.6f}s. Boost x{:.2f}'.format(
+                    t_forward_custom, t_forward_torch / t_forward_custom
+                )
             )
-        )
+
+        t_backward_custom = t_backward_custom / float(n_iter)
+        # log backward
+        if t_backward_torch is None:
+            logger.add_log('Custom Backward time {:.6f}s'.format(t_backward_custom))
+        else:
+            logger.add_log(
+                'Custom Backward time {:.6f}s. Boost x{:.2f}'.format(
+                    t_backward_custom, t_backward_torch / t_backward_custom
+                )
+            )
 
     logger.add_log('_' * 60)
     logger.add_log('\n')

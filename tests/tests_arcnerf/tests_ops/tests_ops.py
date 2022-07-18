@@ -14,7 +14,6 @@ class TestModelDict(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.batch_size = 4096
-        cls.n_rays = 72 * 35
 
     def tests_sh_encode(self):
         if not torch.cuda.is_available():
@@ -23,7 +22,7 @@ class TestModelDict(unittest.TestCase):
         for degree in range(1, 4):
             func = SHEncode(degree)
             # only double gets the accuracy
-            xyz = torch.rand((4096, 3), dtype=torch.double, requires_grad=True).cuda()
+            xyz = torch.rand((self.batch_size, 3), dtype=torch.double, requires_grad=True).cuda()
             out = func(xyz)
             self.assertEqual(out.shape, (self.batch_size, degree**2))
 
@@ -38,6 +37,7 @@ class TestModelDict(unittest.TestCase):
             return
 
         # set up inputs
+        n_dim = 3
         n_levels = 16
         n_feat_per_entry = 2
         hashmap_size = 2**19
@@ -61,18 +61,18 @@ class TestModelDict(unittest.TestCase):
         ).clone().detach().requires_grad_(True).cuda()
         embeddings.uniform_(-std, std)
 
-        min_xyz = [-0.75, -0.75, -0.75]
-        max_xyz = [0.75, 0.75, 0.75]
+        min_xyz = [-0.75] * n_dim
+        max_xyz = [0.75] * n_dim
 
-        func = HashGridEncode(n_levels, n_feat_per_entry, offsets, resolutions).cuda()
-        xyz = torch.rand((4096, 3), dtype=torch.double, requires_grad=True).cuda()
-        out = func(xyz, embeddings, min_xyz, max_xyz)
+        func = HashGridEncode(n_levels, n_feat_per_entry, offsets, resolutions).double()
+        xyz = torch.rand((self.batch_size, n_dim), dtype=torch.double, requires_grad=True).cuda()
+        inputs = (xyz, embeddings, min_xyz, max_xyz)
 
+        out = func(*inputs)
         self.assertEqual(out.shape, (self.batch_size, n_levels * n_feat_per_entry))
-        exit()
 
         loss = torch.sum(1 - out**2)
         loss.backward()
 
         # auto check
-        self.assertTrue(gradcheck(func, xyz, eps=1e-6, atol=1e-8))
+        self.assertTrue(gradcheck(func, inputs, eps=1e-6, atol=1e-8))

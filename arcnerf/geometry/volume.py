@@ -453,7 +453,7 @@ class Volume(nn.Module):
             grid_pts = grid_pts_idx * voxel_size + start_point[0]  # (B_valid, 8, 3)
 
             # get_weight for valid pts
-            w_xyz = (pts[valid_idx] - grid_pts[:, 0, :]) / (grid_pts[:, -1, :] - grid_pts[:, 0, :])  # (B_valid, 3)
+            w_xyz = (pts[valid_idx] - grid_pts[:, 0, :]) / voxel_size  # (B_valid, 3)
             w_xyz = w_xyz.clip(0.0, 1.0)  # in case some pts out of grid
 
             grid_pts_weights = \

@@ -11,6 +11,7 @@ class SHEncodeOps(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, xyz, degree):
+        xyz = xyz.contiguous()  # make it contiguous
         output = _sh_encode.sh_encode_forward(xyz, degree)
         ctx.save_for_backward(xyz)
         ctx.degree = degree

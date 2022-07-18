@@ -15,13 +15,14 @@ template <uint32_t D>
 __device__ uint32_t fast_hash(const uint32_t grid_pts_index[D], const uint32_t hashmap_size) {
     constexpr uint32_t primes[7] = {1, 2654435761, 805459861, 3674653429, 2097192037, 1434869437, 2165219737};
 
-    uint32_t hash = 0;
+    uint64_t hash = 0;
+
     # pragma unroll
-    for (uint32_t i = 0; i < D; i++) {
-        hash ^= grid_pts_index[i] * primes[i];
+    for (uint32_t i=0; i<D; i++) {
+        hash ^= (uint64_t)grid_pts_index[i] * (uint64_t)primes[i];  // in case overflow
     }
 
-    return hash % hashmap_size;
+    return (uint32_t)(hash % hashmap_size);
 }
 
 
@@ -67,17 +68,19 @@ __global__ void forward_kernel(
                 valid = false;
         }
 
-        if (~valid)
+        if (valid == false)
             return;  // it will not contribute to the embeddings
 
         // interpolate from every grid_pts in the voxel
-        scalar_t grid_pts[D];  // left bottom grid_pts pos
+        scalar_t w_xyz[D];  // left bottom grid_pts weights
         uint32_t grid_pts_idx[D];   // left bottom grid_pts index
 
         # pragma unroll
         for (uint32_t i=0; i<D; i++) {
             grid_pts_idx[i] = voxel_idx[i];
-            grid_pts[i] = min_xyz[i] + (scalar_t)voxel_idx[i] * voxel_size[i];
+            scalar_t min_grid_pts = min_xyz[i] + (scalar_t)voxel_idx[i] * voxel_size[i];
+            w_xyz[i] = (xyz[n][i] - min_grid_pts) / voxel_size[i];
+            w_xyz[i] = max(min(w_xyz[i], 1.0), 0.0);
         }
 
         // every grid_pts, find it's weight and feature
@@ -86,28 +89,30 @@ __global__ void forward_kernel(
             scalar_t w = 1.0;
             uint32_t grid_pts_idx_local[D];
 
-//             // for each dim, add up the weights for this grid_pts
-//             # pragma unroll
-//             for (uint32_t d=0; d<D; d++) {  // each axis
-//                 if ((i && (1 << d)) {  // match the same axis
-//                     w *= grid_pts[i];
-//                     grid_pts_idx_local[i] = grid_pts_idx[i] + 1;
-//                 } else {
-//                     w *= (1.0 - grid_pts[i]);
-//                     grid_pts_idx_local[i] = grid_pts_idx[i];
-//                 }
-//             }
-//
-//             // hash_idx in hash bin
-//             uint32_t hash_idx = fast_hash<D>(grid_pts_index, hashmap_size) + offset;
-//
-//             // for each feature, copy the weighted feature from grid
-//             # pragma unroll
-//             for (uint32_t f=0; f<F; f++) {
-//                 atomicAdd(&output[level][n][f], embedding[hash_idx][f];
-//             }
+            // for each dim, multi up the weights for this grid_pts
+            # pragma unroll
+            for (uint32_t d=0; d<D; d++) {  // each axis
+                if (i & (1 << d)) {  // match the same axis
+                    w *= w_xyz[d];
+                    grid_pts_idx_local[d] = grid_pts_idx[d] + 1;
+                } else {
+                    w *= (1.0 - w_xyz[d]);
+                    grid_pts_idx_local[d] = grid_pts_idx[d];
+                }
+            }
+
+            // hash_idx in hash bin
+            uint32_t hash_idx = fast_hash<D>(grid_pts_idx_local, hashmap_size) + offset;
+
+            // for each feature, copy the weighted feature from grid pts
+            # pragma unroll
+            for (uint32_t f=0; f<F; f++) {
+                atomicAdd(&output[level][n][f], embeddings[hash_idx][f] * w);
+            }
         }
     }
+
+    return;
 }
 
 

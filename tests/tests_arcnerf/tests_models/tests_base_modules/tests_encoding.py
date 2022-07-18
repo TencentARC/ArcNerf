@@ -86,6 +86,15 @@ class TestDict(unittest.TestCase):
                     out_dim = 3 * (2 * freq + include)
                     self.assertEqual(out.shape, (self.batch_size * n_interval, out_dim))
 
+    def tests_densegrid_encoder(self):
+        for W_feat in [0, 256]:
+            model = DenseGridEmbedder(include_input=True, W_feat=W_feat).cuda()
+            xyz = torch.rand((self.batch_size, 3)).cuda()
+            out = model(xyz)
+            out_dim = model.get_output_dim()
+            self.assertEqual(out_dim, 1 + 3 + W_feat)
+            self.assertEqual(out.shape, (self.batch_size, 1 + 3 + W_feat))
+
     def tests_sh_embedder(self):
         # test freq factors, at most 5
         include_inputs = [True, False]
@@ -130,11 +139,37 @@ class TestDict(unittest.TestCase):
         self.assertEqual(out_dim, n_levels * n_feat_per_entry + 3)
         self.assertEqual(out.shape, (self.batch_size, n_levels * n_feat_per_entry + 3))
 
-    def tests_densegrid_encoder(self):
-        for W_feat in [0, 256]:
-            model = DenseGridEmbedder(include_input=True, W_feat=W_feat).cuda()
-            xyz = torch.rand((self.batch_size, 3)).cuda()
-            out = model(xyz)
-            out_dim = model.get_output_dim()
-            self.assertEqual(out_dim, 1 + 3 + W_feat)
-            self.assertEqual(out.shape, (self.batch_size, 1 + 3 + W_feat))
+    def tests_hashgrid_embedder_comp(self):
+        if not torch.cuda.is_available():
+            return
+
+        n_levels = [8, 16]
+        n_feat_per_entry = [2, 4, 8]
+        side = 1.5  # to make pts outside the volume
+
+        # double gets the check
+        xyz = torch.rand((self.batch_size, 3), dtype=torch.double) / 2.0
+
+        for level in n_levels:
+            for n_feat in n_feat_per_entry:
+                hashgrid_torch = HashGridEmbedder(
+                    n_levels=level,
+                    n_feat_per_entry=n_feat,
+                    side=side,
+                    include_input=False  # True
+                ).double().cuda()  # embeddings param needs double
+                embeddings_data = hashgrid_torch.get_embeddings()
+                hashgrid_custom = HashGridEmbedder(
+                    n_levels=level, n_feat_per_entry=n_feat, side=side, include_input=False, use_cuda_backend=True
+                ).double().cuda()  # embeddings param needs double
+                hashgrid_custom.set_embeddings(embeddings_data)  # make sure use the same embeddings
+
+                inputs = [xyz.clone().detach().requires_grad_(True)]
+
+                out_torch, out_custom, grad_torch, grad_custom = log_custom_benchmark(
+                    self.logger, 'HashGrid Encode(n_level {} - n_feat {})'.format(level, n_feat), hashgrid_torch,
+                    hashgrid_custom, inputs
+                )
+
+                # the accumulate grad gets quite large error
+                self.check_output_and_grad(out_torch, out_custom, grad_torch, grad_custom)

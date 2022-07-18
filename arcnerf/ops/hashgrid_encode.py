@@ -27,6 +27,8 @@ class HashGridEncodeOps(torch.autograd.Function):
         """
         dtype = xyz.dtype
         device = xyz.device
+        xyz = xyz.contiguous()  # make it contiguous
+        embeddings = embeddings.contiguous()  # make it contiguous
 
         grad_xyz = torch.empty_like(xyz).to(device)
         grad_embeddings = torch.empty_like(embeddings).to(device)
