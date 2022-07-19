@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import math
+import warnings
 
 import torch
 import torch.nn as nn
@@ -12,7 +13,7 @@ try:
     CUDA_BACKEND_AVAILABLE = True
 except ImportError:
     CUDA_BACKEND_AVAILABLE = False
-    raise RuntimeWarning('HashGridEncode not import correctly...Possibly not build yet...')
+    warnings.warn('HashGridEncode not import correctly...Possibly not build yet...')
 
 
 @ENCODER_REGISTRY.register()

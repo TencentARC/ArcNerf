@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 
-from . import get_colors_from_cm
 import matplotlib.pyplot as plt
 import numpy as np
+
+from . import get_colors_from_cm
 
 
 def draw_points(ax, points, point_size, min_values, max_values):

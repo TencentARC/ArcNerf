@@ -12,7 +12,7 @@ def get_learning_rate_scheduler(
     total_epoch=100,
     type='MultiStepLR',
     lr_gamma=0.1,
-    lr_steps=[],
+    lr_steps=None,
     tmax=20,
     min_factor=0.1,
     **kwargs
@@ -20,6 +20,9 @@ def get_learning_rate_scheduler(
     """Setup learning rate scheduler.
        Now support [MultiStepLR, ExponentialLR, PolyLR, CosineAnnealingLR, WarmUpCosineLR].
     """
+    if lr_steps is None:
+        lr_steps = []
+
     if type == 'ExponentialLR':
         lr_gamma_step = lr_gamma**(1.0 / lr_steps[0])
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, lr_gamma_step, last_epoch=last_epoch)

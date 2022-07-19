@@ -12,7 +12,7 @@ Modules like embedder, implicit function, radiance field, etc.
 ## encoder
 We provide several encoder to transfer the input xyz/dir into higher freq embeddings.
 
-Some of the customize cuda implementation needed to be install by `sh scripts/install_ops.sh`
+Some customized cuda implementations needed to be installed by `sh scripts/install_ops.sh`
 ### FreqEmbedder
 Positional encoding introduced in [NeRF](https://arxiv.org/abs/2003.08934).
 

@@ -1,3 +1,9 @@
+// Copyright 2022 Tencent Inc. All rights reserved.
+//
+// Author: leoyluo@tencent.com (Yue Luo)
+//
+// multi-res grid vertices hash embeddings
+
 #include <torch/extension.h>
 #include <torch/torch.h>
 
@@ -51,7 +57,7 @@ std::vector<torch::Tensor> hashgrid_encode_forward(
     const torch::Tensor resolutions,
     const torch::Tensor min_xyz,
     const torch::Tensor max_xyz) {
-    //checking
+    // checking
     CHECK_INPUT(xyz)
     CHECK_IS_FLOATING(xyz)
     CHECK_INPUT(embeddings)
@@ -93,7 +99,8 @@ std::vector<torch::Tensor> hashgrid_encode_backward_cuda(
     const torch::Tensor embeddings,
     const torch::Tensor weights,
     const torch::Tensor hash_idx,
-    const torch::Tensor valid);
+    const torch::Tensor valid,
+    const torch::Tensor dw_dxyz);
 
 
 /* c++ wrapper of hashgrid_encode backward func
@@ -112,8 +119,9 @@ std::vector<torch::Tensor> hashgrid_encode_backward(
     const torch::Tensor embeddings,
     const torch::Tensor weights,
     const torch::Tensor hash_idx,
-    const torch::Tensor valid) {
-    //checking
+    const torch::Tensor valid,
+    const torch::Tensor dw_dxyz) {
+    // checking
     CHECK_INPUT(grad_out)
     CHECK_IS_FLOATING(grad_out)
     CHECK_INPUT(xyz)
@@ -126,9 +134,11 @@ std::vector<torch::Tensor> hashgrid_encode_backward(
     CHECK_IS_LONG(hash_idx)
     CHECK_INPUT(valid)
     CHECK_IS_BOOL(valid)
+    CHECK_INPUT(dw_dxyz)
+    CHECK_IS_FLOATING(dw_dxyz)
 
     // call actual cuda function
-    return hashgrid_encode_backward_cuda(grad_out, xyz, embeddings, weights, hash_idx, valid);
+    return hashgrid_encode_backward_cuda(grad_out, xyz, embeddings, weights, hash_idx, valid, dw_dxyz);
 }
 
 

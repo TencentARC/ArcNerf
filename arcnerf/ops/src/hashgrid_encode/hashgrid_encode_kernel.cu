@@ -39,7 +39,8 @@ __global__ void forward_kernel(
     torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> output,  // (B, L, F)
     torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> weights,  // (B, L, 1<<D)
     torch::PackedTensorAccessor<int64_t, 3, torch::RestrictPtrTraits, size_t> hash_idx,  // (B, L, 1<<D)
-    torch::PackedTensorAccessor<bool, 1, torch::RestrictPtrTraits, size_t> valid) {  // (B,)
+    torch::PackedTensorAccessor<bool, 1, torch::RestrictPtrTraits, size_t> valid,  // (B,)
+    torch::PackedTensorAccessor<scalar_t, 4, torch::RestrictPtrTraits, size_t> dw_dxyz) {  // (B, L, 1<<D, D)
 
     const uint32_t n = blockIdx.y * blockDim.y + threadIdx.y;  // row id
     const uint32_t level = blockIdx.x * blockDim.x + threadIdx.x;  // level=0,1,2,...,L-1
@@ -79,13 +80,22 @@ __global__ void forward_kernel(
         // interpolate from every grid_pts in the voxel
         scalar_t w_xyz[D];  // left bottom grid_pts weights
         uint32_t grid_pts_idx[D];   // left bottom grid_pts index
+        // grad for dw_x_dx
+        scalar_t grad[D];
+        # pragma unroll
+        for (uint32_t d=0; d<D; d++) {
+            grad[d] = 0.0;
+        }
 
         # pragma unroll
         for (uint32_t i=0; i<D; i++) {
             grid_pts_idx[i] = voxel_idx[i];
             scalar_t min_grid_pts = min_xyz[i] + (scalar_t)voxel_idx[i] * voxel_size[i];
             w_xyz[i] = (xyz[n][i] - min_grid_pts) / voxel_size[i];
-            w_xyz[i] = max(min(w_xyz[i], 1.0), 0.0);
+            if (w_xyz[i] >= 0.0 && w_xyz[i] <= 1.0){
+                grad[i] = 1.0 / voxel_size[i];
+            }
+           w_xyz[i] = max(min(w_xyz[i], 1.0), 0.0);
         }
 
         // every grid_pts, find it's weight and feature
@@ -94,16 +104,46 @@ __global__ void forward_kernel(
             scalar_t w = 1.0;
             uint32_t grid_pts_idx_local[D];
 
+            // local grad dw_xyz_dw_x
+            scalar_t grad_local[D];
+            # pragma unroll
+            for (uint32_t d=0; d<D; d++) {
+                grad_local[d] = 1.0;
+            }
+
             // for each dim, multi up the weights for this grid_pts
             # pragma unroll
             for (uint32_t d=0; d<D; d++) {  // each axis
                 if (i & (1 << d)) {  // match the same axis
                     w *= w_xyz[d];
                     grid_pts_idx_local[d] = grid_pts_idx[d] + 1;
+
+                    // grad from grid_pts to each dim
+                    # pragma unroll
+                    for (uint32_t k=0; k<D; k++) {
+                        if (k != d) {
+                            grad_local[k] *= w_xyz[d];
+                        }
+                    }
                 } else {
                     w *= (1.0 - w_xyz[d]);
                     grid_pts_idx_local[d] = grid_pts_idx[d];
+                    // grad from grid_pts to each dim
+                    # pragma unroll
+                    for (uint32_t k=0; k<D; k++) {
+                        if (k == d) {
+                            grad_local[k] *= -1;
+                        } else {
+                            grad_local[k] *= (1.0 - w_xyz[d]);
+                        }
+                    }
                 }
+            }
+
+            // update grad on each vertices to each dim
+            # pragma unroll
+            for (uint32_t d=0; d<D; d++) {
+                dw_dxyz[n][level][i][d] = grad[d] * grad_local[d];
             }
 
             // hash_idx in hash bin
@@ -137,7 +177,8 @@ template <typename scalar_t> void forward_kernel_wrapper(
     torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> output,  // (B, L, F)
     torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> weights,  // (B, L, 1<<D)
     torch::PackedTensorAccessor<int64_t, 3, torch::RestrictPtrTraits, size_t> hash_idx,  // (B, L, 1<<D)
-    torch::PackedTensorAccessor<bool, 1, torch::RestrictPtrTraits, size_t> valid) {  // (B,)
+    torch::PackedTensorAccessor<bool, 1, torch::RestrictPtrTraits, size_t> valid,  // (B,)
+    torch::PackedTensorAccessor<scalar_t, 4, torch::RestrictPtrTraits, size_t> dw_dxyz) {  // (B, L, 1<<D, D)
 
     const uint32_t batch_size = xyz.size(0);  // B
     const uint32_t threads_per_row = 512;
@@ -149,52 +190,64 @@ template <typename scalar_t> void forward_kernel_wrapper(
         case 1: {
             switch (D) {
                 case 2: forward_kernel<scalar_t, 1, 2><<<blocks, threads>>>(
-                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx, valid
+                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx,
+                            valid, dw_dxyz
                         ); break;
                 case 3: forward_kernel<scalar_t, 1, 3><<<blocks, threads>>>(
-                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx, valid
+                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx,
+                            valid, dw_dxyz
                         ); break;
                 case 4: forward_kernel<scalar_t, 1, 4><<<blocks, threads>>>(
-                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx, valid
+                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx,
+                            valid, dw_dxyz
                         ); break;
                 default: throw std::runtime_error{"Input dim must be 2,3,4."};
             }; break;
         } case 2: {
             switch (D) {
                 case 2: forward_kernel<scalar_t, 2, 2><<<blocks, threads>>>(
-                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx, valid
+                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx,
+                            valid, dw_dxyz
                         ); break;
                 case 3: forward_kernel<scalar_t, 2, 3><<<blocks, threads>>>(
-                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx, valid
+                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx,
+                            valid, dw_dxyz
                         ); break;
                 case 4: forward_kernel<scalar_t, 2, 4><<<blocks, threads>>>(
-                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx, valid
+                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx,
+                            valid, dw_dxyz
                         ); break;
                 default: throw std::runtime_error{"Input dim must be 2,3,4."};
             }; break;
         } case 4: {
             switch (D) {
                 case 2: forward_kernel<scalar_t, 4, 2><<<blocks, threads>>>(
-                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx, valid
+                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx,
+                            valid, dw_dxyz
                         ); break;
                 case 3: forward_kernel<scalar_t, 4, 3><<<blocks, threads>>>(
-                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx, valid
+                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx,
+                            valid, dw_dxyz
                         ); break;
                 case 4: forward_kernel<scalar_t, 4, 4><<<blocks, threads>>>(
-                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx, valid
+                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx,
+                            valid, dw_dxyz
                         ); break;
                 default: throw std::runtime_error{"Input dim must be 2,3,4."};
             }; break;
         } case 8: {
             switch (D) {
                 case 2: forward_kernel<scalar_t, 8, 2><<<blocks, threads>>>(
-                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx, valid
+                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx,
+                            valid, dw_dxyz
                         ); break;
                 case 3: forward_kernel<scalar_t, 8, 3><<<blocks, threads>>>(
-                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx, valid
+                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx,
+                            valid, dw_dxyz
                         ); break;
                 case 4: forward_kernel<scalar_t, 8, 4><<<blocks, threads>>>(
-                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx, valid
+                            xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, output, weights, hash_idx,
+                            valid, dw_dxyz
                         ); break;
                 default: throw std::runtime_error{"Input dim must be 2, 3, 4."};
             }; break;
@@ -218,6 +271,7 @@ template <typename scalar_t> void forward_kernel_wrapper(
    @return: weights, torch float tensor of (B, L, 1<<D), the contributed weights in each level on each grid_pts
    @return: hash_idx, torch long tensor of (B, L, 1<<D), the hash index of pts in each level on each grid_pts
    @return: valid, torch bool tensor of (B,), whether the pts is in grid
+   @return: dw_dxyz, torch float tensor of (B, L, 1<<D, D), save the grad from w_xyz to xyz
 */
 std::vector<torch::Tensor> hashgrid_encode_forward_cuda(
     const torch::Tensor xyz,
@@ -235,9 +289,10 @@ std::vector<torch::Tensor> hashgrid_encode_forward_cuda(
     // Init the output tensor
     torch::Tensor output = torch::zeros({B, L, F}, xyz.dtype()).to(xyz.device());  // (B, L, F)
     // tensor for backward
-    torch::Tensor weights = torch::empty({B, L, 1<<D}, xyz.dtype()).to(xyz.device());  // (B, L, 1<<D)
+    torch::Tensor weights = torch::zeros({B, L, 1<<D}, xyz.dtype()).to(xyz.device());  // (B, L, 1<<D)
     torch::Tensor hash_idx = torch::zeros({B, L, 1<<D}, torch::kInt64).to(xyz.device());  // (B, L, 1<<D)
     torch::Tensor valid = torch::zeros(B, torch::kBool).to(xyz.device());  // (B,)
+    torch::Tensor dw_dxyz = torch::zeros({B, L, 1<<D, D}, xyz.dtype()).to(xyz.device());  // (B, L, 1<<D, D)
 
     // instantiate the real executable kernel
     AT_DISPATCH_FLOATING_TYPES(xyz.scalar_type(), "hashgrid_encode_forward_cuda",
@@ -253,11 +308,12 @@ std::vector<torch::Tensor> hashgrid_encode_forward_cuda(
             output.packed_accessor<scalar_t, 3, torch::RestrictPtrTraits, size_t>(),
             weights.packed_accessor<scalar_t, 3, torch::RestrictPtrTraits, size_t>(),
             hash_idx.packed_accessor<int64_t, 3, torch::RestrictPtrTraits, size_t>(),
-            valid.packed_accessor<bool, 1, torch::RestrictPtrTraits, size_t>()
+            valid.packed_accessor<bool, 1, torch::RestrictPtrTraits, size_t>(),
+            dw_dxyz.packed_accessor<scalar_t, 4, torch::RestrictPtrTraits, size_t>()
         );
     }));
 
-    return {output, weights, hash_idx, valid};
+    return {output, weights, hash_idx, valid, dw_dxyz};
 }
 
 
@@ -271,6 +327,7 @@ __global__ void backward_kernel(
     const torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> weights,  // (B, L, 1<<D)
     const torch::PackedTensorAccessor<int64_t, 3, torch::RestrictPtrTraits, size_t> hash_idx,  // (B, L, 1<<D)
     const torch::PackedTensorAccessor<bool, 1, torch::RestrictPtrTraits, size_t> valid,  // (B,)
+    const torch::PackedTensorAccessor<scalar_t, 4, torch::RestrictPtrTraits, size_t> dw_dxyz,  // (B, L, 1<<D, D)
     torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> grad_xyz,
     torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> grad_embeddings) {
 
@@ -284,9 +341,18 @@ __global__ void backward_kernel(
             for (uint32_t f=0; f<F; f++) {
 
                 # pragma unroll
-                for (uint32_t d=0; d<(1<<D); d++) {
-                    int64_t hash = hash_idx[n][level][d];  // hash index on certain grid_pts
-                    atomicAdd(&grad_embeddings[hash][f], grad_out[n][level][f] * weights[n][level][d]);
+                for (uint32_t i=0; i<(1<<D); i++) {
+                    int64_t hash = hash_idx[n][level][i];  // hash index on certain grid_pts
+
+                    // update grad on embedding
+                    atomicAdd(&grad_embeddings[hash][f], grad_out[n][level][f] * weights[n][level][i]);
+
+                    // update grad on xyz
+                    # pragma unroll
+                    for (uint32_t d=0; d<D; d++){
+                        scalar_t accum_grad = grad_out[n][level][f] * embeddings[hash][f] * dw_dxyz[n][level][i][d];
+                        atomicAdd(&grad_xyz[n][d], accum_grad);
+                    }
                 }
             }
         }
@@ -307,6 +373,7 @@ template <typename scalar_t> void backward_kernel_wrapper(
     const torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> weights,  // (B, L, 1<<D)
     const torch::PackedTensorAccessor<int64_t, 3, torch::RestrictPtrTraits, size_t> hash_idx,  // (B, L, 1<<D)
     const torch::PackedTensorAccessor<bool, 1, torch::RestrictPtrTraits, size_t> valid,  // (B,)
+    const torch::PackedTensorAccessor<scalar_t, 4, torch::RestrictPtrTraits, size_t> dw_dxyz,  // (B, L, 1<<D, D)
     torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> grad_xyz,
     torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> grad_embeddings) {
 
@@ -320,52 +387,52 @@ template <typename scalar_t> void backward_kernel_wrapper(
         case 1: {
             switch (D) {
                 case 2: backward_kernel<scalar_t, 1, 2><<<blocks, threads>>>(
-                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, grad_xyz, grad_embeddings
+                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
                 case 3: backward_kernel<scalar_t, 1, 3><<<blocks, threads>>>(
-                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, grad_xyz, grad_embeddings
+                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
                 case 4: backward_kernel<scalar_t, 1, 4><<<blocks, threads>>>(
-                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, grad_xyz, grad_embeddings
+                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
                 default: throw std::runtime_error{"Input dim must be 2,3,4."};
             }; break;
         } case 2: {
             switch (D) {
                 case 2: backward_kernel<scalar_t, 2, 2><<<blocks, threads>>>(
-                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, grad_xyz, grad_embeddings
+                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
                 case 3: backward_kernel<scalar_t, 2, 3><<<blocks, threads>>>(
-                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, grad_xyz, grad_embeddings
+                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
                 case 4: backward_kernel<scalar_t, 2, 4><<<blocks, threads>>>(
-                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, grad_xyz, grad_embeddings
+                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
                 default: throw std::runtime_error{"Input dim must be 2,3,4."};
             }; break;
         } case 4: {
             switch (D) {
                 case 2: backward_kernel<scalar_t, 4, 2><<<blocks, threads>>>(
-                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, grad_xyz, grad_embeddings
+                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
                 case 3: backward_kernel<scalar_t, 4, 3><<<blocks, threads>>>(
-                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, grad_xyz, grad_embeddings
+                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
                 case 4: backward_kernel<scalar_t, 4, 4><<<blocks, threads>>>(
-                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, grad_xyz, grad_embeddings
+                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
                 default: throw std::runtime_error{"Input dim must be 2,3,4."};
             }; break;
         } case 8: {
             switch (D) {
                 case 2: backward_kernel<scalar_t, 8, 2><<<blocks, threads>>>(
-                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, grad_xyz, grad_embeddings
+                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
                 case 3: backward_kernel<scalar_t, 8, 3><<<blocks, threads>>>(
-                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, grad_xyz, grad_embeddings
+                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
                 case 4: backward_kernel<scalar_t, 8, 4><<<blocks, threads>>>(
-                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, grad_xyz, grad_embeddings
+                            grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
                 default: throw std::runtime_error{"Input dim must be 2, 3, 4."};
             }; break;
@@ -381,6 +448,7 @@ template <typename scalar_t> void backward_kernel_wrapper(
    @param: weights, torch float tensor of (B, L, 1<<D), the contributed weights in each level on each grid_pts
    @param: hash_idx, torch long tensor of (B, L, 1<<D), the hash index of pts in each level on each grid_pts
    @param: valid, torch bool tensor of (B,), whether the pts is in grid
+   @param: dw_dxyz, torch float tensor of (B, L, 1<<D, D), save the grad from w_xyz to xyz
    @return: list of output, first is grad_xyz (B, D), second is grad_embeddings (n_total_embed, F)
 */
 std::vector<torch::Tensor> hashgrid_encode_backward_cuda(
@@ -389,7 +457,8 @@ std::vector<torch::Tensor> hashgrid_encode_backward_cuda(
     const torch::Tensor embeddings,
     const torch::Tensor weights,
     const torch::Tensor hash_idx,
-    const torch::Tensor valid) {
+    const torch::Tensor valid,
+    const torch::Tensor dw_dxyz) {
 
     const uint32_t B = xyz.size(0);  // B
     const uint32_t D = xyz.size(1);  // D
@@ -411,6 +480,7 @@ std::vector<torch::Tensor> hashgrid_encode_backward_cuda(
             weights.packed_accessor<scalar_t, 3, torch::RestrictPtrTraits, size_t>(),
             hash_idx.packed_accessor<int64_t, 3, torch::RestrictPtrTraits, size_t>(),
             valid.packed_accessor<bool, 1, torch::RestrictPtrTraits, size_t>(),
+            dw_dxyz.packed_accessor<scalar_t, 4, torch::RestrictPtrTraits, size_t>(),
             grad_xyz.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
             grad_embeddings.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>()
         );

@@ -1,3 +1,9 @@
+// Copyright 2022 Tencent Inc. All rights reserved.
+//
+// Author: leoyluo@tencent.com (Yue Luo)
+//
+// spherical harmonics embedding of direction xyz
+
 #include <torch/extension.h>
 #include <torch/torch.h>
 
@@ -23,7 +29,7 @@ torch::Tensor sh_encode_forward_cuda(const torch::Tensor xyz, const uint32_t deg
    @return: output, torch float tensor of (B, degree**2)
 */
 torch::Tensor sh_encode_forward(const torch::Tensor xyz, const uint32_t degree) {
-    //checking
+    // checking
     CHECK_INPUT(xyz)
     CHECK_IS_FLOATING(xyz)
 
@@ -56,7 +62,7 @@ torch::Tensor sh_encode_backward(
     const torch::Tensor grad_out,
     const torch::Tensor xyz,
     const uint32_t degree) {
-    //checking
+    // checking
     CHECK_INPUT(xyz)
     CHECK_INPUT(grad_out)
 

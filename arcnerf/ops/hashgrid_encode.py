@@ -42,11 +42,11 @@ class HashGridEncodeOps(torch.autograd.Function):
         _max_xyz = torch.tensor(max_xyz, dtype=dtype).to(device)  # (D, )
 
         # forward
-        output, weights, hash_idx, valid = _hashgrid_encode.hashgrid_encode_forward(
+        output, weights, hash_idx, valid, dw_dxyz = _hashgrid_encode.hashgrid_encode_forward(
             xyz, embeddings, n_levels, n_feat_per_entry, _offsets, _resolutions, _min_xyz, _max_xyz
         )
 
-        ctx.save_for_backward(xyz, embeddings, weights, hash_idx, valid)
+        ctx.save_for_backward(xyz, embeddings, weights, hash_idx, valid, dw_dxyz)
 
         # reshape output from (B, L, F) -> (B, L*F)
         output = output.view(xyz.shape[0], -1)  # (B, L*F)

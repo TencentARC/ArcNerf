@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import warnings
+
 import torch
 import torch.nn as nn
 
@@ -9,7 +11,7 @@ try:
     CUDA_BACKEND_AVAILABLE = True
 except ImportError:
     CUDA_BACKEND_AVAILABLE = False
-    raise RuntimeWarning('SHEncode not import correctly...Possibly not build yet...')
+    warnings.warn('SHEncode not import correctly...Possibly not build yet...')
 
 
 @ENCODER_REGISTRY.register()

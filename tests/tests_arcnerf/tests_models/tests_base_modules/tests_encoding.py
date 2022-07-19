@@ -175,4 +175,4 @@ class TestDict(unittest.TestCase):
                 )
 
                 # the accumulate grad gets quite large error
-                self.check_output_and_grad(out_torch, out_custom, grad_torch, grad_custom)
+                self.check_output_and_grad(out_torch, out_custom, grad_torch, grad_custom, atol=1e-4)  # 5e-5 level

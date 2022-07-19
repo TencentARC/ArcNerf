@@ -39,7 +39,7 @@ class TestDict(unittest.TestCase):
 
             x = list(range(self.cfgs.progress.epoch))
             y = [self.cfgs.optim.lr]
-            for epoch in range(self.cfgs.progress.epoch - 1):
+            for _ in range(self.cfgs.progress.epoch - 1):
                 optimizer.zero_grad()
                 optimizer.step()
                 lr = lr_scheduler.get_last_lr()[0]
