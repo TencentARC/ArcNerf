@@ -59,8 +59,8 @@ __device__ T forward_table(uint32_t c, T x, T y, T z) {
 // The real cuda forward_kernel
 template <typename scalar_t, uint32_t D_START, uint32_t D_END>
 __device__ void forward_kernel(
-    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> xyz,
-    torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> output,
+    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> xyz,
+    torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> output,
     const uint32_t n) {
 
     # pragma unroll
@@ -72,9 +72,9 @@ __device__ void forward_kernel(
 // The forward wrapper
 template <typename scalar_t>
 __global__ void forward_kernel_wrapper(
-    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> xyz,
+    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> xyz,
     const uint32_t degree,
-    torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> output) {
+    torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> output) {
 
     const uint32_t d = blockIdx.x * blockDim.x + threadIdx.x;  // d=0,1,2,3,4,5,6
     const uint32_t n = blockIdx.y * blockDim.y + threadIdx.y;  // row id
@@ -111,9 +111,9 @@ torch::Tensor sh_encode_forward_cuda(
     AT_DISPATCH_FLOATING_TYPES(xyz.scalar_type(), "sh_encode_forward_cuda",
     ([&] {
         forward_kernel_wrapper<scalar_t><<<blocks, threads>>>(
-            xyz.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+            xyz.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
             degree,
-            output.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>()
+            output.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>()
         );
     }));
 
@@ -229,9 +229,9 @@ __device__ T backward_table(uint32_t c, uint32_t index, T x, T y, T z) {
 // The real cuda backward_kernel
 template <typename scalar_t, uint32_t D_START, uint32_t D_END>
 __device__ void backward_kernel(
-    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> grad_out,
-    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> xyz,
-    torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> grad_xyz,
+    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> grad_out,
+    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> xyz,
+    torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> grad_xyz,
     const uint32_t n) {
 
     scalar_t x = xyz[n][0];
@@ -250,10 +250,10 @@ __device__ void backward_kernel(
 // The backward wrapper
 template <typename scalar_t>
 __global__ void backward_kernel(
-    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> grad_out,
-    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> xyz,
+    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> grad_out,
+    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> xyz,
     const uint32_t degree,
-    torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> grad_xyz) {
+    torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> grad_xyz) {
 
     const uint32_t d = blockIdx.x * blockDim.x + threadIdx.x;  // d=0,1,2,3,4,5,6
     const uint32_t n = blockIdx.y * blockDim.y + threadIdx.y;  // row id
@@ -291,10 +291,10 @@ torch::Tensor sh_encode_backward_cuda(
     AT_DISPATCH_FLOATING_TYPES(xyz.scalar_type(), "sh_encode_backward_cuda",
     ([&] {
         backward_kernel<scalar_t><<<blocks, threads>>>(
-            grad_out.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
-            xyz.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+            grad_out.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
+            xyz.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
             degree,
-            grad_xyz.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>()
+            grad_xyz.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>()
         );
     }));
 

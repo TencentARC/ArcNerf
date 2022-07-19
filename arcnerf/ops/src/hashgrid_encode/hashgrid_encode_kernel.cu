@@ -29,18 +29,18 @@ __device__ uint32_t fast_hash(const uint32_t grid_pts_index[D], const uint32_t h
 // The real cuda forward_kernel
 template <typename scalar_t, uint32_t F, uint32_t D>
 __global__ void forward_kernel(
-    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> xyz,  // (B, D)
-    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> embeddings,  // (n_total_embed, F)
+    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> xyz,  // (B, D)
+    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> embeddings,  // (n_total_embed, F)
     const uint32_t L,  // n_levels
-    const torch::PackedTensorAccessor<int, 1, torch::RestrictPtrTraits, size_t> offsets,  // L+1
-    const torch::PackedTensorAccessor<int, 1, torch::RestrictPtrTraits, size_t> resolutions,  // L
-    const torch::PackedTensorAccessor<scalar_t, 1, torch::RestrictPtrTraits, size_t> min_xyz,  // D
-    const torch::PackedTensorAccessor<scalar_t, 1, torch::RestrictPtrTraits, size_t> max_xyz,  // D
-    torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> output,  // (B, L, F)
-    torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> weights,  // (B, L, 1<<D)
-    torch::PackedTensorAccessor<int64_t, 3, torch::RestrictPtrTraits, size_t> hash_idx,  // (B, L, 1<<D)
-    torch::PackedTensorAccessor<bool, 1, torch::RestrictPtrTraits, size_t> valid,  // (B,)
-    torch::PackedTensorAccessor<scalar_t, 4, torch::RestrictPtrTraits, size_t> dw_dxyz) {  // (B, L, 1<<D, D)
+    const torch::PackedTensorAccessor32<int, 1, torch::RestrictPtrTraits> offsets,  // L+1
+    const torch::PackedTensorAccessor32<int, 1, torch::RestrictPtrTraits> resolutions,  // L
+    const torch::PackedTensorAccessor32<scalar_t, 1, torch::RestrictPtrTraits> min_xyz,  // D
+    const torch::PackedTensorAccessor32<scalar_t, 1, torch::RestrictPtrTraits> max_xyz,  // D
+    torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> output,  // (B, L, F)
+    torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> weights,  // (B, L, 1<<D)
+    torch::PackedTensorAccessor32<int64_t, 3, torch::RestrictPtrTraits> hash_idx,  // (B, L, 1<<D)
+    torch::PackedTensorAccessor32<bool, 1, torch::RestrictPtrTraits> valid,  // (B,)
+    torch::PackedTensorAccessor32<scalar_t, 4, torch::RestrictPtrTraits> dw_dxyz) {  // (B, L, 1<<D, D)
 
     const uint32_t n = blockIdx.y * blockDim.y + threadIdx.y;  // row id
     const uint32_t level = blockIdx.x * blockDim.x + threadIdx.x;  // level=0,1,2,...,L-1
@@ -165,20 +165,20 @@ __global__ void forward_kernel(
 
 // The forward wrapper
 template <typename scalar_t> void forward_kernel_wrapper(
-    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> xyz,  // (B, D)
-    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> embeddings,  // (n_total_embed, F)
+    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> xyz,  // (B, D)
+    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> embeddings,  // (n_total_embed, F)
     const uint32_t L,  // n_levels
     const uint32_t F,  // n_feat_per_entry
     const uint32_t D,  // input dim
-    const torch::PackedTensorAccessor<int, 1, torch::RestrictPtrTraits, size_t> offsets,  // L+1
-    const torch::PackedTensorAccessor<int, 1, torch::RestrictPtrTraits, size_t> resolutions,  // L
-    const torch::PackedTensorAccessor<scalar_t, 1, torch::RestrictPtrTraits, size_t> min_xyz,  // D
-    const torch::PackedTensorAccessor<scalar_t, 1, torch::RestrictPtrTraits, size_t> max_xyz,  // D
-    torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> output,  // (B, L, F)
-    torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> weights,  // (B, L, 1<<D)
-    torch::PackedTensorAccessor<int64_t, 3, torch::RestrictPtrTraits, size_t> hash_idx,  // (B, L, 1<<D)
-    torch::PackedTensorAccessor<bool, 1, torch::RestrictPtrTraits, size_t> valid,  // (B,)
-    torch::PackedTensorAccessor<scalar_t, 4, torch::RestrictPtrTraits, size_t> dw_dxyz) {  // (B, L, 1<<D, D)
+    const torch::PackedTensorAccessor32<int, 1, torch::RestrictPtrTraits> offsets,  // L+1
+    const torch::PackedTensorAccessor32<int, 1, torch::RestrictPtrTraits> resolutions,  // L
+    const torch::PackedTensorAccessor32<scalar_t, 1, torch::RestrictPtrTraits> min_xyz,  // D
+    const torch::PackedTensorAccessor32<scalar_t, 1, torch::RestrictPtrTraits> max_xyz,  // D
+    torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> output,  // (B, L, F)
+    torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> weights,  // (B, L, 1<<D)
+    torch::PackedTensorAccessor32<int64_t, 3, torch::RestrictPtrTraits> hash_idx,  // (B, L, 1<<D)
+    torch::PackedTensorAccessor32<bool, 1, torch::RestrictPtrTraits> valid,  // (B,)
+    torch::PackedTensorAccessor32<scalar_t, 4, torch::RestrictPtrTraits> dw_dxyz) {  // (B, L, 1<<D, D)
 
     const uint32_t batch_size = xyz.size(0);  // B
     const uint32_t threads_per_row = 512;
@@ -298,18 +298,18 @@ std::vector<torch::Tensor> hashgrid_encode_forward_cuda(
     AT_DISPATCH_FLOATING_TYPES(xyz.scalar_type(), "hashgrid_encode_forward_cuda",
     ([&] {
         forward_kernel_wrapper<scalar_t>(
-            xyz.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
-            embeddings.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
+            xyz.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
+            embeddings.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
             L, F, D,
-            offsets.packed_accessor<int, 1, torch::RestrictPtrTraits, size_t>(),
-            resolutions.packed_accessor<int, 1, torch::RestrictPtrTraits, size_t>(),
-            min_xyz.packed_accessor<scalar_t, 1, torch::RestrictPtrTraits, size_t>(),
-            max_xyz.packed_accessor<scalar_t, 1, torch::RestrictPtrTraits, size_t>(),
-            output.packed_accessor<scalar_t, 3, torch::RestrictPtrTraits, size_t>(),
-            weights.packed_accessor<scalar_t, 3, torch::RestrictPtrTraits, size_t>(),
-            hash_idx.packed_accessor<int64_t, 3, torch::RestrictPtrTraits, size_t>(),
-            valid.packed_accessor<bool, 1, torch::RestrictPtrTraits, size_t>(),
-            dw_dxyz.packed_accessor<scalar_t, 4, torch::RestrictPtrTraits, size_t>()
+            offsets.packed_accessor32<int, 1, torch::RestrictPtrTraits>(),
+            resolutions.packed_accessor32<int, 1, torch::RestrictPtrTraits>(),
+            min_xyz.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
+            max_xyz.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
+            output.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            weights.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            hash_idx.packed_accessor32<int64_t, 3, torch::RestrictPtrTraits>(),
+            valid.packed_accessor32<bool, 1, torch::RestrictPtrTraits>(),
+            dw_dxyz.packed_accessor32<scalar_t, 4, torch::RestrictPtrTraits>()
         );
     }));
 
@@ -320,16 +320,16 @@ std::vector<torch::Tensor> hashgrid_encode_forward_cuda(
 // The real cuda backward_kernel
 template <typename scalar_t, uint32_t F, uint32_t D>
 __global__ void backward_kernel(
-    const torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> grad_out,  // (B, L, F)
+    const torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> grad_out,  // (B, L, F)
     const uint32_t L,  // n_levels
-    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> xyz,  // (B, D)
-    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> embeddings,  // (n_total_embed, F)
-    const torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> weights,  // (B, L, 1<<D)
-    const torch::PackedTensorAccessor<int64_t, 3, torch::RestrictPtrTraits, size_t> hash_idx,  // (B, L, 1<<D)
-    const torch::PackedTensorAccessor<bool, 1, torch::RestrictPtrTraits, size_t> valid,  // (B,)
-    const torch::PackedTensorAccessor<scalar_t, 4, torch::RestrictPtrTraits, size_t> dw_dxyz,  // (B, L, 1<<D, D)
-    torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> grad_xyz,
-    torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> grad_embeddings) {
+    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> xyz,  // (B, D)
+    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> embeddings,  // (n_total_embed, F)
+    const torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> weights,  // (B, L, 1<<D)
+    const torch::PackedTensorAccessor32<int64_t, 3, torch::RestrictPtrTraits> hash_idx,  // (B, L, 1<<D)
+    const torch::PackedTensorAccessor32<bool, 1, torch::RestrictPtrTraits> valid,  // (B,)
+    const torch::PackedTensorAccessor32<scalar_t, 4, torch::RestrictPtrTraits> dw_dxyz,  // (B, L, 1<<D, D)
+    torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> grad_xyz,
+    torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> grad_embeddings) {
 
     const uint32_t n = blockIdx.y * blockDim.y + threadIdx.y;  // row id
     const uint32_t level = blockIdx.x * blockDim.x + threadIdx.x;  // level=0,1,2,...,L-1
@@ -364,18 +364,18 @@ __global__ void backward_kernel(
 
 // The backward wrapper
 template <typename scalar_t> void backward_kernel_wrapper(
-    const torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> grad_out,  // (B, L, F)
+    const torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> grad_out,  // (B, L, F)
     const uint32_t L,  // n_levels
     const uint32_t F,  // n_feat_per_entry
     const uint32_t D,  // input dim
-    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> xyz,  // (B, D)
-    const torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> embeddings,  // (n_total_embed, F)
-    const torch::PackedTensorAccessor<scalar_t, 3, torch::RestrictPtrTraits, size_t> weights,  // (B, L, 1<<D)
-    const torch::PackedTensorAccessor<int64_t, 3, torch::RestrictPtrTraits, size_t> hash_idx,  // (B, L, 1<<D)
-    const torch::PackedTensorAccessor<bool, 1, torch::RestrictPtrTraits, size_t> valid,  // (B,)
-    const torch::PackedTensorAccessor<scalar_t, 4, torch::RestrictPtrTraits, size_t> dw_dxyz,  // (B, L, 1<<D, D)
-    torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> grad_xyz,
-    torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t> grad_embeddings) {
+    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> xyz,  // (B, D)
+    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> embeddings,  // (n_total_embed, F)
+    const torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> weights,  // (B, L, 1<<D)
+    const torch::PackedTensorAccessor32<int64_t, 3, torch::RestrictPtrTraits> hash_idx,  // (B, L, 1<<D)
+    const torch::PackedTensorAccessor32<bool, 1, torch::RestrictPtrTraits> valid,  // (B,)
+    const torch::PackedTensorAccessor32<scalar_t, 4, torch::RestrictPtrTraits> dw_dxyz,  // (B, L, 1<<D, D)
+    torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> grad_xyz,
+    torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> grad_embeddings) {
 
     const uint32_t batch_size = xyz.size(0);  // B
     const uint32_t threads_per_row = 512;
@@ -473,16 +473,16 @@ std::vector<torch::Tensor> hashgrid_encode_backward_cuda(
     AT_DISPATCH_FLOATING_TYPES(grad_xyz.scalar_type(), "hashgrid_encode_backward_cuda",
     ([&] {
         backward_kernel_wrapper<scalar_t>(
-            grad_out.packed_accessor<scalar_t, 3, torch::RestrictPtrTraits, size_t>(),
+            grad_out.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
             L, F, D,
-            xyz.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
-            embeddings.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
-            weights.packed_accessor<scalar_t, 3, torch::RestrictPtrTraits, size_t>(),
-            hash_idx.packed_accessor<int64_t, 3, torch::RestrictPtrTraits, size_t>(),
-            valid.packed_accessor<bool, 1, torch::RestrictPtrTraits, size_t>(),
-            dw_dxyz.packed_accessor<scalar_t, 4, torch::RestrictPtrTraits, size_t>(),
-            grad_xyz.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>(),
-            grad_embeddings.packed_accessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>()
+            xyz.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
+            embeddings.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
+            weights.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            hash_idx.packed_accessor32<int64_t, 3, torch::RestrictPtrTraits>(),
+            valid.packed_accessor32<bool, 1, torch::RestrictPtrTraits>(),
+            dw_dxyz.packed_accessor32<scalar_t, 4, torch::RestrictPtrTraits>(),
+            grad_xyz.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
+            grad_embeddings.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>()
         );
     }));
 

@@ -58,7 +58,7 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
                 grad_torch.append(None)
 
         # grad from model
-        if isinstance(custom_fuc, torch.nn.Module):
+        if isinstance(torch_func, torch.nn.Module):
             for n, p in torch_func.named_parameters():
                 if p.grad is not None:
                     grad_torch.append(p.grad.clone())
