@@ -19,6 +19,7 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
     Returns:
         out_torch: list of torch output. Return None if torch_func is None
         out_custom: list of custom output
+        out_custom_forward_only: list of custom output from forward-only mode
         grad_torch: list of torch grad. Return None if torch_func is None
         grad_custom: list of custom grad
     """
@@ -41,7 +42,7 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
 
     out_torch = None
     grad_torch = None
-    t_forward_torch, t_backward_torch = None, None
+    t_forward_torch, t_backward_torch, t_forward_only_torch = None, None, None
     # torch implementation
     if torch_func is not None:
         # grad
@@ -66,6 +67,7 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
         # timing
         t_forward_torch = 0.0
         t_backward_torch = 0.0
+        t_forward_only_torch = 0.0
         for _ in range(n_iter):
             # zeros the grad
             for input in inputs:
@@ -81,12 +83,20 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
             loss.backward()
             t_backward_torch += get_end_time(t0)
 
+            # forward only
+            with torch.no_grad():
+                t0 = get_start_time()
+                _ = torch_func(*inputs_gpu)
+                t_forward_only_torch += get_end_time(t0)
+
         # log time
         if n_iter > 0:
             t_forward_torch = t_forward_torch / float(n_iter)
             logger.add_log('Torch Forward time {:.6f}s'.format(t_forward_torch))
             t_backward_torch = t_backward_torch / float(n_iter)
             logger.add_log('Torch Backward time {:.6f}s'.format(t_backward_torch))
+            t_forward_only_torch = t_forward_only_torch / float(n_iter)
+            logger.add_log('Torch Forward-Only time {:.6f}s'.format(t_forward_only_torch))
 
         # zeros the grad
         for input in inputs:
@@ -105,6 +115,9 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
         else:
             grad_custom.append(None)
 
+    with torch.no_grad():
+        out_custom_forward_only = custom_fuc(*inputs_gpu)
+
     # grad from model
     if isinstance(custom_fuc, torch.nn.Module):
         for n, p in custom_fuc.named_parameters():
@@ -113,6 +126,7 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
 
     t_forward_custom = 0.0
     t_backward_custom = 0.0
+    t_forward_only_custom = 0.0
     for _ in range(n_iter):
         # zeros the grad
         for input in inputs:
@@ -128,6 +142,12 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
         t0 = get_start_time()
         loss.backward()
         t_backward_custom += get_end_time(t0)
+
+        # forward only
+        with torch.no_grad():
+            t0 = get_start_time()
+            _ = custom_fuc(*inputs_gpu)
+            t_forward_only_custom += get_end_time(t0)
 
     # log time
     if n_iter > 0:
@@ -152,7 +172,18 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
                 )
             )
 
+        t_forward_only_custom = t_forward_only_custom / float(n_iter)
+        # log forward-only
+        if t_forward_only_torch is None:
+            logger.add_log('Custom Forward-Only time {:.6f}s'.format(t_forward_only_custom))
+        else:
+            logger.add_log(
+                'Custom Forward-Only time {:.6f}s. Boost x{:.2f}'.format(
+                    t_forward_only_custom, t_forward_only_torch / t_forward_only_custom
+                )
+            )
+
     logger.add_log('_' * 60)
     logger.add_log('\n')
 
-    return out_torch, out_custom, grad_torch, grad_custom
+    return out_torch, out_custom, out_custom_forward_only, grad_torch, grad_custom

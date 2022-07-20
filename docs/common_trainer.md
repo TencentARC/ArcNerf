@@ -236,6 +236,14 @@ If you use `A.data_ptr<scalar_t>()` to send the pointer, it will be hard to acce
 You can instead use `PackedAccessor`, which is like
 `torch::PackedTensorAccessor<scalar_t, 2, torch::RestrictPtrTraits, size_t>()` to allow easier access.
 
+### cal_grad in forward
+In some case, it is helpful to store by-product for backward grad calculation. But in pure inference mode, it is not
+good to do such calculation during forward pass. It is helpful to pass an indicator in customized forward pass.
+
+This indicator should be [`any(input.requires_grad)` and `torch.is_grad_enabled()`] to check
+whether any input requires_grad and whether it is in the no_grad context. In the `.cu` kernel, you should have the
+grad calculation by yourself.
+
 ------------------------------------------------------------------------
 ## More to do:
 - inference, demo

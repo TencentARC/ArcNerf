@@ -25,16 +25,18 @@ class TestDict(unittest.TestCase):
         cls.batch_size = 4096
         cls.logger = Logger(path=osp.join(RESULT_DIR, './benchmark.txt'), keep_console=False)
 
-    def check_output_and_grad(self, out_torch, out_custom, grad_torch, grad_custom, atol=1e-8):
+    def check_output_and_grad(self, out_torch, out_custom, out_custom_forward_only, grad_torch, grad_custom, atol=1e-8):
         """Check the output and grad"""
         if out_torch is not None:
             if isinstance(out_torch, list):
-                for out, _out in zip(out_torch, out_custom):
+                for out, _out, _out_forward in zip(out_torch, out_custom, out_custom_forward_only):
                     if isinstance(out, torch.Tensor):
                         self.assertTrue(torch.allclose(out, _out, atol=atol))
+                        self.assertTrue(torch.allclose(out, _out_forward, atol=atol))
             else:
                 if isinstance(out_torch, torch.Tensor):
                     self.assertTrue(torch.allclose(out_torch, out_custom, atol=atol))
+                    self.assertTrue(torch.allclose(out_torch, out_custom_forward_only, atol=atol))
 
         if grad_torch is not None:
             if isinstance(grad_torch, list):
@@ -121,12 +123,12 @@ class TestDict(unittest.TestCase):
 
             inputs = [dirs_norm.clone().detach().requires_grad_(True)]
 
-            out_torch, out_custom, grad_torch, grad_custom = log_custom_benchmark(
+            out_torch, out_custom, out_custom_forward_only, grad_torch, grad_custom = log_custom_benchmark(
                 self.logger, 'SH Encode(degree {})'.format(degree), sh_torch, sh_custom, inputs
             )
 
             # the accumulate grad gets quite large error
-            self.check_output_and_grad(out_torch, out_custom, grad_torch, grad_custom)
+            self.check_output_and_grad(out_torch, out_custom, out_custom_forward_only, grad_torch, grad_custom)
 
     def tests_hashgrid_encoder(self):
         n_levels = 16
@@ -169,10 +171,12 @@ class TestDict(unittest.TestCase):
 
                 inputs = [xyz.clone().detach().requires_grad_(True)]
 
-                out_torch, out_custom, grad_torch, grad_custom = log_custom_benchmark(
+                out_torch, out_custom, out_custom_forward_only, grad_torch, grad_custom = log_custom_benchmark(
                     self.logger, 'HashGrid Encode(n_level {} - n_feat {})'.format(level, n_feat), hashgrid_torch,
                     hashgrid_custom, inputs
                 )
 
                 # the accumulate grad gets quite large error
-                self.check_output_and_grad(out_torch, out_custom, grad_torch, grad_custom, atol=1e-4)  # 5e-5 level
+                self.check_output_and_grad(
+                    out_torch, out_custom, out_custom_forward_only, grad_torch, grad_custom, atol=1e-4
+                )  # 5e-5 level

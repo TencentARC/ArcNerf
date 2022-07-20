@@ -21,7 +21,7 @@
 
 
 // define the real cuda function to be called by c++ wrapper.
-std::vector<torch::Tensor> hashgrid_encode_forward_cuda(
+torch::Tensor hashgrid_encode_forward_cuda(
     const torch::Tensor xyz,
     const torch::Tensor embeddings,
     const uint32_t L,
@@ -29,7 +29,12 @@ std::vector<torch::Tensor> hashgrid_encode_forward_cuda(
     const torch::Tensor offsets,
     const torch::Tensor resolutions,
     const torch::Tensor min_xyz,
-    const torch::Tensor max_xyz);
+    const torch::Tensor max_xyz,
+    const bool cal_grad,
+    torch::Tensor weights,
+    torch::Tensor hash_idx,
+    torch::Tensor valid,
+    torch::Tensor dw_dxyz);
 
 
 /* c++ wrapper of hashgrid_encode forward func
@@ -43,12 +48,14 @@ std::vector<torch::Tensor> hashgrid_encode_forward_cuda(
    @param: resolutions, torch float tensor of (L, ), resolution at each level, len is L
    @param: min_xyz, torch float tensor of (D, ), the min_xyz position of the grid
    @param: max_xyz, torch float tensor of (D, ), the max_xyz position of the grid
+   @param: cal_grad, bool value decide whether to cal grad
+   @param: weights, torch float tensor of (B, L, 1<<D), the contributed weights in each level on each grid_pts
+   @param: hash_idx, torch long tensor of (B, L, 1<<D), the hash index of pts in each level on each grid_pts
+   @param: valid, torch bool tensor of (B,), whether the pts is in grid
+   @param: dw_dxyz, torch float tensor of (B, L, 1<<D, D), save the grad from w_xyz to xyz
    @return: output, torch float tensor of (B, L, F)
-   @return: weights, torch float tensor of (B, L, 1<<D), the contributed weights in each level on each grid_pts
-   @return: hash_idx, torch long tensor of (B, L, 1<<D), the hash index of pts in each level on each grid_pts
-   @return: valid, torch bool tensor of (B,), whether the pts is in grid
 */
-std::vector<torch::Tensor> hashgrid_encode_forward(
+torch::Tensor hashgrid_encode_forward(
     const torch::Tensor xyz,
     const torch::Tensor embeddings,
     const uint32_t L,
@@ -56,7 +63,12 @@ std::vector<torch::Tensor> hashgrid_encode_forward(
     const torch::Tensor offsets,
     const torch::Tensor resolutions,
     const torch::Tensor min_xyz,
-    const torch::Tensor max_xyz) {
+    const torch::Tensor max_xyz,
+    const bool cal_grad,
+    torch::Tensor weights,
+    torch::Tensor hash_idx,
+    torch::Tensor valid,
+    torch::Tensor dw_dxyz) {
     // checking
     CHECK_INPUT(xyz)
     CHECK_IS_FLOATING(xyz)
@@ -70,6 +82,15 @@ std::vector<torch::Tensor> hashgrid_encode_forward(
     CHECK_IS_FLOATING(min_xyz)
     CHECK_INPUT(max_xyz)
     CHECK_IS_FLOATING(max_xyz)
+    CHECK_INPUT(weights)
+    CHECK_IS_FLOATING(weights)
+    CHECK_INPUT(hash_idx)
+    CHECK_IS_LONG(hash_idx)
+    CHECK_INPUT(valid)
+    CHECK_IS_BOOL(valid)
+    CHECK_INPUT(dw_dxyz)
+    CHECK_IS_FLOATING(dw_dxyz)
+
 
     if (offsets.size(0) != L + 1) {
         throw std::runtime_error{"Offset length must be L+1."};
@@ -89,7 +110,8 @@ std::vector<torch::Tensor> hashgrid_encode_forward(
     }
 
     // call actual cuda function
-    return hashgrid_encode_forward_cuda(xyz, embeddings, L, F, offsets, resolutions, min_xyz, max_xyz);
+    return hashgrid_encode_forward_cuda(xyz, embeddings, L, F, offsets, resolutions, min_xyz, max_xyz, cal_grad,
+                                        weights, hash_idx, valid, dw_dxyz);
 }
 
 // define the real cuda function to be called by c++ wrapper.
