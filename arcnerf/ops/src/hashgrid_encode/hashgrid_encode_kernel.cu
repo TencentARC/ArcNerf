@@ -43,8 +43,8 @@ __global__ void forward_kernel(
     torch::PackedTensorAccessor32<bool, 1, torch::RestrictPtrTraits> valid,  // (B,)
     torch::PackedTensorAccessor32<scalar_t, 4, torch::RestrictPtrTraits> dw_dxyz) {  // (B, L, 1<<D, D)
 
-    const uint32_t n = blockIdx.y * blockDim.y + threadIdx.y;  // row id
     const uint32_t level = blockIdx.x * blockDim.x + threadIdx.x;  // level=0,1,2,...,L-1
+    const uint32_t n = blockIdx.y * blockDim.y + threadIdx.y;  // row id
 
     if (n < xyz.size(0) && level < L) {
         const uint32_t cur_res = (uint32_t)resolutions[level];
@@ -225,7 +225,7 @@ template <typename scalar_t> void forward_kernel_wrapper(
                             xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, cal_grad, output,
                             weights, hash_idx, valid, dw_dxyz
                         ); break;
-                default: throw std::runtime_error{"Input dim must be 2,3,4."};
+                default: throw std::runtime_error{"Input dim must be 2, 3, 4."};
             }; break;
         } case 2: {
             switch (D) {
@@ -241,7 +241,7 @@ template <typename scalar_t> void forward_kernel_wrapper(
                             xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, cal_grad, output,
                             weights, hash_idx, valid, dw_dxyz
                         ); break;
-                default: throw std::runtime_error{"Input dim must be 2,3,4."};
+                default: throw std::runtime_error{"Input dim must be 2, 3, 4."};
             }; break;
         } case 4: {
             switch (D) {
@@ -257,7 +257,7 @@ template <typename scalar_t> void forward_kernel_wrapper(
                             xyz, embeddings, L, offsets, resolutions, min_xyz, max_xyz, cal_grad, output,
                             weights, hash_idx, valid, dw_dxyz
                         ); break;
-                default: throw std::runtime_error{"Input dim must be 2,3,4."};
+                default: throw std::runtime_error{"Input dim must be 2, 3, 4."};
             }; break;
         } case 8: {
             switch (D) {
@@ -357,8 +357,8 @@ __global__ void backward_kernel(
     torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> grad_xyz,
     torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> grad_embeddings) {
 
-    const uint32_t n = blockIdx.y * blockDim.y + threadIdx.y;  // row id
     const uint32_t level = blockIdx.x * blockDim.x + threadIdx.x;  // level=0,1,2,...,L-1
+    const uint32_t n = blockIdx.y * blockDim.y + threadIdx.y;  // row id
 
     if (n < xyz.size(0) && level < L) {
         if (valid[n] == true) {  // only update for the pts in volume
@@ -421,7 +421,7 @@ template <typename scalar_t> void backward_kernel_wrapper(
                 case 4: backward_kernel<scalar_t, 1, 4><<<blocks, threads>>>(
                             grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
-                default: throw std::runtime_error{"Input dim must be 2,3,4."};
+                default: throw std::runtime_error{"Input dim must be 2, 3, 4."};
             }; break;
         } case 2: {
             switch (D) {
@@ -434,7 +434,7 @@ template <typename scalar_t> void backward_kernel_wrapper(
                 case 4: backward_kernel<scalar_t, 2, 4><<<blocks, threads>>>(
                             grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
-                default: throw std::runtime_error{"Input dim must be 2,3,4."};
+                default: throw std::runtime_error{"Input dim must be 2, 3, 4."};
             }; break;
         } case 4: {
             switch (D) {
@@ -447,7 +447,7 @@ template <typename scalar_t> void backward_kernel_wrapper(
                 case 4: backward_kernel<scalar_t, 4, 4><<<blocks, threads>>>(
                             grad_out, L, xyz, embeddings, weights, hash_idx, valid, dw_dxyz, grad_xyz, grad_embeddings
                         ); break;
-                default: throw std::runtime_error{"Input dim must be 2,3,4."};
+                default: throw std::runtime_error{"Input dim must be 2, 3, 4."};
             }; break;
         } case 8: {
             switch (D) {
