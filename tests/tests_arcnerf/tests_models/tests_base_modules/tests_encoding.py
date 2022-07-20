@@ -23,7 +23,7 @@ class TestDict(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.batch_size = 4096
-        cls.logger = Logger(path=osp.join(RESULT_DIR, './benchmark.txt'), keep_console=False)
+        cls.logger = Logger(path=osp.join(RESULT_DIR, './encoder.txt'), keep_console=False)
 
     def check_output_and_grad(self, out_torch, out_custom, out_custom_forward_only, grad_torch, grad_custom, atol=1e-8):
         """Check the output and grad"""

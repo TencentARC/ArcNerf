@@ -86,7 +86,7 @@ class TestDict(unittest.TestCase):
         return loss_func
 
     def get_avg_time(self, model, input, loss_func):
-        t_forward, t_backward = 0.0, 0.0
+        t_forward, t_backward, t_forward_only = 0.0, 0.0, 0.0
         for _ in range(self.n_run):
             # clear the grad
             for k, v in input.items():
@@ -107,16 +107,24 @@ class TestDict(unittest.TestCase):
             loss['sum'].backward()
             t_backward += get_end_time(t0)
 
+            # forward only
+            with torch.no_grad():
+                t0 = get_start_time()
+                _ = model(input)
+                t_forward_only += get_end_time(t0)
+
         t_forward = t_forward / float(self.n_run)
         t_backward = t_backward / float(self.n_run)
+        t_forward_only = t_forward_only / float(self.n_run)
 
-        return t_forward, t_backward
+        return t_forward, t_backward, t_forward_only
 
-    def log_time(self, model_name, t_f, t_b):
+    def log_time(self, model_name, t_f, t_b, t_f_o):
         self.logger.add_log('_' * 60)
         self.logger.add_log('Model: {}'.format(model_name))
         self.logger.add_log('   Forward: {:.6f}s'.format(t_f))
         self.logger.add_log('   Backward: {:.6f}s'.format(t_b))
+        self.logger.add_log('   Forward-Only: {:.6f}s'.format(t_f_o))
         self.logger.add_log('_' * 60)
 
     def tests_nerf(self):
@@ -124,45 +132,45 @@ class TestDict(unittest.TestCase):
         model = self.build_test_model(cfgs_name)
         loss_func = self.build_loss_func(['rgb_fine'])
 
-        t_forward, t_backward = self.get_avg_time(model, self.data, loss_func)
-        self.log_time('NeRF ', t_forward, t_backward)
+        t_forward, t_backward, t_forward_only = self.get_avg_time(model, self.data, loss_func)
+        self.log_time('NeRF ', t_forward, t_backward, t_forward_only)
 
     def tests_nerfpp(self):
         cfgs_name = 'nerfpp.yaml'
         model = self.build_test_model(cfgs_name)
         loss_func = self.build_loss_func(['rgb_fine'])
 
-        t_forward, t_backward = self.get_avg_time(model, self.data, loss_func)
-        self.log_time('NeRF++ ', t_forward, t_backward)
+        t_forward, t_backward, t_forward_only = self.get_avg_time(model, self.data, loss_func)
+        self.log_time('NeRF++ ', t_forward, t_backward, t_forward_only)
 
     def tests_neus(self):
         cfgs_name = 'neus.yaml'
         model = self.build_test_model(cfgs_name)
         loss_func = self.build_loss_func(['rgb'])
 
-        t_forward, t_backward = self.get_avg_time(model, self.data, loss_func)
-        self.log_time('Neus ', t_forward, t_backward)
+        t_forward, t_backward, t_forward_only = self.get_avg_time(model, self.data, loss_func)
+        self.log_time('Neus ', t_forward, t_backward, t_forward_only)
 
     def tests_volsdf(self):
         cfgs_name = 'volsdf.yaml'
         model = self.build_test_model(cfgs_name)
         loss_func = self.build_loss_func(['rgb'])
 
-        t_forward, t_backward = self.get_avg_time(model, self.data, loss_func)
-        self.log_time('Volsdf ', t_forward, t_backward)
+        t_forward, t_backward, t_forward_only = self.get_avg_time(model, self.data, loss_func)
+        self.log_time('Volsdf ', t_forward, t_backward, t_forward_only)
 
     def tests_mipnerf(self):
         cfgs_name = 'mipnerf.yaml'
         model = self.build_test_model(cfgs_name)
         loss_func = self.build_loss_func(['rgb_fine'])
 
-        t_forward, t_backward = self.get_avg_time(model, self.data, loss_func)
-        self.log_time('mipnerf ', t_forward, t_backward)
+        t_forward, t_backward, t_forward_only = self.get_avg_time(model, self.data, loss_func)
+        self.log_time('mipnerf ', t_forward, t_backward, t_forward_only)
 
     def tests_nerf_ngp(self):
         cfgs_name = 'nerf_ngp.yaml'
         model = self.build_test_model(cfgs_name)
         loss_func = self.build_loss_func(['rgb_fine'])
 
-        t_forward, t_backward = self.get_avg_time(model, self.data, loss_func)
-        self.log_time('NeRF-ngp ', t_forward, t_backward)
+        t_forward, t_backward, t_forward_only = self.get_avg_time(model, self.data, loss_func)
+        self.log_time('NeRF-ngp ', t_forward, t_backward, t_forward_only)
