@@ -1,6 +1,6 @@
 # default config.
 
-name: default
+name: capture_qqtiger_nerf
 
 resume: None
 
@@ -146,7 +146,7 @@ inference:
         #     grad_dir: ascent      # if 'descent', sigma is larger than level in obj(NeRF), if 'ascent' is smaller(SDF)
 
     volume:                         # volume params
-        origin: (0.0, 0.0, 0.0)     # volume center
+        origin: [0.0, 0.0, 0.0]     # volume center
         n_grid: 512                 # n_grid is the num of voxel in each dim. For visual set a small num only
         side: 1.5                   # if set, all len at each dim will be side
         xlen: 1.5                   # x-dim length, only when side is None
