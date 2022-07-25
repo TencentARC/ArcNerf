@@ -37,6 +37,10 @@ We provide a custom cuda implementation as well by setting `use_cuda_backend` as
 ### DenseGridEmbedder
 The dense grid embedder directly extracts density and feature from a dense volume. It only embed xyz direction rather than positions.
 
+## Tiny-cuda-nn
+Some encoders are implemented in [tiny-cuda-nn]() by Nvidia. You should clone the repo `--recursive`
+and install them by `sh scripts/install_tinycudann.sh`.
+
 
 ------------------------------------------------------------------------
 ## BaseGeoNet/BaseRadianceNetwork
