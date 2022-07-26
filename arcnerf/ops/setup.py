@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
 # see: https://pytorch.org/tutorials/advanced/cpp_extension.html for details
 
+import os
 from setuptools import setup
+
 from torch.utils.cpp_extension import CUDAExtension, BuildExtension
+
+# compile on all arch
+os.environ['TORCH_CUDA_ARCH_LIST'] = ''
 
 setup(
     name='arcnerf_custom_ops',
@@ -21,6 +26,7 @@ setup(
             sources=['./src/hashgrid_encode/hashgrid_encode.cpp', './src/hashgrid_encode/hashgrid_encode_kernel.cu']
         )
     ],
+
     cmdclass={
         'build_ext': BuildExtension
     }

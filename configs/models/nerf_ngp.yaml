@@ -23,12 +23,12 @@ model:
             type: HashGridEmbedder    # type of encoder
             input_dim: 3              # xyz input channel
             n_freqs: 0                # this one controls the geo init
-            n_levels: 16              # num of levels for multi-res hashing
+            n_levels: 16              # num of levels for multi-res hashing, increase from base_res to max_res
             n_feat_per_entry: 2       # num of feat in each entry
-            hashmap_size: 19          #
-            base_res: 16
-            max_res: 512
-            use_cuda_backend: True    # cuda implementation
+            hashmap_size: 19          # 2**hashmap_size for hashmap size in each bin
+            base_res: 16              # base res on each xyz dim
+            max_res: 512              # last res
+            backend: tcnn             # backend: support torch/cuda/tcnn
         W_feat: 16                    # extra feature output
         geometric_init: False         # whether to use geometric init. need radius_init
     radiance:
@@ -40,5 +40,5 @@ model:
                 type: SHEmbedder      # type of encoder
                 input_dim: 3          # view input channel
                 n_freqs: 4            # view embed freq, output is degree**2
-                use_cuda_backend: True # cuda implementation
+                backend: tcnn         # backend: support torch/cuda/tcnn
         W_feat_in: 16                 # dim for feature from geometry

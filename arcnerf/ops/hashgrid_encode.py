@@ -17,10 +17,10 @@ class HashGridEncodeOps(torch.autograd.Function):
             embeddings: embeddings vec in shape (n_total_embed, F)
             n_levels: num of levels of embeddings(L), by default 16
             n_feat_per_entry: num of feat for each entry in hashmap(F), by default 2
-            offsets: a list of offset of each level, len is L+1
-            resolutions: a list of resolution at each level, len is L
-            min_xyz: a list of D, the min_xyz position of the grid
-            max_xyz: a list of D, the max_xyz position of the grid
+            offsets: a list of offset of each level, tensor with len L+1
+            resolutions: a list of resolution at each level, tensor with len L
+            min_xyz: the min_xyz position of the grid, tensor with len D
+            max_xyz: the max_xyz position of the grid, tensor with len D
             cal_grad: bool value of whether cal the grad. It depends on the input's requires_grad
 
         Returns:
@@ -36,11 +36,6 @@ class HashGridEncodeOps(torch.autograd.Function):
 
         xyz = xyz.contiguous()  # make it contiguous
         embeddings = embeddings.contiguous()  # make it contiguous
-        # change list to tensor
-        _offsets = torch.tensor(offsets, dtype=torch.int).to(device)  # (L+1, )
-        _resolutions = torch.tensor(resolutions, dtype=torch.int).to(device)  # (L, )
-        _min_xyz = torch.tensor(min_xyz, dtype=dtype).to(device)  # (D, )
-        _max_xyz = torch.tensor(max_xyz, dtype=dtype).to(device)  # (D, )
 
         if cal_grad:
             n_dim, n_grid = xyz.shape[1], 2**xyz.shape[1]
@@ -56,7 +51,7 @@ class HashGridEncodeOps(torch.autograd.Function):
 
         # forward
         output = _hashgrid_encode.hashgrid_encode_forward(
-            xyz, embeddings, n_levels, n_feat_per_entry, _offsets, _resolutions, _min_xyz, _max_xyz, cal_grad, weights,
+            xyz, embeddings, n_levels, n_feat_per_entry, offsets, resolutions, min_xyz, max_xyz, cal_grad, weights,
             hash_idx, valid, dw_dxyz
         )
 
@@ -86,38 +81,35 @@ class HashGridEncodeOps(torch.autograd.Function):
 class HashGridEncode(nn.Module):
     """A torch.nn class that use the HashGridEncode function"""
 
-    def __init__(self, n_levels, n_feat_per_entry, offsets, resolutions):
+    def __init__(self, n_levels, n_feat_per_entry):
         """
         Args:
             n_levels: num of levels of embeddings(L), by default 16
             n_feat_per_entry: num of feat for each entry in hashmap(F), by default 2
-            offsets: a list of offset of each level, len is L+1
-            resolutions: a list of resolution at each level, len is L
         """
         super(HashGridEncode, self).__init__()
         self.n_levels = n_levels
         self.n_feat_per_entry = n_feat_per_entry
-        self.offsets = offsets
-        self.resolutions = resolutions
 
-    def forward(self, xyz, embeddings, min_xyz, max_xyz):
+    def forward(self, xyz, embeddings, offsets, resolutions, min_xyz, max_xyz):
         """
         Args:
             xyz: tensor of shape (B, D), xyz position
             embeddings: embeddings vec in shape (n_total_embed, F)
-            min_xyz: a list of D, the min_xyz position of the grid
-            max_xyz: a list of D, the max_xyz position of the grid
+            offsets: a list of offset of each level, tensor with len L+1
+            resolutions: a list of resolution at each level, tensor with len L
+            min_xyz: the min_xyz position of the grid, tensor with len D
+            max_xyz: the max_xyz position of the grid, tensor with len D
 
         Returns:
              output: torch tensor with (B, L*F) shape
         """
         assert len(min_xyz) == xyz.shape[1] and len(max_xyz) == xyz.shape[1], 'Incorrect boundary size'
-        assert embeddings.shape == (self.offsets[-1], self.n_feat_per_entry), 'embeddings must be (n_total_embed, F)'
+        assert embeddings.shape == (offsets[-1], self.n_feat_per_entry), 'embeddings must be (n_total_embed, F)'
 
         # any one requires grad and not in no_grad context
         cal_grad = (xyz.requires_grad or embeddings.requires_grad) and torch.is_grad_enabled()
 
         return HashGridEncodeOps.apply(
-            xyz, embeddings, self.n_levels, self.n_feat_per_entry, self.offsets, self.resolutions, min_xyz, max_xyz,
-            cal_grad
+            xyz, embeddings, self.n_levels, self.n_feat_per_entry, offsets, resolutions, min_xyz, max_xyz, cal_grad
         )

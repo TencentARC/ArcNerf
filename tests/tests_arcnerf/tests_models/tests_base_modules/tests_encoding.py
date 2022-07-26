@@ -119,7 +119,7 @@ class TestDict(unittest.TestCase):
 
         for degree in range(1, 6):
             sh_torch = SHEmbedder(n_freqs=degree, include_input=True)
-            sh_custom = SHEmbedder(n_freqs=degree, include_input=True, use_cuda_backend=True)
+            sh_custom = SHEmbedder(n_freqs=degree, include_input=True, backend='cuda')
 
             inputs = [dirs_norm.clone().detach().requires_grad_(True)]
 
@@ -165,7 +165,7 @@ class TestDict(unittest.TestCase):
                     hashmap_size=hashmap_size,
                     side=side,
                     include_input=True,
-                    use_cuda_backend=True
+                    backend='cuda'
                 ).double().cuda()  # embeddings param needs double
                 hashgrid_custom.set_embeddings(embeddings_data.clone())  # make sure use the same embeddings
 

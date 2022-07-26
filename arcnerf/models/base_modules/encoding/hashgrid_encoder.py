@@ -8,12 +8,20 @@ import torch.nn as nn
 
 from . import ENCODER_REGISTRY
 from arcnerf.geometry.volume import Volume
+# import customized hashgrid encode
 try:
     from arcnerf.ops import HashGridEncode
     CUDA_BACKEND_AVAILABLE = True
 except ImportError:
     CUDA_BACKEND_AVAILABLE = False
     warnings.warn('HashGridEncode not import correctly...Possibly not build yet...')
+# import tcnn encoder
+try:
+    import tinycudann as tcnn
+    TCNN_BACKEND_AVAILABLE = True
+except ImportError:
+    TCNN_BACKEND_AVAILABLE = False
+    warnings.warn('TCNN not import correctly...Possibly not build yet...')
 
 
 @ENCODER_REGISTRY.register()
@@ -37,7 +45,7 @@ class HashGridEmbedder(nn.Module):
         zlen=None,
         dtype=torch.float32,
         include_input=True,
-        use_cuda_backend=False,
+        backend=None,
         *args,
         **kwargs
     ):
@@ -59,7 +67,7 @@ class HashGridEmbedder(nn.Module):
                 zlen: len of z dim, if None use side
                 dtype: dtype of params. By default is torch.float32
             include_input: if True, raw input is included in the embedding. Appear at beginning. By default is True
-            use_cuda_backend: whether to use the customized cuda backend. By default False, use pure torch version.
+            backend: which backend to use. By default None, use pure torch version.
 
         Returns:
             Embedded inputs with shape:
@@ -87,16 +95,43 @@ class HashGridEmbedder(nn.Module):
             n_grid=self.base_res, origin=origin, side=side, xlen=xlen, ylen=ylen, zlen=zlen, dtype=dtype
         )
 
+        # register params
+        self.register()
+
+        # backend
+        if backend is None:
+            backend = 'torch'
+        assert backend in ['torch', 'cuda', 'tcnn'], 'Invalid backend used, only torch/cuda/tcnn allowed'
+        self.backend = backend
+
         # set up cuda backend
-        self.use_cuda_backend = use_cuda_backend
-        if self.use_cuda_backend and CUDA_BACKEND_AVAILABLE:
-            self.hashgrid_encode = HashGridEncode(self.n_levels, self.n_feat_per_entry, self.offsets, self.resolutions)
+        if self.backend == 'cuda' and CUDA_BACKEND_AVAILABLE:
+            self.hashgrid_encode_cuda = HashGridEncode(self.n_levels, self.n_feat_per_entry)
+        elif self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
+            self.hashgrid_encode_tcnn = tcnn.Encoding(
+                n_input_dims=input_dim,
+                encoding_config={
+                    'otype': 'HashGrid',
+                    'n_levels': self.n_levels,
+                    'n_features_per_level': self.n_feat_per_entry,
+                    'log2_hashmap_size': hashmap_size,
+                    'base_resolution': self.base_res,
+                    'per_level_scale': float(self.per_level_scale),
+                },
+            )
 
         self.out_dim = n_levels * n_feat_per_entry + include_input * input_dim  # L * F + 3
 
     def get_output_dim(self):
         """Get output dim"""
         return self.out_dim
+
+    def register(self):
+        """To make those tensor into the same device"""
+        self.register_buffer('min_xyz', self.volume.get_range()[:, 0])  # (3,)
+        self.register_buffer('max_xyz', self.volume.get_range()[:, 1])  # (3,)
+        self.register_buffer('t_offsets', torch.tensor(self.offsets, dtype=torch.int))  # (L+1,)
+        self.register_buffer('t_resolutions', torch.tensor(self.resolutions, dtype=torch.int))  # (L,)
 
     def init_embeddings(self, std=1e-4):
         """Init embedding. To save memory, at lower level, do not init large embeddings
@@ -149,10 +184,13 @@ class HashGridEmbedder(nn.Module):
         if self.include_input:
             out.append(xyz)  # (B, 3)
 
-        if self.use_cuda_backend and CUDA_BACKEND_AVAILABLE:
-            min_xyz = self.volume.get_range()[:, 0].detach().cpu().numpy().tolist()
-            max_xyz = self.volume.get_range()[:, 1].detach().cpu().numpy().tolist()
-            hashgrid_embed = self.hashgrid_encode(xyz, self.embeddings, min_xyz, max_xyz)
+        if self.backend == 'cuda' and CUDA_BACKEND_AVAILABLE:
+            hashgrid_embed = self.hashgrid_encode_cuda(
+                xyz, self.embeddings, self.t_offsets, self.t_resolutions, self.min_xyz, self.max_xyz
+            )
+        elif self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
+            norm_xyz = (xyz - self.min_xyz) / (self.max_xyz - self.min_xyz)  # to (0~1)
+            hashgrid_embed = self.hashgrid_encode_tcnn(norm_xyz)
         else:
             hashgrid_embed = self.hashgrid_encode_torch(xyz)
         out.append(hashgrid_embed)  # (B, T*F)

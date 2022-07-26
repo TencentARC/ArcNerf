@@ -1,4 +1,4 @@
-name: nerf_lego_nerf_hashgrid_torch_sh
+name: nerf_lego_nerf_hashgrid_torch_sh_onestage
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_hashgrid_torch_sh'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_hashgrid_torch_sh_onestage'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_hashgrid_torch_sh/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_hashgrid_torch_sh_onestage/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -116,8 +116,7 @@ model:
         # bounding_radius: 3.0
         near: 1.5
         far: 4.5
-        n_sample: 64
-        n_importance: 128
+        n_sample: 128
         inverse_linear: False
         perturb: True
         add_inf_z: True
@@ -136,9 +135,10 @@ model:
             n_levels: 16
             n_feat_per_entry: 2
             hashmap_size: 19
+            side: 2.0
             base_res: 16
             max_res: 512
-            use_cuda_backend: False  # no cuda
+            backend: torch  # no cuda
         W_feat: 16
         geometric_init: False
     radiance:
@@ -150,12 +150,12 @@ model:
                 type: SHEmbedder
                 input_dim: 3
                 n_freqs: 4
-                use_cuda_backend: True
+                backend: cuda
         W_feat_in: 16
 
 loss:
     ImgLoss:
-        keys: ['rgb_coarse', 'rgb_fine']
+        keys: ['rgb_coarse']
         weight: 1.0
 
 metric:
@@ -163,4 +163,4 @@ metric:
 
 train_metric:
     PSNR:
-        key: 'rgb_fine'
+        key: 'rgb_coarse'

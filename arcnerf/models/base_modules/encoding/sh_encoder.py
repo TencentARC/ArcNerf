@@ -6,12 +6,20 @@ import torch
 import torch.nn as nn
 
 from . import ENCODER_REGISTRY
+# import customized SH encode
 try:
     from arcnerf.ops import SHEncode
     CUDA_BACKEND_AVAILABLE = True
 except ImportError:
     CUDA_BACKEND_AVAILABLE = False
     warnings.warn('SHEncode not import correctly...Possibly not build yet...')
+# import tcnn encoder
+try:
+    import tinycudann as tcnn
+    TCNN_BACKEND_AVAILABLE = True
+except ImportError:
+    TCNN_BACKEND_AVAILABLE = False
+    warnings.warn('TCNN not import correctly...Possibly not build yet...')
 
 
 @ENCODER_REGISTRY.register()
@@ -22,13 +30,13 @@ class SHEmbedder(nn.Module):
     This can be only used for xyz direction, but not position
     """
 
-    def __init__(self, input_dim=3, n_freqs=4, include_input=True, use_cuda_backend=False, *args, **kwargs):
+    def __init__(self, input_dim=3, n_freqs=4, include_input=True, backend=None, *args, **kwargs):
         """
         Args:
             input_dim: dimension of input to be embedded. Must be 3(direction)
             n_freqs: num of degree for embedding.
             include_input: if True, raw input is included in the embedding. Appear at beginning. By default is True.
-            use_cuda_backend: whether to use the customized cuda backend. By default False, use pure torch version.
+            backend: which backend to use. By default None, use pure torch version.
 
         Returns:
             Embedded inputs with shape:
@@ -41,11 +49,23 @@ class SHEmbedder(nn.Module):
         self.input_dim = input_dim
         self.n_freqs = n_freqs
         self.include_input = include_input
-        self.use_cuda_backend = use_cuda_backend
+
+        # backend
+        if backend is None:
+            backend = 'torch'
+        assert backend in ['torch', 'cuda', 'tcnn'], 'Invalid backend used, only torch/cuda/tcnn allowed'
+        self.backend = backend
 
         # set up cuda backend
-        if self.use_cuda_backend and CUDA_BACKEND_AVAILABLE:
-            self.sh_encode = SHEncode(n_freqs)
+        if self.backend == 'cuda' and CUDA_BACKEND_AVAILABLE:
+            self.sh_encode_cuda = SHEncode(n_freqs)
+        elif self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
+            self.sh_encode_tcnn = tcnn.Encoding(
+                n_input_dims=input_dim, encoding_config={
+                    'otype': 'SphericalHarmonics',
+                    'degree': n_freqs
+                }
+            )
 
         self.out_dim = n_freqs**2 + include_input * input_dim
 
@@ -95,8 +115,10 @@ class SHEmbedder(nn.Module):
         if self.include_input:
             out.append(xyz)  # (B, 3)
 
-        if self.use_cuda_backend and CUDA_BACKEND_AVAILABLE:
-            sh_embed = self.sh_encode(xyz)
+        if self.backend == 'cuda' and CUDA_BACKEND_AVAILABLE:
+            sh_embed = self.sh_encode_cuda(xyz)
+        elif self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
+            sh_embed = self.sh_encode_tcnn(xyz)
         else:
             sh_embed = self.sh_encode_torch(xyz)
         out.append(sh_embed)  # (B, n_freqs**2)

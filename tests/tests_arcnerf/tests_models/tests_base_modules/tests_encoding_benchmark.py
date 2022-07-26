@@ -125,50 +125,48 @@ class TestDict(unittest.TestCase):
         t_f, t_b, t_f_o = self.get_avg_time(model, pts)
         self.log_time('DenseGrid Embedder(Grid=256, W_feat=256): ', t_f, t_b, t_f_o, dim=pts.shape)
 
+    def run_sh_embedder(self, model, backend='torch'):
+        model = self.to_cuda(model)
+        dirs = self.to_cuda(self.dirs.clone().requires_grad_(True))
+        # single pts per ray
+        dirs_single = dirs[:self.n_rays]
+        t_f, t_b, t_f_o = self.get_avg_time(model, dirs_single)
+        self.log_time('SH Embedder(Freq=4), {}-based: '.format(backend), t_f, t_b, t_f_o, dim=dirs_single.shape)
+        # full ray process
+        t_f, t_b, t_f_o = self.get_avg_time(model, dirs)
+        self.log_time('SH Embedder(Freq=4), {}-based:'.format(backend), t_f, t_b, t_f_o, dim=dirs.shape)
+
     def tests_sh_embedder_torch(self):
         model = SHEmbedder(3, 4, include_input=True)
-        model = self.to_cuda(model)
-        dirs = self.to_cuda(self.dirs.clone().requires_grad_(True))
-        # single pts per ray
-        dirs_single = dirs[:self.n_rays]
-        t_f, t_b, t_f_o = self.get_avg_time(model, dirs_single)
-        self.log_time('SH Embedder(Freq=4), torch-based: ', t_f, t_b, t_f_o, dim=dirs_single.shape)
-        # full ray process
-        t_f, t_b, t_f_o = self.get_avg_time(model, dirs)
-        self.log_time('SH Embedder(Freq=4), torch-based:', t_f, t_b, t_f_o, dim=dirs.shape)
+        self.run_sh_embedder(model)
 
     def tests_sh_embedder_cuda(self):
-        model = SHEmbedder(3, 4, include_input=True, use_cuda_backend=True)
+        model = SHEmbedder(3, 4, include_input=True, backend='cuda')
+        self.run_sh_embedder(model, 'cuda')
+
+    def tests_sh_embedder_tcnn(self):
+        model = SHEmbedder(3, 4, include_input=True, backend='tcnn')
+        self.run_sh_embedder(model, 'tcnn')
+
+    def run_hashgrid_embedder(self, model, backend='torch'):
         model = self.to_cuda(model)
-        dirs = self.to_cuda(self.dirs.clone().requires_grad_(True))
+        pts = self.to_cuda(self.pts.clone().requires_grad_(True))
         # single pts per ray
-        dirs_single = dirs[:self.n_rays]
-        t_f, t_b, t_f_o = self.get_avg_time(model, dirs_single)
-        self.log_time('SH Embedder(Freq=4), cuda-based: ', t_f, t_b, t_f_o, dim=dirs_single.shape)
+        pts_single = pts[:self.n_rays]
+        t_f, t_b, t_f_o = self.get_avg_time(model, pts_single)
+        self.log_time('HashGrid Embedder, {}-based: '.format(backend), t_f, t_b, t_f_o, dim=pts_single.shape)
         # full ray process
-        t_f, t_b, t_f_o = self.get_avg_time(model, dirs)
-        self.log_time('SH Embedder(Freq=4), cuda-based:', t_f, t_b, t_f_o, dim=dirs.shape)
+        t_f, t_b, t_f_o = self.get_avg_time(model, pts)
+        self.log_time('HashGrid Embedder, {}-based:'.format(backend), t_f, t_b, t_f_o, dim=pts.shape)
 
     def tests_hashgrid_embedder_torch(self):
         model = HashGridEmbedder(3, include_input=True)
-        model = self.to_cuda(model)
-        pts = self.to_cuda(self.pts.clone().requires_grad_(True))
-        # single pts per ray
-        pts_single = pts[:self.n_rays]
-        t_f, t_b, t_f_o = self.get_avg_time(model, pts_single)
-        self.log_time('HashGrid Embedder, torch-based: ', t_f, t_b, t_f_o, dim=pts_single.shape)
-        # full ray process
-        t_f, t_b, t_f_o = self.get_avg_time(model, pts)
-        self.log_time('HashGrid Embedder, torch-based:', t_f, t_b, t_f_o, dim=pts.shape)
+        self.run_hashgrid_embedder(model)
 
     def tests_hashgrid_embedder_cuda(self):
-        model = HashGridEmbedder(3, include_input=True, use_cuda_backend=True)
-        model = self.to_cuda(model)
-        pts = self.to_cuda(self.pts.clone().requires_grad_(True))
-        # single pts per ray
-        pts_single = pts[:self.n_rays]
-        t_f, t_b, t_f_o = self.get_avg_time(model, pts_single)
-        self.log_time('HashGrid Embedder, cuda-based: ', t_f, t_b, t_f_o, dim=pts_single.shape)
-        # full ray process
-        t_f, t_b, t_f_o = self.get_avg_time(model, pts)
-        self.log_time('HashGrid Embedder, cuda-based:', t_f, t_b, t_f_o, dim=pts.shape)
+        model = HashGridEmbedder(3, include_input=True, backend='cuda')
+        self.run_hashgrid_embedder(model, 'cuda')
+
+    def tests_hashgrid_embedder_tcnn(self):
+        model = HashGridEmbedder(3, include_input=True, backend='tcnn')
+        self.run_hashgrid_embedder(model, 'tcnn')
