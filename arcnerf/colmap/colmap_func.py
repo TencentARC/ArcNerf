@@ -116,6 +116,9 @@ def handle_unregistered_images(scene_dir, logger, poses, pts3d, image_names):
     Args:
         scene_dir: scene_dir contains image and poses
         logger: logger
+        poses: w2c + focal, N camera
+        pts3d: 3d point cloud in world coordinate
+        image_names: reg image list
 
     Returns:
         pts3d: with adjusted image_ids to remaining

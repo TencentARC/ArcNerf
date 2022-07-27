@@ -3,7 +3,7 @@
 import torch
 
 
-class DataPrefetcher():
+class DataPrefetcher(object):
     """Data loader prefetcher. But the benefit is limited from this. Just keep it but no use."""
 
     def __init__(self, loader):

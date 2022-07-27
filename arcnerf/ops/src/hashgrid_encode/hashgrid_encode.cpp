@@ -126,7 +126,7 @@ std::vector<torch::Tensor> hashgrid_encode_backward_cuda(
 
 
 /* c++ wrapper of hashgrid_encode backward func
-   py: hashgrid_encode_bacwardward(grad, grad_xyz, grad_embeddings)
+   py: hashgrid_encode_bacward(grad, grad_xyz, grad_embeddings)
    @param: grad_out, torch float tensor of (B, L, F), final grad
    @param: xyz, torch float tensor of (B, D)
    @param: embeddings, torch float tensor of (n_total_embed, F)

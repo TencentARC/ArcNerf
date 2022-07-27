@@ -152,7 +152,7 @@ class Inferencer(object):
             render:
                 inputs: a list of inputs, each is list of n_cam images
                     each list contain n_cam dict with following keys:
-                        c2w: novel view camera postion, (4, 4) np array
+                        c2w: novel view camera position, (4, 4) np array
                         intrinsic: cam intrinsic, (3, 3) np array
                         rays_o: (1, HW, 3) torch tensor
                         rays_d: (1, HW, 3) torch tensor

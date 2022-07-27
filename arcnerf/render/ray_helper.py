@@ -49,22 +49,23 @@ def get_rays(
     device = intrinsic.device
     dtype = intrinsic.dtype
     i, j = torch.meshgrid(
-        torch.linspace(0, W - 1, W, dtype=dtype), torch.linspace(0, H - 1, H, dtype=dtype)
+        torch.linspace(0, W - 1, W, dtype=dtype, device=device),
+        torch.linspace(0, H - 1, H, dtype=dtype, device=device)
     )  # i, j: (W, H)
-    pixels = torch.stack([i, j], dim=-1).view(-1, 2).unsqueeze(0).to(device)  # (1, WH, 2)
+    pixels = torch.stack([i, j], dim=-1).view(-1, 2).unsqueeze(0)  # (1, WH, 2)
 
     # index unroll
     if index is not None:
         assert len(index.shape) == 2 and index.shape[-1] == 2, 'invalid shape, should be (N_rays, 2)'
         if isinstance(index, np.ndarray):
-            index = torch.tensor(index, dtype=torch.long).to(device)
+            index = torch.tensor(index, dtype=torch.long, device=device)
         else:
             index = index.type(torch.long).to(device)
         index = index[:, 0] * H + index[:, 1]  # (N_rays, ) unroll from (i, j)
     # sample by N_rays
     if n_rays > 0:
         index = np.random.choice(range(0, W * H), n_rays, replace=False)  # (N_rays, )
-        index = torch.tensor(index, dtype=torch.long).to(device)
+        index = torch.tensor(index, dtype=torch.long, device=device)
     # sampled by index
     if index is not None:
         pixels = pixels[:, index, :]
@@ -74,7 +75,7 @@ def get_rays(
     if not wh_order and index is None and n_rays <= 0:  # (HW, 2)
         pixels = pixels.squeeze(0).contiguous().view(W, H, 2).permute(1, 0, 2).contiguous().view(-1, 2).unsqueeze(0)
 
-    z = torch.ones(size=(1, pixels.shape[1]), dtype=dtype).to(device)  # (1, WH/N_rays)
+    z = torch.ones(size=(1, pixels.shape[1]), dtype=dtype, device=device)  # (1, WH/N_rays)
     xyz_world = pixel_to_world(pixels, z, intrinsic.unsqueeze(0), c2w.unsqueeze(0))  # (1, WH/N_rays, 3)
 
     cam_loc = c2w[:3, 3].unsqueeze(0)  # (1, 3)
@@ -104,7 +105,7 @@ def get_rays(
             dirs = rays_d.clone().view(H, W, 3)  # (H, W, 3)
             dx = torch.sqrt(torch.sum((dirs[:, :-1, ...] - dirs[:, 1:, ...])**2, -1))  # (H, W-1, 1)
             dx = torch.cat([dx, dx[:, -2:-1, ...]], dim=1)  # (H, W, 1)
-        rays_r = dx.unsqueeze(-1) * 2 / torch.sqrt(torch.tensor([12], dtype=dx.dtype).to(dx.device))
+        rays_r = dx.unsqueeze(-1) * 2 / torch.sqrt(torch.tensor([12], dtype=dx.dtype, device=dx.device))
         rays_r = rays_r.view(-1, 1)
 
     return rays_o, rays_d, index, rays_r
@@ -195,12 +196,12 @@ def get_near_far_from_rays(
             raise NotImplementedError('You must specify near/far in some place...')
 
         if bounds is None:
-            radius = torch.tensor([bounding_radius], dtype=dtype).to(device)
+            radius = torch.tensor([bounding_radius], dtype=dtype, device=device)
             near, far, _, mask = sphere_ray_intersection(rays_o, rays_d, radius=radius)  # (N_rays, 1)
         else:
             near, far = bounds[:, 0:1], bounds[:, 1:2]
             if bounding_radius is not None:  # restrict the far end bound if radius is set
-                radius = torch.tensor([bounding_radius], dtype=dtype).to(device)
+                radius = torch.tensor([bounding_radius], dtype=dtype, device=device)
                 _, far_bound, _, mask = sphere_ray_intersection(rays_o, rays_d, radius=radius)  # (N_rays, 1)
                 far[far > far_bound] = far_bound[far > far_bound]
 
@@ -210,8 +211,8 @@ def get_near_far_from_rays(
         if far_hardcode is not None:
             far = far * 0 + far_hardcode
     else:
-        near = torch.ones(size=(n_rays, 1), dtype=dtype).to(device) * near_hardcode  # (N_rays, 1)
-        far = torch.ones(size=(n_rays, 1), dtype=dtype).to(device) * far_hardcode  # (N_rays, 1)
+        near = torch.ones(size=(n_rays, 1), dtype=dtype, device=device) * near_hardcode  # (N_rays, 1)
+        far = torch.ones(size=(n_rays, 1), dtype=dtype, device=device) * far_hardcode  # (N_rays, 1)
 
     # in case near >= far, cast far as near + 1e-5
     far[far <= near] = near[far <= near] + 1e-5
@@ -240,9 +241,9 @@ def get_zvals_from_near_far(
     dtype = near.dtype
 
     if inclusive:
-        t_vals = torch.linspace(0.0, 1.0, n_pts, dtype=dtype).to(device)  # (N_pts,)
+        t_vals = torch.linspace(0.0, 1.0, n_pts, dtype=dtype, device=device)  # (N_pts,)
     else:
-        t_vals = torch.linspace(0.0, 1.0, n_pts + 2, dtype=dtype)[1:-1].to(device)  # (N_pts,)
+        t_vals = torch.linspace(0.0, 1.0, n_pts + 2, dtype=dtype, device=device)[1:-1]  # (N_pts,)
 
     if inverse_linear:  # +1e-8 in case nan
         zvals = 1.0 / (1.0 / (near + 1e-8) * (1.0 - t_vals) + 1.0 / (far + 1e-8) * t_vals)  # (N_rays, N_pts)
@@ -272,7 +273,7 @@ def get_zvals_outside_sphere(rays_o: torch.Tensor, rays_d: torch.Tensor, n_pts, 
     device = rays_o.device
     dtype = rays_o.dtype
 
-    t_vals = torch.linspace(0.0, 1.0, n_pts + 2, dtype=dtype)[1:-1].to(device)  # (N_pts,)
+    t_vals = torch.linspace(0.0, 1.0, n_pts + 2, dtype=dtype, device=device)[1:-1]  # (N_pts,)
     sphere_radius = radius / torch.flip(t_vals, dims=[-1])  # (N_pts,), extend from radius -> inf
     if perturb:
         sphere_radius = perturb_interval(sphere_radius[None])[0]  # (N_pts, )
@@ -312,7 +313,7 @@ def perturb_interval(vals: torch.Tensor):
     _mids = .5 * (vals[..., 1:] + vals[..., :-1])  # (N_rays, N_pts-1)
     _upper = torch.cat([_mids, vals[..., -1:]], -1)  # (N_rays, N_pts)
     _lower = torch.cat([vals[..., :1], _mids], -1)  # (N_rays, N_pts)
-    _z_rand = torch.rand(size=_upper.shape, dtype=dtype).to(device)
+    _z_rand = torch.rand(size=_upper.shape, dtype=dtype, device=device)
     vals = _lower + (_upper - _lower) * _z_rand  # (N_rays, N_pts)
 
     return vals
@@ -447,7 +448,7 @@ def ray_marching(
 
     # add an inf distance as last to keep original dimension
     if add_inf_z:  # (N_rays, N_pts)
-        deltas = torch.cat([deltas, 1e10 * torch.ones(size=(n_rays, 1), dtype=dtype).to(device)], dim=-1)
+        deltas = torch.cat([deltas, 1e10 * torch.ones(size=(n_rays, 1), dtype=dtype, device=device)], dim=-1)
     else:
         if alpha is None:  # only do that if alpha is None
             _sigma = sigma[:, :-1] if sigma is not None else None  # (N_rays, N_pts-1)
@@ -458,7 +459,7 @@ def ray_marching(
     if alpha is None:
         noise = 0.0
         if noise_std > 0.0:
-            noise = torch.randn(_sigma.shape, dtype=dtype).to(device) * noise_std
+            noise = torch.randn(_sigma.shape, dtype=dtype, device=device) * noise_std
 
         # alpha_i = (1 - exp(- relu(sigma + noise) * delta_i)
         alpha = 1 - torch.exp(-torch.relu(_sigma + noise) * deltas)  # (N_rays, N_p)
@@ -515,7 +516,7 @@ def alpha_to_weights(alpha: torch.Tensor):
     dtype = alpha.dtype
     device = alpha.device
     # Ti = mul_1_i-1(1 - alpha_i)
-    alpha_one = torch.ones_like(alpha[:, :1], dtype=dtype).to(device)
+    alpha_one = torch.ones_like(alpha[:, :1], dtype=dtype, device=device)
     trans_shift = torch.cat([alpha_one, 1 - alpha + 1e-10], -1)  # (N_rays, N_p+1)
     trans_shift = torch.cumprod(trans_shift, -1)[:, :-1]  # (N_rays, N_p)
     # weight_i = Ti * alpha_i

@@ -95,7 +95,7 @@ def draw_cameras(ax, c2w, cam_colors, intrinsic, min_values, max_values, plotly)
             for j in range(X.shape[1]):  # each point in polygon, (4, )
                 X[:4, j] = mat @ camera_model[i][:4, j]
             X = transform_plt_space(X[:3, :])
-            # draw in world coord. plot3D plots line betweem neighbour vertices
+            # draw in world coord. plot3D plots line between neighbour vertices
             if plotly:
                 ax.append(
                     go.Scatter3d(
@@ -184,7 +184,7 @@ def draw_rays(ax, rays, ray_colors, ray_linewidth, min_values, max_values, plotl
         # cone in array
         cone_ratio = 1.0 / 50.0
         cone_start = rays_o_plt * cone_ratio + (1 - cone_ratio) * rays_e_plt
-        cone_len = cone_ratio * (rays_d_plt)
+        cone_len = cone_ratio * rays_d_plt
         for idx in range(rays_o_plt.shape[0]):
             rgb = colorize_np(ray_colors[idx])
             ax.append(
@@ -438,7 +438,7 @@ def draw_3d_components(
         save_path: path to save the fig. None will only show fig
         plotly: If True, use plotly instead of plt. Can be zoom-in/out. By default False.
         plotly_html: If True and save_path is not True, save to .html file instead of .png, good for interactive
-        return_fig: If True, return the fig for usage like monitor save. Do not show. By defalt False
+        return_fig: If True, return the fig for usage like monitor save. Do not show. By default False
     """
     fig = None
     if plotly:

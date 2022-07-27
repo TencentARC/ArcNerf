@@ -14,6 +14,7 @@ class SHEncodeOps(torch.autograd.Function):
         """
         Args:
             xyz: tensor of shape (B, 3), xyz direction, normalized
+            degree: num of degree for encoding
 
         Returns:
              output: torch tensor with (B, degree**2) shape

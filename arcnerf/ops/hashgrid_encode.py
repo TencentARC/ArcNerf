@@ -39,15 +39,15 @@ class HashGridEncodeOps(torch.autograd.Function):
 
         if cal_grad:
             n_dim, n_grid = xyz.shape[1], 2**xyz.shape[1]
-            weights = torch.zeros((xyz.shape[0], n_levels, n_grid), dtype=dtype).to(device)  # (B, L, 1<<D)
-            hash_idx = torch.zeros((xyz.shape[0], n_levels, n_grid), dtype=torch.long).to(device)  # (B, L, 1<<D)
-            valid = torch.zeros((xyz.shape[0], ), dtype=torch.bool).to(device)  # (B,)
-            dw_dxyz = torch.zeros((xyz.shape[0], n_levels, n_grid, n_dim), dtype=dtype).to(device)  # (B, L, 1<<D, D)
+            weights = torch.zeros((xyz.shape[0], n_levels, n_grid), dtype=dtype, device=device)  # (B, L, 1<<D)
+            hash_idx = torch.zeros((xyz.shape[0], n_levels, n_grid), dtype=torch.long, device=device)  # (B, L, 1<<D)
+            valid = torch.zeros((xyz.shape[0], ), dtype=torch.bool, device=device)  # (B,)
+            dw_dxyz = torch.zeros((xyz.shape[0], n_levels, n_grid, n_dim), dtype=dtype, device=device)  # (B,L,1<<D,D)
         else:  # save memory
-            weights = torch.zeros((1, 1, 1), dtype=dtype).to(device)
-            hash_idx = torch.zeros((1, 1, 1), dtype=torch.long).to(device)
-            valid = torch.zeros((1, ), dtype=torch.bool).to(device)
-            dw_dxyz = torch.zeros((1, 1, 1, 1), dtype=dtype).to(device)
+            weights = torch.zeros((1, 1, 1), dtype=dtype, device=device)
+            hash_idx = torch.zeros((1, 1, 1), dtype=torch.long, device=device)
+            valid = torch.zeros((1, ), dtype=torch.bool, device=device)
+            dw_dxyz = torch.zeros((1, 1, 1, 1), dtype=dtype, device=device)
 
         # forward
         output = _hashgrid_encode.hashgrid_encode_forward(

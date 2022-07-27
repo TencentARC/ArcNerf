@@ -187,7 +187,7 @@ class RenderPytorch3d:
         else:
             rotation = torch.repeat_interleave(torch.eye(3, dtype=self.dtype).unsqueeze(0), self.batch_size, dim=0)\
                 .to(self.device)
-            translate = torch.zeros((self.batch_size, 3), dtype=self.dtype).to(self.device)
+            translate = torch.zeros((self.batch_size, 3), dtype=self.dtype, device=self.device)
 
         # set camera
         self.camera.R = rotation

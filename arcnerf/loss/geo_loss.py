@@ -57,7 +57,7 @@ class EikonalLoss(nn.Module):
             mask = data['mask'].to(device)  # (B, N_rays)
 
         norm = torch.norm(out, dim=-1)  # (B, N_rays, (N_pts))
-        norm_ones = torch.ones_like(norm, dtype=dtype).to(device)
+        norm_ones = torch.ones_like(norm, dtype=dtype, device=device)
 
         loss = self.loss(norm, norm_ones)
 

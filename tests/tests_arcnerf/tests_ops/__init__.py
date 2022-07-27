@@ -11,7 +11,7 @@ def log_custom_benchmark(logger, func_name, torch_func, custom_fuc, inputs, n_it
     Args:
         logger: logger to write info
         func_name: str name of the func
-        torch_func: torch implementation for comparsion. If None, only run on custom_func
+        torch_func: torch implementation for comparison. If None, only run on custom_func
         custom_fuc: custom ops in cuda.
         inputs: a list of input. For the tensors, they should be in cpu.
         n_iter: for average running time. By default 100. If n_iter <= 0, only runs once for output/grad, no timing.
