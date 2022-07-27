@@ -47,6 +47,9 @@ Functions for ray point. ray is `(rays_o, rays_d)`, rays_d is always assumed to 
 - closest_point_to_two_rays: two rays and their closest pts pair with distance. All case applied(parallel, zvals<0)
 - closest_distance_of_two_rays: distance of two ray. But need to assume rays are pointing inward.
 - closest_point_to_rays: a point close to all rays. Good for cam view centralization.
+- sphere_ray_intersection: find the ray-sphere intersection.
+- surface_ray_intersection: find the ray-surface intersection. Support `sphere_tracing`/`root_finding`.
+- aabb_ray_intersection: find the ray-volume intersection.
 
 ------------------------------------------------------------------------
 # triangle
@@ -85,6 +88,7 @@ For ray in pts in volume, we provide a lot of function like
 - get_voxel_idx_from_xyz: get voxel idx from pts position
 - get_grid_pts_idx_by_voxel_idx/get_grid_pts_by_voxel_idx: get grid pts index and position by voxel idx
 - cal_weights_to_grid_pts / interpolate: interpolate pts by grid_pts using trilinear interpolation
+- ray_volume_intersection: call the aabb intersection test and find the ray-volume intersection
 
 ------------------------------------------------------------------------
 # point cloud

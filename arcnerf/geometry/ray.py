@@ -282,36 +282,50 @@ def aabb_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, aabb_range
         mask: (N_rays, N_v), show whether each ray has intersection with the volume, BoolTensor
      """
     device = rays_o.device
-    # dtype = rays_o.dtype
+    dtype = rays_o.dtype
     n_rays = rays_o.shape[0]
     n_volume = aabb_range.shape[0]
     assert aabb_range.shape[1] == 3 and aabb_range.shape[2] == 2, 'AABB range must be (N, 3, 2)'
+
+    near = torch.zeros((n_rays * n_volume, ), dtype=dtype, device=device)  # (N_rays*N_v,)
+    far = torch.ones((n_rays * n_volume, ), dtype=dtype, device=device) * 10000.0  # (N_rays*N_v,)
 
     rays_o_repeat = torch.repeat_interleave(rays_o, n_volume, 0)  # (N_rays*N_v, 3)
     rays_d_repeat = torch.repeat_interleave(rays_d, n_volume, 0)  # (N_rays*N_v, 3)
     aabb_range_repeat = torch.repeat_interleave(aabb_range.unsqueeze(0), n_rays, 0).view(-1, 3, 2)  # (N_rays*N_v, 3, 2)
     min_range, max_range = aabb_range_repeat[..., 0], aabb_range_repeat[..., 1]  # (N_rays*N_v, 3)
 
-    mask = torch.ones(size=(n_rays * n_volume, 1), dtype=torch.bool, device=device)
+    mask = torch.ones(size=(n_rays * n_volume, ), dtype=torch.bool, device=device)
 
-    # parallel to x plane, d_x ~= 0
-    mask_x = (rays_d_repeat[..., 0] < eps)  # (N_rays*N_v,)
-    mask_x_out = torch.logical_or((rays_o_repeat[..., 0] < min_range[..., 0]),
-                                  (rays_o_repeat[..., 0] > max_range[..., 0]))  # outside the plane
-    mask[torch.logical_and(mask_x, mask_x_out)] = False  # (valid_x,)
+    def update_bound(_rays_o, _rays_d, _min_range, _max_range, _mask, _near, _far, dim=0):
+        """Update bound and mask on each dim"""
+        _mask_axis = (torch.abs(_rays_d[..., dim]) < eps)  # (N_rays*N_v,)
+        _mask_axis_out = torch.logical_or((_rays_o[..., dim] < _min_range[..., dim]),
+                                          (_rays_o[..., dim] > _max_range[..., dim]))  # outside the plane
+        _mask[torch.logical_and(_mask_axis, _mask_axis_out)] = False
 
-    t1 = (min_range[mask, 0] - rays_o_repeat[mask, 0]) / rays_d_repeat[mask, 0]  # (valid_x,)
-    t2 = (max_range[mask, 0] - rays_o_repeat[mask, 0]) / rays_d_repeat[mask, 0]  # (valid_x,)
-    t = torch.cat([t1[:, None], t2[:, None]], dim=-1)
-    t1 = torch.min(t, dim=-1)
-    t2 = torch.max(t, dim=-1)
+        t1 = (_min_range[..., dim] - _rays_o[..., dim]) / _rays_d[..., dim]
+        t2 = (_max_range[..., dim] - _rays_o[..., dim]) / _rays_d[..., dim]
+        t = torch.cat([t1[:, None], t2[:, None]], dim=-1)
+        t1, _ = torch.min(t, dim=-1)
+        t2, _ = torch.max(t, dim=-1)
+        update_near = torch.logical_and(_mask, t1 > _near)
+        _near[update_near] = t1[update_near]
+        update_far = torch.logical_and(_mask, t2 < _far)
+        _far[update_far] = t2[update_far]
+        _mask[_near > _far] = False
 
-    print(t1.shape, t2.shape)
-    exit()
-    near, far = None, None
+        return _mask, _near, _far
 
-    near = torch.clamp_min(near, 0.0)
-    far = torch.clamp_min(far, 0.0)
+    # x plane
+    mask, near, far = update_bound(rays_o_repeat, rays_d_repeat, min_range, max_range, mask, near, far, 0)
+    # y plane
+    mask, near, far = update_bound(rays_o_repeat, rays_d_repeat, min_range, max_range, mask, near, far, 1)
+    # z plane
+    mask, near, far = update_bound(rays_o_repeat, rays_d_repeat, min_range, max_range, mask, near, far, 2)
+
+    near = torch.clamp_min(near, 0.0)[:, None]
+    far = torch.clamp_min(far, 0.0)[:, None]
     near[~mask], far[~mask] = 0.0, 0.0  # (N_rays*N_v, 1) * 2
 
     zvals = torch.cat([near, far], dim=1)  # (N_rays*N_v, 2)

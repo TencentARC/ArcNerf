@@ -61,3 +61,35 @@ class ShuffleRays(object):
             inputs['mask'] = inputs['mask'][select_idx, ...]
 
         return inputs
+
+
+def linear_to_srgb(x: torch.Tensor):
+    """RGB from linear space to sRGB Space
+    ref: https://entropymine.com/imageworsener/srgbformula/
+
+    Args:
+        x: linear rgb value in (B, 3), should be in (0~1)
+
+    Returns:
+        y: rgb value in sRGB space
+
+    """
+    assert torch.all(x <= 1.0) and torch.all(x >= 0.0), 'Input should be in (0~1)'
+
+    return torch.where(x <= 0.00313066844250063, 12.92 * x, 1.055 * x**(1.0 / 2.4) - 0.055)
+
+
+def srgb_to_linear(x):
+    """RGB from sRGB space to linear Space
+    ref: https://entropymine.com/imageworsener/srgbformula/
+
+    Args:
+        x: sRGB value in (B, 3), should be in (0~1)
+
+    Returns:
+        y: rgb value in linear space
+
+    """
+    assert torch.all(x <= 1.0) and torch.all(x >= 0.0), 'Input should be in (0~1)'
+
+    return torch.where(x <= 0.0404482362771082, x / 12.92, ((x + 0.055) / 1.055)**2.4)

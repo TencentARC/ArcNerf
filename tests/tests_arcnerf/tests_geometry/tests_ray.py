@@ -10,14 +10,15 @@ import torch
 
 from arcnerf.geometry.poses import look_at, generate_cam_pose_on_sphere
 from arcnerf.geometry.ray import (
-    closest_point_on_ray, closest_point_to_rays, closest_point_to_two_rays, get_ray_points_by_zvals,
-    sphere_ray_intersection, sphere_tracing, secant_root_finding
+    aabb_ray_intersection, closest_point_on_ray, closest_point_to_rays, closest_point_to_two_rays,
+    get_ray_points_by_zvals, sphere_ray_intersection, sphere_tracing, secant_root_finding
 )
 from arcnerf.geometry.transformation import normalize
+from arcnerf.geometry.volume import Volume
 from arcnerf.render.camera import PerspectiveCamera
 from arcnerf.render.ray_helper import equal_sample, get_rays
 from arcnerf.visual.plot_3d import draw_3d_components
-from common.utils.torch_utils import np_wrapper
+from common.utils.torch_utils import np_wrapper, torch_to_np
 from common.visual import get_combine_colors
 from tests import setup_test_config
 
@@ -288,8 +289,8 @@ class TestDict(unittest.TestCase):
             [0, 1, 0],  # no intersection, similar direction to origin
             [-1, -1, 0],  # no intersection, opposition direction to origin
             [-1, 0, 0],  # one intersection, on surface outer ray
-            [1, 10, 0]
-        ])  # two intersection, on surface inner ray
+            [1, 10, 0],  # two intersection, on surface inner ray
+        ])
         rays_d = normalize(rays_d)
         # get intersection. (n_rays, n_r) * 2, (n_rays, n_r, 2, 3), (n_rays, n_r)
         near, far, pts, mask = np_wrapper(sphere_ray_intersection, rays_o, rays_d, radius, origin)
@@ -315,6 +316,66 @@ class TestDict(unittest.TestCase):
             sphere_origin=origin,
             sphere_radius=radius.tolist(),
             title='sphere ray intersection(ray in red no intersection)',
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True
+        )
+
+    def tests_aabb_ray_intersection(self):
+        # set volume range
+        volume = Volume(n_grid=None, side=2.0)
+        aabb_range = volume.get_range().detach().numpy()[None]  # (1, 3, 2), bounding from (-1, 1)
+
+        # set rays
+        rays_o = np.array([
+            [0.5, 0.3, 0],  # inside
+            [-0.5, -0.1, -0.2],
+            [0.5, 2.0, 1.0],  # outside
+            [1.8, 1.4, 2.1],
+            [-0.5, -0.5, 2.0],
+            [0.2, 0, 1],  # on surface
+            [0, 0.2, 1],
+            [0, -0.2, 1]
+        ])
+        rays_d = np.array([
+            [-1.0, -1.0, 0],  # 1 intersection, OC*D < 0
+            [-1.0, -1.0, -1.0],  # 1 intersection, OC*D > 0
+            [0, -1.0, 0.0],  # 1 intersection(tangent）
+            [-0.9, -0.7, -1.0],  # 2 intersection
+            [-1, -1, 1.0],  # no intersection, opposition direction to origin
+            [0, 0, 1],  # one intersection, on surface outer ray
+            [0, 0, -1],  # two intersection, on surface inner ray
+            [1, 0.5, 0],  # two intersection, on surface tangent ray
+        ])
+
+        rays_d = normalize(rays_d)
+        # get intersection. (n_rays, n_v) * 2, (n_rays, n_v, 2, 3), (n_rays, n_v)
+        near, far, pts, mask = np_wrapper(aabb_ray_intersection, rays_o, rays_d, aabb_range)
+        pts = pts[mask, :].reshape(-1, 3)  # (n_valid_ray * 2, 3)
+
+        # repeat rays and extend valid rays
+        mask = mask.reshape(-1)
+        far = far.reshape(-1)
+        rays_d[mask] *= (far[mask][:, None] + 0.1) * 1.2  # for near=far
+
+        blue_color = get_combine_colors(['blue'], [1])
+        ray_colors = get_combine_colors(['red'], [rays_o.shape[0]])
+        ray_colors[mask, :] = blue_color[0]
+
+        volume_dict = {
+            'grid_pts': torch_to_np(volume.get_corner()),
+            'lines': volume.get_bound_lines(),
+            'faces': volume.get_bound_faces()
+        }
+
+        file_path = osp.join(RESULT_DIR, 'aabb_ray_intersection.png')
+        draw_3d_components(
+            points=pts,
+            rays=(rays_o, rays_d),
+            ray_linewidth=0.5,
+            ray_colors=ray_colors,
+            volume=volume_dict,
+            title='aabb ray intersection(ray in red no intersection)',
             save_path=file_path,
             plotly=True,
             plotly_html=True
