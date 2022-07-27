@@ -5,6 +5,7 @@ import torch
 
 from arcnerf.geometry.projection import pixel_to_world
 from arcnerf.geometry.ray import sphere_ray_intersection
+from arcnerf.geometry.volume import Volume
 from arcnerf.geometry.transformation import normalize
 from common.utils.torch_utils import torch_to_np
 
@@ -170,7 +171,8 @@ def get_near_far_from_rays(
     bounds: torch.Tensor = None,
     near_hardcode=None,
     far_hardcode=None,
-    bounding_radius=None
+    bounding_radius=None,
+    volume_cfgs=None,
 ):
     """Get near, far zvals from rays. Hard-reset by near/far_hardcode
 
@@ -182,6 +184,8 @@ def get_near_far_from_rays(
         near_hardcode: If not None, will force all near to be this value
         far_hardcode: If not None, will force all far to be this value
         bounding_radius: If not None, will use this to calculate the ray-sphere intersection as near/far
+        volume_cfgs: Params for setting a volume, If not None, use the ray-volume intersection as near/far
+                     If both volume_cfgs and bounding_radius is None, use the volume.
 
     Returns:
         near: tensor(N_rays, 1), near zvals
@@ -192,18 +196,22 @@ def get_near_far_from_rays(
     n_rays = rays_o.shape[0]
 
     if near_hardcode is None or far_hardcode is None:
-        if bounds is None and bounding_radius is None:
+        if bounds is None and bounding_radius is None and volume_cfgs is None:
             raise NotImplementedError('You must specify near/far in some place...')
 
-        if bounds is None:
-            radius = torch.tensor([bounding_radius], dtype=dtype, device=device)
-            near, far, _, mask = sphere_ray_intersection(rays_o, rays_d, radius=radius)  # (N_rays, 1)
+        if volume_cfgs is not None:  # once set volume, use it
+            volume = Volume(**volume_cfgs.__dict__)
+            near, far, _, _ = volume.ray_volume_intersection(rays_o, rays_d)
         else:
-            near, far = bounds[:, 0:1], bounds[:, 1:2]
-            if bounding_radius is not None:  # restrict the far end bound if radius is set
+            if bounds is None:
                 radius = torch.tensor([bounding_radius], dtype=dtype, device=device)
-                _, far_bound, _, mask = sphere_ray_intersection(rays_o, rays_d, radius=radius)  # (N_rays, 1)
-                far[far > far_bound] = far_bound[far > far_bound]
+                near, far, _, _ = sphere_ray_intersection(rays_o, rays_d, radius=radius)  # (N_rays, 1)
+            else:
+                near, far = bounds[:, 0:1], bounds[:, 1:2]
+                if bounding_radius is not None:  # restrict the far end bound if radius is set
+                    radius = torch.tensor([bounding_radius], dtype=dtype, device=device)
+                    _, far_bound, _, _ = sphere_ray_intersection(rays_o, rays_d, radius=radius)  # (N_rays, 1)
+                    far[far > far_bound] = far_bound[far > far_bound]
 
         # hard set for near/far
         if near_hardcode is not None:

@@ -21,7 +21,7 @@ class TestNeusDict(TestModelDict):
 
     def tests_model(self):
         # multiple choice
-        model_cfgs = ['neus.yaml', 'neus_dv_withnn.yaml']
+        model_cfgs = ['neus.yaml']
         model_logs = [name.split('.')[0] + '.txt' for name in model_cfgs]
 
         for model_cfg, model_log in zip(model_cfgs, model_logs):

@@ -233,6 +233,7 @@ class TestDict(unittest.TestCase):
 
         # near/far from config
         bounding_radius = get_value_from_cfgs_field(self.cfgs.model.rays, 'bounding_radius')
+        volume = get_value_from_cfgs_field(self.cfgs.model.rays, 'volume')
         near = get_value_from_cfgs_field(self.cfgs.model.rays, 'near')
         far = get_value_from_cfgs_field(self.cfgs.model.rays, 'far')
 
@@ -254,7 +255,9 @@ class TestDict(unittest.TestCase):
         rays_d = np.concatenate(rays_d, axis=0)  # (n_rays*n_cam, 3)
         bounds = None if len(bounds) == 0 else np.concatenate(bounds, axis=0)  # (n_rays*n_cam, 2)
 
-        near_all, far_all = np_wrapper(get_near_far_from_rays, rays_o, rays_d, bounds, near, far, bounding_radius)
+        near_all, far_all = np_wrapper(
+            get_near_far_from_rays, rays_o, rays_d, bounds, near, far, bounding_radius, volume
+        )
         zvals = np_wrapper(get_zvals_from_near_far, near_all, far_all, n_pts)  # (n_rays*n_cam, n_pts)
         pts = np_wrapper(get_ray_points_by_zvals, rays_o, rays_d, zvals)  # (n_rays*n_cam, n_pts, 3)
         points = pts.reshape(-1, 3)  # (n_rays*n_cam*n_pts, 3)

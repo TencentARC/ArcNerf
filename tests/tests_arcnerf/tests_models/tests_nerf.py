@@ -8,7 +8,7 @@ class TestNerfDict(TestModelDict):
 
     def tests_model(self):
         # multiple choice
-        model_cfgs = ['nerf.yaml', 'nerf_dv_withnn.yaml', 'nerf_dv_sh.yaml']
+        model_cfgs = ['nerf.yaml', 'nerf_ngp.yaml']
         model_logs = [name.split('.')[0] + '.txt' for name in model_cfgs]
 
         for model_cfg, model_log in zip(model_cfgs, model_logs):

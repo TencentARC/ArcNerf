@@ -13,6 +13,9 @@ dataset:
 model:
     rays:
         #bounding_radius: 3.0
+        #volume:
+        #    n_grid: None
+        #    side: 2.0
         near: 1.5
         far: 4.5
 

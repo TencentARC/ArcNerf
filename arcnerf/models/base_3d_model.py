@@ -38,6 +38,7 @@ class Base3dModel(BaseModel):
         """Read cfgs for ray, common case"""
         ray_cfgs = {
             'bounding_radius': get_value_from_cfgs_field(self.cfgs.model.rays, 'bounding_radius'),
+            'volume': get_value_from_cfgs_field(self.cfgs.model.rays, 'volume'),
             'near': get_value_from_cfgs_field(self.cfgs.model.rays, 'near'),
             'far': get_value_from_cfgs_field(self.cfgs.model.rays, 'far'),
             'n_sample': get_value_from_cfgs_field(self.cfgs.model.rays, 'n_sample', 128),
@@ -108,7 +109,7 @@ class Base3dModel(BaseModel):
             bounds = inputs['bounds'] if 'bounds' in inputs else None
         near, far = get_near_far_from_rays(
             inputs['rays_o'], inputs['rays_d'], bounds, self.get_ray_cfgs('near'), self.get_ray_cfgs('far'),
-            self.get_ray_cfgs('bounding_radius')
+            self.get_ray_cfgs('bounding_radius'), self.get_ray_cfgs('volume')
         )
 
         return near, far
