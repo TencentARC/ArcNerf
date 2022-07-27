@@ -7,7 +7,7 @@ import os
 import yaml
 
 
-class Obj():
+class Obj(object):
     """object for convert dict into object"""
 
     def __init__(self, cfgs_dict):
@@ -124,21 +124,21 @@ def nested_set_dict(dic, keys, value):
     dic[keys[-1]] = value
 
 
-def update_configs(cfgs, unknows):
+def update_configs(cfgs, unknowns):
     """Update configs from command line arguments"""
-    if unknows is None:
+    if unknowns is None:
         return cfgs
 
     # this is special param using launch
-    if len(unknows) > 0 and unknows[0].startswith('--local_rank='):
-        unknows.pop(0)
+    if len(unknowns) > 0 and unknowns[0].startswith('--local_rank='):
+        unknowns.pop(0)
 
-    for idx, arg in enumerate(unknows):
-        if idx == len(unknows) - 1:
+    for idx, arg in enumerate(unknowns):
+        if idx == len(unknowns) - 1:
             break
         if arg.startswith('--'):  # Only allows one following value for each key now
             keys = arg.replace('--', '').split('.')
-            value = unknows[idx + 1]
+            value = unknowns[idx + 1]
             nested_set_dict(cfgs, keys, value)
 
     return cfgs

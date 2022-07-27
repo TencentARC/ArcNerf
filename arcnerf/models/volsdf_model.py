@@ -141,7 +141,7 @@ class VolSDF(SdfModel):
 
         # Get maximum beta from the upper bound (Lemma 2)
         dists = zvals[:, 1:] - zvals[:, :-1]  # (B, N_eval-1)
-        log_eps_one = torch.log(torch.tensor(eps + 1.0, dtype=dtype)).to(device)
+        log_eps_one = torch.log(torch.tensor(eps + 1.0, dtype=dtype, device=device))
         bound = (1.0 / (4.0 * log_eps_one)) * (dists**2.).sum(-1)
         beta = torch.sqrt(bound)
 
@@ -204,14 +204,14 @@ class VolSDF(SdfModel):
         if self.get_ray_cfgs('n_importance') > 0:
             n_importance = self.get_ray_cfgs('n_importance')
             if inference_only:
-                sample_idx = torch.linspace(0, zvals.shape[1] - 1, n_importance).long().to(device)
+                sample_idx = torch.linspace(0, zvals.shape[1] - 1, n_importance, dtype=torch.long, device=device)
             else:
-                sample_idx = torch.randperm(zvals.shape[1])[:n_importance].to(device)
+                sample_idx = torch.randperm(zvals.shape[1], device=device)[:n_importance]
             zvals_extra = zvals[:, sample_idx]  # (B, N_importance)
             zvals_sample, _ = torch.sort(torch.cat([zvals_sample, zvals_extra], -1), -1)  # (B, N_sample + N_importance)
 
         # follow volsdf original repo, sampled on the whole ray
-        idx = torch.randint(zvals_sample.shape[-1], (zvals_sample.shape[0], )).to(device)
+        idx = torch.randint(zvals_sample.shape[-1], (zvals_sample.shape[0], ), device=device)
         zvals_surface = torch.gather(zvals_sample, 1, idx.unsqueeze(-1))
 
         return zvals_sample, zvals_surface
@@ -236,7 +236,7 @@ class VolSDF(SdfModel):
 
         dists = zvals[:, 1:] - zvals[:, :-1]
         sigma = sdf_to_sigma(sdf, beta, self.beta_min)  # (B, N_pts)
-        zeros = torch.zeros(dists.shape[0], 1, dtype=dtype).to(device)  # (B, 1)
+        zeros = torch.zeros(dists.shape[0], 1, dtype=dtype, device=device)  # (B, 1)
         shifted_free_energy = torch.cat([zeros, dists * sigma[:, :-1]], dim=-1)  # (B, N_pts)
         integral_esti = torch.cumsum(shifted_free_energy, dim=-1)
         bound_opacity = self.get_integral_bound(integral_esti, beta, d_star, dists)  # (B, N_pts-1)
@@ -264,7 +264,7 @@ class VolSDF(SdfModel):
         a, b, c = dists, sdf[:, :-1].abs(), sdf[:, 1:].abs()  # (B, N_pts-1)
         first_cond = a.pow(2) + b.pow(2) <= c.pow(2)
         second_cond = a.pow(2) + c.pow(2) <= b.pow(2)
-        d_star = torch.zeros(zvals.shape[0], zvals.shape[1] - 1, dtype=dtype).to(device)  # (B, N_pts-1)
+        d_star = torch.zeros(zvals.shape[0], zvals.shape[1] - 1, dtype=dtype, device=device)  # (B, N_pts-1)
         d_star[first_cond] = b[first_cond]
         d_star[second_cond] = c[second_cond]
         s = (a + b + c) / 2.0  # (B, N_eval-1)
@@ -311,8 +311,8 @@ class VolSDF(SdfModel):
         bounding_radius = self.get_ray_cfgs('bounding_radius')
 
         # random pts in sphere, (B, 1, 3)
-        pts_rand = torch.empty(size=(rays_o.shape[0], 1, 3), dtype=dtype)\
-            .uniform_(-bounding_radius, bounding_radius).to(device)
+        pts_rand = torch.empty(size=(rays_o.shape[0], 1, 3), dtype=dtype, device=device)\
+            .uniform_(-bounding_radius, bounding_radius)
         pts_rand = pts_rand / torch.norm(pts_rand, dim=-1, keepdim=True).max() * bounding_radius  # make sure in sphere
 
         # pts on surface, (B, 1, 3)

@@ -24,10 +24,15 @@ class NeRF(Base3dModel):
         self.coarse_radiance_net = build_radiance_model(self.cfgs.model.radiance)
         # custom rays cfgs
         self.ray_cfgs['n_importance'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'n_importance', 0)
+        self.ray_cfgs['shared_network'] = get_value_from_cfgs_field(self.cfgs.model.rays, 'shared_network', False)
         # set fine model if n_importance > 0
         if self.get_ray_cfgs('n_importance') > 0:
-            self.fine_geo_net = build_geo_model(self.cfgs.model.geometry)
-            self.fine_radiance_net = build_radiance_model(self.cfgs.model.radiance)
+            if self.get_ray_cfgs('shared_network'):  # use the same network
+                self.fine_geo_net = self.coarse_geo_net
+                self.fine_radiance_net = self.coarse_radiance_net
+            else:  # separate network
+                self.fine_geo_net = build_geo_model(self.cfgs.model.geometry)
+                self.fine_radiance_net = build_radiance_model(self.cfgs.model.radiance)
 
     def get_net(self):
         """Get the actual net for usage"""

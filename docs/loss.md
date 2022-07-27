@@ -1,10 +1,10 @@
 # img_loss
-Loss for comparing image. Used for view systhesis.
+Loss for comparing image. Used for view synthesis.
 ## ImgLoss
 - keys: list of key to calculate, used sum of them. By default `['rgb']`.
 `['rgb_coarse/fine']` for two stage model.
 - loss_type: select loss type such as 'MSE'/'L1'. By default MSE
-- internal_weights: If set, will multiply factors to each weights. By default None.
+- internal_weights: If set, will multiply factors to each weight. By default None.
 - use_mask: use mask for average calculation. By default False.
 - do_mean: calculate the mean of loss. By default True.
 
@@ -17,7 +17,7 @@ Required input/output:
 
 ------------------------------------------------------------------------
 # mask_loss
-Loss for comparing mask. Used for view systhesis and object area prediction.
+Loss for comparing mask. Used for view synthesis and object area prediction.
 ## MaskLoss
 - keys: list of key to calculate, used sum of them. By default `['mask']`.
 `['mask_coarse/fine']` for two stage model.

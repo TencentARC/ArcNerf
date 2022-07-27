@@ -29,7 +29,7 @@ def center_poses(poses, center_loc=None):
     Centralize the pose, which changes the world coordinate center. Good for cams that are not centered at (0,0,0)
     If you now where camera's are looking at (like central of point_cloud), you can set center_loc and
         all camera will look to this new place, rotation not change.
-    Else all camera will look at avg_pose instead (rotatation applied
+    Else all camera will look at avg_pose instead (rotation applied)
     The avg_poses/center_loc is now the origin of world. This will change the orientation of cameras. Be careful to use.
 
     Args:
@@ -176,7 +176,7 @@ def generate_cam_pose_on_sphere(
                   If False, from u_start -> u_end -> u_start.
                   If True, u is swing in clockwise, (u 0-1 is counter-clockwise in fact). Will be
                         u_end -> 1 -> u_start -> 1 -> u_end
-        upper: Control camera postion for get_regular_sphere_line
+        upper: Control camera position for get_regular_sphere_line
         close: if true, first one will be the same as last(for circle and regular)
         origin: origin of sphere, tuple of 3
         normal: normal of the sphere, tuple of 3. If not (0, 1, 0), rotate the points.
@@ -229,6 +229,7 @@ def generate_can_pose_from_tri_circumcircle(verts, n_cam, close=True):
 
     Args:
         verts: np(3, 3), triangle verts, second dim is xyz
+        n_cam: num of cam
         close: if true, first one will be the same as last
 
     Returns:

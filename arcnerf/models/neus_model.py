@@ -151,7 +151,7 @@ class Neus(SdfModel):
             prev_zvals, next_zvals = zvals[:, :-1], zvals[:, 1:]
             slope = (next_sdf - prev_sdf) / (next_zvals - prev_zvals + 1e-5)  # (B, N_pts-1)
 
-            zeros_pad = torch.zeros([n_rays, 1], dtype=dtype).to(device)
+            zeros_pad = torch.zeros([n_rays, 1], dtype=dtype, device=device)
             prev_slope = torch.cat([zeros_pad, slope[:, :-1]], dim=-1)  # (B, N_pts-1)
             slope = torch.stack([prev_slope, slope], dim=-1)  # (B, N_pts-1, 2)
             slope, _ = torch.min(slope, dim=-1, keepdim=False)  # (B, N_pts-1)

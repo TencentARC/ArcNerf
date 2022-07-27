@@ -178,11 +178,13 @@ def closest_distance_of_two_rays(rays_o: torch.Tensor, rays_d: torch.Tensor):
 
 def sphere_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, radius: torch.Tensor, origin=(0, 0, 0)):
     """Get intersection of ray with sphere surface and the near/far zvals.
-    This will be 4 cases: (1)outside no intersection -> near/far: 0, mask = 0
+    This will be 6 cases: (1)outside no intersection -> near/far: 0, mask = 0
                           (2)outside 1 intersection  -> near = far, mask = 1
                           (3)outside 2 intersections -> near=near>0, far=far
                           (4)inside 1 intersection -> near=0, far=far
-    https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/definition-ray
+                          (5)on surface 1 intersection -> near=0=far=0
+                          (6)on surface 2 intersection -> near=0, far=far (tangent/not tangent)
+    www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection
     Since floating point error exists, we set torch.tensor as 0 for small values, used for tangent case
 
      Args:
@@ -206,16 +208,16 @@ def sphere_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, radius: 
     # read radius
     if not isinstance(radius, torch.Tensor):
         assert isinstance(radius, float) or isinstance(radius, int), 'Invalid type'
-        radius = torch.tensor([radius], dtype=dtype).to(device)
+        radius = torch.tensor([radius], dtype=dtype, device=device)
     n_sphere = radius.shape[0]
 
     rays_o_repeat = torch.repeat_interleave(rays_o, n_sphere, 0)  # (N_rays*N_r, 3)
     rays_d_repeat = torch.repeat_interleave(rays_d, n_sphere, 0)  # (N_rays*N_r, 3)
     r = torch.repeat_interleave(radius.unsqueeze(0), n_rays, 0).view(-1, 1)  # (N_rays*N_r, 3)
 
-    mask = torch.ones(size=(n_rays * n_sphere, 1)).type(torch.BoolTensor).to(device)
+    mask = torch.ones(size=(n_rays * n_sphere, 1), dtype=torch.bool, device=device)
 
-    C = torch.tensor([origin], dtype=dtype).to(device)  # (1, 3)
+    C = torch.tensor([origin], dtype=dtype, device=device)  # (1, 3)
     C = torch.repeat_interleave(C, n_rays * n_sphere, 0)  # (N_rays*N_r, 3)
 
     OC = C - rays_o_repeat  # (N_rays*N_r, 3)
@@ -249,6 +251,77 @@ def sphere_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, radius: 
     far = far.contiguous().view(n_rays, n_sphere)
     mask = mask.contiguous().view(n_rays, n_sphere)
     pts = pts.contiguous().view(n_rays, n_sphere, 2, 3)
+
+    return near, far, pts, mask
+
+
+def aabb_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, aabb_range: torch.Tensor, eps=1e-5):
+    """Get intersection of ray with volume outside surface and the near/far zvals.
+    This will be 6 cases: (1)outside no intersection -> near/far: 0, mask = 0
+                          (2)outside 1 intersection  -> near = far, mask = 1
+                          (3)outside 2 intersections -> near=near>0, far=far (tangent/not tangent)
+                          (4)inside 1 intersection -> near=0, far=far
+                          (5)on surface 1 intersection -> near=0=far=0
+                          (6)on surface 2 intersection -> near=0, far=far (tangent/not tangent)
+    www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
+    Since floating point error exists, we set torch.tensor as 0 for small values, used for tangent case
+
+     Args:
+        rays_o: ray origin, (N_rays, 3)
+        rays_d: ray direction, assume normalized, (N_rays, 3)
+        aabb_range: bbox range of volume, (N_v, 3, 2) of xyz_min/max of each volume
+        eps: error threshold for parallel comparison, by default 1e-5
+
+    Returns:
+        near: near intersection zvals. (N_rays, N_v)
+              If only 1 intersection: if not tangent, same as far; else 0. clip by 0.
+        far:  far intersection zvals. (N_rays, N_v)
+              If only 1 intersection: if not tangent, same as far; else 0.
+        pts: (N_rays, N_v, 2, 3), each ray has near/far two points with each volume.
+                                  if nan, means no intersection at this ray
+        mask: (N_rays, N_v), show whether each ray has intersection with the volume, BoolTensor
+     """
+    device = rays_o.device
+    # dtype = rays_o.dtype
+    n_rays = rays_o.shape[0]
+    n_volume = aabb_range.shape[0]
+    assert aabb_range.shape[1] == 3 and aabb_range.shape[2] == 2, 'AABB range must be (N, 3, 2)'
+
+    rays_o_repeat = torch.repeat_interleave(rays_o, n_volume, 0)  # (N_rays*N_v, 3)
+    rays_d_repeat = torch.repeat_interleave(rays_d, n_volume, 0)  # (N_rays*N_v, 3)
+    aabb_range_repeat = torch.repeat_interleave(aabb_range.unsqueeze(0), n_rays, 0).view(-1, 3, 2)  # (N_rays*N_v, 3, 2)
+    min_range, max_range = aabb_range_repeat[..., 0], aabb_range_repeat[..., 1]  # (N_rays*N_v, 3)
+
+    mask = torch.ones(size=(n_rays * n_volume, 1), dtype=torch.bool, device=device)
+
+    # parallel to x plane, d_x ~= 0
+    mask_x = (rays_d_repeat[..., 0] < eps)  # (N_rays*N_v,)
+    mask_x_out = torch.logical_or((rays_o_repeat[..., 0] < min_range[..., 0]),
+                                  (rays_o_repeat[..., 0] > max_range[..., 0]))  # outside the plane
+    mask[torch.logical_and(mask_x, mask_x_out)] = False  # (valid_x,)
+
+    t1 = (min_range[mask, 0] - rays_o_repeat[mask, 0]) / rays_d_repeat[mask, 0]  # (valid_x,)
+    t2 = (max_range[mask, 0] - rays_o_repeat[mask, 0]) / rays_d_repeat[mask, 0]  # (valid_x,)
+    t = torch.cat([t1[:, None], t2[:, None]], dim=-1)
+    t1 = torch.min(t, dim=-1)
+    t2 = torch.max(t, dim=-1)
+
+    print(t1.shape, t2.shape)
+    exit()
+    near, far = None, None
+
+    near = torch.clamp_min(near, 0.0)
+    far = torch.clamp_min(far, 0.0)
+    near[~mask], far[~mask] = 0.0, 0.0  # (N_rays*N_v, 1) * 2
+
+    zvals = torch.cat([near, far], dim=1)  # (N_rays*N_v, 2)
+    pts = get_ray_points_by_zvals(rays_o_repeat, rays_d_repeat, zvals)  # (N_rays*N_v, 2, 3)
+
+    # reshape
+    near = near.contiguous().view(n_rays, n_volume)
+    far = far.contiguous().view(n_rays, n_volume)
+    mask = mask.contiguous().view(n_rays, n_volume)
+    pts = pts.contiguous().view(n_rays, n_volume, 2, 3)
 
     return near, far, pts, mask
 
@@ -332,16 +405,16 @@ def sphere_tracing(
     if isinstance(near, torch.Tensor) and near.shape == (n_rays, 1):
         _near = near
     else:
-        _near = torch.ones((n_rays, 1), dtype=dtype).to(device) * near
+        _near = torch.ones((n_rays, 1), dtype=dtype, device=device) * near
     if isinstance(far, torch.Tensor) and far.shape == (n_rays, 1):
         _far = far
     else:
-        _far = torch.ones((n_rays, 1), dtype=dtype).to(device) * far
+        _far = torch.ones((n_rays, 1), dtype=dtype, device=device) * far
 
-    zvals = torch.ones((n_rays, 1), dtype=dtype).to(device) * _near  # (N_rays, 1), start from rays_o
-    mask = torch.ones(n_rays).type(torch.BoolTensor).to(device)  # (N_rays)
-    obj_mask = torch.zeros(n_rays).type(torch.BoolTensor).to(device)  # (N_rays)
-    sdf = torch.zeros(n_rays, dtype=dtype).to(device)  # (N_rays)
+    zvals = torch.ones((n_rays, 1), dtype=dtype, device=device) * _near  # (N_rays, 1), start from rays_o
+    mask = torch.ones(n_rays, dtype=torch.bool, device=device)  # (N_rays)
+    obj_mask = torch.zeros(n_rays, dtype=torch.bool, device=device)  # (N_rays)
+    sdf = torch.zeros(n_rays, dtype=dtype, device=device)  # (N_rays)
 
     for _ in range(n_iter):
         # only update for the valid pts
@@ -409,17 +482,17 @@ def secant_root_finding(
     device = rays_o.device
     n_rays = rays_o.shape[0]
 
-    zvals = torch.zeros((n_rays, 1), dtype=dtype).to(device)  # (N_rays, 1), start from rays_o
+    zvals = torch.zeros((n_rays, 1), dtype=dtype, device=device)  # (N_rays, 1), start from rays_o
 
     t = torch.linspace(0., 1., n_step, device=device)[None, :]  # (N_pts, 1)
     if isinstance(near, torch.Tensor) and near.shape == (n_rays, 1):
         _near = near
     else:
-        _near = torch.ones((n_rays, 1), dtype=dtype).to(device) * near
+        _near = torch.ones((n_rays, 1), dtype=dtype, device=device) * near
     if isinstance(far, torch.Tensor) and far.shape == (n_rays, 1):
         _far = far
     else:
-        _far = torch.ones((n_rays, 1), dtype=dtype).to(device) * far
+        _far = torch.ones((n_rays, 1), dtype=dtype, device=device) * far
     step = _near * (1 - t) + _far * t  # (N_rays, N_pts)
 
     pts = get_ray_points_by_zvals(rays_o, rays_d, step).view(-1, 3)  # (N_rays*N_pts, 3)
@@ -442,7 +515,7 @@ def secant_root_finding(
     )  # (N_rays, N_pts)
 
     # first change gives higher weights
-    cost_matrix = sign_matrix * torch.arange(n_step, 0, -1).type(dtype).to(device)  # (N_rays, N_pts)
+    cost_matrix = sign_matrix * torch.arange(n_step, 0, -1, dtype=dtype, device=device)  # (N_rays, N_pts)
     min_cost, index = torch.min(cost_matrix, -1)  # (N_rays) * 2
 
     # at least one sign change in (0, far)

@@ -131,7 +131,7 @@ def get_verts_by_faces(verts, faces, vert_colors=None):
     Args:
         verts: (V, 3) np array, verts adjusted by volume offset
         faces: (F, 3) np array, faces
-        verts_colors: (V, 3) np array, rgb color in (0~1). optional
+        vert_colors: (V, 3) np array, rgb color in (0~1). optional
 
     Returns:
         verts_by_faces: (F, 3, 3) np array

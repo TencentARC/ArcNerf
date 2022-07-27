@@ -24,8 +24,7 @@ Tests for all nerf/3d related functions.
 ## tests_datasets
 Tests for datasets. Including showing cameras, avg cams and test cam trajectory.
 ### tests_any_datasets
-This tests is not `unittest`. It will read datasets from `default.yaml`,
-save related visual results into results folder.
+It will read datasets from `default.yaml`, save related visual results into results folder.
 Change the config file in `tests_datasets.__init__`.
 
 ------------------------------------------------------------------------

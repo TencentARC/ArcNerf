@@ -50,8 +50,7 @@ each line prints `N_pt_in_line-1` line seg
 
 ------------------------------------------------------------------------
 ## Volume
-A complete volume implementation is in `geometry.volume`. You only inputs
-points/lines/faces for visual results.
+A complete volume implementation is in `geometry.volume`. You only input points/lines/faces for visual results.
 - 'grid_pts': grid point, ((n+1)^3, 3). If use corner only, (8,3)
   - grid_pts_colors: pts_colors in str. If not exist, use `chocolate`.
   - 'grid_pts_size': pts_size. If not exist, set 20.

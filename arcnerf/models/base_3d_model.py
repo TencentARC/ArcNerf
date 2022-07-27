@@ -246,7 +246,7 @@ class Base3dModel(BaseModel):
         """
         geo_net, radiance_net = self.get_net()
         if view_dir is None:
-            rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
+            rays_d = torch.zeros_like(pts, dtype=pts.dtype, device=pts.device)
         else:
             rays_d = normalize(view_dir)  # norm view dir
 
@@ -369,7 +369,7 @@ class Base3dModel(BaseModel):
             rays_o, rays_d, geo_net.forward_geo_value, method, near, far, n_step, n_iter, threshold, level, grad_dir
         )
 
-        rgb = torch.ones((n_rays, 3), dtype=dtype).to(device)  # white bkg
+        rgb = torch.ones((n_rays, 3), dtype=dtype, device=device)  # white bkg
         depth = zvals  # at max zvals after far
         mask_float = mask.type(dtype)
 

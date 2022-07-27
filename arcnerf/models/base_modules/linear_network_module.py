@@ -186,7 +186,7 @@ def pretrain_siren(model, radius_init, sample_radius, n_iter=5000, lr=1e-4, thre
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     l1loss = nn.L1Loss(reduction='mean')
     for _ in range(n_iter):
-        pts = torch.empty([n_pts, 3], dtype=dtype).uniform_(-sample_radius, sample_radius).to(device)
+        pts = torch.empty([n_pts, 3], dtype=dtype, device=device).uniform_(-sample_radius, sample_radius)
         sdf_gt = pts.norm(dim=-1) - radius_init  # inside -/outside +
         sdf_pred = model(pts)[0]
         loss = l1loss(sdf_pred, sdf_gt[:, None])

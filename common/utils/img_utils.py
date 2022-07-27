@@ -37,7 +37,7 @@ def read_img(path, dtype=np.float32, norm_by_255=False, bgr2rgb=True, gray=False
 
 def img_scale(img, scale, interpolation=None):
     """Scale a image using cv2.resize(). scale > 1 is scale_up
-    By default scale_up uses INTER_LINEAR, scale_down uses INTER_AREA. You can specify by youself.
+    By default scale_up uses INTER_LINEAR, scale_down uses INTER_AREA. You can specify by yourself.
     """
     if scale == 1:
         return img

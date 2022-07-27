@@ -118,7 +118,7 @@ def get_rotate_matrix_from_vec(vec_a: torch.Tensor, vec_b: torch.Tensor, eps=1e-
     matrix_valid = torch.matmul(base_b[valid], torch.inverse(base_a[valid]))
 
     # get full matrix
-    matrix = torch.eye(3, dtype=vec_a.dtype).to(vec_a.device).unsqueeze(0)
+    matrix = torch.eye(3, dtype=vec_a.dtype, device=vec_a.device).unsqueeze(0)
     matrix = torch.repeat_interleave(matrix, vec_a.shape[0], dim=0)
     matrix[valid] = matrix_valid
     matrix[invalid_neg] = -1.0 * matrix[invalid_neg]

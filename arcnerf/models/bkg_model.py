@@ -54,7 +54,7 @@ class BkgModel(Base3dModel):
 @MODEL_REGISTRY.register()
 class NeRFPP(BkgModel):
     """ Nerf++ model.
-        Process bkg points only. Do not support geometric extractration.
+        Process bkg points only. Do not support geometric extraction.
         ref: https://arxiv.org/abs/2010.07492
     """
 

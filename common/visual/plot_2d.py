@@ -56,10 +56,10 @@ def draw_2d_components(
         line_width: size of point, by default 2
         legends: list of str for the lines, len is N_line
         xlabel: x-axis label, by default x
-        ylabel: y-axis label, by dafault y
+        ylabel: y-axis label, by default y
         title: a string of figure title
         save_path: path to save the fig. None will only show fig
-        return_fig: If True, return the fig for usage like monitor save. Do not show. By defalt False
+        return_fig: If True, return the fig for usage like monitor save. Do not show. By default False
     """
     fig = plt.figure()
     ax = fig.add_subplot()

@@ -1,5 +1,5 @@
 # A pytorch template for deep learning project
-An easy to use template for pytorch dl projects.
+An easy-to-use template for pytorch dl projects.
 
 ------------------------------------------------------------------------
 ## Start a new proj
@@ -45,11 +45,11 @@ by argument, you can directly add `--arg value` during input.
 ------------------------------------------------------------------------
 ## Resume training
 - You can set `--resume` as the checkpoint_path, or the checkpoint folder which will load the `lastest.pt.tar`.
-But this only reads the model, you have to set `--configs xxx` as the configs in the existing exper folder.
+But this only reads the model, you have to set `--configs xxx` as the configs in the existing expr folder.
 
-- In `resume` mode, if you set `progress.start_epoch` as `-1`. if will resume training.
--
-- If `progress.start_epoch` is `0`, it will load the weight and finetune from epoch 0. You should set
+- In `resume` mode, if you set `progress.start_epoch` as `-1`. It will resume training.
+
+- If `progress.start_epoch` is `0`, it will load the weight and fine-tune from epoch 0. You should set
 a different expr name like `xxx_finetune` for separation.
 
 ------------------------------------------------------------------------
@@ -64,7 +64,7 @@ a different expr name like `xxx_finetune` for separation.
 
 - Add `@MODEL_REGISTRY.register()` to the class for registration.
 
-- Some backbones/compents are provided in `common.models`.
+- Some backbones/components are provided in `common.models`.
 
 ------------------------------------------------------------------------
 ## Dataset
@@ -158,7 +158,7 @@ You can set `clip_warm` as positive number in order to use `clip_gradients_warmu
 ## Eval
 - Evaluation will be performed on `eval` dataset every `progress.epoch_eval` dataset.
 All result will be locally recorded in `experiments/expr_name/eval` for each epoch.
-But generally you should not make it in training progress. Local evaluation is better to avoid overfitting.
+But generally you should not make it in training progress. Local evaluation is better to avoid over-fitting.
 
 - You can specify the valid cfgs in `dataset.eval` to change the dataset details.
 
@@ -173,9 +173,12 @@ But generally you should not make it in training progress. Local evaluation is b
 
 ------------------------------------------------------------------------
 ## Tests
-- Tests for `common` class and `custom` are in `tests`. You should implement you tests for `custom` class when needed.
+- Tests for `common` class and `custom` are in `tests`. You should implement your tests for `custom` class when needed.
 
-- We use unittest. You can run `python -m unittest test_file` or `python -m unittest discover test_dir` for unittest.
+- We use unittest. You can run
+  - `python -m unittest test_file` on tests in the whole file.
+  - `python -m unittest discover test_dir` on tests in the whole directory.
+  - `python -m unitttest test_dir.test_file.test_method` on test for single func.
 
 ------------------------------------------------------------------------
 ## Monitor and Progress saver
@@ -188,7 +191,7 @@ But generally you should not make it in training progress. Local evaluation is b
 - Change `render_progress_img` in `custom_trainer` for different visual results.
 
 ------------------------------------------------------------------------
-## CUDA extentsion
+## CUDA extension
 We provide simple samples of CUDA extensions for simple add_matrix function, and a python wrapper
 to use it like a `torch.nn.Module`.
 More detail please see [official doc](https://pytorch.org/tutorials/advanced/cpp_extension.html).
@@ -218,8 +221,7 @@ A python wrapper is suggested to put under `custom/ops/func.py` to use the func 
   - use this is called `grid-stride loop`
 #### 2d and 1d
 - 2d/1d grid/block are all supported based on your input tensor shape.
-- Ref to [doc1](http://www.mathcs.emory.edu/~cheung/Courses/355/Syllabus/94-CUDA/2D-grids.html) and
-and [doc2](https://blog.csdn.net/canhui_wang/article/details/51730264) for detail.
+- Ref to [doc1](http://www.mathcs.emory.edu/~cheung/Courses/355/Syllabus/94-CUDA/2D-grids.html) and [doc2](https://blog.csdn.net/canhui_wang/article/details/51730264) for detail.
 
 ### PackedAccessor
 To put a tensor into cuda kernel, it uses

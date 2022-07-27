@@ -26,7 +26,7 @@ class SdfModel(Base3dModel):
         """Rewrite to use normal processing """
         geo_net, radiance_net = self.get_net()
         if view_dir is None:
-            rays_d = torch.zeros_like(pts, dtype=pts.dtype).to(pts.device)
+            rays_d = torch.zeros_like(pts, dtype=pts.dtype, device=pts.device)
         else:
             rays_d = normalize(view_dir)  # norm view dir
 
@@ -72,8 +72,8 @@ class SdfModel(Base3dModel):
             rays_o, rays_d, geo_net.forward_geo_value, method, near, far, n_step, n_iter, threshold, level, grad_dir
         )
 
-        rgb = torch.ones((n_rays, 3), dtype=dtype).to(device)  # white bkg
-        normal = torch.zeros((n_rays, 3), dtype=dtype).to(device)
+        rgb = torch.ones((n_rays, 3), dtype=dtype, device=device)  # white bkg
+        normal = torch.zeros((n_rays, 3), dtype=dtype, device=device)
         depth = zvals  # at max zvals after far
         mask_float = mask.type(dtype)
 

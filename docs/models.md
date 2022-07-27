@@ -24,18 +24,18 @@ You need to first get the Gaussian representation of the interval(mean/cov), the
 ### HashGridEmbedder
 The multi-res hashing embedding introduced in [Instant-ngp](https://arxiv.org/abs/2201.05989).
 
-It only embed xyz positions rather than direction. It uses multi-res volume grid index, hash them and get the
+It only embeds xyz positions rather than direction. It uses multi-res volume grid index, hash them and get the
 embedding of grid_pts from hashmap, and get the embedding by interpolation.
 
 You can select the backend by setting `backend`=`torch`/`cuda`/`tcnn`.
 ### SHEmbedder
 The spherical harmonic hashing embedding introduced in [Instant-ngp](https://arxiv.org/abs/2201.05989).
 
-It only embed xyz direction rather than positions.
+It only embeds xyz direction rather than positions.
 
 You can select the backend by setting `backend`=`torch`/`cuda`/`tcnn`.
 ### DenseGridEmbedder
-The dense grid embedder directly extracts density and feature from a dense volume. It only embed xyz direction rather than positions.
+The dense grid embedder directly extracts density and feature from a dense volume. It only embeds xyz direction rather than positions.
 
 ## Tiny-cuda-nn
 Some encoders are implemented in [tiny-cuda-nn]() by Nvidia. You should clone the repo `--recursive`
@@ -44,7 +44,7 @@ and install them by `sh scripts/install_tinycudann.sh`.
 
 ------------------------------------------------------------------------
 ## BaseGeoNet/BaseRadianceNetwork
-This models serve as the basic block for modeling obj geometry and radiance. It can be pure linear networks, pure volume,
+These models serve as the basic block for modeling obj geometry and radiance. It can be pure linear networks, pure volume,
 mix of volume and network, sparse octree, multi-res volume with hashing, tensorRF etc. All the blocks can be select from
 `geometry/radiance` part in `cfgs.model`.
 
@@ -98,9 +98,9 @@ The dataset only provides `rays_o` and `rays_d`, but the actual sampling procedu
 - near: Hard reset the near zvals for all rays
 - far: Hard reset the far zvals for all rays
 - bounding_radius: If not None, will use to calculate near/far in the sphere.
-But it could be overwrite by hardcode near/far.
+But it could be overwritten by hardcode near/far.
 - bounds: If bounds is provided in dataset, use it instead of bounding radius.
-- But it could be overwrite by hardcode near/far.
+- But it could be overwritten by hardcode near/far.
 
 For point sampling:
 - n_sample: Init sample point.
@@ -122,7 +122,7 @@ There are four ways to handle background
   - background will be noisy and hard to model.
 - (2) Constrain the far zvals by bounds or bounding_radius. `MaskImgLoss` needs to be applied to get obj area optimized.
 `MaskLoss` should also be applied for geometry.
-- (3) If the obj does not have mask, but it is with white background(like nerf `lego`  dataset`).
+- (3) If the obj does not have mask, but it is with white background(like nerf `lego` dataset).
 Set `white_bkg` in the rays, and sample in the ball. Directly compare the image and output rgb.
 - (4) Use a separate background model(nerf++), restrict the inner rays in sphere. Combine the inner and background model
 For color. `ImgLoss` and be applied on the combined image. `MaskLoss` and `MaskImageLoss` can be applied on obj image.
@@ -202,7 +202,7 @@ Since it gets sdf value instead of sigma, we do not support sigma mode for blend
 The performance is worse than Neus as we test.
 
 ### Instant-ngp
-[Instant-ngp](https://arxiv.org/abs/2201.05989) is not a model. It use `HashGridEmbedder` and `SHEmbedder` to
+[Instant-ngp](https://arxiv.org/abs/2201.05989) is not a model. It uses `HashGridEmbedder` and `SHEmbedder` to
 accelerate the training progress.
 
 ------------------------------------------------------------------------

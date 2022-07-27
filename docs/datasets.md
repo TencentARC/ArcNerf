@@ -107,7 +107,7 @@ cam is on surface with `scale_radius`. Only scale and translation is applied, do
 ### LLFF
 This is a forward facing dataset. Not object extraction is performed. Only used to view synthesis.
 For fair comparsion, test/val images have not overlapping with train images.
-- The camera are aligned flatten. Adjust the poses/bounds by range to avoid large xyz values.
+- The cameras are aligned flatten. Adjust the poses/bounds by range to avoid large xyz values.
 - scene_name: scene_name that is the folder name under `LLFF`. Use it to be identifier.
 - NDC: We support NDC Space conversion if you set `ndc_space=True` in dataset.
   - In the original implementation, even they use `ndc_space` rays for sampling, the view_dirs sent to radianceNet is

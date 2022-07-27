@@ -152,9 +152,7 @@ def get_video_metadata(path):
 
 def ffmpeg_video_read(video_path, fps=None):
     """Video reader based on FFMPEG. Borrow from https://github.com/google/aistplusplus_api.
-      This function supports setting fps for video reading. It is critical
-      as AIST++ Dataset are constructed under exact 60 fps, while some of
-      the AIST dance videos are not percisely 60 fps.
+      This function supports setting fps for video reading.
 
     Args:
         video_path: A video file.

@@ -88,7 +88,8 @@ class HashGridEmbedder(nn.Module):
         self.hashmap_size = 2**hashmap_size  # T
         self.n_feat_per_entry = n_feat_per_entry  # F
         self.n_levels = n_levels  # L
-        self.embeddings, self.n_total_embed, self.offsets, self.resolutions = self.init_embeddings()
+        init_emb = not (backend == 'tcnn' and TCNN_BACKEND_AVAILABLE)
+        self.embeddings, self.n_total_embed, self.offsets, self.resolutions = self.init_embeddings(init_emb)
 
         # set volume with base res
         self.volume = Volume(
@@ -118,6 +119,7 @@ class HashGridEmbedder(nn.Module):
                     'base_resolution': self.base_res,
                     'per_level_scale': float(self.per_level_scale),
                 },
+                dtype=dtype
             )
 
         self.out_dim = n_levels * n_feat_per_entry + include_input * input_dim  # L * F + 3
@@ -133,10 +135,11 @@ class HashGridEmbedder(nn.Module):
         self.register_buffer('t_offsets', torch.tensor(self.offsets, dtype=torch.int))  # (L+1,)
         self.register_buffer('t_resolutions', torch.tensor(self.resolutions, dtype=torch.int))  # (L,)
 
-    def init_embeddings(self, std=1e-4):
+    def init_embeddings(self, init_emb, std=1e-4):
         """Init embedding. To save memory, at lower level, do not init large embeddings
 
         Args:
+            init_emb: whether you need to set up the real embedding tensor. False for tcnn backend
             std: for embedding init, by default 1e-4
 
         Returns:
@@ -157,8 +160,11 @@ class HashGridEmbedder(nn.Module):
             n_total_embed += n_embed_per_level
 
         offsets.append(n_total_embed)
-        embeddings = nn.Parameter(torch.empty(n_total_embed, self.n_feat_per_entry))
-        nn.init.uniform_(embeddings, -std, std)
+
+        embeddings = None
+        if init_emb:
+            embeddings = nn.Parameter(torch.empty(n_total_embed, self.n_feat_per_entry))
+            nn.init.uniform_(embeddings, -std, std)
 
         return embeddings, n_total_embed, offsets, resolutions
 
@@ -173,7 +179,7 @@ class HashGridEmbedder(nn.Module):
     def forward(self, xyz: torch.Tensor):
         """
         Args:
-            xyz: tensor of shape (B, 3), xyz position
+            xyz: tensor of shape (B, 3), xyz position. You should make sure the xyz in the whole bbox.
 
         Returns:
             out: tensor of shape (B, out_dim=T*F + include_inputs * input_dim)

@@ -3,6 +3,7 @@
 import torch
 import torch.nn as nn
 
+from .ray import aabb_ray_intersection
 from common.utils.torch_utils import torch_to_np
 
 
@@ -24,6 +25,7 @@ class Volume(nn.Module):
         Args:
             n_grid: N of volume/line seg on each side. Each side is divided into n_grid seg with n_grid+1 pts.
                     total num of volume is n_grid**3, total num of grid_pts is (n_grid+1)**3.
+                    If n_grid is None, only set the out-bounding lines/pts.
             origin: origin point(centroid of cube), a tuple of 3
             side: each side len, if None, use xyzlen. If exist, use side only
             xlen: len of x dim, if None use side
@@ -59,8 +61,9 @@ class Volume(nn.Module):
         self.set_len(side, xlen, ylen, zlen)
         self.cal_range()
         self.cal_corner()
-        self.cal_grid_pts()
-        self.cal_volume_pts()
+        if self.n_grid is not None:
+            self.cal_grid_pts()
+            self.cal_volume_pts()
 
     def set_n_grid(self, n_grid, reset_pts=True):
         """Change the n_grid manually and reset the grid_pts"""
@@ -265,7 +268,7 @@ class Volume(nn.Module):
         return sub_grid_pts, sub_volume_range
 
     @staticmethod
-    def check_pts_in_grid_boundary(pts, grid_pts):
+    def check_pts_in_grid_boundary(pts: torch.Tensor, grid_pts: torch.Tensor):
         """Check whether pts in grid pts boundary. Remind that float accuracy affect the real choice.
 
         Args:
@@ -287,14 +290,14 @@ class Volume(nn.Module):
         assert grid_pts_expand.shape[0] == n_pts, 'Invalid num of grid_pts, should be in (B, 8, 3) or (8, 3)'
 
         # check in min_max boundary
-        pts_min_req = torch.BoolTensor(pts >= grid_pts_expand.min(dim=1)[0]).to(pts.device)
-        pts_max_req = torch.BoolTensor(pts < grid_pts_expand.max(dim=1)[0]).to(pts.device)
+        pts_min_req = torch.BoolTensor(pts >= grid_pts_expand.min(dim=1)[0], device=pts.device)
+        pts_max_req = torch.BoolTensor(pts < grid_pts_expand.max(dim=1)[0], device=pts.device)
         pts_in_boundary = torch.logical_and(pts_min_req, pts_max_req)  # (B, 3)
         pts_in_boundary = torch.all(pts_in_boundary, dim=-1)  # (B, )
 
         return pts_in_boundary
 
-    def get_voxel_idx_from_xyz(self, pts):
+    def get_voxel_idx_from_xyz(self, pts: torch.Tensor):
         """Get the voxel idx from xyz pts. Directly calculate the offset index in each dim.
 
         Args:
@@ -321,7 +324,7 @@ class Volume(nn.Module):
 
         return voxel_idx, valid_idx
 
-    def get_grid_pts_idx_by_voxel_idx(self, voxel_idx, flatten=True):
+    def get_grid_pts_idx_by_voxel_idx(self, voxel_idx: torch.Tensor, flatten=True):
         """Get the grid pts index from voxel idx
 
         Args:
@@ -345,7 +348,7 @@ class Volume(nn.Module):
 
         return grid_pts_idx
 
-    def collect_grid_pts_by_voxel_idx(self, voxel_idx):
+    def collect_grid_pts_by_voxel_idx(self, voxel_idx: torch.Tensor):
         """Get the grid pts xyz from voxel idx. Collect from full grid_pts is smaller than just cal by input
 
         Args:
@@ -362,7 +365,7 @@ class Volume(nn.Module):
 
         return grid_pts_by_voxel_idx
 
-    def get_grid_pts_by_voxel_idx(self, voxel_idx):
+    def get_grid_pts_by_voxel_idx(self, voxel_idx: torch.Tensor):
         """Get the grid pts xyz from voxel idx, directly calculated from voxel_idx
 
         Args:
@@ -382,7 +385,7 @@ class Volume(nn.Module):
 
         return grid_pts_by_voxel_idx
 
-    def cal_weights_to_grid_pts(self, pts, grid_pts):
+    def cal_weights_to_grid_pts(self, pts: torch.Tensor, grid_pts: torch.Tensor):
         """Calculate the weights of each grid_pts to pts by trilinear interpolation
 
         Args:
@@ -416,7 +419,7 @@ class Volume(nn.Module):
 
         return weights
 
-    def get_voxel_grid_info_from_xyz(self, pts):
+    def get_voxel_grid_info_from_xyz(self, pts: torch.Tensor):
         """Get the voxel and grid pts info(index, pos) directly from xyz position
 
         Args:
@@ -463,7 +466,7 @@ class Volume(nn.Module):
 
         return voxel_idx, valid_idx, grid_pts_idx, grid_pts, grid_pts_weights
 
-    def interpolate(self, values, weights, voxel_idx):
+    def interpolate(self, values: torch.Tensor, weights: torch.Tensor, voxel_idx: torch.Tensor):
         """Interpolate values by getting value on grid_pts in each voxel and multiply weights
         You should assume the values are on the same device.
 
@@ -486,7 +489,7 @@ class Volume(nn.Module):
         return values_by_weights
 
     @staticmethod
-    def interpolate_values_by_weights(values, weights):
+    def interpolate_values_by_weights(values: torch.Tensor, weights: torch.Tensor):
         """Interpolate the values collect from grid_pts by weights
 
         Args:
@@ -503,7 +506,7 @@ class Volume(nn.Module):
         return values_by_weights
 
     @staticmethod
-    def convert_xyz_index_to_flatten_index(xyz, n):
+    def convert_xyz_index_to_flatten_index(xyz: torch.Tensor, n):
         """Convert xyz index to flatten index
 
         Args:
@@ -518,7 +521,7 @@ class Volume(nn.Module):
         return flatten_index
 
     @staticmethod
-    def convert_flatten_index_to_xyz_index(flatten_index, n):
+    def convert_flatten_index_to_xyz_index(flatten_index: torch.Tensor, n):
         """Convert flatten index to xyz index
 
         Args:
@@ -528,7 +531,7 @@ class Volume(nn.Module):
         Returns:
             xyz: (B, 3) index in torch.long
         """
-        xyz_index = torch.zeros((flatten_index.shape[0], 3), dtype=torch.int).to(flatten_index.device)
+        xyz_index = torch.zeros((flatten_index.shape[0], 3), dtype=torch.int, device=flatten_index.device)
 
         for i in range(3):
             xyz_index[:, 2 - i] = flatten_index % n
@@ -536,7 +539,7 @@ class Volume(nn.Module):
 
         return xyz_index
 
-    def collect_grid_pts_values(self, values, grid_pts_idx):
+    def collect_grid_pts_values(self, values: torch.Tensor, grid_pts_idx: torch.Tensor):
         """Collect values on grid_pts(xyz, feature, value) by grid_pts_idx
 
         Args:
@@ -553,6 +556,27 @@ class Volume(nn.Module):
         values_by_grid_pts_idx = values[grid_pts_idx, ...]  # (B, 8, ...)
 
         return values_by_grid_pts_idx
+
+    def ray_volume_intersection(self, rays_o: torch.Tensor, rays_d: torch.Tensor):
+        """Calculate the rays intersection with the out-bounding surfaces
+        Args:
+            rays_o: ray origin, (N_rays, 3)
+            rays_d: ray direction, (N_rays, 3)
+
+        Returns:
+            near: near intersection zvals. (N_rays, 1)
+                  If only 1 intersection: if not tangent, same as far; else 0. clip by 0.
+            far:  far intersection zvals. (N_rays, 1)
+                  If only 1 intersection: if not tangent, same as far; else 0.
+            pts: (N_rays, 2, 3), each ray has near/far two points with each sphere.
+                                      if nan, means no intersection at this ray
+            mask: (N_rays, 1), show whether each ray has intersection with the sphere, BoolTensor
+        """
+        aabb_range = self.get_range()[None].to(rays_o.device)  # (1, 3, 2)
+        near, far, pts, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)
+        pts = pts[:, 0, :, :]  # (N_rays, 1, 2, 3) -> (N_rays, 2, 3)
+
+        return near, far, pts, mask
 
     def get_bound_lines(self):
         """Get the outside bounding lines. for visual purpose.
