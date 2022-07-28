@@ -448,6 +448,7 @@ def ray_marching(
     assert sigma is not None or alpha is not None, 'Can not be None for both alpha and sigma..'
 
     deltas = zvals[:, 1:] - zvals[:, :-1]  # (N_rays, N_pts-1)
+    deltas[torch.abs(deltas) < 1e-5] = 0.0  # small value handling
     assert torch.all(deltas >= 0), 'zvals is not all increase....'
 
     _sigma = sigma

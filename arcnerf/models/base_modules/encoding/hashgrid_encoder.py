@@ -39,7 +39,7 @@ class HashGridEmbedder(nn.Module):
         base_res=16,
         max_res=512,
         origin=(0, 0, 0),
-        side=1.5,
+        side=2.0,
         xlen=None,
         ylen=None,
         zlen=None,
@@ -61,7 +61,7 @@ class HashGridEmbedder(nn.Module):
                 Each level res is base * (scale ** L).
             The following are for volume:
                 origin: origin point(centroid of cube), a tuple of 3
-                side: each side len, if None, use xyzlen. If exist, use side only. By default 1.5.
+                side: each side len, if None, use xyzlen. If exist, use side only. By default 2.0, xyz from [-1, 1]
                 xlen: len of x dim, if None use side
                 ylen: len of y dim, if None use side
                 zlen: len of z dim, if None use side

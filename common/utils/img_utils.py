@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import math
 import os
 
 import cv2
@@ -117,3 +117,38 @@ def get_image_metadata(img_path):
         h, w, channel = img.shape
 
     return w, h, channel
+
+
+def get_bbox_from_mask(mask, expand=1.05):
+    """Get the bbox from mask. It finds the mask contour area and expand the bbox.
+
+    Args:
+        mask: (H, W) binary numpy array, 0 or 1
+        expand: expand the final bbox by the factor. By default 1.05(5% more)
+
+    Returns:
+        bbox: numpy array of (4,), in the order of (min_x, min_y, max_x, max_y)
+    """
+    m = mask.astype(np.uint8)
+    contours, hierarchy = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+
+    areas = []
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        areas.append(area)
+    # largest area
+    idx = areas.index(np.max(areas))
+    x, y, w, h = cv2.boundingRect(contours[idx])
+    # center
+    c_x, c_y = x + w / 2.0, y + h / 2.0
+    # expand
+    w, h = w * expand, h * expand
+
+    bounding_box = np.array([
+        math.floor(c_x - w / 2.0),
+        math.floor(c_y - h / 2.0),
+        math.ceil(c_x + w / 2.0),
+        math.ceil(c_y + h / 2.0)
+    ])
+
+    return bounding_box

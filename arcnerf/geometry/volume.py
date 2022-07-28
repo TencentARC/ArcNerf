@@ -59,6 +59,10 @@ class Volume(nn.Module):
             'Specify at least side or xyzlen'
         self.set_origin(origin)
         self.set_len(side, xlen, ylen, zlen)
+        self.set_pts()
+
+    def set_pts(self):
+        """Set the pts(range, corner, grid, volume) using the internal origin/lenghts"""
         self.cal_range()
         self.cal_corner()
         if self.n_grid is not None:
@@ -88,7 +92,14 @@ class Volume(nn.Module):
 
     def get_len(self):
         """Return len of each dim, in tuple of float num"""
-        return float(self.xlen[0]), float(self.ylen[0]), float(self.zlen[0]),
+        return float(self.xlen[0]), float(self.ylen[0]), float(self.zlen[0])
+
+    def expand_len(self, factor):
+        """Expand the length of each dim. When requires_grad, do not call this"""
+        self.xlen[0] = self.xlen[0] * factor
+        self.ylen[0] = self.ylen[0] * factor
+        self.zlen[0] = self.zlen[0] * factor
+        self.set_pts()
 
     @torch.no_grad()
     def set_origin(self, origin=(0.0, 0.0, 0.0)):

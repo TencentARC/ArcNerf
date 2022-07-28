@@ -5,16 +5,16 @@ import os
 
 import torch
 
-from common.metric.metric_dict import MetricDictCounter
-from common.utils.cfgs_utils import parse_configs, get_value_from_cfgs_field
-from common.utils.logger import Logger
-from common.utils.model_io import load_model
 from arcnerf.datasets import get_dataset, get_model_feed_in
 from arcnerf.datasets.transform.augmentation import get_transforms
 from arcnerf.eval.eval_func import run_eval
 from arcnerf.metric import build_metric
 from arcnerf.models import build_model
 from arcnerf.visual.render_img import render_progress_imgs, write_progress_imgs
+from common.metric.metric_dict import MetricDictCounter
+from common.utils.cfgs_utils import parse_configs, get_value_from_cfgs_field
+from common.utils.logger import Logger
+from common.utils.model_io import load_model
 
 if __name__ == '__main__':
     cfgs = parse_configs()

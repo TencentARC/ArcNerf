@@ -83,6 +83,13 @@ Will write data to `cfgs.dir.data_dir/Capture/scene_name`
 - dense_reconstruct: If true, run dense_reconstruct and get dense point cloud and mesh.
 ### Mask generation
 - TODO: We may add it in the future.
+### Volume regression from mask
+If mask is provided, we use all masks in training set to get the 2d bbox, and simply regress a 3d volume for the object.
+This help to get the close approximation of the bounding volume, which could be helpful in modelling for some explicit
+methods.
+- Run `python tools//get_3d_bbox_from_silhouette.py --configs configs/datasets/DATASET_NAME/SCENE_NAME.yaml`, you should
+prepare a yaml file for this dataset and scene. It will output the regressed volume information and visualization of
+volume and bbox.
 ### Dataset
 Use `Capture` class for this dataset. It is specified by scene_name.
 - scene_name: scene_name that is the folder name under `Capture`. Use it to be identifier.

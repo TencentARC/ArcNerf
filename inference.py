@@ -6,12 +6,12 @@ import os.path as osp
 
 import torch
 
-from common.utils.cfgs_utils import parse_configs
-from common.utils.logger import Logger
-from common.utils.model_io import load_model
 from arcnerf.datasets import get_dataset, get_model_feed_in
 from arcnerf.eval.infer_func import Inferencer
 from arcnerf.models import build_model
+from common.utils.cfgs_utils import parse_configs
+from common.utils.logger import Logger
+from common.utils.model_io import load_model
 
 if __name__ == '__main__':
     cfgs = parse_configs()

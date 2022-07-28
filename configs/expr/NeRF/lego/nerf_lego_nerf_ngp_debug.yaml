@@ -1,18 +1,18 @@
-name: nerf_lego_nerf_hashgrid_torch_sh
+name: nerf_lego_nerf_ngp_debug
 
 resume: None
 
 debug:
     debug_mode: False
     print_all_grad: False
-    get_progress: False
+    get_progress: True
 
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_hashgrid_torch_sh'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_ngp_debug'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_hashgrid_torch_sh/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_ngp_debug/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -29,13 +29,13 @@ n_rays: 4096
 worker: 4
 
 optim:
-    lr: 5e-4
+    lr: 1e-2
     optim_type: adam
-    weight_decay: 0.0
+    weight_decay: 1e-6
     lr_scheduler:
-        type: ExponentialLR
-        lr_gamma: 0.1
-        lr_steps: [500000]
+        type: MultiStepLR
+        lr_gamma: 0.33
+        lr_steps: [2000, 3000, 4000, 5000]
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -43,24 +43,20 @@ optim:
 
 progress:
     start_epoch: -1
-    epoch: 300000
+    epoch: 500
     save_time: 1800
 
-    epoch_loss: 100
+    epoch_loss: 10
     iter_loss: 1
     save_progress: True
-    epoch_save_progress: 50000
+    epoch_save_progress: 250
     iter_save_progress: 1
 
-    epoch_val: 50000
-    save_progress_val: True
-    max_samples_val: 1
-
-    epoch_save_checkpoint: 100000
-    local_progress: False
+    epoch_save_checkpoint: 20000
+    local_progress: True
 
     init_eval: False
-    epoch_eval: 100000
+    epoch_eval: 500
     max_samples_eval: 25
 
 dataset:
@@ -68,20 +64,12 @@ dataset:
         type: NeRF
         scene_name: lego
         img_scale: 1.0
-        scale_radius: 3.0
+#        scale_radius: 3.0
         precache: True
         scheduler:
             precrop:
                 ratio: 0.5
                 max_epoch: 500
-
-    val:
-        skip: 8
-        type: NeRF
-        scene_name: lego
-        img_scale: 0.5
-        scale_radius: 3.0
-        precache: False
 
     eval:
         eval_batch_size: 1
@@ -89,35 +77,42 @@ dataset:
         type: NeRF
         scene_name: lego
         img_scale: 1.0
-        scale_radius: 3.0
+#        scale_radius: 3.0
         precache: True
 
-inference:
-    render:
-        type: [spiral]
-        n_cam: [60]
-        repeat: [1]
-        radius: 3.0
-        u_start: 0.5
-        v_range: [-0.6, -0.2]
-        fps: 5
-
-    volume:
-        n_grid: 512
-        side: 2.0
-        level: 50.0
-        chunk_pts_factor: 32
-        render_mesh:
-            backend: pytorch3d
+#inference:
+#    render:
+#        type: [spiral]
+#        n_cam: [60]
+#        repeat: [1]
+#        radius: 4.5
+#        u_start: 0.5
+#        v_range: [-0.6, -0.2]
+#        fps: 5
+#
+#    volume:
+#        n_grid: 512
+#        origin: [0.464427,  -1.2491295, 0.5037755]
+#        xlen: 2.529166
+#        ylen: 1.161881
+#        zlen: 2.599449
+#        level: 50.0
+#        chunk_pts_factor: 32
+#        render_mesh:
+#            backend: pytorch3d
 
 model:
     type: NeRF
     rays:
         # bounding_radius: 3.0
-        near: 1.5
-        far: 4.5
-        n_sample: 64
-        n_importance: 128
+        volume:
+            n_grid: None
+            origin: [-0.464427, -1.2491295, -0.5037755]
+            xlen: 2.529166
+            ylen: 1.161881
+            zlen: 2.599449
+        n_sample: 1024
+#        n_importance: 128
         inverse_linear: False
         perturb: True
         add_inf_z: True
@@ -133,12 +128,16 @@ model:
             type: HashGridEmbedder
             input_dim: 3
             n_freqs: 0  # do not do geo init
+            origin: [-0.464427, -1.2491295, -0.5037755]
+            xlen: 2.529166
+            ylen: 1.161881
+            zlen: 2.599449
             n_levels: 16
             n_feat_per_entry: 2
             hashmap_size: 19
             base_res: 16
             max_res: 512
-            backend: torch
+            backend: tcnn
         W_feat: 16
         geometric_init: False
     radiance:
@@ -150,12 +149,12 @@ model:
                 type: SHEmbedder
                 input_dim: 3
                 n_freqs: 4
-                backend: cuda
+                backend: tcnn
         W_feat_in: 16
 
 loss:
     ImgLoss:
-        keys: ['rgb_coarse', 'rgb_fine']
+        keys: ['rgb_coarse']
         weight: 1.0
 
 metric:
@@ -163,4 +162,4 @@ metric:
 
 train_metric:
     PSNR:
-        key: 'rgb_fine'
+        key: 'rgb_coarse'
