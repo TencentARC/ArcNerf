@@ -60,8 +60,20 @@ Test func for ray sampling, resample cdf/pdf, etc.
 
 ------------------------------------------------------------------------
 ## tests_models
+Test all the models and components for correctness and time.
 ### tests_base_modules
-Test embedder, implicit function, radiance function, with correct input/output. And some gives running time/FLOPS.
+#### tests_activation
+Test activation functions.
+#### tests_encoding
+Test all kinds of encoder. Some encoders have different backend(`torch`/`cuda`/`tcnn`), will check correctness.
+#### tests_encoding_benchmark
+Test encoders speed and time.
+#### tests_linear
+Test linear layers
+#### tests_linear_network
+Test implicit/radiance function with encoder and linear network.
+### tests_benchmark
+Test all the model and get the speed/time.
 ### tests_bkg_model
 Test each bkg model like nerf++.
 ### tests_nerf
@@ -74,9 +86,10 @@ Test NeRF model with nerf++ as bkg model.
 Test Neus model and its sdf_to_alpha method with sampling.
 ### tests_volsdf
 Test VolSDF model and its sdf_to_sigma method with sampling.
-### tests_volnet
-Test the custom dense volnet method, which contains an explict volume and get values for pts
-using trilinear interpolation.
+
+------------------------------------------------------------------------
+### tests_ops
+Tests of the customized operations in CUDA extension.
 
 ------------------------------------------------------------------------
 ### tests_loss

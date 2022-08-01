@@ -3,6 +3,7 @@
 import torch
 import torch.nn as nn
 
+from arcnerf.ops.trunc_exp import TruncExp
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 
 
@@ -38,6 +39,9 @@ def get_activation(cfg):
         act = Sine(w0=w)
     elif cfg.type.lower() == 'sigmoid':
         act = nn.Sigmoid()
+    elif cfg.type.lower() == 'truncexp':
+        clip = get_value_from_cfgs_field(cfg, 'clip', 15.0)
+        act = TruncExp(clip)
     else:
         raise NotImplementedError('No activation class {}'.format(cfg.type))
 

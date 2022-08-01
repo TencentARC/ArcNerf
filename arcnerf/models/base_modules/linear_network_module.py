@@ -34,6 +34,7 @@ class GeoNet(BaseGeoNet):
         radius_init=1.0,
         use_siren=False,
         weight_norm=False,
+        out_act_cfg=None,
         *args,
         **kwargs
     ):
@@ -59,6 +60,7 @@ class GeoNet(BaseGeoNet):
             use_siren: If True, use SirenLayer instead of DenseLayer with sine activation. By fault False.
             weight_norm: If weight_norm, do extra weight_normalization. By default False.
                          Nerf do not use it. Only for surface modeling methods(idr/neus/volsdf/unisurf)
+            out_act_cfg: if not None, will perform an activation ops for output sigma.
         """
         super(GeoNet, self).__init__()
         self.W = W
@@ -133,6 +135,11 @@ class GeoNet(BaseGeoNet):
 
         self.layers = nn.ModuleList(layers)
 
+        # out_act
+        self.out_act = None
+        if out_act_cfg is not None:
+            self.out_act = get_activation(cfg=out_act_cfg)
+
     def pretrain_siren(self, n_iter=5000, lr=1e-4, thres=0.01, n_pts=5000):
         """Pretrain the siren params."""
         if self.geometric_init and self.use_siren and not self.is_pretrained:
@@ -146,7 +153,8 @@ class GeoNet(BaseGeoNet):
             x: torch.tensor (B, input_ch)
 
         Returns:
-            out: tensor in shape (B, 1) for geometric value(sdf, sigma, occ).
+            out_geo: tensor in shape (B, 1) for geometric value(sdf, sigma, occ).
+                     Perform activation if out_act is not None.
             out_feat: tensor in shape (B, W_feat) if W_feat > 0. None if W_feat <= 0
         """
         x_embed = self.embed_fn(x)  # input_ch -> embed_dim
@@ -159,10 +167,18 @@ class GeoNet(BaseGeoNet):
                 if self.norm_skip:
                     out = out / math.sqrt(2)
 
+        out_geo, out_feat = None, None
         if self.W_feat <= 0:  # (B, 1), None
-            return out, None
+            out_geo = out
         else:  # (B, 1), (B, W_feat)
-            return out[:, 0].unsqueeze(-1), out[:, 1:]
+            out_geo = out[:, 0].unsqueeze(-1)
+            out_feat = out[:, 1:]
+
+        if self.out_act is not None:
+            print('Perfom output activation')
+            out_geo = self.out_act(out_geo)
+
+        return out_geo, out_feat
 
 
 def pretrain_siren(model, radius_init, sample_radius, n_iter=5000, lr=1e-4, thres=0.01, n_pts=5000):

@@ -4,11 +4,11 @@ model:
     type: NeRF
     rays:
         bounding_radius: 3.0          # bounding ray sampling region
-        volume:
+        volume:                       # this is for sampling in the volume
             n_grid: None
             side: 2.0
-        n_sample: 128                  # n_sample for zvals sampling
-        n_importance: 128             # n_importance for zvals for hierarchical sampling
+        n_sample: 256                 # n_sample for zvals sampling
+        n_importance: 0               # do not use hierarchical sampling
         inverse_linear: False         # inverse_linear make zvals close to near
         perturb: True                 # perturb zvals interval
         add_inf_z: True               # Add inf zval for ray marching
@@ -23,6 +23,7 @@ model:
         encoder:                      # encoder
             type: HashGridEmbedder    # type of encoder
             input_dim: 3              # xyz input channel
+            side: 2.0                 # bounding volume
             n_freqs: 0                # this one controls the geo init
             n_levels: 16              # num of levels for multi-res hashing, increase from base_res to max_res
             n_feat_per_entry: 2       # num of feat in each entry
@@ -32,6 +33,8 @@ model:
             backend: tcnn             # backend: support torch/cuda/tcnn
         W_feat: 16                    # extra feature output
         geometric_init: False         # whether to use geometric init. need radius_init
+        out_act_cfg:
+            type: TruncExp            # follow official implementation
     radiance:
         mode: 'vf'                    # view_dir and feature only
         W: 64                         # linear hidden dim

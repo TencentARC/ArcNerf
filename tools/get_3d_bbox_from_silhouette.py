@@ -23,7 +23,7 @@ from common.visual.draw_cv2 import draw_bbox_on_img
 # Some constant params
 INIT_SIDE = 2.0
 BBOX_EXPAND = 1.05
-VOLUME_EXPAND = 1.2  # in case 2d bbox can not cover well
+VOLUME_EXPAND = 1.25  # in case 2d bbox can not cover well
 N_ITER = 1000
 THRES = 1e-2
 LR = 1e-2
