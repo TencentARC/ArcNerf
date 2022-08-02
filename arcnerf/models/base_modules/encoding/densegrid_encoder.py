@@ -18,10 +18,8 @@ class DenseGridEmbedder(nn.Module):
         input_dim=3,
         n_grid=128,
         origin=(0, 0, 0),
-        side=1.5,
-        xlen=None,
-        ylen=None,
-        zlen=None,
+        side=None,
+        xyz_len=None,
         dtype=torch.float32,
         radius_init=None,
         include_input=False,
@@ -35,10 +33,8 @@ class DenseGridEmbedder(nn.Module):
                 n_grid: N of volume/line seg on each side. Each side is divided into n_grid seg with n_grid+1 pts.
                     total num of volume is n_grid**3, total num of grid_pts is (n_grid+1)**3.
                 origin: origin point(centroid of cube), a tuple of 3
-                side: each side len, if None, use xyzlen. If exist, use side only. By default 1.5.
-                xlen: len of x dim, if None use side
-                ylen: len of y dim, if None use side
-                zlen: len of z dim, if None use side
+                side: each side len, if None, use xyz_len. If exist, use side only.
+                xyz_len: len of xyz dim, if None use side
                 dtype: dtype of params. By default is torch.float32
             radius_init: If not None, init the geo value as sdf of a sphere
             include_input: if True, raw input is included in the embedding. Appear at beginning. By default is True
@@ -52,11 +48,12 @@ class DenseGridEmbedder(nn.Module):
 
         assert input_dim == 3, 'HashGridEmbedder should has input_dim==3...'
         assert W_feat >= 0, 'Should not input a negative W_feat'
+        assert side is not None or xyz_len is not None, 'You must set the size of volume...'
         self.input_dim = input_dim
         self.include_input = include_input
 
         # set volume with base res
-        self.volume = Volume(n_grid=n_grid, origin=origin, side=side, xlen=xlen, ylen=ylen, zlen=zlen, dtype=dtype)
+        self.volume = Volume(n_grid=n_grid, origin=origin, side=side, xyz_len=xyz_len, dtype=dtype)
         self.n_grid = n_grid
 
         # set up dense grid params

@@ -25,9 +25,7 @@ class TestDict(unittest.TestCase):
     def setUpClass(cls):
         cls.side = 1.5
         cls.n_grid = 4
-        cls.xlen = 1.0
-        cls.ylen = 2.0
-        cls.zlen = 1.5
+        cls.xyz_len = [1.0, 2.0, 1.5]
         cls.radius = 2.0
         cls.origin = (0.5, 0.5, 0)
 
@@ -66,7 +64,7 @@ class TestDict(unittest.TestCase):
 
     def tests_custom_volume(self):
         volume = Volume(n_grid=self.n_grid)
-        volume.set_params(self.origin, None, self.xlen, self.ylen, self.zlen)
+        volume.set_params(self.origin, None, self.xyz_len)
 
         volume_dict = {
             'grid_pts': torch_to_np(volume.get_corner()),  # (8, 3)

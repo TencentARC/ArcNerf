@@ -118,16 +118,14 @@ class Inferencer(object):
             volume_cfgs = {
                 'n_grid': get_value_from_cfgs_field(self.cfgs.volume, 'n_grid', 128),
                 'origin': tuple(get_value_from_cfgs_field(self.cfgs.volume, 'origin', [0.0, 0.0, 0.0])),
-                'xlen': get_value_from_cfgs_field(self.cfgs.volume, 'xlen', None),
-                'ylen': get_value_from_cfgs_field(self.cfgs.volume, 'ylen', None),
-                'zlen': get_value_from_cfgs_field(self.cfgs.volume, 'zlen', None),
+                'xyz_len': get_value_from_cfgs_field(self.cfgs.volume, 'xyz_len', None),
                 'level': get_value_from_cfgs_field(self.cfgs.volume, 'level', 50.0),
                 'grad_dir': get_value_from_cfgs_field(self.cfgs.volume, 'grad_dir', 'descent'),
                 'chunk_pts_factor': get_value_from_cfgs_field(self.cfgs.volume, 'chunk_pts_factor', 1),
                 'render_mesh': valid_key_in_cfgs(self.cfgs.volume, 'render_mesh'),
                 'render_backend': get_value_from_cfgs_field(self.cfgs.volume.render_mesh, 'backend'),
             }
-            if any([length is None for length in [volume_cfgs['xlen'], volume_cfgs['ylen'], volume_cfgs['zlen']]]):
+            if volume_cfgs['xyz_len'] is None:
                 volume_cfgs['side'] = get_value_from_cfgs_field(self.cfgs.volume, 'side', 1.5)  # make sure volume exist
             else:
                 volume_cfgs['side'] = get_value_from_cfgs_field(self.cfgs.volume, 'side', None)
@@ -224,9 +222,7 @@ class Inferencer(object):
                 self.volume_cfgs['n_grid'],
                 self.volume_cfgs['origin'],
                 self.volume_cfgs['side'],
-                self.volume_cfgs['xlen'],
-                self.volume_cfgs['ylen'],
-                self.volume_cfgs['zlen'],
+                self.volume_cfgs['xyz_len'],
                 dtype=self.dtype
             )
             volume_data['Vol'] = volume

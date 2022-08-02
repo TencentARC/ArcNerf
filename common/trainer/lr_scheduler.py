@@ -14,6 +14,7 @@ def get_learning_rate_scheduler(
     lr_gamma=0.1,
     lr_steps=None,
     tmax=20,
+    eta_min=1e-3,
     min_factor=0.1,
     **kwargs
 ):
@@ -41,7 +42,9 @@ def get_learning_rate_scheduler(
 
         lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_map, last_epoch=last_epoch)
     elif type == 'CosineAnnealingLR':
-        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=tmax, last_epoch=last_epoch)
+        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=tmax, eta_min=eta_min, last_epoch=last_epoch
+        )
     elif type == 'WarmUpCosineLR':
 
         def lambda_map(epoch_index):

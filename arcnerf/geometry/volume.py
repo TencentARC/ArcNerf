@@ -10,27 +10,15 @@ from common.utils.torch_utils import torch_to_np
 class Volume(nn.Module):
     """A volume with custom operation"""
 
-    def __init__(
-        self,
-        n_grid,
-        origin=(0, 0, 0),
-        side=None,
-        xlen=None,
-        ylen=None,
-        zlen=None,
-        dtype=torch.float32,
-        requires_grad=False
-    ):
+    def __init__(self, n_grid, origin=(0, 0, 0), side=None, xyz_len=None, dtype=torch.float32, requires_grad=False):
         """
         Args:
             n_grid: N of volume/line seg on each side. Each side is divided into n_grid seg with n_grid+1 pts.
                     total num of volume is n_grid**3, total num of grid_pts is (n_grid+1)**3.
                     If n_grid is None, only set the out-bounding lines/pts.
             origin: origin point(centroid of cube), a tuple of 3
-            side: each side len, if None, use xyzlen. If exist, use side only
-            xlen: len of x dim, if None use side
-            ylen: len of y dim, if None use side
-            zlen: len of z dim, if None use side
+            side: each side len, if None, use xyz_len. If exist, use side only
+            xyz_len: len of xyz dim, if None use side
             dtype: dtype of params. By default is torch.float32
             requires_grad: whether the parameters requires grad. If True, waste memory for graphic.
         """
@@ -41,24 +29,21 @@ class Volume(nn.Module):
         # set nn params
         self.n_grid = n_grid
         self.origin = nn.Parameter(torch.tensor([0.0, 0.0, 0.0], dtype=dtype), requires_grad=self.requires_grad)
-        self.xlen = nn.Parameter(torch.tensor([0.0], dtype=dtype), requires_grad=self.requires_grad)
-        self.ylen = nn.Parameter(torch.tensor([0.0], dtype=dtype), requires_grad=self.requires_grad)
-        self.zlen = nn.Parameter(torch.tensor([0.0], dtype=dtype), requires_grad=self.requires_grad)
+        self.xyz_len = nn.Parameter(torch.tensor([0.0, 0.0, 0.0], dtype=dtype), requires_grad=self.requires_grad)
         self.range = None
         self.corner = None
         self.grid_pts = None
         self.volume_pts = None
 
         # set real value
-        if origin is not None and (side is not None or all([length is not None for length in [xlen, ylen, zlen]])):
-            self.set_params(origin, side, xlen, ylen, zlen)
+        if origin is not None and (side is not None or xyz_len is not None):
+            self.set_params(origin, side, xyz_len)
 
-    def set_params(self, origin, side, xlen, ylen, zlen):
+    def set_params(self, origin, side, xyz_len):
         """you can call outside to reset the params"""
-        assert side is not None or all([length is not None for length in [xlen, ylen, zlen]]), \
-            'Specify at least side or xyzlen'
+        assert side is not None or xyz_len is not None, 'Specify at least side or xyz_len'
         self.set_origin(origin)
-        self.set_len(side, xlen, ylen, zlen)
+        self.set_len(side, xyz_len)
         self.set_pts()
 
     def set_pts(self):
@@ -79,26 +64,24 @@ class Volume(nn.Module):
             self.cal_volume_pts()
 
     @torch.no_grad()
-    def set_len(self, side, xlen, ylen, zlen):
+    def set_len(self, side, xyz_len):
         """Set len of each dim"""
         if side is not None:
-            self.xlen[0] = side
-            self.ylen[0] = side
-            self.zlen[0] = side
+            self.xyz_len[0] = side
+            self.xyz_len[1] = side
+            self.xyz_len[2] = side
         else:
-            self.xlen[0] = xlen
-            self.ylen[0] = ylen
-            self.zlen[0] = zlen
+            self.xyz_len[0] = xyz_len[0]
+            self.xyz_len[1] = xyz_len[1]
+            self.xyz_len[2] = xyz_len[2]
 
     def get_len(self):
         """Return len of each dim, in tuple of float num"""
-        return float(self.xlen[0]), float(self.ylen[0]), float(self.zlen[0])
+        return float(self.xyz_len[0]), float(self.xyz_len[1]), float(self.xyz_len[2])
 
     def expand_len(self, factor):
         """Expand the length of each dim. When requires_grad, do not call this"""
-        self.xlen[0] = self.xlen[0] * factor
-        self.ylen[0] = self.ylen[0] * factor
-        self.zlen[0] = self.zlen[0] * factor
+        self.xyz_len = self.xyz_len * factor
         self.set_pts()
 
     @torch.no_grad()
@@ -114,8 +97,8 @@ class Volume(nn.Module):
 
     def cal_range(self):
         """Cal the xyz range(min, max) from origin and sides. range is (3, 2) tensor"""
-        xyz_min = self.origin - torch.cat([self.xlen, self.ylen, self.zlen]) / 2.0
-        xyz_max = self.origin + torch.cat([self.xlen, self.ylen, self.zlen]) / 2.0
+        xyz_min = self.origin - self.xyz_len / 2.0
+        xyz_max = self.origin + self.xyz_len / 2.0
         self.range = torch.cat([xyz_min[:, None], xyz_max[:, None]], dim=-1)
 
     def get_range(self):
@@ -301,8 +284,8 @@ class Volume(nn.Module):
         assert grid_pts_expand.shape[0] == n_pts, 'Invalid num of grid_pts, should be in (B, 8, 3) or (8, 3)'
 
         # check in min_max boundary
-        pts_min_req = torch.BoolTensor(pts >= grid_pts_expand.min(dim=1)[0], device=pts.device)
-        pts_max_req = torch.BoolTensor(pts < grid_pts_expand.max(dim=1)[0], device=pts.device)
+        pts_min_req = (pts >= grid_pts_expand.min(dim=1)[0]).clone().detach().type(torch.bool).to(pts.device)
+        pts_max_req = (pts < grid_pts_expand.max(dim=1)[0]).clone().detach().type(torch.bool).to(pts.device)
         pts_in_boundary = torch.logical_and(pts_min_req, pts_max_req)  # (B, 3)
         pts_in_boundary = torch.all(pts_in_boundary, dim=-1)  # (B, )
 

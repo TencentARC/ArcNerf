@@ -210,7 +210,7 @@ Controls the params of volume estimation and mesh extraction/rendering.
 
 We support extract the mesh from volume field and getting the colors of mesh/verts by normal direction.
 
-- origin/n_grid/side/xlen/ylen: params for volume position and size. Check `geometry/volume.py` for detail.
+- origin/n_grid/side/xyz_len: params for volume position and size. Check `geometry/volume.py` for detail.
 - level/grad_dir: Determine the value flow. SDF is 0.0/ascent(inside smaller), density is +level/descent(inside larger).
 - chunk_pts_factor: In extract_mesh mode, you can progress more pts in a batch, set a factor to allow large pts batch.
 - render_mesh: For rasterization of mesh only. You can use `pytorch3d` or `open3d` as backend.

@@ -49,6 +49,7 @@ optim:
         lr_gamma: 0.1               # for ExponentialLR, MultiStepLR, PolyLR
         lr_steps: [200000]          # for ExponentialLR(Use first), MultiStepLR(Use all), PolyLR(Use all)
         tmax: 20                    # for CosineAnnealingLR
+        ema_min: 1e-3               # for CosineAnnealingLR
         min_factor: 0.1             # for WarmUpCosineLR
 
     clip_gradients: 0.0             # grad clipping set for init
@@ -149,9 +150,7 @@ inference:
         origin: [0.0, 0.0, 0.0]     # volume center
         n_grid: 512                 # n_grid is the num of voxel in each dim. For visual set a small num only
         side: 1.5                   # if set, all len at each dim will be side
-        xlen: 1.5                   # x-dim length, only when side is None
-        ylen: 1.5                   # y-dim length, only when side is None
-        zlen: 1.5                   # z-dim length, only when side is None
+        # xyz_len: [1.0, 1.0, 1.0]  # xyz-dim length, only when side is None
         level: 50.0                 # level set for mesh extracting. For sigma is around 50. For sdf is 0.
         grad_dir: descent           # if 'descent', sigma is larger than level in obj(NeRF), if 'ascent' is smaller(SDF)
         chunk_pts_factor: 32        # set this to allow model to process more pts in pts_dir forward mode

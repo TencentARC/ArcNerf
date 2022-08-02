@@ -13,11 +13,12 @@ dataset:
 model:
     rays:
         #bounding_radius: 3.0
-        #volume:
-        #    n_grid: None
-        #    side: 2.0
-        near: 1.5
-        far: 4.5
+        volume:
+            n_grid: None
+            origin: [0.0, -0.11, 0.0]
+            xyz_len: [1.2, 1.2, 2.0]
+#        near: 1.5
+#        far: 4.5
 
 inference:
     render:
@@ -29,4 +30,5 @@ inference:
 
     volume:
         n_grid: 4       # just for visual purpose
-        side: 2.0
+        origin: [0.0, -0.11, 0.0]
+        xyz_len: [1.2, 1.2, 2.0]

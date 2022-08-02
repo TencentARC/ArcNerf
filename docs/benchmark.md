@@ -16,6 +16,18 @@ Expname are in the format of `{dataset}_{scene}_{model}_{other_settings}`.
 | VolSDF |configs/expr/NeRF/lego/nerf_lego_volsdf.yaml|28.14| https://github.com/lioryariv/volsdf | 20.77 |NA| Official repo not converge well on lego scene  |
 |MipNeRF |configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml|32.93| https://github.com/google/mipnerf | TODO |35.74||
 
+#### Instant-NGP
+The highly optimized [instant-ngp](https://github.com/NVlabs/instant-ngp) model, official performance:
+- max_samples: 1024, color space: sRGB, max_res: 524288(per_level_scale: 2.0)
+
+| Num steps | time | PSNR in linear space | PSNR in sRGB space|
+|:---------:|:----:|:--------------------:|:-----------------:|
+| 100 | ~1s | 21.46 | 21.79 |
+| 500 | ~5s | 29.62 | 29.83 |
+| 2k  | ~15s| 33.42 | 33.67 |
+| 1w  |~1min| 35.67 | 35.11 |
+| 5w  |~5min| 36.36 | 35.78 |
+
 
 ## LLFF
 ### Fern  (378*504, 3 eval images)

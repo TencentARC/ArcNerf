@@ -5,7 +5,7 @@ resume: None
 debug:
     debug_mode: False
     print_all_grad: False
-    get_progress: True
+    get_progress: False
 
 dir:
     expr_dir: None
@@ -29,13 +29,16 @@ n_rays: 4096
 worker: 4
 
 optim:
-    lr: 1e-2
+    lr: 3e-3
     optim_type: adam
-    weight_decay: 1e-6
+    weight_decay: 0.0 #1e-6
     lr_scheduler:
-        type: MultiStepLR
-        lr_gamma: 0.33
-        lr_steps: [2000, 3000, 4000, 5000]
+#        type: MultiStepLR
+#        lr_gamma: 0.33
+#        lr_steps: [5000, 10000]
+        type: CosineAnnealingLR
+        tmax: 15000
+        eta_min: 1e-4
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -43,20 +46,24 @@ optim:
 
 progress:
     start_epoch: -1
-    epoch: 500
+    epoch: 15000
     save_time: 1800
 
-    epoch_loss: 10
+    epoch_loss: 100
     iter_loss: 1
     save_progress: True
-    epoch_save_progress: 250
+    epoch_save_progress: 5000
     iter_save_progress: 1
 
     epoch_save_checkpoint: 20000
     local_progress: True
 
+    epoch_val: 5000
+    save_progress_val: True
+    max_samples_val: 1
+
     init_eval: False
-    epoch_eval: 500
+    epoch_eval: 5000
     max_samples_eval: 25
 
 dataset:
@@ -64,12 +71,20 @@ dataset:
         type: NeRF
         scene_name: lego
         img_scale: 1.0
-#        scale_radius: 3.0
+        scale_radius: 3.0
         precache: True
         scheduler:
             precrop:
                 ratio: 0.5
                 max_epoch: 500
+
+    val:
+        skip: 8
+        type: NeRF
+        scene_name: lego
+        img_scale: 1.0
+        scale_radius: 3.0
+        precache: False
 
     eval:
         eval_batch_size: 1
@@ -77,42 +92,38 @@ dataset:
         type: NeRF
         scene_name: lego
         img_scale: 1.0
-#        scale_radius: 3.0
+        scale_radius: 3.0
         precache: True
 
-#inference:
-#    render:
-#        type: [spiral]
-#        n_cam: [60]
-#        repeat: [1]
-#        radius: 4.5
-#        u_start: 0.5
-#        v_range: [-0.6, -0.2]
-#        fps: 5
-#
-#    volume:
-#        n_grid: 512
-#        origin: [0.464427,  -1.2491295, 0.5037755]
-#        xlen: 2.529166
-#        ylen: 1.161881
-#        zlen: 2.599449
-#        level: 50.0
-#        chunk_pts_factor: 32
-#        render_mesh:
-#            backend: pytorch3d
+inference:
+    render:
+        type: [spiral]
+        n_cam: [60]
+        repeat: [1]
+        radius: 3.0
+        u_start: 0.5
+        v_range: [-0.6, -0.2]
+        fps: 5
+
+    volume:
+        n_grid: 512
+        origin: [0.0, -0.11, 0.0]
+        xyz_len: [1.2, 1.2, 2.0]
+        level: 50.0
+        chunk_pts_factor: 32
+        render_mesh:
+            backend: pytorch3d
 
 model:
     type: NeRF
     rays:
-        # bounding_radius: 3.0
         volume:
             n_grid: None
-            origin: [-0.464427, -1.2491295, -0.5037755]
-            xlen: 2.529166
-            ylen: 1.161881
-            zlen: 2.599449
+            origin: [0.0, -0.11, 0.0]
+            xyz_len: [1.2, 1.2, 2.0]
         n_sample: 1024
 #        n_importance: 128
+#        shared_network: True
         inverse_linear: False
         perturb: True
         add_inf_z: True
@@ -128,10 +139,8 @@ model:
             type: HashGridEmbedder
             input_dim: 3
             n_freqs: 0  # do not do geo init
-            origin: [-0.464427, -1.2491295, -0.5037755]
-            xlen: 2.529166
-            ylen: 1.161881
-            zlen: 2.599449
+            origin: [0.0, -0.11, 0.0]
+            xyz_len: [1.2, 1.2, 2.0]
             n_levels: 16
             n_feat_per_entry: 2
             hashmap_size: 19
@@ -140,6 +149,8 @@ model:
             backend: tcnn
         W_feat: 16
         geometric_init: False
+#        out_act_cfg:
+#            type: TruncExp
     radiance:
         mode: 'vf'
         W: 64

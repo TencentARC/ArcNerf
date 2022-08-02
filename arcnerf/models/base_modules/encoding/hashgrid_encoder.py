@@ -40,9 +40,7 @@ class HashGridEmbedder(nn.Module):
         max_res=512,
         origin=(0, 0, 0),
         side=None,
-        xlen=None,
-        ylen=None,
-        zlen=None,
+        xyz_len=None,
         dtype=torch.float32,
         include_input=True,
         backend=None,
@@ -61,10 +59,8 @@ class HashGridEmbedder(nn.Module):
                 Each level res is base * (scale ** L).
             The following are for volume:
                 origin: origin point(centroid of cube), a tuple of 3
-                side: each side len, if None, use xyzlen. If exist, use side only. By default None.
-                xlen: len of x dim, if None use side
-                ylen: len of y dim, if None use side
-                zlen: len of z dim, if None use side
+                side: each side len, if None, use xyz_len. If exist, use side only. By default None.
+                xyz_len: len of xyz dim, if None use side
                 dtype: dtype of params. By default is torch.float32
             include_input: if True, raw input is included in the embedding. Appear at beginning. By default is True
             backend: which backend to use. By default None, use pure torch version.
@@ -76,6 +72,7 @@ class HashGridEmbedder(nn.Module):
         super(HashGridEmbedder, self).__init__()
 
         assert input_dim == 3, 'HashGridEmbedder should has input_dim==3...'
+        assert side is not None or xyz_len is not None, 'You must set the size of volume...'
         self.input_dim = input_dim
         self.include_input = include_input
 
@@ -92,9 +89,7 @@ class HashGridEmbedder(nn.Module):
         self.embeddings, self.n_total_embed, self.offsets, self.resolutions = self.init_embeddings(init_emb)
 
         # set volume with base res
-        self.volume = Volume(
-            n_grid=self.base_res, origin=origin, side=side, xlen=xlen, ylen=ylen, zlen=zlen, dtype=dtype
-        )
+        self.volume = Volume(n_grid=self.base_res, origin=origin, side=side, xyz_len=xyz_len, dtype=dtype)
 
         # register params
         self.register()
@@ -152,9 +147,10 @@ class HashGridEmbedder(nn.Module):
         resolutions = []
         n_total_embed = 0
 
+        # TODO: This do not exactly match the tcnn params_in_levels, need to check if performance loss
         for i in range(self.n_levels):
             offsets.append(n_total_embed)
-            cur_res = math.floor(self.base_res * self.per_level_scale**i)
+            cur_res = math.ceil(2**(i * math.log2(self.per_level_scale)) * self.base_res - 1.0)
             resolutions.append(cur_res)
             n_embed_per_level = min(self.hashmap_size, (cur_res + 1)**3)  # save memory for low res
             n_total_embed += n_embed_per_level

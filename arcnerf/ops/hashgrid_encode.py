@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
 
+import warnings
+
 import torch
 import torch.nn as nn
 
-import _hashgrid_encode
+try:
+    import _hashgrid_encode
+except ImportError:
+    warnings.warn('HashGrid Ops not build...')
 
 
 class HashGridEncodeOps(torch.autograd.Function):

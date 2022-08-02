@@ -96,7 +96,7 @@ class TestDict(unittest.TestCase):
 
         if infer_cfgs is not None and valid_key_in_cfgs(infer_cfgs, 'volume'):
             cls.parse_volume(infer_cfgs.volume)
-            cls.volume = Volume(cls.n_grid, cls.origin, cls.side, cls.xlen, cls.ylen, cls.zlen)
+            cls.volume = Volume(cls.n_grid, cls.origin, cls.side, cls.xyz_len)
             cls.volume_dict = {
                 'grid_pts': torch_to_np(cls.volume.get_grid_pts()),
                 'lines': cls.volume.get_dense_lines()
@@ -123,10 +123,8 @@ class TestDict(unittest.TestCase):
     def parse_volume(cls, volume_cfgs):
         cls.n_grid = get_value_from_cfgs_field(volume_cfgs, 'n_grid', 4)
         cls.origin = tuple(get_value_from_cfgs_field(volume_cfgs, 'origin', [0.0, 0.0, 0.0]))
-        cls.xlen = get_value_from_cfgs_field(volume_cfgs, 'xlen', None)
-        cls.ylen = get_value_from_cfgs_field(volume_cfgs, 'ylen', None)
-        cls.zlen = get_value_from_cfgs_field(volume_cfgs, 'zlen', None)
-        if any([length is None for length in [cls.xlen, cls.ylen, cls.zlen]]):
+        cls.xyz_len = get_value_from_cfgs_field(volume_cfgs, 'xyz_len', None)
+        if cls.xyz_len is None:
             cls.side = get_value_from_cfgs_field(volume_cfgs, 'side', 1.0)  # make sure volume exist
         else:
             cls.side = get_value_from_cfgs_field(volume_cfgs, 'side', None)

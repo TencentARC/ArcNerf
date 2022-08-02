@@ -72,6 +72,7 @@ Function for mesh extraction, color extraction, etc.
 # volume
 Definition and function of a volume. For all the point you can get it in grid or fatten(by default)
 - n_grid: num of volume/line seg on each side
+- You can set the size of the volume by `side` or `xyz_len`
 - corner: 8 corner pts
 - grid_pts: all the grid points, in total `(n_grid+1)^3`
 - voxel_size: each voxel size, useful for marching cubes.

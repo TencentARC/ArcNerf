@@ -2,10 +2,12 @@
 
 ------------------------------------------------------------------------
 # TODO:
-- cuda实现的geometry函数和数据结构
+- 加速一下数据io和concat
+- cuda实现的geometry函数和数据结构(Some are good)
 - tetrahedra相关
 - nvdiffras vs pytorch3d (The renderer is not fully tested yet. Inconsistency appears in rendering)
 
+- mix-precision
 - 光照拆解
 - 材质拆解
 
@@ -20,7 +22,7 @@
   - instangp/hash_nerf
     - ff_mlp/gridencoder/shencoder/raychingmarching（torch版本， tinycudann版本， torchngp版本）
   - nsvf/plenoxel/plenoctree
-  - tensroRF
+  - tensorRF
   - mip-nerf-360
   - diver (voxel interval representation)
   - neuraltex

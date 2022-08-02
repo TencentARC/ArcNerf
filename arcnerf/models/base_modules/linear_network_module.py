@@ -175,7 +175,6 @@ class GeoNet(BaseGeoNet):
             out_feat = out[:, 1:]
 
         if self.out_act is not None:
-            print('Perfom output activation')
             out_geo = self.out_act(out_geo)
 
         return out_geo, out_feat
