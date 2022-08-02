@@ -22,6 +22,7 @@ Will not touch intrinsic. If point cloud exists, rescale them by same factor to 
     - This actual cam radius will be adjusted by a factor of `1.05` which ensure cam `inside` the sphere, which will be
   good for ray-sphere computation(forbid nan).
 - precache: If True, will precache all the rays for all pixels at once.
+- device: If set to gpu, it will put data directly to gpu(which fasten the speed of ray generation, but takes gpu).
 - pc_radius(base_3d_pc_dataset): Remove point cloud that are outside such absolute radius(all scaled by extra `1.05`).
 - align_cam: Sometimes it can be used to align cam in a horizontal way.
 - exchange_coord: Flexible to exchange/flip the coord to a standard system.
@@ -188,6 +189,9 @@ For some standard benchmark(`NeRF`/`LLFF`), we follow the same split as they use
 ## Inference
 Inference will be performed based on eval dataset params(intrinsic, img shape). If you do not set
 the eval dataset, inference will not be performed.
+
+###
+to_gpu: If you set this to True, will create rays tensors on gpu directly if you use gpu.
 
 ### Render
 Controls the params of render novel view(volume rendering), like the camera path. Check `geometry/poses.py` for detail.

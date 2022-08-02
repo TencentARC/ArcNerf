@@ -32,6 +32,7 @@ dataset:
         skip: 10
         align_cam: False
         precache: True
+        device: cpu
 
 model:
     type: NeRF

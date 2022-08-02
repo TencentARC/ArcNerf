@@ -12,7 +12,7 @@ from arcnerf.geometry.projection import world_to_pixel, world_to_cam
 class PerspectiveCamera(object):
     """A camera with intrinsic and c2w pose. All calculation is on cpu."""
 
-    def __init__(self, intrinsic: np.ndarray, c2w: np.ndarray, W=None, H=None, dtype=torch.float32):
+    def __init__(self, intrinsic: np.ndarray, c2w: np.ndarray, W=None, H=None, dtype=torch.float32, device='cpu'):
         """
         Args:
             Intrinsic: (3, 3) numpy array
@@ -20,12 +20,18 @@ class PerspectiveCamera(object):
             H, W: height/width
             dtype: torch tensor type. controls for outputs like intrinsic/pose/ray_bundle.
                     By default is torch.float32
+            device: If device is 'gpu', will return the tensor(intrinsic/c2w/rays) one gpu
         """
         self.dtype = dtype
         self.intrinsic = intrinsic.copy()
         self.c2w = c2w.copy()
         self.W = W if W is not None else int(c2w[0, 2] / 2.0)
         self.H = H if H is not None else int(c2w[1, 2] / 2.0)
+        self.device = device
+
+    def set_device(self, device):
+        """Manually set the device"""
+        self.device = device
 
     def rescale(self, scale):
         """Scale intrinsic and hw. scale < 1.0 means scale_down"""
@@ -54,7 +60,10 @@ class PerspectiveCamera(object):
     def get_intrinsic(self, torch_tensor=True):
         """Get intrinsic. return numpy array by default"""
         if torch_tensor:
-            return torch.tensor(self.intrinsic, dtype=self.dtype)
+            intrinsic = torch.tensor(self.intrinsic, dtype=self.dtype)
+            if self.device == 'gpu':
+                intrinsic = intrinsic.cuda()
+            return intrinsic
         else:
             return self.intrinsic
 
@@ -102,6 +111,8 @@ class PerspectiveCamera(object):
             pose = invert_poses(pose)
         if torch_tensor:
             pose = torch.tensor(pose, dtype=self.dtype)
+            if self.device == 'gpu':
+                pose = pose.cuda()
 
         return pose
 
@@ -118,6 +129,9 @@ class PerspectiveCamera(object):
         Returns:
             pixels: pixel loc, torch.Tensor(N, 2)
         """
+        if self.device == 'gpu':
+            assert points.is_cuda, 'You must have the points on device {}'.format(self.device)
+
         pixel = world_to_pixel(
             points.unsqueeze(0),
             self.get_intrinsic().unsqueeze(0),
@@ -135,6 +149,9 @@ class PerspectiveCamera(object):
         Returns:
             pts_cam: pts in cam space, torch.Tensor(N, 3)
         """
+        if self.device == 'gpu':
+            assert points.is_cuda, 'You must have the points on device {}'.format(self.device)
+
         pixel = world_to_cam(points.unsqueeze(0), self.get_pose(w2c=True).unsqueeze(0))
 
         return pixel[0]

@@ -37,6 +37,9 @@ class Base3dDataset(BaseDataset):
         # whether in ndc space
         self.ndc_space = get_value_from_cfgs_field(cfgs, 'ndc_space', False)
 
+        # device
+        self.device = get_value_from_cfgs_field(cfgs, 'device', 'cpu')
+
     def get_identifier(self):
         """string identifier of a dataset like scan_id/scene_name"""
         return self.identifier
@@ -44,6 +47,12 @@ class Base3dDataset(BaseDataset):
     def get_wh(self):
         """Get the image shape"""
         return self.W, self.H
+
+    def set_device(self, device):
+        """Set the device for the tensors"""
+        self.device = device
+        for cam in self.cameras:
+            cam.set_device(self.device)
 
     def skip_samples(self):
         """For any mode, you can skip the samples in order."""
@@ -220,17 +229,26 @@ class Base3dDataset(BaseDataset):
         mask = self.masks[idx].reshape(-1) if len(self.masks) > 0 else None  # (hw)
         img = torch.FloatTensor(img)
         mask = torch.FloatTensor(mask) if mask is not None else None
+        if self.device == 'gpu':
+            img = img.cuda(non_blocking=True)
+            mask = mask.cuda(non_blocking=True) if mask is not None else None
+
         c2w = self.cameras[idx].get_pose()
         intrinsic = self.cameras[idx].get_intrinsic()
+
         bounds = None
         if len(self.bounds) > 0:
             bounds = self.bounds[idx]  # (2,)
             bounds = torch.FloatTensor(bounds).unsqueeze(0)
+            if self.device == 'gpu':
+                bounds = bounds.cuda(non_blocking=True)
             bounds = torch.repeat_interleave(bounds, img.shape[0], dim=0)
 
         # force the bounds to be 0-1 in ndc_space
         if self.ndc_space:
             bounds = torch.FloatTensor([[0.0, 1.0]])  # (1, 2)
+            if self.device == 'gpu':
+                bounds = bounds.cuda(non_blocking=True)
             bounds = torch.repeat_interleave(bounds, img.shape[0], dim=0)
 
         if self.precache:

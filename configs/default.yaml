@@ -91,6 +91,7 @@ dataset:
         # exchange_coord: [y, z, x]  # exchange and flip coord. Generally not use
         ndc_space: False             # change the rays into ndc_space. You must assure the near is 1.0 before that. You should set near/far as 1 if used ndc_space
         precache: True               # precache all the rays at once
+        device: cpu                  # ['cpu', 'gpu'], gpu brings all tensor to GPU, takes memory but fast in data preparation
         augmentation:                # augmentation is for rays on a single image. Do not change in whole progress
             shuffle: False           # shuffle all rays on a single image
         scheduler:                   # scheduler handles sampling during training in different stage
@@ -110,6 +111,7 @@ dataset:
         skip: 10
         align_cam: False
         precache: False
+        device: cpu
 
     eval:
         eval_batch_size: 1
@@ -122,8 +124,10 @@ dataset:
         skip: 10
         align_cam: False
         precache: True
+        device: cpu
 
 inference:
+    to_gpu: False                   # If true, directly create rays on gpu, if trained on gpu. Will be faster.
     render:                         # set a list of render camera on sphere
         type: [circle, spiral]      # list of render cam type
         n_cam: [20, 20]             # each render type num of cam

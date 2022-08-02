@@ -33,6 +33,8 @@ class BlendedMVS(Base3dDataset):
         self.cam_file = osp.join(self.data_spec_dir, 'cameras.npz')
         assert osp.exists(self.cam_file), 'Camera file {} not exist...'.format(self.cam_file)
         self.cameras = self.read_cameras()
+        for cam in self.cameras:
+            cam.set_device(self.device)
 
         # norm camera_pose
         self.norm_cam_pose()

@@ -81,7 +81,7 @@ class Volume(nn.Module):
 
     def expand_len(self, factor):
         """Expand the length of each dim. When requires_grad, do not call this"""
-        self.xyz_len = self.xyz_len * factor
+        self.xyz_len.data = self.xyz_len.data * factor
         self.set_pts()
 
     @torch.no_grad()

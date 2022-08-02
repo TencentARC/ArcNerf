@@ -30,7 +30,7 @@ from common.utils.video_utils import write_video
 class Inferencer(object):
     """An inferencer to infer on the model"""
 
-    def __init__(self, cfgs, intrinsic, wh: tuple, device, logger, dtype=torch.float32):
+    def __init__(self, cfgs, intrinsic, wh: tuple, device, logger, dtype=torch.float32, to_gpu=False):
         """Set the inference data from cfgs(inference_part)
 
             Args:
@@ -40,6 +40,7 @@ class Inferencer(object):
                 device: device used
                 logger: logger used
                 dtype: dtype of rays input, by default torch.float32
+                to_gpu: Whether manually put the rays into gpu. device must be 'gpu'
             """
         assert intrinsic is not None and intrinsic.shape == (3, 3), 'Please input an intrinsic of shape (3, 3)'
         assert len(wh) is not None, 'Please input correct image shape (w, h)'
@@ -47,6 +48,7 @@ class Inferencer(object):
         self.intrinsic = intrinsic
         self.dtype = dtype
         self.device = device
+        self.to_gpu = to_gpu
         self.logger = logger
 
         self.cfgs = cfgs
@@ -178,11 +180,16 @@ class Inferencer(object):
 
                 input = []
                 for cam_id in range(c2w.shape[0]):
+                    t_intrinsic = torch.tensor(self.intrinsic, dtype=self.dtype)
+                    t_c2w = torch.tensor(c2w[cam_id], dtype=self.dtype)
+                    if self.device == 'gpu' and self.to_gpu:  # create tensor on gpu
+                        t_intrinsic = t_intrinsic.cuda()
+                        t_c2w = t_c2w.cuda()
                     ray_bundle = get_rays(
                         self.W,
                         self.H,
-                        torch.tensor(self.intrinsic, dtype=self.dtype),
-                        torch.tensor(c2w[cam_id], dtype=self.dtype),
+                        t_intrinsic,
+                        t_c2w,
                         wh_order=False,
                     )  # (HW, 3) * 2
                     input_per_img = {

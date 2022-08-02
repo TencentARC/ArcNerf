@@ -9,7 +9,7 @@ import torch
 from arcnerf.datasets import get_dataset, get_model_feed_in
 from arcnerf.eval.infer_func import Inferencer
 from arcnerf.models import build_model
-from common.utils.cfgs_utils import parse_configs
+from common.utils.cfgs_utils import parse_configs, get_value_from_cfgs_field
 from common.utils.logger import Logger
 from common.utils.model_io import load_model
 
@@ -50,7 +50,8 @@ if __name__ == '__main__':
 
     # prepare inference data
     logger.add_log('Setting Inference data...')
-    inferencer = Inferencer(cfgs.inference, intrinsic, wh, device, logger)
+    to_gpu = get_value_from_cfgs_field(cfgs.inference, 'to_gpu', False)
+    inferencer = Inferencer(cfgs.inference, intrinsic, wh, device, logger, to_gpu=to_gpu)
     if inferencer.is_none():
         logger.add_log('You did not add any valid configs for inference, please check the configs...')
         exit()

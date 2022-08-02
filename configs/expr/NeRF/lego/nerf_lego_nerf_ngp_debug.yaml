@@ -73,6 +73,7 @@ dataset:
         img_scale: 1.0
         scale_radius: 3.0
         precache: True
+        device: gpu
         scheduler:
             precrop:
                 ratio: 0.5
@@ -85,6 +86,7 @@ dataset:
         img_scale: 1.0
         scale_radius: 3.0
         precache: False
+        device: gpu
 
     eval:
         eval_batch_size: 1
@@ -93,9 +95,11 @@ dataset:
         scene_name: lego
         img_scale: 1.0
         scale_radius: 3.0
-        precache: True
+        precache: False
+        device: gpu
 
 inference:
+    to_gpu: True
     render:
         type: [spiral]
         n_cam: [60]

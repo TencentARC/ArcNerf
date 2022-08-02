@@ -26,8 +26,10 @@ dataset:
         skip: 10
         align_cam: False
         precache: False
+        device: cpu
 
 inference:
+    to_gpu: False                   # If true, directly create rays on gpu, if trained on gpu. Will be faster.
     # set render if you want to render view
     render:                         # set a list of render camera on sphere
         type: [circle, spiral]      # list of render cam type

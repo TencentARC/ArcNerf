@@ -36,6 +36,8 @@ class LLFF(Base3dDataset):
         assert osp.exists(self.cam_file), 'Camera file {} not exist...Please run colmap first...'.format(self.cam_file)
         self.poses = np.load(self.cam_file, allow_pickle=True)  # (N_imgs, 17)
         self.cameras, self.bounds = self.read_cameras()
+        for cam in self.cameras:
+            cam.set_device(self.device)
 
         # rescale image, call from parent class
         self.rescale_img_and_pose()
