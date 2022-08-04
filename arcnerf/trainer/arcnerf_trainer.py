@@ -150,7 +150,9 @@ class ArcNerfTrainer(BasicTrainer):
 
     def set_train_dataset(self, epoch=0):
         """Set train dataset by collecting all rays together"""
+        self.logger.add_log('-' * 60)
         assert self.cfgs.dataset.train is not None, 'Please input train dataset...'
+
         data_on_gpu = (get_value_from_cfgs_field(self.cfgs.dataset.train, 'device', 'cpu') == 'gpu')
         tkwargs = {
             'batch_size': 1,  # does not matter
@@ -172,8 +174,10 @@ class ArcNerfTrainer(BasicTrainer):
         The concat tensor should be in (N_img, HW, ...) shape
         """
         self.logger.add_log('Concat all training rays...')
+
         concat_data = {}
         total_item = len(loader)
+
         # append all dict from different image
         tensor_shape = {}
         dtype = None

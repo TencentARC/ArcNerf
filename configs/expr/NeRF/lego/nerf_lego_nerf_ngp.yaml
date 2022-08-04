@@ -1,4 +1,4 @@
-name: nerf_lego_nerf_ngp_debug
+name: nerf_lego_nerf_ngp
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_ngp_debug'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_ngp'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_ngp_debug/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_ngp/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -46,7 +46,7 @@ optim:
 
 progress:
     start_epoch: -1
-    epoch: 15000
+    epoch: 50000
     save_time: 1800
 
     epoch_loss: 100
@@ -55,7 +55,7 @@ progress:
     epoch_save_progress: 5000
     iter_save_progress: 1
 
-    epoch_save_checkpoint: 20000
+    epoch_save_checkpoint: 10000
     local_progress: True
 
     epoch_val: 5000

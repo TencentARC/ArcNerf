@@ -52,18 +52,11 @@ def rotate_points(points: torch.Tensor, rot: torch.Tensor, rotate_only=False):
     Returns:
         rotated points in (B, N, 3)
     """
-    if rotate_only:
-        proj_points = torch.einsum('bki,bji->bjk', rot[:, :3, :3], points)
-        return proj_points
+    proj_points = torch.einsum('bki,bji->bjk', rot[:, :3, :3], points)
+    if not rotate_only:
+        proj_points += rot[:, :3, 3]
 
-    # convert points to home
-    homo_coord = torch.ones(list(points.shape)[:-1] + [1], dtype=points.dtype, device=points.device)
-    points_h = torch.cat([points, homo_coord], dim=-1)
-
-    proj_points = torch.einsum('bki,bji->bjk', rot, points_h)  # (B, N, 4)
-    proj_points = torch.div(proj_points[..., :3], proj_points[..., 3].unsqueeze(-1) + 1e-8)
-
-    return proj_points[..., :3]
+    return proj_points
 
 
 def rotate_matrix(rot: torch.Tensor, source: torch.Tensor):
