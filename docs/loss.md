@@ -3,7 +3,7 @@ Loss for comparing image. Used for view synthesis.
 ## ImgLoss
 - keys: list of key to calculate, used sum of them. By default `['rgb']`.
 `['rgb_coarse/fine']` for two stage model.
-- loss_type: select loss type such as 'MSE'/'L1'. By default MSE
+- loss_type: select loss type such as 'MSE'/'L1'/'huber'. By default MSE
 - internal_weights: If set, will multiply factors to each weight. By default None.
 - use_mask: use mask for average calculation. By default False.
 - do_mean: calculate the mean of loss. By default True.
@@ -45,3 +45,20 @@ Required output:
 - Output:  (select by key)
   - 'normal': normal from implicit function. `(B, N_rays, 3)`
   - 'normal_pts': normal points from implicit function. `(B, N_rays, N_pts, 3)`
+## RegMaskLoss
+Regularize mask each ray that each value is 0 or 1, opacity clear.
+- keys: keys to calculate. By default `['mask']`.  `['mask_coarse/fine']` for two stage model like nerf.
+- do_mean: calculate the mean of loss. By default True.
+
+Required output:
+- Output:  (select by key)
+  - 'mask': mask output. `(B, N_rays)`
+## RegWeightsLoss
+Regularize weights each ray pts that each value is 0 or 1, opacity clear.
+- keys: keys to calculate. By default `['weights']`.  `['weights_coarse/fine']` for two stage model like nerf.
+  - real key in output is starting with `progress_`. (You must set `debug.get_progress=True`)
+- do_mean: calculate the mean of loss. By default True.
+
+Required output:
+- Output:  (select by key)
+  - 'progress_weights': ray marching progress output. `(B, N_rays, N_pts)`

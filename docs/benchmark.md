@@ -18,9 +18,9 @@ Expname are in the format of `{dataset}_{scene}_{model}_{other_settings}`.
 
 #### Instant-NGP
 The highly optimized [instant-ngp](https://github.com/NVlabs/instant-ngp) model, official performance:
-- max_samples: 1024, color space: sRGB, max_res: 524288(per_level_scale: 2.0)
+- max_samples: 1024, color space: sRGB, max_res: 512(per_level_scale: 1.2599)
 
-| Num steps | time | PSNR in linear space | PSNR in sRGB space|
+| Num steps | time | PSNR in sRGB space | PSNR in linear space|
 |:---------:|:----:|:--------------------:|:-----------------:|
 | 100 | ~1s | 21.46 | 21.79 |
 | 500 | ~5s | 29.62 | 29.83 |

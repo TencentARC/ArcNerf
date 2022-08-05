@@ -10,12 +10,14 @@ from common.utils.torch_utils import torch_to_np
 class Volume(nn.Module):
     """A volume with custom operation"""
 
-    def __init__(self, n_grid, origin=(0, 0, 0), side=None, xyz_len=None, dtype=torch.float32, requires_grad=False):
+    def __init__(
+        self, n_grid=None, origin=(0, 0, 0), side=None, xyz_len=None, dtype=torch.float32, requires_grad=False
+    ):
         """
         Args:
             n_grid: N of volume/line seg on each side. Each side is divided into n_grid seg with n_grid+1 pts.
                     total num of volume is n_grid**3, total num of grid_pts is (n_grid+1)**3.
-                    If n_grid is None, only set the out-bounding lines/pts.
+                    If n_grid is None, only set the out-bounding lines/pts. By default None.
             origin: origin point(centroid of cube), a tuple of 3
             side: each side len, if None, use xyz_len. If exist, use side only
             xyz_len: len of xyz dim, if None use side

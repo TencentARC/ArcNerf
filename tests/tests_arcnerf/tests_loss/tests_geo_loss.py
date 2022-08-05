@@ -5,7 +5,7 @@ import unittest
 
 import torch
 
-from arcnerf.loss.geo_loss import EikonalLoss
+from arcnerf.loss.geo_loss import EikonalLoss, RegMaskLoss, RegWeightsLoss
 from common.utils.cfgs_utils import dict_to_obj
 
 
@@ -50,4 +50,27 @@ class TestDict(unittest.TestCase):
         self.assertEqual(res.shape, ())
         mask_loss = EikonalLoss(dict_to_obj({'key': 'normal_pts', 'use_mask': True, 'do_mean': False}))
         res = mask_loss(data, output)
+        self.assertEqual(res.shape, (self.batch_size, self.n_rays, self.n_pts))
+
+    def tests_regmaskloss(self):
+        output = {'mask': self.bn_tensor.clone()}
+        loss = RegMaskLoss(dict_to_obj({'keys': ['mask']}))
+        res = loss(None, output)
+        self.assertEqual(res.shape, ())
+        output = {'mask_coarse': self.bn_tensor.clone(), 'mask_fine': self.bn_tensor.clone()}
+        loss = RegMaskLoss(dict_to_obj({'keys': ['mask_coarse', 'mask_fine']}))
+        res = loss(None, output)
+        self.assertEqual(res.shape, ())
+        output = {'mask': self.bn_tensor.clone()}
+        loss = RegMaskLoss(dict_to_obj({'keys': ['mask'], 'do_mean': False}))
+        res = loss(None, output)
+        self.assertEqual(res.shape, (self.batch_size, self.n_rays))
+
+    def tests_regweightsloss(self):
+        output = {'progress_weights': self.bnp_tensor.clone()}
+        loss = RegWeightsLoss(dict_to_obj({'keys': ['weights']}))
+        res = loss(None, output)
+        self.assertEqual(res.shape, ())
+        loss = RegWeightsLoss(dict_to_obj({'keys': ['weights'], 'do_mean': False}))
+        res = loss(None, output)
         self.assertEqual(res.shape, (self.batch_size, self.n_rays, self.n_pts))

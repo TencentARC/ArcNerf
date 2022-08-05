@@ -22,6 +22,11 @@ def get_transforms(cfgs):
             transforms_list.append(ShuffleRays())
             aug_info += '  Add Rays shuffle\n'
 
+        if valid_key_in_cfgs(cfgs.augmentation, 'transfer_rgb'):
+            type = get_value_from_cfgs_field(cfgs.augmentation.transfer_rgb, 'type', 'linear_to_srgb')
+            transforms_list.append(TransferRGBSpace(type))
+            aug_info += '  Add RGB space transfer - {}\n'.format(type)
+
     return transforms.Compose(transforms_list), aug_info
 
 
@@ -59,6 +64,24 @@ class ShuffleRays(object):
 
         if 'mask' in inputs:
             inputs['mask'] = inputs['mask'][select_idx, ...]
+
+        return inputs
+
+
+class TransferRGBSpace(object):
+    """Transfer the rgb space of image rays. Must be rgb ordered image."""
+
+    def __init__(self, t_type):
+        self.t_type = t_type
+        assert self.t_type in ['linear_to_srgb' and 'srgb_to_linear'], 'Not support {}'.format(t_type)
+
+    def __call__(self, inputs):
+        if self.t_type == 'linear_to_srgb':
+            inputs['img'] = linear_to_srgb(inputs['img'])
+        elif self.t_type == 'srgb_to_linear':
+            inputs['img'] = srgb_to_linear(inputs['img'])
+        else:
+            raise NotImplementedError('Transfer {} not supported...'.format(self.t_type))
 
         return inputs
 

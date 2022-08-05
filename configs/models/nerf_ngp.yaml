@@ -3,11 +3,10 @@
 model:
     type: NeRF
     rays:
-        bounding_radius: 3.0          # bounding ray sampling region
         volume:                       # this is for sampling in the volume
             n_grid: None
             side: 2.0
-        n_sample: 256                 # n_sample for zvals sampling
+        n_sample: 1024                # n_sample for zvals sampling
         n_importance: 0               # do not use hierarchical sampling
         inverse_linear: False         # inverse_linear make zvals close to near
         perturb: True                 # perturb zvals interval

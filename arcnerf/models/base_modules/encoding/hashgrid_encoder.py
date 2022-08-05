@@ -114,7 +114,7 @@ class HashGridEmbedder(nn.Module):
                     'base_resolution': self.base_res,
                     'per_level_scale': float(self.per_level_scale),
                 },
-                dtype=dtype
+                dtype=dtype  # TODO: will fp16 fast without loss acc
             )
 
         self.out_dim = n_levels * n_feat_per_entry + include_input * input_dim  # L * F + 3

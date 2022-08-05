@@ -30,6 +30,9 @@ class TestDict(unittest.TestCase):
         l1loss = ImgLoss(dict_to_obj({'loss_type': 'L1'}))
         res = l1loss(data, output)
         self.assertEqual(res.shape, ())
+        huberloss = ImgLoss(dict_to_obj({'loss_type': 'Huber', 'delta': 0.1}))
+        res = huberloss(data, output)
+        self.assertEqual(res.shape, ())
 
     def tests_imgcfloss(self):
         data = {'img': self.bn3_tensor.clone()}

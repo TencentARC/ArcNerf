@@ -31,6 +31,7 @@ Done after camera `scale_radius`. The radius is restricted within `scale_radius`
 The augmentation is for all image process in all time.
 - n_rays: Sample `n_rays` instead of using all. But calling it every time may sample overlapping rays, not use in train.
 - shuffle: shuffle all the rays from the same image together
+- transfer_rgb: transfer the rgb space
 ## rgb and mask
 - All color are in `rgb` order and normed by `255` into `0~1` range.
 - All masks should be binary masks with `{0,1}` values. Can be [] if not exist.

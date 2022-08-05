@@ -70,3 +70,82 @@ class EikonalLoss(nn.Module):
                 loss = loss.mean()
 
         return loss
+
+
+@LOSS_REGISTRY.register()
+class RegMaskLoss(nn.Module):
+    """Regularize the mask to make opacity 0/1"""
+
+    def __init__(self, cfgs=None):
+        """
+        Args:
+            cfgs: a obj with following attributes:
+                keys: key used for loss sum. By default 'mask'.
+                do_mean: calculate the mean of loss. By default True.
+        """
+        super(RegMaskLoss, self).__init__()
+        self.keys = get_value_from_cfgs_field(cfgs, 'keys', ['mask'])
+        self.do_mean = get_value_from_cfgs_field(cfgs, 'do_mean', True)
+
+    def forward(self, data, output):
+        """
+        Args:
+            output['mask'/'mask_fine'/'mask_coarse']: (B, N_rays). output mask depends on keys
+
+        Returns:
+            reg mask loss: (1, ) mean loss.
+                     if not do_mean, return (B, N_rays) loss
+        """
+
+        def cal_loss(t):
+            return -t * torch.log(t)
+
+        loss = 0.0
+        for idx, k in enumerate(self.keys):
+            loss += cal_loss(output[k])  # (B, N_rays)
+
+        if self.do_mean:
+            loss = loss.mean()
+
+        return loss
+
+
+@LOSS_REGISTRY.register()
+class RegWeightsLoss(nn.Module):
+    """Regularize the weights to make opacity 0/1"""
+
+    def __init__(self, cfgs=None):
+        """
+        Args:
+            cfgs: a obj with following attributes:
+                key: key used for loss sum. By default 'weights'. All key add 'progress_'
+                do_mean: calculate the mean of loss. By default True.
+        """
+        super(RegWeightsLoss, self).__init__()
+        self.keys = get_value_from_cfgs_field(cfgs, 'keys', ['weights'])
+        self.keys = ['progress_' + k for k in self.keys]
+        self.do_mean = get_value_from_cfgs_field(cfgs, 'do_mean', True)
+
+    def forward(self, data, output):
+        """
+        Args:
+            output['progress_weights'/'progress_weights_fine'/'progress_weights_coarse']: (B, N_rays, N_pts).
+                output weights depends on keys. pts on each weights
+
+        Returns:
+            reg weights loss: (1, ) mean loss.
+                     if not do_mean, return (B, N_rays, N_pts) loss
+        """
+
+        def cal_loss(t):
+            return -t * torch.log(t)
+
+        loss = 0.0
+        for idx, k in enumerate(self.keys):
+            assert k in output.keys(), 'You must turn debug.get_progress=True for this loss...'
+            loss += cal_loss(output[k])  # (B, N_rays)
+
+        if self.do_mean:
+            loss = loss.mean()
+
+        return loss

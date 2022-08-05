@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import torch
 import torch.nn as nn
 
 from common.utils.cfgs_utils import get_value_from_cfgs_field
@@ -36,6 +37,9 @@ class ImgLoss(nn.Module):
             loss = nn.MSELoss(reduction='none')
         elif loss_type == 'L1':
             loss = nn.L1Loss(reduction='none')
+        elif loss_type == 'Huber':
+            delta = get_value_from_cfgs_field(cfgs, 'delta', 1.0)
+            loss = HuberLoss(delta, reduction='none')
         else:
             raise NotImplementedError('Loss type {} not support in img loss...'.format(loss_type))
 
@@ -69,5 +73,35 @@ class ImgLoss(nn.Module):
                 loss = mean_tensor_by_mask(loss.mean(-1), mask)
             else:
                 loss = loss.mean()
+
+        return loss
+
+
+class HuberLoss(nn.Module):
+    """Huber loss compare two tensor"""
+
+    def __init__(self, delta=1.0, reduction='none'):
+        super(HuberLoss, self).__init__()
+        self.delta = delta
+        self.reduction = reduction
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor):
+        """
+        Args:
+            x: any torch tensor
+            y: any torch tensor with same shape as x
+        """
+        abs_diff = (x - y).abs()
+
+        loss = torch.empty_like(x, dtype=x.dtype, device=x.device)
+        # |x-y| < delta
+        m1 = abs_diff < self.delta
+        loss[m1] = 0.5 / self.delta * (abs_diff[m1]**2)
+        # |x-y| >= delta
+        m2 = abs_diff >= self.delta
+        loss[m2] = self.delta * (abs_diff[m2] - 0.5 * self.delta)
+
+        if self.reduction == 'mean':
+            return loss.mean()
 
         return loss
