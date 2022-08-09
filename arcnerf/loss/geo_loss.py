@@ -96,13 +96,9 @@ class RegMaskLoss(nn.Module):
             reg mask loss: (1, ) mean loss.
                      if not do_mean, return (B, N_rays) loss
         """
-
-        def cal_loss(t):
-            return -t * torch.log(t)
-
         loss = 0.0
         for idx, k in enumerate(self.keys):
-            loss += cal_loss(output[k])  # (B, N_rays)
+            loss += cal_nll_loss(output[k])  # (B, N_rays)
 
         if self.do_mean:
             loss = loss.mean()
@@ -136,16 +132,21 @@ class RegWeightsLoss(nn.Module):
             reg weights loss: (1, ) mean loss.
                      if not do_mean, return (B, N_rays, N_pts) loss
         """
-
-        def cal_loss(t):
-            return -t * torch.log(t)
-
         loss = 0.0
         for idx, k in enumerate(self.keys):
             assert k in output.keys(), 'You must turn debug.get_progress=True for this loss...'
-            loss += cal_loss(output[k])  # (B, N_rays)
+            loss += cal_nll_loss(output[k])  # (B, N_rays)
 
         if self.do_mean:
             loss = loss.mean()
 
         return loss
+
+
+def cal_nll_loss(t, eps=1e-5):
+    """neg-loglikehood loss = -o*log(o)"""
+    loss = torch.zeros_like(t, dtype=t.dtype, device=t.device)
+    zeros_mask = t < eps  # any neg and 0 value
+    loss[~zeros_mask] = -t[~zeros_mask] * torch.log(t[~zeros_mask])
+
+    return loss

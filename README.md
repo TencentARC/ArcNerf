@@ -2,7 +2,6 @@
 
 ------------------------------------------------------------------------
 # TODO:
-- 加速一下数据io和concat
 - cuda实现的geometry函数和数据结构(Some are good)
 - tetrahedra相关
 - nvdiffras vs pytorch3d (The renderer is not fully tested yet. Inconsistency appears in rendering)
@@ -23,6 +22,7 @@
     - ff_mlp/gridencoder/shencoder/raychingmarching（torch版本， tinycudann版本， torchngp版本）
   - nsvf/plenoxel/plenoctree
   - tensorRF
+
   - mip-nerf-360
   - diver (voxel interval representation)
   - neuraltex
@@ -52,11 +52,6 @@ git clone --recursive xxx
 
 ### Self-Capture data and Colmap
 
-
-### to add
-- synthetic nsvf
-- tanks and temples
-- mip-360
 
 ------------------------------------------------------------------------
 ## Models

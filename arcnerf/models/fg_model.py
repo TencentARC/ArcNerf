@@ -56,9 +56,9 @@ class FgModel(Base3dModel):
         """
         # optimize the obj bound, mostly for volume base structure
         if cur_epoch > 0 and self.epoch_optim is not None and cur_epoch % self.epoch_optim == 0:
-            self.optim_obj_bound()
+            self.optim_obj_bound(cur_epoch)
 
-    def optim_obj_bound(self):
+    def optim_obj_bound(self, cur_epoch):
         """Optimize the obj bounding geometric structure. Support ['volume'] now."""
         if self.obj_bound_type == 'volume':
             pass

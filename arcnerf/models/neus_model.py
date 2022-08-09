@@ -67,7 +67,7 @@ class Neus(SdfModel):
         near, far = self.get_near_far_from_rays(inputs)  # (B, 1) * 2
 
         # get coarse zvals
-        zvals = self.get_zvals_from_near_far(near, far, inference_only)  # (B, N_sample)
+        zvals = self.get_zvals_from_near_far(near, far, self.get_ray_cfgs('n_sample'), inference_only)  # (B, N_sample)
 
         # up-sample zvals
         zvals = self.upsample_zvals(rays_o, rays_d, zvals, inference_only)  # (B, N_total(N_sample+N_importance))

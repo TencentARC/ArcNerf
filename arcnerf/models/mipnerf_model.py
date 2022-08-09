@@ -2,17 +2,17 @@
 
 import torch
 
-from .base_3d_model import Base3dModel
+from .fg_model import FgModel
 from .base_modules.encoding.gaussian_encoder import Gaussian
 from .base_modules import build_geo_model, build_radiance_model
-from arcnerf.render.ray_helper import get_zvals_from_near_far, sample_pdf
+from arcnerf.render.ray_helper import sample_pdf
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import MODEL_REGISTRY
 from common.utils.torch_utils import chunk_processing
 
 
 @MODEL_REGISTRY.register()
-class MipNeRF(Base3dModel):
+class MipNeRF(FgModel):
     """ MipNerf model.
         The mip-NeRF model that handles multi-res image using gaussian representation and encoding
         ref: https://github.com/google/mipnerf
@@ -34,27 +34,31 @@ class MipNeRF(Base3dModel):
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)
         rays_r = inputs['rays_r']  # (B, 1)
+        n_rays = rays_o.shape[0]
         output = {}
 
         # get bounds for object
         near, far = self.get_near_far_from_rays(inputs)  # (B, 1) * 2
 
         # get zvals for each intervals
-        zvals = self.get_zvals_from_near_far(near, far, inference_only)  # (B, N_sample+1)
+        zvals = self.get_zvals_from_near_far(
+            near, far,
+            self.get_ray_cfgs('n_sample') + 1, inference_only
+        )  # (B, N_sample+1)
 
         # get mean/cov representation of intervals
         intervals = self.gaussian(zvals, rays_o, rays_d, rays_r)  # (B, N_sample, 6)
         intervals = intervals.view(-1, intervals.shape[-1])  # (B*N_sample, 6)
 
         # get sigma and rgb, expand rays_d to all pts. shape in (B*N_sample, ...)
-        rays_d_repeat = torch.repeat_interleave(rays_d, self.get_ray_cfgs('n_sample'), dim=0)
+        rays_d_repeat = torch.repeat_interleave(rays_d, int(intervals.shape[0] / n_rays), dim=0)
         sigma, radiance = chunk_processing(
             self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, intervals, rays_d_repeat
         )
 
         # reshape
-        sigma = sigma.view(-1, self.get_ray_cfgs('n_sample'))  # (B, N_sample)
-        radiance = radiance.view(-1, self.get_ray_cfgs('n_sample'), 3)  # (B, N_sample, 3)
+        sigma = sigma.view(n_rays, -1)  # (B, N_sample)
+        radiance = radiance.view(n_rays, -1, 3)  # (B, N_sample, 3)
 
         # ray marching for coarse network, keep the coarse weights for next stage, use mid pts for interval
         zvals_mid = 0.5 * (zvals[:, 1:] + zvals[:, :-1])
@@ -71,17 +75,17 @@ class MipNeRF(Base3dModel):
 
             # get mean/cov representation of intervals
             intervals = self.gaussian(zvals, rays_o, rays_d, rays_r)  # (B, N_importance, 6)
-            intervals = intervals.view(-1, intervals.shape[-1])  # (B*N_sample, 6)
+            intervals = intervals.view(-1, intervals.shape[-1])  # (B*N_importance, 6)
 
             # get sigma and rgb, expand rays_d to all pts. shape in (B*N_importance, ...)
-            rays_d_repeat = torch.repeat_interleave(rays_d, self.get_ray_cfgs('n_importance'), dim=0)
+            rays_d_repeat = torch.repeat_interleave(rays_d, int(intervals.shape[0] / n_rays), dim=0)
             sigma, radiance = chunk_processing(
                 self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, intervals, rays_d_repeat
             )
 
             # reshape
-            sigma = sigma.view(-1, self.get_ray_cfgs('n_importance'))  # (B, N_importance)
-            radiance = radiance.view(-1, self.get_ray_cfgs('n_importance'), 3)  # (B, N_importance, 3)
+            sigma = sigma.view(n_rays, -1)  # (B, N_importance)
+            radiance = radiance.view(n_rays, -1, 3)  # (B, N_importance, 3)
 
             # ray marching for fine network, keep the coarse weights for next stage, use mid pts for interval
             zvals_mid = 0.5 * (zvals[:, 1:] + zvals[:, :-1])
@@ -94,30 +98,6 @@ class MipNeRF(Base3dModel):
         output = self.adjust_coarse_fine_output(output, inference_only)
 
         return output
-
-    def get_zvals_from_near_far(self, near: torch.Tensor, far: torch.Tensor, inference_only=False):
-        """Get the zvals from near/far. Get n+1 zvals for each interval representation.
-
-        It will use ray_cfgs['n_sample'] to select coarse samples.
-        Other sample keys are not allowed.
-
-        Args:
-            near: torch.tensor (B, 1) near z distance
-            far: torch.tensor (B, 1) far z distance
-            inference_only: If True, will not pertube the zvals. used in eval/infer model. Default False.
-
-        Returns:
-            zvals: torch.tensor (B, N_sample+1)
-        """
-        zvals = get_zvals_from_near_far(
-            near,
-            far,
-            self.get_ray_cfgs('n_sample') + 1,  # get extra zvals
-            inverse_linear=self.get_ray_cfgs('inverse_linear'),
-            perturb=self.get_ray_cfgs('perturb') if not inference_only else False
-        )  # (B, N_sample+1)
-
-        return zvals
 
     def upsample_zvals(self, zvals: torch.Tensor, weights: torch.Tensor, inference_only=True):
         """Upsample zvals if N_importance > 0. Similar to nerf. But it returns resampled zvals only

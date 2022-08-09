@@ -71,7 +71,7 @@ class Capture(Base3dPCDataset):
             self.precache_ray()
 
     def skip_samples_no_images(self, img_list):
-        """Capture dataset do not real all images at first."""
+        """Capture dataset do not read all images at first."""
         if self.skip > 1:
             self.cameras = self.cameras[::self.skip]
             self.bounds = self.bounds[::self.skip]

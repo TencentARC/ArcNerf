@@ -2,14 +2,14 @@
 
 import torch
 
-from .base_3d_model import Base3dModel
+from .fg_model import FgModel
 from arcnerf.geometry.ray import surface_ray_intersection
 from arcnerf.geometry.transformation import normalize
 
 from common.utils.torch_utils import chunk_processing
 
 
-class SdfModel(Base3dModel):
+class SdfModel(FgModel):
     """ SDF model. Modelling geo in sdf and convert it to alpha.
         Methods include Neus/volSDF, etc.
     """

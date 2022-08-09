@@ -57,7 +57,9 @@ def remap_value(value):
     if any([isinstance(value, t) for t in [bool, int, float, list]]):
         return value
     elif isinstance(value, str):  # Support None, T/F, int, float, list
-        if value.lower() == 'none':
+        if value.startswith('str(') and value.endswith(')'):  # force string
+            return str(value[4:-1])
+        elif value.lower() == 'none':
             return None
         elif value.lower() == 'true':
             return True

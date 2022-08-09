@@ -3,28 +3,25 @@ dir:
 
 dataset:
     train:
-        type: NeRF
-        scene_name: lego
-        skip: 4
-        img_scale: 1.0
+        type: RTMV
+        scene_name: google_scanned/00000
+        skip: 8
+        img_scale: 0.25
         scale_radius: 3.0
         precache: False
 
 model:
     rays:
-        # bounding_radius: 3.0
-        near: 1.5
-        far: 4.5
+        bounding_radius: 3.0
 
 inference:
     render:
         type: [spiral]
         n_cam: [20]
         radius: 3.0
-        u_start: 0.5
+        u_start: 0.0
         v_range: [-0.6, -0.2]
 
     volume:
         n_grid: 4       # just for visual purpose
-        origin: [0.0, -0.11, 0.0]
-        xyz_len: [1.2, 1.2, 2.0]
+        side: 1.5

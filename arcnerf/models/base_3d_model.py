@@ -109,12 +109,12 @@ class Base3dModel(BaseModel):
             bounds = inputs['bounds'] if 'bounds' in inputs else None
         near, far = get_near_far_from_rays(
             inputs['rays_o'], inputs['rays_d'], bounds, self.get_ray_cfgs('near'), self.get_ray_cfgs('far'),
-            self.get_ray_cfgs('bounding_radius'), self.get_ray_cfgs('volume')
+            self.get_ray_cfgs('bounding_radius')
         )
 
         return near, far
 
-    def get_zvals_from_near_far(self, near: torch.Tensor, far: torch.Tensor, inference_only=False):
+    def get_zvals_from_near_far(self, near: torch.Tensor, far: torch.Tensor, n_pts, inference_only=False):
         """Get the zvals from near/far.
 
         It will use ray_cfgs['n_sample'] to select coarse samples.
@@ -123,6 +123,7 @@ class Base3dModel(BaseModel):
         Args:
             near: torch.tensor (B, 1) near z distance
             far: torch.tensor (B, 1) far z distance
+            n_pts: num of points for zvals sampling. It is generally the `rays.n_sample` in the model_cfgs.
             inference_only: If True, will not pertube the zvals. used in eval/infer model. Default False.
 
         Returns:
@@ -131,7 +132,7 @@ class Base3dModel(BaseModel):
         zvals = get_zvals_from_near_far(
             near,
             far,
-            self.get_ray_cfgs('n_sample'),
+            n_pts,
             inverse_linear=self.get_ray_cfgs('inverse_linear'),
             perturb=self.get_ray_cfgs('perturb') if not inference_only else False
         )  # (B, N_sample)

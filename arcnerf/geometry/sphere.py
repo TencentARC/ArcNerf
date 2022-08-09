@@ -3,8 +3,12 @@
 import math
 
 import numpy as np
+import torch
+import torch.nn as nn
 
 from .transformation import normalize
+from .ray import sphere_ray_intersection
+from common.utils.torch_utils import torch_to_np
 
 
 def uv_to_sphere_point(u, v, radius, origin=(0, 0, 0)):
@@ -259,3 +263,74 @@ def get_swing_line(radius, u_range=(0, 0.5), v_range=(-1, 0), origin=(0, 0, 0), 
     line = uv_to_sphere_point(u, v, radius, origin)
 
     return line
+
+
+class Sphere(nn.Module):
+    """A simple sphere class"""
+
+    def __init__(self, origin=(0, 0, 0), radius=1.0, dtype=torch.float32, requires_grad=False):
+        """
+        Args:
+            origin: origin point(centroid of sphere), a tuple of 3
+
+            dtype: dtype of params. By default is torch.float32
+            requires_grad: whether the parameters requires grad. If True, waste memory for graphic.
+        """
+        super(Sphere, self).__init__()
+        self.requires_grad = requires_grad
+        self.dtype = dtype
+
+        self.origin = nn.Parameter(torch.tensor([0.0, 0.0, 0.0], dtype=dtype), requires_grad=self.requires_grad)
+        self.radius = nn.Parameter(torch.tensor([0.0], dtype=dtype), requires_grad=self.requires_grad)
+
+        self.set_params(origin, radius)
+
+    def set_params(self, origin, radius):
+        """you can call outside to reset the params"""
+        self.set_origin(origin)
+        self.set_radius(radius)
+
+    @torch.no_grad()
+    def set_origin(self, origin=(0.0, 0.0, 0.0)):
+        """Set the origin """
+        self.origin[0] = origin[0]
+        self.origin[1] = origin[1]
+        self.origin[2] = origin[2]
+
+    def get_origin(self, in_tuple=False):
+        """Gets origin in tensor(3, )"""
+        if in_tuple:
+            return tuple(torch_to_np(self.origin).tolist())
+        return self.origin
+
+    @torch.no_grad()
+    def set_radius(self, radius):
+        """Set the radius """
+        self.radius[0] = radius
+
+    def get_radius(self, in_float=False):
+        """Gets radius in tensor(1, )"""
+        if in_float:
+            return float(self.radius[0])
+        return self.radius
+
+    def ray_sphere_intersection(self, rays_o: torch.Tensor, rays_d: torch.Tensor):
+        """Calculate the rays intersection with the sphere
+        Args:
+            rays_o: ray origin, (N_rays, 3)
+            rays_d: ray direction, (N_rays, 3)
+
+        Returns:
+            near: near intersection zvals. (N_rays, 1)
+                  If only 1 intersection: if not tangent, same as far; else 0. clip by 0.
+            far:  far intersection zvals. (N_rays, 1)
+                  If only 1 intersection: if not tangent, same as far; else 0.
+            pts: (N_rays, 2, 3), each ray has near/far two points with each sphere.
+                                      if nan, means no intersection at this ray
+            mask: (N_rays, 1), show whether each ray has intersection with the sphere, BoolTensor
+        """
+        near, far, pts, mask = sphere_ray_intersection(
+            rays_o, rays_d, self.get_radius(in_float=True), self.get_origin(in_tuple=True)
+        )
+
+        return near, far, pts, mask

@@ -564,9 +564,9 @@ class Volume(nn.Module):
                   If only 1 intersection: if not tangent, same as far; else 0. clip by 0.
             far:  far intersection zvals. (N_rays, 1)
                   If only 1 intersection: if not tangent, same as far; else 0.
-            pts: (N_rays, 2, 3), each ray has near/far two points with each sphere.
+            pts: (N_rays, 2, 3), each ray has near/far two points with each volume.
                                       if nan, means no intersection at this ray
-            mask: (N_rays, 1), show whether each ray has intersection with the sphere, BoolTensor
+            mask: (N_rays, 1), show whether each ray has intersection with the volume, BoolTensor
         """
         aabb_range = self.get_range()[None].to(rays_o.device)  # (1, 3, 2)
         near, far, pts, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)

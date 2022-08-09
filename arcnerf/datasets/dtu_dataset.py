@@ -21,7 +21,7 @@ class DTU(Base3dDataset):
         super(DTU, self).__init__(cfgs, data_dir, mode, transforms)
 
         # real DTU dataset with scan_id
-        self.data_spec_dir = osp.join(self.data_dir, 'DTU', 'scan{}'.format(self.cfgs.scan_id))
+        self.data_spec_dir = osp.join(self.data_dir, 'DTU', 'dtu_scan{}'.format(self.cfgs.scan_id))
         self.identifier = str(self.cfgs.scan_id)
 
         # get image and mask
@@ -32,7 +32,7 @@ class DTU(Base3dDataset):
         self.H, self.W = self.images[0].shape[:2]
 
         # get cameras
-        self.cam_file = osp.join(self.data_spec_dir, 'cameras.npz')
+        self.cam_file = osp.join(self.data_spec_dir, 'cameras_sphere.npz')
         assert osp.exists(self.cam_file), 'Camera file {} not exist...'.format(self.cam_file)
         self.cameras = self.read_cameras()
         for cam in self.cameras:
@@ -43,12 +43,12 @@ class DTU(Base3dDataset):
         # align if required
         self.align_cam_horizontal()
 
-        # rescale image, call from parent class
-        self.rescale_img_and_pose()
-
         # skip image and keep less samples
         self.skip_samples()
         self.keep_eval_samples()
+
+        # rescale image, call from parent class
+        self.rescale_img_and_pose()
 
         # precache_all rays
         self.ray_bundles = None

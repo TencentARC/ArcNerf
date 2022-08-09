@@ -44,12 +44,12 @@ class BlendedMVS(Base3dDataset):
         # exchange pose coord
         self.exchange_coord()
 
-        # rescale image, call from parent class
-        self.rescale_img_and_pose()
-
         # skip image and keep less samples
         self.skip_samples()
         self.keep_eval_samples()
+
+        # rescale image, call from parent class
+        self.rescale_img_and_pose()
 
         # precache_all rays
         self.ray_bundles = None

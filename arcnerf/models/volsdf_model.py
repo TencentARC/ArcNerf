@@ -8,7 +8,7 @@ from .sdf_model import SdfModel
 from .base_modules import build_geo_model, build_radiance_model
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.transformation import normalize
-from arcnerf.render.ray_helper import sample_pdf, get_zvals_from_near_far
+from arcnerf.render.ray_helper import sample_pdf
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import MODEL_REGISTRY
 from common.utils.torch_utils import chunk_processing
@@ -62,13 +62,7 @@ class VolSDF(SdfModel):
         near, far = self.get_near_far_from_rays(inputs)  # (B, 1) * 2
 
         # get coarse zvals, use N_eval instead of using N_sample
-        zvals = get_zvals_from_near_far(
-            near,
-            far,
-            self.get_ray_cfgs('n_eval'),
-            inverse_linear=self.get_ray_cfgs('inverse_linear'),
-            perturb=self.get_ray_cfgs('perturb') if not inference_only else False
-        )  # (B, N_eval)
+        zvals = self.get_zvals_from_near_far(near, far, self.get_ray_cfgs('n_eval'), inference_only)  # (B, N_eval)
 
         # sample zvals near surface, (B, N_total(N_sample+N_importance)) for zvals,  (B, 1) for zvals_surface
         zvals, zvals_surface = self.sample_zvals(rays_o, rays_d, zvals, inference_only, self.forward_pts)
