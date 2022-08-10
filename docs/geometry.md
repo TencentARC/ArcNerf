@@ -83,6 +83,8 @@ Definition and function of a volume. For all the point you can get it in grid or
 - bound_faces: outside bounding faces, `6 faces`, tensor in `(6, 4, 3)` shape
 - dense_faces: inner+outside bounding faces, tensor in `((n_grid+1)n_grid^2*3, 4, 3)` shape
 - convert_flatten_index_to_xyz_index/convert_xyz_index_to_flatten_index: index conversion
+- set_up_voxel_bitfield: it creates a tensor of `(n_grid ^ 3) // 8` for recording this voxel's occupancy.
+  - You can update and get the occupied voxels as well. And take the occupied voxel's line/face for visualization.
 ## ray/pts in volume
 For ray in pts in volume, we provide a lot of function like
 - check_pts_in_grid_boundary: check pts in voxel

@@ -172,3 +172,30 @@ class TestDict(unittest.TestCase):
         grid_pts_2 = np_wrapper(volume.get_grid_pts_by_voxel_idx, voxel_idx[valid_idx])
 
         self.assertTrue(np.allclose(grid_pts_1, grid_pts_2))
+
+    def tests_voxel_bitfield(self):
+        n_grid = 4
+        volume = Volume(n_grid=n_grid, side=self.side)
+        volume.set_up_voxel_bitfield()
+        self.assertEqual(volume.get_voxel_bitfield().shape, (n_grid, n_grid, n_grid))
+        self.assertEqual(volume.get_n_occupied_voxel(), 0)
+
+        occupancy = torch.rand((n_grid, n_grid, n_grid))
+        occupancy = (occupancy > 0.8).type(torch.bool)
+        volume.update_bitfield(occupancy)
+        self.assertEqual(volume.get_n_occupied_voxel(), occupancy.sum())
+
+        volume_dict = {
+            'grid_pts': torch_to_np(volume.get_occupied_voxel_grid_pts().view(-1, 3)),  # (8N, 3)
+            'lines': volume.get_occupied_lines(),  # (2*6, 3)
+            'faces': volume.get_occupied_faces()  # (6, 4, 3)
+        }
+
+        file_path = osp.join(RESULT_DIR, 'voxel_occupancy.png')
+        draw_3d_components(
+            volume=volume_dict,
+            title='volume with occupancy indicator',
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True
+        )
