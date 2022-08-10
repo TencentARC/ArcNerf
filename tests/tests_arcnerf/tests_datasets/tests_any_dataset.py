@@ -5,8 +5,9 @@ import os
 import os.path as osp
 import unittest
 
-import numpy as np
 import cv2
+import numpy as np
+import torch
 
 from . import setup_test_config
 from arcnerf.datasets import get_dataset
@@ -15,8 +16,9 @@ from arcnerf.geometry.poses import average_poses, generate_cam_pose_on_sphere
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.transformation import normalize
 from arcnerf.geometry.volume import Volume
+from arcnerf.models.fg_model import FgModel
 from arcnerf.render.camera import PerspectiveCamera
-from arcnerf.render.ray_helper import equal_sample, get_rays, get_near_far_from_rays, get_zvals_from_near_far
+from arcnerf.render.ray_helper import equal_sample, get_rays
 from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.cfgs_utils import get_value_from_cfgs_field, valid_key_in_cfgs
 from common.utils.img_utils import img_to_uint8
@@ -229,11 +231,9 @@ class TestDict(unittest.TestCase):
         n_rays = n_rays_w * n_rays_h
         index = equal_sample(n_rays_w, n_rays_h, self.W, self.H)
 
-        # near/far from config
-        bounding_radius = get_value_from_cfgs_field(self.cfgs.model.rays, 'bounding_radius')
-        volume = get_value_from_cfgs_field(self.cfgs.model.rays, 'volume')
-        near = get_value_from_cfgs_field(self.cfgs.model.rays, 'near')
-        far = get_value_from_cfgs_field(self.cfgs.model.rays, 'far')
+        # custom chunk
+        self.cfgs.model.chunk_rays = 1024
+        self.cfgs.model.chunk_pts = 1024 * 32
 
         # change this range if you are not set cam in radius=3
         n_pts = 15
@@ -253,10 +253,16 @@ class TestDict(unittest.TestCase):
         rays_d = np.concatenate(rays_d, axis=0)  # (n_rays*n_cam, 3)
         bounds = None if len(bounds) == 0 else np.concatenate(bounds, axis=0)  # (n_rays*n_cam, 2)
 
-        near_all, far_all = np_wrapper(
-            get_near_far_from_rays, rays_o, rays_d, bounds, near, far, bounding_radius, volume
-        )
-        zvals = np_wrapper(get_zvals_from_near_far, near_all, far_all, n_pts)  # (n_rays*n_cam, n_pts)
+        # use the foreground for sampling pts
+        model = FgModel(self.cfgs)
+
+        inputs = {
+            'rays_o': torch.tensor(rays_o),
+            'rays_d': torch.tensor(rays_d),
+            'bounds': torch.tensor(bounds) if bounds is not None else None
+        }
+        near, far = model.get_near_far_from_rays(inputs)
+        zvals = torch_to_np(model.get_zvals_from_near_far(near, far, n_pts))  # (n_rays*n_cam, n_pts)
         pts = np_wrapper(get_ray_points_by_zvals, rays_o, rays_d, zvals)  # (n_rays*n_cam, n_pts, 3)
         points = pts.reshape(-1, 3)  # (n_rays*n_cam*n_pts, 3)
         self.assertEqual(points.shape, (self.n_cam * n_rays * n_pts, 3))
@@ -301,9 +307,6 @@ class TestDict(unittest.TestCase):
 
         title_with_setting = 'Each ray sampled {} points, z_range({:.1f}-{:.1f}).\n'.format(
             n_pts, zvals.min(), zvals.max()
-        )
-        title_with_setting += 'Settings - bounds:{}/near:{}/far:{}/bounding_radius:{}'.format(
-            bounds is not None, near, far, bounding_radius
         )
         file_path = osp.join(self.spec_result_dir, 'points_from_all_cams.png')
         draw_3d_components(

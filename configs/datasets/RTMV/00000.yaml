@@ -19,7 +19,7 @@ inference:
         type: [spiral]
         n_cam: [20]
         radius: 3.0
-        u_start: 0.0
+        u_start: 0.9
         v_range: [-0.6, -0.2]
 
     volume:

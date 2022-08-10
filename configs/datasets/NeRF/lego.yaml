@@ -11,6 +11,11 @@ dataset:
         precache: False
 
 model:
+    obj_bound:
+        volume:
+            n_grid: None
+            origin: [ 0.0, -0.11, 0.0 ]
+            xyz_len: [ 1.2, 1.2, 2.0 ]
     rays:
         # bounding_radius: 3.0
         near: 1.5
