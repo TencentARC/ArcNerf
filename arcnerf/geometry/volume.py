@@ -51,7 +51,7 @@ class Volume(nn.Module):
         self.set_pts()
 
     def set_pts(self):
-        """Set the pts(range, corner, grid, volume) using the internal origin/lenghts"""
+        """Set the pts(range, corner, grid, volume) using the internal origin/lengths"""
         self.cal_range()
         self.cal_corner()
         if self.n_grid is not None:
@@ -67,6 +67,10 @@ class Volume(nn.Module):
             self.cal_grid_pts()
             self.cal_volume_pts()
 
+    def get_n_grid(self):
+        """Get the num of grid"""
+        return self.n_grid
+
     def get_n_voxel(self):
         """Get total num of voxel. Assume n_grid exists."""
         return self.n_grid**3
@@ -74,6 +78,10 @@ class Volume(nn.Module):
     def get_n_grid_pts(self):
         """Get total num of grid_pts. Assume n_grid exists."""
         return (self.n_grid + 1)**3
+
+    def get_device(self):
+        """Get the device for parameter"""
+        return self.origin.device
 
     @torch.no_grad()
     def set_len(self, side, xyz_len):
@@ -116,6 +124,28 @@ class Volume(nn.Module):
     def get_range(self):
         """Get the xyz range in (3, 2)"""
         return self.range
+
+    def get_diag_len(self):
+        """Get the len of diagonal"""
+        return float(torch.sqrt(((self.range[:, 1] - self.range[:, 0])**2).sum()))
+
+    def get_full_voxel_idx(self, flatten=False):
+        """Get the full voxel_idx
+
+        Args:
+            flatten: whether to get flatten idx, by default False
+        Returns:
+            voxel_idx: If flatten, in (n_grid**3, 3), else in (n_grid, n_grid, n_grid, 3), each value in (0, n_grid)
+        """
+        x = torch.linspace(0, self.n_grid - 1, self.n_grid, dtype=torch.long, device=self.get_device())  # (n)
+        y = torch.linspace(0, self.n_grid - 1, self.n_grid, dtype=torch.long, device=self.get_device())  # (n)
+        z = torch.linspace(0, self.n_grid - 1, self.n_grid, dtype=torch.long, device=self.get_device())  # (n)
+
+        voxel_idx = torch.stack(torch.meshgrid(x, y, z), -1)  # (n, n, n, 3)
+        if flatten:
+            voxel_idx = voxel_idx.view(-1, 3)
+
+        return voxel_idx
 
     @staticmethod
     def get_eight_permutation(x, y, z):
@@ -330,6 +360,18 @@ class Volume(nn.Module):
 
         return voxel_idx, valid_idx
 
+    @staticmethod
+    def get_unique_voxel_idx(voxel_idx: torch.Tensor):
+        """Get the unique voxel idx by removing the duplicated rows
+
+        Args:
+            voxel_idx: voxel index in (B, 3) of each xyz index, range in (0, n_grid).
+
+        Returns:
+            uni_voxel_idx: unique voxel_idx in (B_uni, 3)
+        """
+        return torch.unique(voxel_idx, dim=0)
+
     def get_grid_pts_idx_by_voxel_idx(self, voxel_idx: torch.Tensor, flatten=True):
         """Get the grid pts index from voxel idx
 
@@ -355,7 +397,7 @@ class Volume(nn.Module):
         return grid_pts_idx
 
     def collect_grid_pts_by_voxel_idx(self, voxel_idx: torch.Tensor):
-        """Get the grid pts xyz from voxel idx. Collect from full grid_pts is smaller than just cal by input
+        """Get the grid pts xyz from voxel idx. Collect from full grid_pts is slower than just cal by input
 
         Args:
             voxel_idx: (B, 3) tensor of xyz index, should be in (0, n_grid)
@@ -390,6 +432,25 @@ class Volume(nn.Module):
         grid_pts_by_voxel_idx = grid_pts_idx * voxel_size + start_pos
 
         return grid_pts_by_voxel_idx
+
+    def get_voxel_pts_by_voxel_idx(self, voxel_idx: torch.Tensor):
+        """Get the voxel center pts(part of volume_pts) xyz from voxel idx, directly calculated from voxel_ids
+
+        Args:
+            voxel_idx: (B, 3) tensor of xyz index, should be in (0, n_grid)
+
+        Returns:
+            voxel_pts_by_voxel_idx: select voxel center xyz values by voxel_idx, (B, 3), each pts of voxel
+        """
+        device = voxel_idx.device
+
+        # base position(xyz_min) and voxel size
+        voxel_size = self.get_voxel_size(to_list=False).to(device)  # (3,)
+        start_pos = self.get_range()[:, 0].to(device)  # (3,)
+
+        voxel_pts_by_voxel_ids = voxel_idx * voxel_size + 0.5 * voxel_size + start_pos
+
+        return voxel_pts_by_voxel_ids
 
     def cal_weights_to_grid_pts(self, pts: torch.Tensor, grid_pts: torch.Tensor):
         """Calculate the weights of each grid_pts to pts by trilinear interpolation
@@ -537,7 +598,7 @@ class Volume(nn.Module):
         Returns:
             xyz: (B, 3) index in torch.long
         """
-        xyz_index = torch.zeros((flatten_index.shape[0], 3), dtype=torch.int, device=flatten_index.device)
+        xyz_index = torch.zeros((flatten_index.shape[0], 3), dtype=torch.long, device=flatten_index.device)
 
         for i in range(3):
             xyz_index[:, 2 - i] = flatten_index % n
@@ -565,6 +626,7 @@ class Volume(nn.Module):
 
     def ray_volume_intersection(self, rays_o: torch.Tensor, rays_d: torch.Tensor):
         """Calculate the rays intersection with the out-bounding surfaces
+
         Args:
             rays_o: ray origin, (N_rays, 3)
             rays_d: ray direction, (N_rays, 3)
@@ -584,20 +646,68 @@ class Volume(nn.Module):
 
         return near, far, pts, mask
 
+    def get_ray_pass_through(
+        self, rays_o: torch.Tensor, rays_d: torch.Tensor, return_voxel_idx=False, in_occ_voxel=False
+    ):
+        """Get voxel_idx that rays pass through. It takes all n**3 voxel for aabb intersection, will take time.
+
+        Args:
+            rays_o: ray origin, (N_rays, 3)
+            rays_d: ray direction, (N_rays, 3)
+            return_voxel_idx: If True, return the voxel idx of those passed through voxels. by default False
+            in_occ_voxel:
+
+        Returns:
+            out: (n_grid, n_grid, n_grid) tensor of xyz index that rays pass through
+                 If return_voxel_idx, return a voxel_idx in (N, 3).Return None if no intersection.
+        """
+        if in_occ_voxel and self.bitfield is not None:
+            assert return_voxel_idx, 'If fine the ray pass through from occupied voxels, you can only return voxel_idx'
+            grid_pts = self.get_occupied_grid_pts()  # (n_occ, 3)
+        else:
+            voxel_idx = self.get_full_voxel_idx(flatten=True)  # (n_grid**3, 3)
+            grid_pts = self.get_grid_pts_by_voxel_idx(voxel_idx)  # (n_grid**3, 8, 3)
+
+        aabb_range = torch.cat([grid_pts[:, 0, :].unsqueeze(-1), grid_pts[:, -1, :].unsqueeze(-1)], dim=-1)  # (n, 3, 2)
+
+        _, _, _, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)  # (n_rays, n_grid**3)
+        mask = torch.any(mask, dim=0)  # (n_grid**3) / (n)
+
+        if not return_voxel_idx:
+            return mask.view(self.n_grid, self.n_grid, self.n_grid)
+
+        # return voxel_idx
+        if torch.sum(mask) == 0:  # all rays not hit
+            return None
+
+        voxel_idx = torch.where(mask)[0].type(torch.long)
+        voxel_idx = self.convert_flatten_index_to_xyz_index(voxel_idx, self.n_grid)
+
+        return voxel_idx
+
     @torch.no_grad()
-    def set_up_voxel_bitfield(self):
-        """Set up the bitfield as a torch.bool tensor in shape (n_grid, n_grid, n_grid), each value contains the occupancy
+    def set_up_voxel_bitfield(self, init_occ=True):
+        """Set up the bitfield as a torch.bool tensor in shape (n_grid, n_grid, n_grid), each value is the occupancy
         Bitfield representation in (n_grid^3 // 8, uint8) can save memory, but torch is not flexible in bit manipulation
         You need customized cuda func for that.
+
+        Args:
+            init_occ: init occupancy, by default True(all voxels occupied.
 
         Returns:
             bitfield: a (n_grid, n_grid, n_grid) bool tensor
         """
         assert self.n_grid is not None, 'Voxel bitfield must be set for known resolution volume'
         assert (self.n_grid & self.n_grid - 1) == 0, 'Bitfield is only for volume with n_grid in 2^n'
-        self.bitfield = nn.Parameter(
-            torch.zeros((self.n_grid, self.n_grid, self.n_grid), dtype=torch.bool), requires_grad=False
-        )
+
+        if init_occ:  # Use params to put it on device, but do not want grad
+            self.bitfield = nn.Parameter(
+                torch.ones((self.n_grid, self.n_grid, self.n_grid), dtype=torch.bool), requires_grad=False
+            )  # full volume.
+        else:
+            self.bitfield = nn.Parameter(
+                torch.zeros((self.n_grid, self.n_grid, self.n_grid), dtype=torch.bool), requires_grad=False
+            )  # empty volume.
 
     def get_voxel_bitfield(self, flatten=False):
         """Get the voxel bitfield
@@ -614,8 +724,22 @@ class Volume(nn.Module):
             return self.bitfield
 
     @torch.no_grad()
+    def reset_voxel_bitfield(self, occ=True):
+        """Reset all the occupancy value
+
+        Args:
+            occ: single bool value for reset. By default occ.
+        """
+        dtype = self.bitfield.data.dtype
+        device = self.bitfield.data.device
+        if occ:
+            self.bitfield.data = torch.ones_like(self.bitfield.data, dtype=dtype, device=device)
+        else:
+            self.bitfield.data = torch.zeros_like(self.bitfield.data, dtype=dtype, device=device)
+
+    @torch.no_grad()
     def update_bitfield(self, occupancy):
-        """Update each bit by occupancy
+        """Update each voxel indicator by occupancy. new occupancy is the union of old and new.
 
         Args:
             occupancy: torch.bool in shape (n_grid**3, ) or (n_grid, n_grid, n_grid)
@@ -630,12 +754,29 @@ class Volume(nn.Module):
 
         assert occupancy.dtype == torch.bool, 'Must input bool tensor'
 
-        self.bitfield.data = occupancy
+        self.bitfield.data = torch.logical_and(self.bitfield.data, occupancy)  # update
 
+    @torch.no_grad()
+    def update_bitfield_by_voxel_idx(self, voxel_idx: torch.Tensor, occ=True):
+        """Update each bit by voxel_idx.
+
+        Args:
+            voxel_idx: (B, 3) tensor of xyz index, should be in (0, n_grid)
+            occ: The occupancy value to set. By default set to True.
+
+        Returns:
+            bitfield: update by voxel_idx
+        """
+        assert 0 <= torch.all(voxel_idx) < self.n_grid, 'Invalid voxel range is not allowed'
+        uni_voxel_idx = self.get_unique_voxel_idx(voxel_idx)  # update unique voxel only
+        self.bitfield.data[uni_voxel_idx[:, 0], uni_voxel_idx[:, 1], uni_voxel_idx[:, 2]] = occ  # update
+
+    @torch.no_grad()
     def get_n_occupied_voxel(self):
         """Get the num of occupied voxels"""
         return self.bitfield.sum()
 
+    @torch.no_grad()
     def get_occupied_voxel_idx(self, flatten=False):
         """Return the occupied voxel mask
 
@@ -651,16 +792,29 @@ class Volume(nn.Module):
 
         return occ_voxel_idx
 
-    def get_occupied_voxel_grid_pts(self):
+    @torch.no_grad()
+    def get_occupied_grid_pts(self):
         """Return the occupied voxel corners
 
         Returns:
             occ_voxel_grid_pts: (N_occ, 8, 3) tensor, N occupied voxel's grid_pts
         """
         occ_voxel_idx = self.get_occupied_voxel_idx(flatten=False)  # (N_occ, 3)
-        occ_voxel_grid_pts = self.collect_grid_pts_by_voxel_idx(occ_voxel_idx)
+        occ_grid_pts = self.get_grid_pts_by_voxel_idx(occ_voxel_idx)
 
-        return occ_voxel_grid_pts
+        return occ_grid_pts
+
+    @torch.no_grad()
+    def get_occupied_voxel_pts(self):
+        """Return the occupied voxel center pts
+
+        Returns:
+            occ_voxel_pts: (N_occ, 3) tensor, N occupied voxel's center pts
+        """
+        occ_voxel_idx = self.get_occupied_voxel_idx(flatten=False)  # (N_occ, 3)
+        occ_voxel_pts = self.get_voxel_pts_by_voxel_idx(occ_voxel_idx)
+
+        return occ_voxel_pts
 
     @staticmethod
     def get_lines_from_vertices(verts: torch.Tensor, n):
@@ -711,14 +865,15 @@ class Volume(nn.Module):
 
         return lines
 
+    @torch.no_grad()
     def get_occupied_lines(self):
         """Get the inner lines for occupied cells only
 
         Returns:
-            lines: list of N_occ*12(2^3), each is np array of (2, 3)
+            lines: list of N_occ*12, each is np array of (2, 3)
         """
         assert self.bitfield is not None, 'Dont call it if you do not set bitfield'
-        occ_voxel_grid_pts = self.get_occupied_voxel_grid_pts()  # (N_occ, 8, 3)
+        occ_voxel_grid_pts = self.get_occupied_grid_pts()  # (N_occ, 8, 3)
         lines = []
         for i in range(occ_voxel_grid_pts.shape[0]):
             voxel_line = self.get_lines_from_vertices(occ_voxel_grid_pts[i], 2)
@@ -787,6 +942,7 @@ class Volume(nn.Module):
 
         return faces
 
+    @torch.no_grad()
     def get_occupied_faces(self):
         """Get the inner faces for occupied cells only
 
@@ -794,7 +950,7 @@ class Volume(nn.Module):
             faces: (N_occ*6, 4, 3) np array
         """
         assert self.bitfield is not None, 'Dont call it if you do not set bitfield'
-        occ_voxel_grid_pts = self.get_occupied_voxel_grid_pts()  # (N_occ, 8, 3)
+        occ_voxel_grid_pts = self.get_occupied_grid_pts()  # (N_occ, 8, 3)
         faces = []
         for i in range(occ_voxel_grid_pts.shape[0]):
             voxel_face = self.get_faces_from_vertices(occ_voxel_grid_pts[i], 2)

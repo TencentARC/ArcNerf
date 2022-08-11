@@ -78,13 +78,18 @@ Definition and function of a volume. For all the point you can get it in grid or
 - voxel_size: each voxel size, useful for marching cubes.
 - volume_pts: all the volume center points, in total `(n_grid)^3`
   - This can be sent to the network and get the volume density
+- voxel_pts: the partial volume pts of each voxel that selected
 - bound_lines: outside bounding lines, `12` lines with `(2, 3)` start-end pts.
 - dense_lines: inner+outside bounding lines, `3*(n+1)^3` lines with `(2, 3)` start-end pts.
 - bound_faces: outside bounding faces, `6 faces`, tensor in `(6, 4, 3)` shape
 - dense_faces: inner+outside bounding faces, tensor in `((n_grid+1)n_grid^2*3, 4, 3)` shape
 - convert_flatten_index_to_xyz_index/convert_xyz_index_to_flatten_index: index conversion
-- set_up_voxel_bitfield: it creates a tensor of `(n_grid ^ 3) // 8` for recording this voxel's occupancy.
-  - You can update and get the occupied voxels as well. And take the occupied voxel's line/face for visualization.
+# occupancy
+You can manually set up an occupancy record for visual. This can help to save computation like ray sphere intersection.
+- set_up_voxel_bitfield: it creates a bool tensor of `(n_grid ^ 3)` for recording this voxel's occupancy.
+  - You can reset or update the occupied voxels as well. And take the occupied voxel's line/face for visualization.
+  - get_occupied_voxel_idx/get_occupied_voxel_pts/get_occupied_grid_pts/get_occupied_lines/get_occupied_faces:
+  You can get the occupied voxel for visualization or other computation.
 ## ray/pts in volume
 For ray in pts in volume, we provide a lot of function like
 - check_pts_in_grid_boundary: check pts in voxel
@@ -92,7 +97,7 @@ For ray in pts in volume, we provide a lot of function like
 - get_grid_pts_idx_by_voxel_idx/get_grid_pts_by_voxel_idx: get grid pts index and position by voxel idx
 - cal_weights_to_grid_pts / interpolate: interpolate pts by grid_pts using trilinear interpolation
 - ray_volume_intersection: call the aabb intersection test and find the ray-volume intersection
-
+- get_ray_pass_through: get the voxel_ids that the ray pass through
 ------------------------------------------------------------------------
 # point cloud
 Function of point cloud with pts and color.

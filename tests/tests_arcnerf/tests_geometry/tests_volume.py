@@ -178,23 +178,94 @@ class TestDict(unittest.TestCase):
         volume = Volume(n_grid=n_grid, side=self.side)
         volume.set_up_voxel_bitfield()
         self.assertEqual(volume.get_voxel_bitfield().shape, (n_grid, n_grid, n_grid))
-        self.assertEqual(volume.get_n_occupied_voxel(), 0)
+        self.assertEqual(volume.get_n_occupied_voxel(), n_grid**3)
 
+        # reset
+        volume.reset_voxel_bitfield(False)
+        self.assertEqual(volume.get_n_occupied_voxel(), 0)
+        volume.reset_voxel_bitfield(True)
+        self.assertEqual(volume.get_n_occupied_voxel(), n_grid**3)
+
+        # random occ
         occupancy = torch.rand((n_grid, n_grid, n_grid))
-        occupancy = (occupancy > 0.8).type(torch.bool)
+        occupancy = (occupancy > 0.5).type(torch.bool)
         volume.update_bitfield(occupancy)
         self.assertEqual(volume.get_n_occupied_voxel(), occupancy.sum())
 
         volume_dict = {
-            'grid_pts': torch_to_np(volume.get_occupied_voxel_grid_pts().view(-1, 3)),  # (8N, 3)
-            'lines': volume.get_occupied_lines(),  # (2*6, 3)
-            'faces': volume.get_occupied_faces()  # (6, 4, 3)
+            'grid_pts': torch_to_np(volume.get_occupied_grid_pts().view(-1, 3)),  # (8N, 3)
+            'lines': volume.get_occupied_lines(),  # (12N) * (2, 3)
+            'faces': volume.get_occupied_faces()  # (6N, 4, 3)
         }
 
         file_path = osp.join(RESULT_DIR, 'voxel_occupancy.png')
         draw_3d_components(
             volume=volume_dict,
             title='volume with occupancy indicator',
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True
+        )
+
+    def tests_ray_voxel_pass_through(self):
+        volume = Volume(n_grid=8, side=self.side)
+        volume.set_up_voxel_bitfield()
+        n_rays = 8
+        rays_o = np.random.rand(n_rays, 3) * 2.0
+        rays_d = -normalize(rays_o + np.random.rand(n_rays, 3))  # point to origin
+
+        # get the voxel_idx that rays pass through
+        occ = np_wrapper(volume.get_ray_pass_through, rays_o, rays_d)
+        np_wrapper(volume.update_bitfield, occ)
+
+        volume_dict = {
+            'lines': volume.get_occupied_lines(),  # (12N) * (2, 3)
+            'faces': volume.get_occupied_faces()  # (6N, 4, 3)
+        }
+
+        file_path = osp.join(RESULT_DIR, 'ray_pass_through_volume.png')
+        draw_3d_components(
+            rays=(rays_o, rays_d * 4.0),
+            volume=volume_dict,
+            title='ray pass though volume selection',
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True
+        )
+
+    def tests_get_voxel_grid_pts_by_voxel_idx(self):
+        volume = Volume(n_grid=4, side=self.side)  # (-0.75, 0.75)
+        volume.set_up_voxel_bitfield()
+        batch_size = 32
+        pts = torch.rand((batch_size, 3)) * 2.0 - 1.0  # (-1, 1)
+        pts_colors = get_combine_colors(['blue'], [batch_size])
+
+        # get unique voxel idx
+        voxel_idx, valid_idx = np_wrapper(volume.get_voxel_idx_from_xyz, pts)
+        uni_valid_voxel_idx = np_wrapper(volume.get_unique_voxel_idx, voxel_idx[valid_idx])
+
+        # update occupancy
+        volume.reset_voxel_bitfield(False)
+        np_wrapper(volume.update_bitfield_by_voxel_idx, voxel_idx[valid_idx])
+        self.assertEqual(volume.get_n_occupied_voxel(), uni_valid_voxel_idx.shape[0])
+
+        # get grid pts and voxel pts
+        grid_pts = np_wrapper(volume.get_occupied_grid_pts).reshape(-1, 3)  # (8N, 3)
+        voxel_pts = np_wrapper(volume.get_occupied_voxel_pts)  # (N, 3)
+
+        volume_dict = {
+            'grid_pts': grid_pts,  # (8N, 3)
+            'volume_pts': voxel_pts,  # (N, 3)
+            'lines': volume.get_occupied_lines(),  # (12N) * (2, 3)
+            'faces': volume.get_occupied_faces()  # (6N, 4, 3)
+        }
+
+        file_path = osp.join(RESULT_DIR, 'voxel_grid_pts.png')
+        draw_3d_components(
+            points=torch_to_np(pts),
+            point_colors=pts_colors,
+            volume=volume_dict,
+            title='occupied voxels with grid_pts and voxel_pts',
             save_path=file_path,
             plotly=True,
             plotly_html=True
