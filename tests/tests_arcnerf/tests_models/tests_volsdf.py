@@ -45,7 +45,7 @@ class TestVolsdfDict(TestModelDict):
         zvals = get_zvals_from_near_far(
             feed_in['near'].view(-1, 1), feed_in['far'].view(-1, 1), cfgs.model.rays.n_eval
         )  # (BN, 3)
-        zvals, zvals_surface = model.get_fg_model().sample_zvals(
+        zvals, zvals_surface = model.get_fg_model().upsample_zvals(
             feed_in['rays_o'].view(-1, 3), feed_in['rays_d'].view(-1, 3), zvals, False,
             model.get_fg_model().forward_pts
         )
@@ -59,6 +59,9 @@ class TestVolsdfDict(TestModelDict):
         # direct inference
         pts, view_dir = self.create_pts_dir_to_cuda()
         self._test_pts_dir_forward(model, pts, view_dir)
+
+        # opacity
+        self._test_get_est_opacity(model, pts)
 
         # test sdf_to_sigma
         self._test_sdf_to_sigma()
@@ -154,7 +157,7 @@ class TestVolsdfDict(TestModelDict):
             zvals = zvals.cuda()
 
         # with n_importance
-        zvals_sample, zvals_surface = model.get_fg_model().sample_zvals(
+        zvals_sample, zvals_surface = model.get_fg_model().upsample_zvals(
             rays_o, rays_d, zvals, True, sdf_func
         )  # (1, n_importance+n_sample), (1, 1)
 
@@ -174,7 +177,7 @@ class TestVolsdfDict(TestModelDict):
         # with no n_importance(all near surface)
         model.get_fg_model().set_ray_cfgs('n_importance', 0)
 
-        zvals_sample, zvals_surface = model.get_fg_model().sample_zvals(
+        zvals_sample, zvals_surface = model.get_fg_model().upsample_zvals(
             rays_o, rays_d, zvals, True, sdf_func
         )  # (1, n_sample), (1, 1)
 

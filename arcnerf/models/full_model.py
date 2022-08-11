@@ -429,3 +429,7 @@ class FullModel(nn.Module):
     def forward_pts(self, pts: torch.Tensor):
         """Only the fg model can forward pts"""
         return self.fg_model.forward_pts(pts)
+
+    def get_est_opacity(self, dt, pts: torch.Tensor):
+        """Only the fg model can forward pts"""
+        return self.fg_model.get_est_opacity(dt, pts)

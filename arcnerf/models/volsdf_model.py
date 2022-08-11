@@ -65,7 +65,7 @@ class VolSDF(SdfModel):
         zvals = self.get_zvals_from_near_far(near, far, self.get_ray_cfgs('n_eval'), inference_only)  # (B, N_eval)
 
         # sample zvals near surface, (B, N_total(N_sample+N_importance)) for zvals,  (B, 1) for zvals_surface
-        zvals, zvals_surface = self.sample_zvals(rays_o, rays_d, zvals, inference_only, self.forward_pts)
+        zvals, zvals_surface = self.upsample_zvals(rays_o, rays_d, zvals, inference_only, self.forward_pts)
 
         # get points
         pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (B, N_total, 3)
@@ -107,7 +107,15 @@ class VolSDF(SdfModel):
 
         return output
 
-    def sample_zvals(self, rays_o: torch.Tensor, rays_d: torch.Tensor, zvals: torch.Tensor, inference_only, sdf_func):
+    def get_est_opacity(self, dt, pts):
+        """VolSDF model convert sdf to sigma directly"""
+        sdf = self.forward_pts(pts)  # (B,)
+        density = sdf_to_sigma(sdf, self.forward_beta(), self.beta_min)
+        opacity = 1.0 - torch.exp(-torch.relu(density) * dt)  # (B,)
+
+        return opacity
+
+    def upsample_zvals(self, rays_o: torch.Tensor, rays_d: torch.Tensor, zvals: torch.Tensor, inference_only, sdf_func):
         """Sample zvals near surface
 
         Args:

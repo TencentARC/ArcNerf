@@ -22,6 +22,10 @@ class SdfModel(FgModel):
         """It use SDF(inside object is smaller)"""
         return True
 
+    def get_est_opacity(self, dt, pts):
+        """Get the estimated opacity at certain pts. You have to rewrite this function in sdf-like models"""
+        raise NotImplementedError('You must implement the function in sdf-like models')
+
     def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
         """Rewrite to use normal processing """
         geo_net, radiance_net = self.get_net()

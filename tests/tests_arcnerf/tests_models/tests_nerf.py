@@ -42,5 +42,8 @@ class TestNerfDict(TestModelDict):
             pts, view_dir = self.create_pts_dir_to_cuda()
             self._test_pts_dir_forward(model, pts, view_dir)
 
+            # opacity
+            self._test_get_est_opacity(model, pts)
+
             # surface render
             self._test_surface_render(model, feed_in, method='secant_root_finding', grad_dir='descent')

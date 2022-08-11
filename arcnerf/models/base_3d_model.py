@@ -291,9 +291,9 @@ class Base3dModel(BaseModel):
                 sigma/sdf: torch.tensor (N_pts), geometry value for each point
         """
         geo_net, _ = self.get_net()
-        sigma, _ = chunk_processing(geo_net, self.chunk_pts, False, pts)
+        sigma = chunk_processing(geo_net.forward_geo_value, self.chunk_pts, False, pts)
 
-        return sigma[..., 0]
+        return sigma
 
     def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         """

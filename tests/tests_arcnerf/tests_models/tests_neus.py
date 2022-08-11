@@ -51,6 +51,9 @@ class TestNeusDict(TestModelDict):
             pts, view_dir = self.create_pts_dir_to_cuda()
             self._test_pts_dir_forward(model, pts, view_dir)
 
+            # opacity
+            self._test_get_est_opacity(model, pts)
+
             # test sdf_to_alpha
             self._test_sdf_to_alpha()
 

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import math
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -140,10 +142,8 @@ class Neus(SdfModel):
         for i in range(self.get_ray_cfgs('n_iter')):
             # cal sdf from network
             n_rays, n_pts = zvals.shape[:2]
-            pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)
-            pts = pts.view(-1, 3)
-            sdf = chunk_processing(self.geo_net.forward_geo_value, self.chunk_pts, False, pts)  # (B*N_pts)
-            sdf = sdf.view(n_rays, n_pts)  # (B, N_pts)
+            pts = get_ray_points_by_zvals(rays_o, rays_d, zvals).view(-1, 3)  # (B*N_pts, 3)
+            sdf = self.forward_pts(pts).view(n_rays, n_pts)  # (B, N_pts)
 
             # find min slope
             prev_sdf, next_sdf = sdf[:, :-1], sdf[:, 1:]
@@ -175,6 +175,24 @@ class Neus(SdfModel):
             zvals, _ = torch.sort(zvals, dim=-1)
 
         return zvals
+
+    def get_est_opacity(self, dt, pts):
+        """NeuS model convert sdf with slope to alpha(opacity)
+        TODO: I have not check whether it is correct
+        """
+        n_pts = pts.shape[0]
+        # Make fake sdf on ray to get pts opacity
+        rays_d = -normalize(pts)  # assume points to (0,0,0), (B, 3)
+        sdf, _, normal = chunk_processing(self.geo_net.forward_with_grad, self.chunk_pts, False, pts)  # (B, 1), (B, 3)
+
+        # rays and normal are opposite, slope is neg (dot prod of rays and normal). convert sdf to alpha
+        slope = torch.sum(rays_d * normal, dim=-1, keepdim=True)  # (B, 1)
+        zvals = torch.zeros((n_pts, 2), dtype=pts.dtype, device=pts.device)  # (B, 2)
+        zvals[:, 1] += (dt * 1.0 / math.sqrt(3))  # mask the dist to diag dt to zvals
+        iter_slope = -F.relu(-slope)  # neg
+        opacity = sdf_to_alpha(sdf, zvals, iter_slope, self.forward_scale())  # (B, 1)
+
+        return opacity[:, 0]
 
 
 def sdf_to_cdf(sdf: torch.Tensor, s):

@@ -159,7 +159,25 @@ if you actually need it. It generally contains geo_net and radiance_net for geom
 
 ------------------------------------------------------------------------
 ## fg_model
-Here are the class of fg_model, which concentrates on building the foreground object part.
+Here are the class of fg_model, which concentrates on building the foreground object part. You can choose to bound
+the main object in a volume/sphere for accurate and concentrate sampling, or without the structure to sampling in large space.
+- obj_bound: You can set a volume/sphere that bounding the obj. But you need to manually set the size of the structure.
+We may set up the automatic helper in the future.
+  - volume: It needs `n_grid`/`origin`/`xyz_len`or`side` to set up.
+  - sphere: It needs `origin`/`radius` to set up
+- Optimization
+  - The optimization is only for volume now.
+  - epoch_optim: If not None, will set up the voxel occupancy and do pruning every this epoch.
+  - epoch_optim_warmup: If not None, will do different sampling in volume.
+  - ray_sampling_acc: If True, will do customized skip sampling in CUDA. Otherwise use simple uniform sampling in (near, far)
+- default values
+  - If you use a obj_bound structure to bound the object, many rays may not hit the structure so that they can
+  be skipped for computation. You need to set up a default value for them.
+  - bkg_color:
+  - depth_far:
+  - normal:
+
+
 ### NeRF
 [NeRF](https://arxiv.org/abs/2003.08934) model with single forward or hierarchical sampling. You can control by `n_importance`.
 
@@ -203,12 +221,14 @@ The performance is worse than Neus as we test.
 
 ### Instant-ngp
 [Instant-ngp](https://arxiv.org/abs/2201.05989) is not a model. It uses `HashGridEmbedder` and `SHEmbedder` to
-accelerate the training progress.
+accelerate the training progress. For volume-based acceleration, you should set `obj_bound` as a volume, use do
+optim/ray_sample_acc for fast sampling.
 
 ------------------------------------------------------------------------
 ## bkg_model
 Here are the class of bkg_model, which concentrates on building the background.
 The model is also able to model foreground together if you set the parameters well.
+
 ### NeRFPP(nerf++)
 The [nerf++](http://arxiv.org/abs/2010.07492) model use same structure of one stage NeRF model to model the background in Multi-Sphere Image(MSI),
 and change input to `(x/r, y/r, z/r, 1/r)` for different radius.

@@ -86,10 +86,12 @@ Definition and function of a volume. For all the point you can get it in grid or
 - convert_flatten_index_to_xyz_index/convert_xyz_index_to_flatten_index: index conversion
 # occupancy
 You can manually set up an occupancy record for visual. This can help to save computation like ray sphere intersection.
-- set_up_voxel_bitfield: it creates a bool tensor of `(n_grid ^ 3)` for recording this voxel's occupancy.
+- set_up_voxel_bitfield: it creates a bool tensor of `(n_grid, n_grid, n_grid)` for recording this voxel's occupancy.
   - You can reset or update the occupied voxels as well. And take the occupied voxel's line/face for visualization.
   - get_occupied_voxel_idx/get_occupied_voxel_pts/get_occupied_grid_pts/get_occupied_lines/get_occupied_faces:
   You can get the occupied voxel for visualization or other computation.
+- set_up_voxel_opafield: the opacity field is the float opacity value of each voxel in `(n_grid, n_grid, n_grid)`.
+  - You can update it, and use it to update the occupancy.
 ## ray/pts in volume
 For ray in pts in volume, we provide a lot of function like
 - check_pts_in_grid_boundary: check pts in voxel

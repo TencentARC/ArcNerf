@@ -33,11 +33,6 @@ class Volume(nn.Module):
         self.n_grid = n_grid
         self.origin = nn.Parameter(torch.tensor([0.0, 0.0, 0.0], dtype=dtype), requires_grad=self.requires_grad)
         self.xyz_len = nn.Parameter(torch.tensor([0.0, 0.0, 0.0], dtype=dtype), requires_grad=self.requires_grad)
-        self.range = None
-        self.corner = None
-        self.grid_pts = None
-        self.volume_pts = None
-        self.bitfield = None
 
         # set real value
         if origin is not None and (side is not None or xyz_len is not None):
@@ -119,7 +114,7 @@ class Volume(nn.Module):
         """Cal the xyz range(min, max) from origin and sides. range is (3, 2) tensor"""
         xyz_min = self.origin - self.xyz_len / 2.0
         xyz_max = self.origin + self.xyz_len / 2.0
-        self.range = torch.cat([xyz_min[:, None], xyz_max[:, None]], dim=-1)
+        self.register_buffer('range', torch.cat([xyz_min[:, None], xyz_max[:, None]], dim=-1))
 
     def get_range(self):
         """Get the xyz range in (3, 2)"""
@@ -191,7 +186,7 @@ class Volume(nn.Module):
     def cal_corner(self):
         """Cal the eight corner pts given origin and sides. corner is (8, 3) tensor """
         x, y, z = self.range[0][:, None], self.range[1][:, None], self.range[2][:, None]  # (2, 1)
-        self.corner = self.get_eight_permutation(x, y, z)
+        self.register_buffer('corner', self.get_eight_permutation(x, y, z))
 
     def get_corner(self, in_grid=False):
         """Get the eight corner. tensor (8, 3). If in_grid, return (2, 2, 2, 3) """
@@ -207,7 +202,7 @@ class Volume(nn.Module):
         z = torch.linspace(float(self.range[2, 0]), float(self.range[2, 1]), self.n_grid + 1)  # (n+1)
 
         grid_pts = torch.stack(torch.meshgrid(x, y, z), -1)  # (n+1, n+1, n+1, 3)
-        self.grid_pts = grid_pts.view(-1, 3)  # (n+1^3, 3)
+        self.register_buffer('grid_pts', grid_pts.view(-1, 3))
 
     def get_grid_pts(self, in_grid=False):
         """Get ((self.n_grid+1)^3, 3) grid pts. If in_grid, return (n_grid+1, n_grid+1, n_grid+1, 3) """
@@ -222,9 +217,8 @@ class Volume(nn.Module):
         x = torch.linspace(float(self.range[0, 0]) + 0.5 * v_x, float(self.range[0, 1]) - 0.5 * v_x, self.n_grid)  # (n)
         y = torch.linspace(float(self.range[1, 0]) + 0.5 * v_y, float(self.range[1, 1]) - 0.5 * v_y, self.n_grid)  # (n)
         z = torch.linspace(float(self.range[2, 0]) + 0.5 * v_z, float(self.range[2, 1]) - 0.5 * v_z, self.n_grid)  # (n)
-
         volume_pts = torch.stack(torch.meshgrid(x, y, z), -1)  # (n, n, n, 3)
-        self.volume_pts = volume_pts.view(-1, 3)  # (n^3, 3)
+        self.register_buffer('volume_pts', volume_pts.view(-1, 3))  # (n^3, 3)
 
     def get_volume_pts(self, in_grid=False):
         """Get ((self.n_grid)^3, 3) volume pts. If in_grid, return (n_grid, n_grid, n_grid, 3) """
@@ -655,7 +649,9 @@ class Volume(nn.Module):
             rays_o: ray origin, (N_rays, 3)
             rays_d: ray direction, (N_rays, 3)
             return_voxel_idx: If True, return the voxel idx of those passed through voxels. by default False
-            in_occ_voxel:
+            in_occ_voxel: If True, only calculate intersection between rays and current occ rays.
+                          It can reduced calculation. When some voxels are masked not occupied. By default False.
+                          You are only allowed to return the voxel_idx in this case
 
         Returns:
             out: (n_grid, n_grid, n_grid) tensor of xyz index that rays pass through
@@ -685,29 +681,24 @@ class Volume(nn.Module):
 
         return voxel_idx
 
-    @torch.no_grad()
     def set_up_voxel_bitfield(self, init_occ=True):
         """Set up the bitfield as a torch.bool tensor in shape (n_grid, n_grid, n_grid), each value is the occupancy
         Bitfield representation in (n_grid^3 // 8, uint8) can save memory, but torch is not flexible in bit manipulation
         You need customized cuda func for that.
 
         Args:
-            init_occ: init occupancy, by default True(all voxels occupied.
+            init_occ: init occupancy, by default True(all voxels occupied).
 
         Returns:
             bitfield: a (n_grid, n_grid, n_grid) bool tensor
         """
         assert self.n_grid is not None, 'Voxel bitfield must be set for known resolution volume'
-        assert (self.n_grid & self.n_grid - 1) == 0, 'Bitfield is only for volume with n_grid in 2^n'
 
-        if init_occ:  # Use params to put it on device, but do not want grad
-            self.bitfield = nn.Parameter(
-                torch.ones((self.n_grid, self.n_grid, self.n_grid), dtype=torch.bool), requires_grad=False
-            )  # full volume.
+        if init_occ:
+            bitfield = torch.ones((self.n_grid, self.n_grid, self.n_grid), dtype=torch.bool)
         else:
-            self.bitfield = nn.Parameter(
-                torch.zeros((self.n_grid, self.n_grid, self.n_grid), dtype=torch.bool), requires_grad=False
-            )  # empty volume.
+            bitfield = torch.zeros((self.n_grid, self.n_grid, self.n_grid), dtype=torch.bool)
+        self.register_buffer('bitfield', bitfield)
 
     def get_voxel_bitfield(self, flatten=False):
         """Get the voxel bitfield
@@ -723,21 +714,19 @@ class Volume(nn.Module):
         else:
             return self.bitfield
 
-    @torch.no_grad()
     def reset_voxel_bitfield(self, occ=True):
         """Reset all the occupancy value
 
         Args:
             occ: single bool value for reset. By default occ.
         """
-        dtype = self.bitfield.data.dtype
-        device = self.bitfield.data.device
+        dtype = self.bitfield.dtype
+        device = self.bitfield.device
         if occ:
-            self.bitfield.data = torch.ones_like(self.bitfield.data, dtype=dtype, device=device)
+            self.bitfield = torch.ones_like(self.bitfield, dtype=dtype, device=device)
         else:
-            self.bitfield.data = torch.zeros_like(self.bitfield.data, dtype=dtype, device=device)
+            self.bitfield = torch.zeros_like(self.bitfield, dtype=dtype, device=device)
 
-    @torch.no_grad()
     def update_bitfield(self, occupancy):
         """Update each voxel indicator by occupancy. new occupancy is the union of old and new.
 
@@ -754,9 +743,8 @@ class Volume(nn.Module):
 
         assert occupancy.dtype == torch.bool, 'Must input bool tensor'
 
-        self.bitfield.data = torch.logical_and(self.bitfield.data, occupancy)  # update
+        self.bitfield = torch.logical_and(self.bitfield, occupancy)  # update
 
-    @torch.no_grad()
     def update_bitfield_by_voxel_idx(self, voxel_idx: torch.Tensor, occ=True):
         """Update each bit by voxel_idx.
 
@@ -769,14 +757,12 @@ class Volume(nn.Module):
         """
         assert 0 <= torch.all(voxel_idx) < self.n_grid, 'Invalid voxel range is not allowed'
         uni_voxel_idx = self.get_unique_voxel_idx(voxel_idx)  # update unique voxel only
-        self.bitfield.data[uni_voxel_idx[:, 0], uni_voxel_idx[:, 1], uni_voxel_idx[:, 2]] = occ  # update
+        self.bitfield[uni_voxel_idx[:, 0], uni_voxel_idx[:, 1], uni_voxel_idx[:, 2]] = occ  # update
 
-    @torch.no_grad()
     def get_n_occupied_voxel(self):
         """Get the num of occupied voxels"""
         return self.bitfield.sum()
 
-    @torch.no_grad()
     def get_occupied_voxel_idx(self, flatten=False):
         """Return the occupied voxel mask
 
@@ -792,7 +778,6 @@ class Volume(nn.Module):
 
         return occ_voxel_idx
 
-    @torch.no_grad()
     def get_occupied_grid_pts(self):
         """Return the occupied voxel corners
 
@@ -804,7 +789,6 @@ class Volume(nn.Module):
 
         return occ_grid_pts
 
-    @torch.no_grad()
     def get_occupied_voxel_pts(self):
         """Return the occupied voxel center pts
 
@@ -815,6 +799,50 @@ class Volume(nn.Module):
         occ_voxel_pts = self.get_voxel_pts_by_voxel_idx(occ_voxel_idx)
 
         return occ_voxel_pts
+
+    def set_up_voxel_opafield(self):
+        """Set up the opacity as tensor in shape (n_grid, n_grid, n_grid), each value is the voxel density
+        opacity is init as 0.0 at beginning(Nothing in side the voxel)
+
+        Returns:
+            opafield: a (n_grid, n_grid, n_grid) float tensor
+        """
+        assert self.n_grid is not None, 'Voxel bitfield must be set for known resolution volume'
+
+        opafield = torch.zeros((self.n_grid, self.n_grid, self.n_grid), dtype=self.dtype)
+        self.register_buffer('opafield', opafield)
+
+    def update_opafield_by_voxel_idx(self, voxel_idx, opacity, ema=None):
+        """Update the opafield by voxel_idx. Only update if original value >= 0
+
+        Args:
+            voxel_idx: (B, 3), voxel_idx that need to update. Assume no overlap
+            opacity: (B, ), new opacity value in those voxels
+            ema: If not none, update the value by moving average. Otherwise directly copy new value.
+        """
+        if ema is None:
+            update_opa = opacity
+        else:
+            update_opa = torch.max(self.opafield[voxel_idx[:, 0], voxel_idx[:, 1], voxel_idx[:, 2]] * ema, opacity)
+
+        # update only the occupied voxels
+        update_opa = torch.where(
+            self.bitfield[voxel_idx[:, 0], voxel_idx[:, 1], voxel_idx[:, 2]],
+            update_opa,
+            self.opafield[voxel_idx[:, 0], voxel_idx[:, 1], voxel_idx[:, 2]],
+        )
+
+        self.opafield[voxel_idx[:, 0], voxel_idx[:, 1], voxel_idx[:, 2]] = update_opa
+
+    def get_mean_voxel_opacity(self):
+        """Get the min opacity value of density_field"""
+        return float(self.opafield.clamp(min=0).mean())
+
+    def update_bitfield_by_opafield(self, threshold=0.01):
+        """Update the bitfield(occupancy) by opafield that is large enough"""
+        thres = min(self.get_mean_voxel_opacity(), threshold)
+        update_opafield = (self.opafield >= thres)  # (n_grid, n_grid, n_grid)
+        self.update_bitfield(update_opafield)  # only valid occupancy is updated
 
     @staticmethod
     def get_lines_from_vertices(verts: torch.Tensor, n):
@@ -865,7 +893,6 @@ class Volume(nn.Module):
 
         return lines
 
-    @torch.no_grad()
     def get_occupied_lines(self):
         """Get the inner lines for occupied cells only
 
@@ -942,7 +969,6 @@ class Volume(nn.Module):
 
         return faces
 
-    @torch.no_grad()
     def get_occupied_faces(self):
         """Get the inner faces for occupied cells only
 

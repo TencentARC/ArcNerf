@@ -179,6 +179,11 @@ class TestModelDict(unittest.TestCase):
         if model.sigma_reverse():
             self.assertTrue(output['progress_sigma_reverse'][0])
 
+    def _test_get_est_opacity(self, model, pts):
+        dt = 0.001
+        opacity = model.get_est_opacity(dt, pts)
+        self.assertEqual(opacity.shape, (pts.shape[0], ))
+
     def _test_surface_render(
         self, model, feed_in, method='sphere_tracing', grad_dir='ascent', extra_keys=None, extra_bn3=None
     ):
