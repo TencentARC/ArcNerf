@@ -90,7 +90,7 @@ class TestDict(unittest.TestCase):
 
     def tests_densegrid_encoder(self):
         for W_feat in [0, 256]:
-            model = DenseGridEmbedder(include_input=True, W_feat=W_feat).cuda()
+            model = DenseGridEmbedder(include_input=True, W_feat=W_feat, side=2.0).cuda()
             xyz = torch.rand((self.batch_size, 3)).cuda()
             out = model(xyz)
             out_dim = model.get_output_dim()

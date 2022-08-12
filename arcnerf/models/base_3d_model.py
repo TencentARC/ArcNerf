@@ -112,7 +112,7 @@ class Base3dModel(BaseModel):
             self.get_ray_cfgs('bounding_radius')
         )
 
-        return near, far
+        return near, far, None
 
     def get_zvals_from_near_far(self, near: torch.Tensor, far: torch.Tensor, n_pts, inference_only=False):
         """Get the zvals from near/far.
@@ -361,15 +361,27 @@ class Base3dModel(BaseModel):
         n_rays = rays_o.shape[0]
 
         # get bounds for object
-        near, far = self.get_near_far_from_rays(inputs)  # (B, 1) * 2
+        near, far, valid_rays = self.get_near_far_from_rays(inputs)  # (B, 1) * 2
 
         # get the network
         geo_net, radiance_net = self.get_net()
 
-        # get surface pts
-        zvals, pts, mask = surface_ray_intersection(
-            rays_o, rays_d, geo_net.forward_geo_value, method, near, far, n_step, n_iter, threshold, level, grad_dir
-        )
+        # get surface pts for valid_rays
+        if valid_rays is None or torch.all(valid_rays):
+            zvals, pts, mask = surface_ray_intersection(
+                rays_o, rays_d, geo_net.forward_geo_value, method, near, far, n_step, n_iter, threshold, level, grad_dir
+            )
+        else:
+            zvals_valid, pts_valid, mask_valid = surface_ray_intersection(
+                rays_o[valid_rays], rays_d[valid_rays], geo_net.forward_geo_value, method, near[valid_rays],
+                far[valid_rays], n_step, n_iter, threshold, level, grad_dir
+            )
+
+            # full output update by valid rays
+            zvals = torch.ones((n_rays, 1), dtype=dtype, device=device) * zvals_valid.max()
+            pts = torch.ones((n_rays, 3), dtype=dtype, device=device)
+            mask = torch.zeros((n_rays, ), dtype=torch.bool, device=device)
+            zvals[valid_rays], pts[valid_rays], mask[valid_rays] = zvals_valid, pts_valid, mask_valid
 
         rgb = torch.ones((n_rays, 3), dtype=dtype, device=device)  # white bkg
         depth = zvals  # at max zvals after far

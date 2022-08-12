@@ -18,7 +18,7 @@ class FgModel(Base3dModel):
      But by default it do not use such bounding structure, and the sampling is in a larger area.
 
      Any other modeling methods(NeRF, NeuS, mip-nerf) inherit this model and have their detailed sampling/rendering
-     algorithms.
+     algorithms. This model is used to provide the near-accurate sampling in constrained space.
     """
 
     def __init__(self, cfgs):
@@ -38,6 +38,10 @@ class FgModel(Base3dModel):
         self.bkg_color = get_value_from_cfgs_field(self.cfgs.model, 'bkg_color', [1.0, 1.0, 1.0])  # white
         self.depth_far = get_value_from_cfgs_field(self.cfgs.model, 'depth_far', 10.0)  # far distance
         self.normal = get_value_from_cfgs_field(self.cfgs.model, 'normal', [1.0, 0.0, 0.0])  # for eikonal loss cal
+
+    def get_n_coarse_sample(self):
+        """Num of coarse sample for sampling in the foreground space. By default use n_sample in configs"""
+        return self.get_ray_cfgs('n_sample')
 
     def get_obj_bound_and_type(self):
         """Get the obj bound and type"""
@@ -82,8 +86,8 @@ class FgModel(Base3dModel):
                 bounds: torch.tensor (B, 2). optional
         Returns:
             near, far:  torch.tensor (B, 1) each
+            mask: (B,) of each rays information
         """
-        mask = None
         if self.obj_bound_type is not None:
             if self.obj_bound_type == 'volume':
                 in_occ = self.epoch_optim is not None
@@ -95,7 +99,9 @@ class FgModel(Base3dModel):
             else:
                 raise NotImplementedError('Ray-{} is not valid...Please implement it...'.format(self.obj_bound_type))
         else:  # call the parent class
-            near, far = super().get_near_far_from_rays(inputs)
+            near, far, mask = super().get_near_far_from_rays(inputs)
+
+        mask = None if mask is None else mask[:, 0]
 
         return near, far, mask
 
@@ -116,11 +122,8 @@ class FgModel(Base3dModel):
         return zvals
 
     def get_zvals_from_sparse_volume(self, near: torch.Tensor, far: torch.Tensor, n_pts, inference_only=False):
-        """Get the zvals from optimized coarse volume
-
-        """
-        if self.ray_sample_acc:
-            pass  # TODO
+        """Get the zvals from optimized coarse volume which skip the empty voxels """
+        pass
 
     def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         """If you use a geometric structure bounding the object, some rays does not hit the bound can be ignored.
@@ -129,19 +132,16 @@ class FgModel(Base3dModel):
         # find the near/far and mask
         near, far, mask = self.get_near_far_from_rays(inputs)
         if self.obj_bound_type is None or torch.all(mask):  # all the rays to run
-            zvals = self.get_zvals_from_near_far(near, far, self.get_ray_cfgs(['n_sample']))
-            output = self._forward(
-                inputs, zvals, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000
-            )
+            zvals = self.get_zvals_from_near_far(near, far, self.get_n_coarse_sample(), inference_only)
+            output = self._forward(inputs, zvals, inference_only, get_progress, cur_epoch, total_epoch)
         else:
+            print('Actually get his')
             # rays_o = inputs['rays_o']  # (B, 3)
             # rays_d = inputs['rays_d']  # (B, 3)
             # n_rays = rays_o.shape[0]
             # output = {}
-            zvals = self.get_zvals_from_near_far(near, far, self.get_ray_cfgs(['n_sample']))
-            output = self._forward(
-                inputs, zvals, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000
-            )
+            zvals = self.get_zvals_from_near_far(near, far, self.get_n_coarse_sample(), inference_only)
+            output = self._forward(inputs, zvals, inference_only, get_progress, cur_epoch, total_epoch)
 
         return output
 
@@ -161,6 +161,7 @@ class FgModel(Base3dModel):
     def optimize(self, cur_epoch=0):
         """Optimize the obj bounding geometric structure. Support ['volume'] now."""
         if cur_epoch > 0 and self.epoch_optim is not None and cur_epoch % self.epoch_optim == 0:
+            print('Doing optimize ', cur_epoch)
             if self.obj_bound_type == 'volume':
                 self.optim_volume(cur_epoch)
 

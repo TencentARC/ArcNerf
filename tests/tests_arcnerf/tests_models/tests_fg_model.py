@@ -68,7 +68,7 @@ class TestModelDict(unittest.TestCase):
         if mask is None:  # Not bounded in obj
             pts = get_ray_points_by_zvals(inputs['rays_o'], inputs['rays_d'], zvals)
         else:
-            pts = get_ray_points_by_zvals(inputs['rays_o'][mask[:, 0]], inputs['rays_d'][mask[:, 0]], zvals[mask[:, 0]])
+            pts = get_ray_points_by_zvals(inputs['rays_o'][mask], inputs['rays_d'][mask], zvals[mask])
         pts = torch_to_np(pts).reshape(-1, 3)
 
         near, far = torch_to_np(near), torch_to_np(far)

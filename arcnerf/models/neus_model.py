@@ -60,16 +60,10 @@ class Neus(SdfModel):
 
         return min(1.0, cur_epoch / self.anneal_end)
 
-    def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+    def _forward(self, inputs, zvals, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)
         n_rays = rays_o.shape[0]
-
-        # get bounds for object
-        near, far = self.get_near_far_from_rays(inputs)  # (B, 1) * 2
-
-        # get coarse zvals
-        zvals = self.get_zvals_from_near_far(near, far, self.get_ray_cfgs('n_sample'), inference_only)  # (B, N_sample)
 
         # up-sample zvals
         zvals = self.upsample_zvals(rays_o, rays_d, zvals, inference_only)  # (B, N_total(N_sample+N_importance))

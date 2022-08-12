@@ -9,7 +9,7 @@ from common.utils.torch_utils import torch_to_np
 
 
 class Volume(nn.Module):
-    """A volume with custom operation"""
+    """A volume with customized operation"""
 
     def __init__(
         self, n_grid=None, origin=(0, 0, 0), side=None, xyz_len=None, dtype=torch.float32, requires_grad=False
@@ -639,16 +639,21 @@ class Volume(nn.Module):
         if in_occ_voxel and self.bitfield is not None:  # in occupied sample
             grid_pts = self.get_occupied_grid_pts()  # (n_occ, 3)
             aabb_range = torch.cat([grid_pts[:, 0, :].unsqueeze(-1), grid_pts[:, -1, :].unsqueeze(-1)], dim=-1)
-            near, far, _, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)  # (n_rays, n_occ)*2, (n_rays, n_occ)
+            near, far, _, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)
+
+            # find the rays near/far with any hit voxels
             near[~mask], far[~mask] = 1e6, -1e6
             near = torch.min(near, dim=1)[0][:, None]  # (n_rays, 1)
             far = torch.max(far, dim=1)[0][:, None]  # (n_rays, 1)
             mask = torch.any(mask, dim=1, keepdim=True)  # (n_rays, 1)
-            near[~mask], far[~mask] = 0.0, 0.0  # those not hit rays get all 0
+
+            # those not hit rays get all 0, recalculate pts
+            near[~mask], far[~mask] = 0.0, 0.0
             pts = torch.cat(
                 [get_ray_points_by_zvals(rays_o, rays_d, near),
                  get_ray_points_by_zvals(rays_o, rays_d, far)], dim=1
             )  # (n_rays, 2, 3)
+
         else:  # full volume
             aabb_range = self.get_range()[None].to(rays_o.device)  # (1, 3, 2)
             near, far, pts, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)

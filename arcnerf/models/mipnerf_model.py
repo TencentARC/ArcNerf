@@ -30,21 +30,17 @@ class MipNeRF(FgModel):
         # blur coarse weights
         self.blur_coarse_weights = get_value_from_cfgs_field(self.cfgs.model.rays, 'blur_coarse_weights', False)
 
-    def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+    def get_n_coarse_sample(self):
+        """make one more sample for interval modeling"""
+        return self.get_ray_cfgs('n_sample') + 1
+
+    def _forward(self, inputs, zvals, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+        """zvals is in shape (n_sample+1)"""
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)
         rays_r = inputs['rays_r']  # (B, 1)
         n_rays = rays_o.shape[0]
         output = {}
-
-        # get bounds for object
-        near, far = self.get_near_far_from_rays(inputs)  # (B, 1) * 2
-
-        # get zvals for each intervals
-        zvals = self.get_zvals_from_near_far(
-            near, far,
-            self.get_ray_cfgs('n_sample') + 1, inference_only
-        )  # (B, N_sample+1)
 
         # get mean/cov representation of intervals
         intervals = self.gaussian(zvals, rays_o, rays_d, rays_r)  # (B, N_sample, 6)
@@ -115,7 +111,7 @@ class MipNeRF(FgModel):
             weights_max = torch.max(weights_pad[..., :-1], weights_pad[..., 1:])  # (B, N_sample+1)
             weights = 0.5 * (weights_max[..., :-1] + weights_max[..., 1:])  # (B, N_sample)
 
-        weights_coarse = weights[:, 1:self.get_ray_cfgs('n_sample') - 1]  # (B, N_sample-2)
+        weights_coarse = weights[:, 1:self.get_n_coarse_sample() - 2]  # (B, N_sample-2)
         zvals_mid = 0.5 * (zvals[..., 1:] + zvals[..., :-1])  # (B, N_sample-1)
         _zvals = sample_pdf(
             zvals_mid, weights_coarse,

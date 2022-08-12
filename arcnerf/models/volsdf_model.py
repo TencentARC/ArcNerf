@@ -53,16 +53,14 @@ class VolSDF(SdfModel):
         """Return scale = exp(ln_beta * speed)"""
         return torch.exp(self.ln_beta * self.speed_factor)
 
-    def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+    def get_n_coarse_sample(self):
+        """use N_eval instead of using N_sample """
+        return self.get_ray_cfgs('n_eval')
+
+    def _forward(self, inputs, zvals, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)
         n_rays = rays_o.shape[0]
-
-        # get bounds for object
-        near, far = self.get_near_far_from_rays(inputs)  # (B, 1) * 2
-
-        # get coarse zvals, use N_eval instead of using N_sample
-        zvals = self.get_zvals_from_near_far(near, far, self.get_ray_cfgs('n_eval'), inference_only)  # (B, N_eval)
 
         # sample zvals near surface, (B, N_total(N_sample+N_importance)) for zvals,  (B, 1) for zvals_surface
         zvals, zvals_surface = self.upsample_zvals(rays_o, rays_d, zvals, inference_only, self.forward_pts)

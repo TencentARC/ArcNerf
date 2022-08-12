@@ -14,6 +14,18 @@ class TestNerfPPDict(TestModelDict):
         feed_in = self.create_feed_in_to_cuda()
         self.log_model_info(logger, model, feed_in, cfgs)
 
+        # without obj_bound structure
+        self.run_model_tests(model, feed_in, cfgs)
+
+        # add volume and test
+        model = self.add_volume_structure_to_fg_model(model)
+        self.run_model_tests(model, feed_in, cfgs)
+
+        # add sphere and test
+        model = self.add_sphere_structure_to_fg_model(model)
+        self.run_model_tests(model, feed_in, cfgs)
+
+    def run_model_tests(self, model, feed_in, cfgs):
         # test forward
         self._test_forward(model, feed_in, '_coarse')
 

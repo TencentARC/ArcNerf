@@ -29,6 +29,18 @@ class TestVolsdfDict(TestModelDict):
         feed_in = self.create_feed_in_to_cuda()
         self.log_model_info(logger, model, feed_in, cfgs)
 
+        # without obj_bound structure
+        self.run_model_tests(model, feed_in, cfgs)
+
+        # add volume and test
+        model = self.add_volume_structure_to_fg_model(model)
+        self.run_model_tests(model, feed_in, cfgs)
+
+        # add sphere and test
+        model = self.add_sphere_structure_to_fg_model(model)
+        self.run_model_tests(model, feed_in, cfgs)
+
+    def run_model_tests(self, model, feed_in, cfgs):
         # test forward
         self._test_forward(model, feed_in, extra_keys=['normal'], extra_bn3=[True])
 
@@ -175,11 +187,13 @@ class TestVolsdfDict(TestModelDict):
         )
 
         # with no n_importance(all near surface)
+        n_importance = model.get_fg_model().get_ray_cfgs('n_importance')
         model.get_fg_model().set_ray_cfgs('n_importance', 0)
 
         zvals_sample, zvals_surface = model.get_fg_model().upsample_zvals(
             rays_o, rays_d, zvals, True, sdf_func
         )  # (1, n_sample), (1, 1)
+        model.get_fg_model().set_ray_cfgs('n_importance', n_importance)
 
         res = get_2d_output(zvals, zvals_sample, zvals_surface, sdf)
 

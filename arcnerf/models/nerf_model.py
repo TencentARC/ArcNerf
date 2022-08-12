@@ -51,18 +51,11 @@ class NeRF(FgModel):
         if self.get_ray_cfgs('n_importance') > 0:
             self.fine_geo_net.pretrain_siren()
 
-    def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+    def _forward(self, inputs, zvals, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)
         n_rays = rays_o.shape[0]
         output = {}
-
-        # get bounds for object
-        near, far = self.get_near_far_from_rays(inputs)  # (B, 1) * 2
-
-        # coarse model
-        # get zvals
-        zvals = self.get_zvals_from_near_far(near, far, self.get_ray_cfgs('n_sample'), inference_only)  # (B, N_sample)
 
         # get points
         pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (B, N_sample, 3)

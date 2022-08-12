@@ -31,37 +31,49 @@ class TestNeusDict(TestModelDict):
             feed_in = self.create_feed_in_to_cuda()
             self.log_model_info(logger, model, feed_in, cfgs)
 
-            # test forward
-            self._test_forward(model, feed_in, extra_keys=['normal'], extra_bn3=[True])
+            # without obj_bound structure
+            self.run_model_tests(model, feed_in, cfgs)
 
-            # test params
-            self._test_forward_params_in(model, feed_in, ['scale'])
+            # add volume and test
+            model = self.add_volume_structure_to_fg_model(model)
+            self.run_model_tests(model, feed_in, cfgs)
 
-            # inference only
-            self._test_forward_inference_only(model, feed_in)
+            # add sphere and test
+            model = self.add_sphere_structure_to_fg_model(model)
+            self.run_model_tests(model, feed_in, cfgs)
 
-            # get progress
-            n_sample = cfgs.model.rays.n_sample
-            n_importance = (cfgs.model.rays.n_importance // cfgs.model.rays.n_iter) * cfgs.model.rays.n_iter
-            n_total = n_sample + n_importance
-            progress_shape = (self.batch_size, self.n_rays, n_total)
-            self._test_forward_progress(model, feed_in, progress_shape)
+    def run_model_tests(self, model, feed_in, cfgs):
+        # test forward
+        self._test_forward(model, feed_in, extra_keys=['normal'], extra_bn3=[True])
 
-            # direct inference
-            pts, view_dir = self.create_pts_dir_to_cuda()
-            self._test_pts_dir_forward(model, pts, view_dir)
+        # test params
+        self._test_forward_params_in(model, feed_in, ['scale'])
 
-            # opacity
-            self._test_get_est_opacity(model, pts)
+        # inference only
+        self._test_forward_inference_only(model, feed_in)
 
-            # test sdf_to_alpha
-            self._test_sdf_to_alpha()
+        # get progress
+        n_sample = cfgs.model.rays.n_sample
+        n_importance = (cfgs.model.rays.n_importance // cfgs.model.rays.n_iter) * cfgs.model.rays.n_iter
+        n_total = n_sample + n_importance
+        progress_shape = (self.batch_size, self.n_rays, n_total)
+        self._test_forward_progress(model, feed_in, progress_shape)
 
-            # test weight
-            self._test_sdf_weight()
+        # direct inference
+        pts, view_dir = self.create_pts_dir_to_cuda()
+        self._test_pts_dir_forward(model, pts, view_dir)
 
-            # surface render
-            self._test_surface_render(model, feed_in, extra_keys=['normal'], extra_bn3=[True])
+        # opacity
+        self._test_get_est_opacity(model, pts)
+
+        # test sdf_to_alpha
+        self._test_sdf_to_alpha()
+
+        # test weight
+        self._test_sdf_weight()
+
+        # surface render
+        self._test_surface_render(model, feed_in, extra_keys=['normal'], extra_bn3=[True])
 
     def _test_forward_inference_only(self, model, feed_in):
         """Test that all keys are not started with progress_"""

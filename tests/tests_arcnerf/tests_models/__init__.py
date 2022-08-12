@@ -56,6 +56,10 @@ class TestModelDict(unittest.TestCase):
     def setUpClass(cls):
         cls.batch_size = 1
         cls.n_rays = 72 * 35
+        cls.max_pos = 3.0
+        # those are for object bound
+        cls.radius = 1.0
+        cls.volume_side = 2.0
 
     def get_cfgs_logger(self, config_file, logger_file):
         cfgs = self.load_model_configs(config_file)
@@ -91,8 +95,8 @@ class TestModelDict(unittest.TestCase):
         return model
 
     def create_feed_in_to_cuda(self):
-        rays_o = torch.rand(self.batch_size, self.n_rays, 3) * 2.0
-        rays_d = -normalize(rays_o)  # point to origin
+        rays_o = torch.rand(self.batch_size, self.n_rays, 3) * self.max_pos
+        rays_d = -normalize(rays_o + torch.rand_like(rays_o) * self.max_pos)  # point to origin with noise
         rays_r = torch.rand(self.batch_size, self.n_rays, 1)
         bn3 = torch.ones(self.batch_size, self.n_rays, 3)
         bn1 = torch.ones(self.batch_size, self.n_rays, 1)
@@ -202,3 +206,29 @@ class TestModelDict(unittest.TestCase):
                         self.n_rays,
                     )
                 self.assertEqual(output['{}'.format(key)].shape, gt_shape)
+
+    def add_volume_structure_to_fg_model(self, model):
+        """Add a bounding volume structure to the model """
+        volume_cfgs = {'volume': {'n_grid': 4, 'side': self.volume_side}}
+        volume_cfgs = dict_to_obj(volume_cfgs)
+        model.get_fg_model().epoch_optim = 10  # ugly but fine
+        model.get_fg_model().set_up_obj_bound_structure_by_cfgs(volume_cfgs)
+        model = self.to_cuda(model)
+
+        # call optimization on fg model
+        volume = model.get_fg_model().get_obj_bound_and_type()[0]
+        full_voxel_idx = volume.get_full_voxel_idx(flatten=True)
+        rand_idx = torch.randperm(full_voxel_idx.shape[0])[:int(full_voxel_idx.shape[0] / 2)]
+        rand_voxel_idx = full_voxel_idx[rand_idx, ...]
+        volume.update_bitfield_by_voxel_idx(rand_voxel_idx, occ=False)  # mask 1/2 volume randomly
+
+        return model
+
+    def add_sphere_structure_to_fg_model(self, model):
+        """Add a bounding volume structure to the model """
+        sphere_cfgs = {'sphere': {'radius': self.radius}}
+        sphere_cfgs = dict_to_obj(sphere_cfgs)
+        model.get_fg_model().set_up_obj_bound_structure_by_cfgs(sphere_cfgs)
+        model = self.to_cuda(model)
+
+        return model
