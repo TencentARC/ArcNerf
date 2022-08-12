@@ -112,8 +112,11 @@ inference:
 
 model:
     type: Neus
+    obj_bound: # use a sphere bound for sampling. No need to optimize it.
+        sphere:
+            radius: 1.5
     rays:
-        bounding_radius: 1.5
+        radius_bound: 1.5
         n_sample: 64
         n_importance: 64
         n_iter: 4

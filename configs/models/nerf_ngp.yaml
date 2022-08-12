@@ -2,10 +2,13 @@
 
 model:
     type: NeRF
-    rays:
-        volume:                       # this is for sampling in the volume
-            n_grid: None
+    obj_bound:
+        volume:
+            n_grid: 128
             side: 2.0
+        epoch_optim: 16
+        epoch_optim_warmup: 256
+    rays:
         n_sample: 1024                # n_sample for zvals sampling
         n_importance: 0               # do not use hierarchical sampling
         inverse_linear: False         # inverse_linear make zvals close to near

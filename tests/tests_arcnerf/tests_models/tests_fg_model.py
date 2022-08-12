@@ -203,10 +203,10 @@ class TestModelDict(unittest.TestCase):
         self.run_fg_model_tests(fg_model, 'volume')
 
         # with pruning
-        volume_model_cfgs['model']['epoch_optim'] = 16
-        volume_model_cfgs['model']['epoch_optim_warmup'] = 256
-        volume_model_cfgs['model']['ema_optim_decay'] = 0.0  # for updata compare
-        volume_model_cfgs['model']['ray_sample_acc'] = False
+        volume_model_cfgs['model']['obj_bound']['epoch_optim'] = 16
+        volume_model_cfgs['model']['obj_bound']['epoch_optim_warmup'] = 256
+        volume_model_cfgs['model']['obj_bound']['ema_optim_decay'] = 0.0  # for updata compare
+        volume_model_cfgs['model']['obj_bound']['ray_sample_acc'] = False
         fg_model = FakeFGModel(dict_to_obj(volume_model_cfgs))
         self.run_volume_prunning_acc(fg_model)
 

@@ -2,10 +2,11 @@
 
 model:
     type: VolSDF
+    obj_bound:                        # use a sphere bound for sampling. No need to optimize it.
+        sphere:
+            radius: 1.5
     rays:
-        bounding_radius: 3.0          # bounding ray sampling region
-        near: 1.5                     # hardcode near zvals
-        # far: 4.5                    # hardcode far zvals
+        radius_bound: 1.5             # this bound the radius that large than the object
         n_sample: 64                  # n_sample for zvals sampling, all near surface
         n_importance: 32              # n_importance for extra random samples. Since n_sample are near surface, optional
         n_eval: 128                   # n_eval for zvals in each iteration

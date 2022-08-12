@@ -165,19 +165,18 @@ the main object in a volume/sphere for accurate and concentrate sampling, or wit
 We may set up the automatic helper in the future.
   - volume: It needs `n_grid`/`origin`/`xyz_len`or`side` to set up.
   - sphere: It needs `origin`/`radius` to set up.
-- Optimization
-  - The optimization is only for volume now.
-  - epoch_optim: If not None, will set up the voxel occupancy and do pruning every this epoch.
-  - epoch_optim_warmup: If not None, will do different sampling in volume.
-  - ray_sampling_acc: If True, will do customized skip sampling in CUDA. Otherwise use simple uniform sampling in (near, far)
-  - ema_optim_decay: If None, directly write all `non-negative` opacity value by new one. Else, update old one by ema factor.
-  - opa_thres: The minimum opacity for considering a voxel as occupied.
-- default values
-  - If you use a obj_bound structure to bound the object, many rays may not hit the structure so that they can
-  be skipped for computation. You need to set up a default value for them.
-  - bkg_color:
-  - depth_far:
-  - normal:
+  - Optimization: The optimization is only for volume now. The params are under `cfgs.models.obj_bound`
+    - epoch_optim: If not None, will set up the voxel occupancy and do pruning every this epoch.
+    - epoch_optim_warmup: If not None, will do different sampling in volume.
+    - ray_sampling_acc: If True, will do customized skip sampling in CUDA. Otherwise use simple uniform sampling in (near, far)
+    - ema_optim_decay: If None, directly write all `non-negative` opacity value by new one. Else, update old one by ema factor.
+    - opa_thres: The minimum opacity for considering a voxel as occupied.
+  - default values
+    - If you use a obj_bound structure to bound the object, many rays may not hit the structure so that they can
+    be skipped for computation. You need to set up a default value for them.
+    - bkg_color:
+    - depth_far:
+    - normal:
 
 Following are real modeling methods:
 
@@ -209,6 +208,7 @@ Since it gets sdf value instead of sigma, we do not support sigma mode for blend
 - speed_factor: use to init the inv_s, and get scale by `exp(inv_s * speed_factor``. By default `10`.
 - anneal_end: num of epoch for slope blending. In infer model, the factor is `1`, else `min(epoch/anneal_end, 1)`
 - n_iter: num of iter to run upsample algo.
+- radius_bound: This is the interest of radius that we bound.
 
 ### VolSDF
 [VolSDF](https://arxiv.org/abs/2106.12052) models sdf as well but used different sdf_to_density function and sampling method compared with NeuS.
@@ -219,6 +219,7 @@ Since it gets sdf value instead of sigma, we do not support sigma mode for blend
 - n_eval: num of eval pts for upsampling, not used for backward.
 - beta_iter: num of iter to update beta
 - eps: small threshold
+- radius_bound: This is the interest of radius that we bound.
 
 The performance is worse than Neus as we test.
 

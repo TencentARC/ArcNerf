@@ -23,21 +23,42 @@ class FgModel(Base3dModel):
 
     def __init__(self, cfgs):
         super(FgModel, self).__init__(cfgs)
-        # optimize the struct(pruning the volume, etc) periodically
-        self.epoch_optim = get_value_from_cfgs_field(self.cfgs.model, 'epoch_optim', None)
-        self.epoch_optim_warmup = get_value_from_cfgs_field(self.cfgs.model, 'epoch_optim_warmup', None)
-        self.ema_optim_decay = get_value_from_cfgs_field(self.cfgs.model, 'ema_optim_decay', 0.95)
-        self.opa_thres = get_value_from_cfgs_field(self.cfgs.model, 'opa_thres', 0.01)
-        # whether use accelerated sampling or uniform sample in (near, far)
-        self.ray_sample_acc = get_value_from_cfgs_field(self.cfgs.model, 'ray_sample_acc', False)
         # inner object bounding structure
+        self.optim_cfgs = self.read_optim_cfgs()
         self.obj_bound, self.obj_bound_type = get_value_from_cfgs_field(self.cfgs.model, 'obj_bound'), None
         if self.obj_bound is not None:
             self.set_up_obj_bound_structure()
-        # bkg color/depth/normal for invalid rays
-        self.bkg_color = get_value_from_cfgs_field(self.cfgs.model, 'bkg_color', [1.0, 1.0, 1.0])  # white
-        self.depth_far = get_value_from_cfgs_field(self.cfgs.model, 'depth_far', 10.0)  # far distance
-        self.normal = get_value_from_cfgs_field(self.cfgs.model, 'normal', [1.0, 0.0, 0.0])  # for eikonal loss cal
+
+    def read_optim_cfgs(self):
+        """Read optim params under model.obj_bound. Prams controls optimization"""
+        params = {}
+        if get_value_from_cfgs_field(self.cfgs.model, 'obj_bound') is None:
+            params['epoch_optim'] = None
+        else:
+            cfgs = self.cfgs.model.obj_bound
+            params['epoch_optim'] = get_value_from_cfgs_field(cfgs, 'epoch_optim', None)
+            params['epoch_optim_warmup'] = get_value_from_cfgs_field(cfgs, 'epoch_optim_warmup', None)
+            params['ema_optim_decay'] = get_value_from_cfgs_field(cfgs, 'ema_optim_decay', 0.95)
+            params['opa_thres'] = get_value_from_cfgs_field(cfgs, 'opa_thres', 0.01)
+            # whether use accelerated sampling or uniform sample in (near, far)
+            params['ray_sample_acc'] = get_value_from_cfgs_field(cfgs, 'ray_sample_acc', False)
+            # bkg color/depth/normal for invalid rays
+            params['bkg_color'] = get_value_from_cfgs_field(cfgs, 'bkg_color', [1.0, 1.0, 1.0])  # white
+            params['depth_far'] = get_value_from_cfgs_field(cfgs, 'depth_far', 10.0)  # far distance
+            params['normal'] = get_value_from_cfgs_field(cfgs, 'normal', [1.0, 0.0, 0.0])  # for eikonal loss cal
+
+        return params
+
+    def get_optim_cfgs(self, key=None):
+        """Get optim cfgs by optional key"""
+        if key is None:
+            return self.optim_cfgs
+
+        return self.optim_cfgs[key]
+
+    def set_optim_cfgs(self, key, value):
+        """Set optim cfgs by key"""
+        self.optim_cfgs[key] = value
 
     def get_n_coarse_sample(self):
         """Num of coarse sample for sampling in the foreground space. By default use n_sample in configs"""
@@ -71,7 +92,7 @@ class FgModel(Base3dModel):
         if get_value_from_cfgs_field(volume_cfgs, 'n_grid') is None:  # Must set a default resolution
             volume_cfgs.n_grid = 128
         self.obj_bound = Volume(**volume_cfgs.__dict__)
-        if self.epoch_optim is not None:  # setup bitfield for pruning
+        if self.get_optim_cfgs('epoch_optim') is not None:  # setup bitfield for pruning
             self.obj_bound.set_up_voxel_bitfield()
             self.obj_bound.set_up_voxel_opafield()
 
@@ -90,10 +111,13 @@ class FgModel(Base3dModel):
         """
         if self.obj_bound_type is not None:
             if self.obj_bound_type == 'volume':
-                in_occ = self.epoch_optim is not None
+                in_occ = self.get_optim_cfgs('epoch_optim') is not None
                 # TODO: This calculation may be slow, or directly use large volume and find rays
                 # TODO: But it's accurate for filtering the rays, Otherwise some rays still samples pts
+                from common.utils.torch_utils import get_start_time, get_end_time
+                t0 = get_start_time()
                 near, far, _, mask = self.obj_bound.ray_volume_intersection(inputs['rays_o'], inputs['rays_d'], in_occ)
+                print('aabb full voxel time ', get_end_time(t0), near.shape, in_occ)
             elif self.obj_bound_type == 'sphere':
                 near, far, _, mask = self.obj_bound.ray_sphere_intersection(inputs['rays_o'], inputs['rays_d'])
             else:
@@ -112,7 +136,8 @@ class FgModel(Base3dModel):
         """
         zvals = None
         if self.obj_bound_type is not None:
-            if self.obj_bound_type == 'volume' and self.epoch_optim is not None and self.ray_sample_acc:
+            if self.obj_bound_type == 'volume' and self.get_optim_cfgs('epoch_optim') is not None\
+                    and self.get_optim_cfgs('ray_sample_acc'):
                 self.get_zvals_from_sparse_volume(near, far, n_pts, inference_only)
 
         # only volume based method with pruning allowed acceleration
@@ -128,6 +153,7 @@ class FgModel(Base3dModel):
     def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         """If you use a geometric structure bounding the object, some rays does not hit the bound can be ignored.
          You can assign a bkg color to them directly, with opacity=0.0 and depth=some far distance.
+         TODO: We can only support fix num of sampling for each rays now. Is this good enough.
         """
         # find the near/far and mask
         near, far, mask = self.get_near_far_from_rays(inputs)
@@ -135,7 +161,7 @@ class FgModel(Base3dModel):
             zvals = self.get_zvals_from_near_far(near, far, self.get_n_coarse_sample(), inference_only)
             output = self._forward(inputs, zvals, inference_only, get_progress, cur_epoch, total_epoch)
         else:
-            print('Actually get his')
+            print('Use this')
             # rays_o = inputs['rays_o']  # (B, 3)
             # rays_d = inputs['rays_d']  # (B, 3)
             # n_rays = rays_o.shape[0]
@@ -160,7 +186,8 @@ class FgModel(Base3dModel):
     @torch.no_grad()
     def optimize(self, cur_epoch=0):
         """Optimize the obj bounding geometric structure. Support ['volume'] now."""
-        if cur_epoch > 0 and self.epoch_optim is not None and cur_epoch % self.epoch_optim == 0:
+        epoch_optim = self.get_optim_cfgs('epoch_optim')
+        if cur_epoch > 0 and epoch_optim is not None and cur_epoch % epoch_optim:
             print('Doing optimize ', cur_epoch)
             if self.obj_bound_type == 'volume':
                 self.optim_volume(cur_epoch)
@@ -171,7 +198,8 @@ class FgModel(Base3dModel):
          Else in pose-warmup stage, uniform sampled 1/4 cells from all and 1/4 cells from occupied cells.
          """
         volume = self.obj_bound
-        if self.epoch_optim_warmup is not None and cur_epoch < self.epoch_optim_warmup:
+        epoch_optim_warmup = self.get_optim_cfgs('epoch_optim_warmup')
+        if epoch_optim_warmup is not None and cur_epoch < epoch_optim_warmup:
             voxel_idx = volume.get_full_voxel_idx(flatten=True)  # (N_grid**3, 3)
             voxel_pts = volume.get_volume_pts()  # (N_grid**3, 3)
         else:
@@ -200,8 +228,8 @@ class FgModel(Base3dModel):
         opacity = self.get_est_opacity(dt, voxel_pts)  # (N,)
 
         # update opacity and bitfield
-        volume.update_opafield_by_voxel_idx(voxel_idx, opacity, ema=self.ema_optim_decay)
-        volume.update_bitfield_by_opafield(threshold=self.opa_thres)
+        volume.update_opafield_by_voxel_idx(voxel_idx, opacity, ema=self.get_optim_cfgs('ema_optim_decay'))
+        volume.update_bitfield_by_opafield(threshold=self.get_optim_cfgs('opa_thres'))
 
     def get_est_opacity(self, dt, pts):
         """Get the estimated opacity at certain pts. This method is only for fg_model.

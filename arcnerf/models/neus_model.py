@@ -37,8 +37,8 @@ class Neus(SdfModel):
         self.radius_init = get_value_from_cfgs_field(self.cfgs.model.geometry, 'radius_init', 1.0)
         self.inv_s, self.speed_factor = self.get_params()
         self.anneal_end = get_value_from_cfgs_field(self.cfgs.model.params, 'anneal_end', 0)
-        # Use bounding radius sampling in NeuS
-        assert self.get_ray_cfgs('bounding_radius') is not None, 'You must set a radius of interest for sampling...'
+        # Use bounding sphere in NeuS
+        self.radius_bound = get_value_from_cfgs_field(self.cfgs.model.rays, 'radius_bound', 1.5)
 
     def get_params(self):
         """Get scale param"""
@@ -154,8 +154,7 @@ class Neus(SdfModel):
             # clip the slope only in the sphere of interest
             pts = pts.view(n_rays, n_pts, 3)  # (B, N_pts, 3)
             radius = torch.norm(pts, dim=-1)  # (B, N_pts)
-            bound = self.get_ray_cfgs('bounding_radius')
-            inside_sphere = (radius[:, :-1] < bound) | (radius[:, 1:] < bound)
+            inside_sphere = (radius[:, :-1] < self.radius_bound) | (radius[:, 1:] < self.radius_bound)
             slope = slope * inside_sphere
 
             # upsample by alpha from cdf. eq.13 of paper.

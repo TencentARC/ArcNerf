@@ -36,8 +36,8 @@ class VolSDF(SdfModel):
         # radius init for object
         self.radius_init = get_value_from_cfgs_field(self.cfgs.model.geometry, 'radius_init', 1.0)
         self.ln_beta, self.beta_min, self.speed_factor = self.get_params()
-        # Use bounding radius sampling in NeuS
-        assert self.get_ray_cfgs('bounding_radius') is not None, 'You must set a radius of interest for sampling...'
+        # Use bounding radius sampling in volsdf
+        self.radius_bound = get_value_from_cfgs_field(self.cfgs.model.rays, 'radius_bound', 1.5)
 
     def get_params(self):
         """Get scale param"""
@@ -308,12 +308,11 @@ class VolSDF(SdfModel):
         """
         dtype = rays_o.dtype
         device = rays_o.device
-        bounding_radius = self.get_ray_cfgs('bounding_radius')
 
         # random pts in sphere, (B, 1, 3)
         pts_rand = torch.empty(size=(rays_o.shape[0], 1, 3), dtype=dtype, device=device)\
-            .uniform_(-bounding_radius, bounding_radius)
-        pts_rand = pts_rand / torch.norm(pts_rand, dim=-1, keepdim=True).max() * bounding_radius  # make sure in sphere
+            .uniform_(-self.radius_bound, self.radius_bound)
+        pts_rand = pts_rand / torch.norm(pts_rand, dim=-1, keepdim=True).max() * self.radius_bound  # make sure in bound
 
         # pts on surface, (B, 1, 3)
         pts_surface = None
