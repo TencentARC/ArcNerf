@@ -608,6 +608,9 @@ class ArcNerfTrainer(BasicTrainer):
         """Train for one epoch. Each epoch return the final sum of loss and total num of iter in epoch"""
         step_in_epoch = 1  # in nerf, each epoch is sampling of all rays in all training samples
 
+        # optimize the model for its bounding structure
+        self.model.optimize()
+
         # remake train dataset train crop
         crop_shuffle = self.crop_max_epoch is not None and epoch >= self.crop_max_epoch
         if crop_shuffle:

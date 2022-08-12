@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from .ray import aabb_ray_intersection
+from .ray import aabb_ray_intersection, get_ray_points_by_zvals
 from common.utils.torch_utils import torch_to_np
 
 
@@ -618,12 +618,14 @@ class Volume(nn.Module):
 
         return values_by_grid_pts_idx
 
-    def ray_volume_intersection(self, rays_o: torch.Tensor, rays_d: torch.Tensor):
+    def ray_volume_intersection(self, rays_o: torch.Tensor, rays_d: torch.Tensor, in_occ_voxel=False):
         """Calculate the rays intersection with the out-bounding surfaces
 
         Args:
             rays_o: ray origin, (N_rays, 3)
             rays_d: ray direction, (N_rays, 3)
+            in_occ_voxel: If True, only calculate intersection between rays and current occ rays.
+                          It can reduced calculation. When some voxels are masked not occupied. By default False.
 
         Returns:
             near: near intersection zvals. (N_rays, 1)
@@ -634,9 +636,23 @@ class Volume(nn.Module):
                                       if nan, means no intersection at this ray
             mask: (N_rays, 1), show whether each ray has intersection with the volume, BoolTensor
         """
-        aabb_range = self.get_range()[None].to(rays_o.device)  # (1, 3, 2)
-        near, far, pts, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)
-        pts = pts[:, 0, :, :]  # (N_rays, 1, 2, 3) -> (N_rays, 2, 3)
+        if in_occ_voxel and self.bitfield is not None:  # in occupied sample
+            grid_pts = self.get_occupied_grid_pts()  # (n_occ, 3)
+            aabb_range = torch.cat([grid_pts[:, 0, :].unsqueeze(-1), grid_pts[:, -1, :].unsqueeze(-1)], dim=-1)
+            near, far, _, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)  # (n_rays, n_occ)*2, (n_rays, n_occ)
+            near[~mask], far[~mask] = 1e6, -1e6
+            near = torch.min(near, dim=1)[0][:, None]  # (n_rays, 1)
+            far = torch.max(far, dim=1)[0][:, None]  # (n_rays, 1)
+            mask = torch.any(mask, dim=1, keepdim=True)  # (n_rays, 1)
+            near[~mask], far[~mask] = 0.0, 0.0  # those not hit rays get all 0
+            pts = torch.cat(
+                [get_ray_points_by_zvals(rays_o, rays_d, near),
+                 get_ray_points_by_zvals(rays_o, rays_d, far)], dim=1
+            )  # (n_rays, 2, 3)
+        else:  # full volume
+            aabb_range = self.get_range()[None].to(rays_o.device)  # (1, 3, 2)
+            near, far, pts, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)
+            pts = pts[:, 0, :, :]  # (N_rays, 1, 2, 3) -> (N_rays, 2, 3)
 
         return near, far, pts, mask
 

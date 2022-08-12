@@ -422,6 +422,11 @@ class FullModel(nn.Module):
 
         return output
 
+    @torch.no_grad()
+    def optimize(self, cur_epoch=0):
+        """Optimize the fg_model for its obj_bound structure."""
+        self.fg_model.optimize(cur_epoch)
+
     def forward_pts_dir(self, pts: torch.Tensor, view_dir: torch.Tensor = None):
         """Only the fg model can forward pts and dir"""
         return self.fg_model.forward_pts_dir(pts, view_dir)

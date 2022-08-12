@@ -60,12 +60,15 @@ class TestModelDict(unittest.TestCase):
 
     def get_zvals_np_from_model(self, inputs, model):
         # call get_near_far_from_rays
-        near, far = model.get_near_far_from_rays(inputs)
+        near, far, mask = model.get_near_far_from_rays(inputs)
         self.assertEqual(near.shape, (self.n_rays, 1))
         self.assertEqual(far.shape, (self.n_rays, 1))
-        # draw the sampling pts
+        # draw the sampling pts, only for hit rays
         zvals = model.get_zvals_from_near_far(near, far, 16)
-        pts = get_ray_points_by_zvals(inputs['rays_o'], inputs['rays_d'], zvals)
+        if mask is None:  # Not bounded in obj
+            pts = get_ray_points_by_zvals(inputs['rays_o'], inputs['rays_d'], zvals)
+        else:
+            pts = get_ray_points_by_zvals(inputs['rays_o'][mask[:, 0]], inputs['rays_d'][mask[:, 0]], zvals[mask[:, 0]])
         pts = torch_to_np(pts).reshape(-1, 3)
 
         near, far = torch_to_np(near), torch_to_np(far)
@@ -115,7 +118,7 @@ class TestModelDict(unittest.TestCase):
 
         # pruning the voxels
         model.set_factor(100.0)
-        model.optim_obj_bound(10)  # warmup
+        model.optimize(16)  # warmup
 
         volume = model.get_obj_bound_and_type()[0]
         volume_dict = {
@@ -135,7 +138,7 @@ class TestModelDict(unittest.TestCase):
 
         # this could update by a refined one
         model.set_factor(1.0)
-        model.optim_obj_bound(500)  # not warmup
+        model.optimize(512)  # not warmup
 
         volume = model.get_obj_bound_and_type()[0]
         volume_dict = {

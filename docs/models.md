@@ -164,12 +164,14 @@ the main object in a volume/sphere for accurate and concentrate sampling, or wit
 - obj_bound: You can set a volume/sphere that bounding the obj. But you need to manually set the size of the structure.
 We may set up the automatic helper in the future.
   - volume: It needs `n_grid`/`origin`/`xyz_len`or`side` to set up.
-  - sphere: It needs `origin`/`radius` to set up
+  - sphere: It needs `origin`/`radius` to set up.
 - Optimization
   - The optimization is only for volume now.
   - epoch_optim: If not None, will set up the voxel occupancy and do pruning every this epoch.
   - epoch_optim_warmup: If not None, will do different sampling in volume.
   - ray_sampling_acc: If True, will do customized skip sampling in CUDA. Otherwise use simple uniform sampling in (near, far)
+  - ema_optim_decay: If None, directly write all `non-negative` opacity value by new one. Else, update old one by ema factor.
+  - opa_thres: The minimum opacity for considering a voxel as occupied.
 - default values
   - If you use a obj_bound structure to bound the object, many rays may not hit the structure so that they can
   be skipped for computation. You need to set up a default value for them.
@@ -177,6 +179,7 @@ We may set up the automatic helper in the future.
   - depth_far:
   - normal:
 
+Following are real modeling methods:
 
 ### NeRF
 [NeRF](https://arxiv.org/abs/2003.08934) model with single forward or hierarchical sampling. You can control by `n_importance`.

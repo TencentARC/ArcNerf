@@ -45,17 +45,21 @@ class FgModel(Base3dModel):
 
     def set_up_obj_bound_structure(self):
         """Set up the bounding structure of the model"""
-        if 'volume' in self.obj_bound.__dict__.keys():
-            volume_cfgs = get_value_from_cfgs_field(self.obj_bound, 'volume', None)
+        self.set_up_obj_bound_structure_by_cfgs(self.obj_bound)
+
+    def set_up_obj_bound_structure_by_cfgs(self, cfgs):
+        """Set up the bounding structure by cfgs. Can call it outside"""
+        if 'volume' in cfgs.__dict__.keys():
+            volume_cfgs = get_value_from_cfgs_field(cfgs, 'volume', None)
             if volume_cfgs is not None:
                 self.set_up_volume(volume_cfgs)
-        elif 'sphere' in self.obj_bound.__dict__.keys():
-            sphere_cfgs = get_value_from_cfgs_field(self.obj_bound, 'sphere', None)
+        elif 'sphere' in cfgs.__dict__.keys():
+            sphere_cfgs = get_value_from_cfgs_field(cfgs, 'sphere', None)
             if sphere_cfgs is not None:
                 self.obj_bound_type = 'sphere'
                 self.obj_bound = Sphere(**sphere_cfgs.__dict__)
         else:
-            raise NotImplementedError('Obj bound type {} not support...'.format(self.obj_bound.__dict__.keys()))
+            raise NotImplementedError('Obj bound type {} not support...'.format(cfgs.__dict__.keys()))
 
     def set_up_volume(self, volume_cfgs):
         """Set up the dense volume with bitfield"""
@@ -79,25 +83,31 @@ class FgModel(Base3dModel):
         Returns:
             near, far:  torch.tensor (B, 1) each
         """
+        mask = None
         if self.obj_bound_type is not None:
             if self.obj_bound_type == 'volume':
-                near, far, _, _ = self.obj_bound.ray_volume_intersection(inputs['rays_o'], inputs['rays_d'])
+                in_occ = self.epoch_optim is not None
+                # TODO: This calculation may be slow, or directly use large volume and find rays
+                # TODO: But it's accurate for filtering the rays, Otherwise some rays still samples pts
+                near, far, _, mask = self.obj_bound.ray_volume_intersection(inputs['rays_o'], inputs['rays_d'], in_occ)
             elif self.obj_bound_type == 'sphere':
-                near, far, _, _ = self.obj_bound.ray_sphere_intersection(inputs['rays_o'], inputs['rays_d'])
+                near, far, _, mask = self.obj_bound.ray_sphere_intersection(inputs['rays_o'], inputs['rays_d'])
             else:
                 raise NotImplementedError('Ray-{} is not valid...Please implement it...'.format(self.obj_bound_type))
         else:  # call the parent class
             near, far = super().get_near_far_from_rays(inputs)
 
-        return near, far
+        return near, far, mask
 
     def get_zvals_from_near_far(self, near: torch.Tensor, far: torch.Tensor, n_pts, inference_only=False):
-        """Get the zvals of the object with/without bounding structure"""
+        """Get the zvals of the object with/without bounding structure
+            If ray_sample_acc, Skip empty voxels to sample max up to n_pts points by some step.
+            Else, find the rays's intersection with remaining voxels, and use near, far to sampling directly
+        """
         zvals = None
         if self.obj_bound_type is not None:
             if self.obj_bound_type == 'volume' and self.epoch_optim is not None and self.ray_sample_acc:
                 self.get_zvals_from_sparse_volume(near, far, n_pts, inference_only)
-                # TODO: Sample in the occupied cells
 
         # only volume based method with pruning allowed acceleration
         if zvals is None:
@@ -106,24 +116,53 @@ class FgModel(Base3dModel):
         return zvals
 
     def get_zvals_from_sparse_volume(self, near: torch.Tensor, far: torch.Tensor, n_pts, inference_only=False):
-        """Get the zvals from optimized coarse volume"""
-        pass  # TODO
+        """Get the zvals from optimized coarse volume
+
+        """
+        if self.ray_sample_acc:
+            pass  # TODO
 
     def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         """If you use a geometric structure bounding the object, some rays does not hit the bound can be ignored.
          You can assign a bkg color to them directly, with opacity=0.0 and depth=some far distance.
         """
-        # optimize the obj bound, mostly for volume base structure
-        if cur_epoch > 0 and self.epoch_optim is not None and cur_epoch % self.epoch_optim == 0:
-            self.optim_obj_bound(cur_epoch)
+        # find the near/far and mask
+        near, far, mask = self.get_near_far_from_rays(inputs)
+        if self.obj_bound_type is None or torch.all(mask):  # all the rays to run
+            zvals = self.get_zvals_from_near_far(near, far, self.get_ray_cfgs(['n_sample']))
+            output = self._forward(
+                inputs, zvals, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000
+            )
+        else:
+            # rays_o = inputs['rays_o']  # (B, 3)
+            # rays_d = inputs['rays_d']  # (B, 3)
+            # n_rays = rays_o.shape[0]
+            # output = {}
+            zvals = self.get_zvals_from_near_far(near, far, self.get_ray_cfgs(['n_sample']))
+            output = self._forward(
+                inputs, zvals, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000
+            )
 
-        # TODO: PUT this as a super call in subclass
+        return output
+
+    def _forward(self, inputs, zvals, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+        """The method that really process all rays that have intersection with the bound
+
+        Args:
+            zvals: it is the valid coarse zvals get from foreground model.
+                    If no obj_bound is provided, it uses near/far and bounding_radius to calculate in a large space
+                    If obj_bound is volume/sphere, it use the zvals that rays hits the structure.
+        """
+        raise NotImplementedError(
+            'You should implement the _forward function that process rays with coarse zvals in child class...'
+        )
 
     @torch.no_grad()
-    def optim_obj_bound(self, cur_epoch):
+    def optimize(self, cur_epoch=0):
         """Optimize the obj bounding geometric structure. Support ['volume'] now."""
-        if self.obj_bound_type == 'volume':
-            self.optim_volume(cur_epoch)
+        if cur_epoch > 0 and self.epoch_optim is not None and cur_epoch % self.epoch_optim == 0:
+            if self.obj_bound_type == 'volume':
+                self.optim_volume(cur_epoch)
 
     def optim_volume(self, cur_epoch):
         """Optimize the dense volume by sampling points in the voxel.

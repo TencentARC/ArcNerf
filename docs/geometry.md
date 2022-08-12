@@ -101,6 +101,7 @@ For ray in pts in volume, we provide a lot of function like
 - ray_volume_intersection: call the aabb intersection test and find the ray-volume intersection
 - get_ray_pass_through: get the voxel_ids that the ray pass through
 ------------------------------------------------------------------------
+
 # point cloud
 Function of point cloud with pts and color.
 - save_point_cloud: export pc file as .ply file
