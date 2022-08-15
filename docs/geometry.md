@@ -90,6 +90,7 @@ You can manually set up an occupancy record for visual. This can help to save co
   - You can reset or update the occupied voxels as well. And take the occupied voxel's line/face for visualization.
   - get_occupied_voxel_idx/get_occupied_voxel_pts/get_occupied_grid_pts/get_occupied_lines/get_occupied_faces:
   You can get the occupied voxel for visualization or other computation.
+  - get_occupied_bounding_corner/range: Get the smallest volume that bound all the occ voxels.
 - set_up_voxel_opafield: the opacity field is the float opacity value of each voxel in `(n_grid, n_grid, n_grid)`.
   - You can update it, and use it to update the occupancy.
 ## ray/pts in volume
@@ -99,6 +100,7 @@ For ray in pts in volume, we provide a lot of function like
 - get_grid_pts_idx_by_voxel_idx/get_grid_pts_by_voxel_idx: get grid pts index and position by voxel idx
 - cal_weights_to_grid_pts / interpolate: interpolate pts by grid_pts using trilinear interpolation
 - ray_volume_intersection: call the aabb intersection test and find the ray-volume intersection
+  - ray_volume_intersection_in_occ_voxel: You can call to find the intersection in occupied voxels only
 - get_ray_pass_through: get the voxel_ids that the ray pass through
 ------------------------------------------------------------------------
 

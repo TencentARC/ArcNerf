@@ -13,7 +13,7 @@ from arcnerf.models.base_modules.linear_network_module import BaseGeoNet
 from arcnerf.models.fg_model import FgModel
 from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.cfgs_utils import dict_to_obj
-from common.utils.torch_utils import torch_to_np
+from common.utils.torch_utils import torch_to_np, np_wrapper
 
 RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results'))
 os.makedirs(RESULT_DIR, exist_ok=True)
@@ -47,7 +47,7 @@ class TestModelDict(unittest.TestCase):
 
     def create_feed_in_to_cuda(self):
         rays_o = torch.rand(self.n_rays, 3) * 3.0
-        rays_d = -normalize(rays_o + torch.rand(self.n_rays, 3) * 2.0)  # point to origin
+        rays_d = -normalize(rays_o + torch.rand(self.n_rays, 3) * 3.0)  # point to origin
         feed_in = {
             'rays_o': rays_o,
             'rays_d': rays_d,
@@ -126,11 +126,13 @@ class TestModelDict(unittest.TestCase):
             'lines': volume.get_occupied_lines(),
             'faces': volume.get_occupied_faces()
         }
+        n_occ = volume.get_n_occupied_voxel()
+        n_voxel = volume.get_n_voxel()
         file_path = osp.join(self.result_dir, 'pruned_volume_coarse.png')
         draw_3d_components(
             volume=volume_dict,
             sphere_radius=1.0,  # inner radius
-            title='Pruned volume coarse stage',
+            title='Pruned volume coarse stage {}/{} voxel remains'.format(n_occ, n_voxel),
             save_path=file_path,
             plotly=True,
             plotly_html=True
@@ -146,11 +148,13 @@ class TestModelDict(unittest.TestCase):
             'lines': volume.get_occupied_lines(),
             'faces': volume.get_occupied_faces()
         }
+        n_occ = volume.get_n_occupied_voxel()
+        n_voxel = volume.get_n_voxel()
         file_path = osp.join(self.result_dir, 'pruned_volume_fine.png')
         draw_3d_components(
             volume=volume_dict,
             sphere_radius=1.0,  # inner radius
-            title='Pruned volume fine stage',
+            title='Pruned volume fine stage {}/{} voxel remains'.format(n_occ, n_voxel),
             save_path=file_path,
             plotly=True,
             plotly_html=True
@@ -164,12 +168,13 @@ class TestModelDict(unittest.TestCase):
             'lines': volume.get_occupied_lines(),
             'faces': volume.get_occupied_faces()
         }
+        n_pts_in_occ_voxels = np_wrapper(volume.check_pts_in_occ_voxel, pts).sum()
         file_path = osp.join(self.result_dir, 'pruned_volume_no_acc_sample.png')
         draw_3d_components(
             points=pts,
             rays=(rays_o, far * rays_d),
             volume=volume_dict,
-            title='Pruned volume without acc sampling',
+            title='Pruned volume without acc sampling, {}/{} in occ voxel'.format(n_pts_in_occ_voxels, pts.shape[0]),
             save_path=file_path,
             plotly=True,
             plotly_html=True
@@ -184,12 +189,13 @@ class TestModelDict(unittest.TestCase):
             'lines': volume.get_occupied_lines(),
             'faces': volume.get_occupied_faces()
         }
+        n_pts_in_occ_voxels = np_wrapper(volume.check_pts_in_occ_voxel, pts).sum()
         file_path = osp.join(self.result_dir, 'pruned_volume_with_acc_sample.png')
         draw_3d_components(
             points=pts,
             rays=(rays_o, far * rays_d),
             volume=volume_dict,
-            title='Pruned volume with acc sampling',
+            title='Pruned volume with acc sampling, {}/{} in occ voxel'.format(n_pts_in_occ_voxels, pts.shape[0]),
             save_path=file_path,
             plotly=True,
             plotly_html=True

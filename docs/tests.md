@@ -48,7 +48,8 @@ Test function in triangle, like getting norm, getting circumcircle, etc.
 ### tests_ray
 Test function in ray, like getting sphere-ray-intersection, point-ray distance, etc.
 ### tests_volume
-Test function in volume, like volume pts/line/faces generation and visualization.
+Test function in volume, like volume pts/line/faces generation and visualization,
+ray-volume intersection with coarse structure, etc.
 
 ------------------------------------------------------------------------
 ## tests_render
@@ -74,6 +75,8 @@ Test linear layers
 Test implicit/radiance function with encoder and linear network.
 ### tests_benchmark
 Test all the model and get the speed/time.
+### tests_fg_model
+Test fg model for ray sampling and forward.
 ### tests_bkg_model
 Test each bkg model like nerf++.
 ### tests_nerf

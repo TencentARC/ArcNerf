@@ -637,7 +637,7 @@ class Volume(nn.Module):
             mask: (N_rays, 1), show whether each ray has intersection with the volume, BoolTensor
         """
         if in_occ_voxel:  # in occupied sample
-            near, far, pts, mask = self.ray_volume_intersection_in_occ_voxels(rays_o, rays_d)
+            near, far, pts, mask = self.ray_volume_intersection_in_occ_voxel(rays_o, rays_d)
         else:  # full volume
             aabb_range = self.get_range()[None].to(rays_o.device)  # (1, 3, 2)
             near, far, pts, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)
@@ -645,19 +645,19 @@ class Volume(nn.Module):
 
         return near, far, pts, mask
 
-    def ray_volume_intersection_in_occ_voxels(self, rays_o: torch.Tensor, rays_d: torch.Tensor, force=False):
+    def ray_volume_intersection_in_occ_voxel(self, rays_o: torch.Tensor, rays_d: torch.Tensor, force=False):
         """Ray volume intersection in occupied voxels only.
 
         If the n_rays * n_volume is large, hard to calculate on all the volumes
         (eg. 4096 rays * [128**3] volume, float32, near/far takes = 32GB memory each, can not afford.
-        It will calculate the result on largest remaining bounding voxels.
+        It will calculate the result on smallest remaining bounding voxels.
         We only allow at most (n_rays * n_volume < 4096 * [32**3]) dense calculation, which takes 0.5GB-near/far
         for this calculation, and it takes time even on GPU.
 
         Args:
             rays_o: ray origin, (N_rays, 3)
             rays_d: ray direction, (N_rays, 3)
-            force: If True, only calculate in the largest bounding volume, instead of every voxels. By default False.
+            force: If True, only calculate in the smallest bounding volume, instead of every voxels. By default False.
                     But this is not accurate for every rays. Some rays not hit the dense voxel may be included.
 
         Returns:
@@ -668,7 +668,7 @@ class Volume(nn.Module):
         n_rays = rays_o.shape[0]
         n_occ = self.get_n_occupied_voxel()
         max_allow = 4096 * 32**3
-        if force or n_rays * n_occ > max_allow:  # find the largest bounding of remaining voxels
+        if force or n_rays * n_occ > max_allow:  # find the smallest bounding of remaining voxels
             aabb_range = self.get_occupied_bounding_range()[None]  # (1, 3, 2)
             near, far, pts, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)
             pts = pts[:, 0, :, :]  # (N_rays, 1, 2, 3) -> (N_rays, 2, 3)
@@ -903,6 +903,32 @@ class Volume(nn.Module):
         occ_corner = self.get_eight_permutation(occ_range[0][:, None], occ_range[1][:, None], occ_range[2][:, None])
 
         return occ_corner
+
+    def check_pts_in_occ_voxel(self, pts: torch.Tensor):
+        """Check whether pts in occupied voxels. Don't use it when n_pts * n_occ could be large.
+
+        Args:
+            pts: (B, 3), points to be check
+
+        Returns:
+            pts_in_occ_voxel: (B, ) whether each pts is in occupied voxels
+        """
+        voxel_idx, pts_in_occ_voxel = self.get_voxel_idx_from_xyz(pts)  # (B, 3), (B, )
+        occ_voxel_idx = self.get_occupied_voxel_idx()  # (N_occ, 3)
+
+        # flatten and find uniq elements
+        valid_voxel_idx = voxel_idx[pts_in_occ_voxel]  # (B_valid, 3)
+
+        # could take large memory
+        check_voxel_in_occ_voxel = torch.logical_and(
+            valid_voxel_idx.unsqueeze(1),
+            occ_voxel_idx.unsqueeze(0),
+        )  # (B_valid, N_occ, 3)
+        check_voxel_in_occ_voxel = torch.all(check_voxel_in_occ_voxel, dim=-1)  # (B_valid, N_occ)
+        check_voxel_in_occ_voxel = torch.any(check_voxel_in_occ_voxel, dim=-1)  # (B_valid, )
+        pts_in_occ_voxel[pts_in_occ_voxel.clone()] = check_voxel_in_occ_voxel
+
+        return pts_in_occ_voxel
 
     def set_up_voxel_opafield(self):
         """Set up the opacity as tensor in shape (n_grid, n_grid, n_grid), each value is the voxel density

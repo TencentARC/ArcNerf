@@ -328,7 +328,7 @@ class TestDict(unittest.TestCase):
         )
 
         # on dense voxels
-        near, far, _, mask = np_wrapper(volume.ray_volume_intersection_in_occ_voxels, rays_o, rays_d)
+        near, far, _, mask = np_wrapper(volume.ray_volume_intersection_in_occ_voxel, rays_o, rays_d)
         mask = mask[:, 0]
         n_no_hit = np.sum(~mask)
         near, far = near[mask].reshape(-1, 1), far[mask].reshape(-1, 1)
@@ -352,9 +352,9 @@ class TestDict(unittest.TestCase):
         )
 
         # on dense voxels bounding volume
-        _, _, _, mask_dense = np_wrapper(volume.ray_volume_intersection_in_occ_voxels, rays_o, rays_d, False)
+        _, _, _, mask_dense = np_wrapper(volume.ray_volume_intersection_in_occ_voxel, rays_o, rays_d, False)
         n_no_hit_dense = np.sum(~mask_dense)
-        near, far, _, mask = np_wrapper(volume.ray_volume_intersection_in_occ_voxels, rays_o, rays_d, True)
+        near, far, _, mask = np_wrapper(volume.ray_volume_intersection_in_occ_voxel, rays_o, rays_d, True)
         mask = mask[:, 0]
         n_no_hit = np.sum(~mask)
         near, far = near[mask].reshape(-1, 1), far[mask].reshape(-1, 1)
