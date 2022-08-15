@@ -636,11 +636,46 @@ class Volume(nn.Module):
                                       if nan, means no intersection at this ray
             mask: (N_rays, 1), show whether each ray has intersection with the volume, BoolTensor
         """
-        if in_occ_voxel and self.bitfield is not None:  # in occupied sample
+        if in_occ_voxel:  # in occupied sample
+            near, far, pts, mask = self.ray_volume_intersection_in_occ_voxels(rays_o, rays_d)
+        else:  # full volume
+            aabb_range = self.get_range()[None].to(rays_o.device)  # (1, 3, 2)
+            near, far, pts, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)
+            pts = pts[:, 0, :, :]  # (N_rays, 1, 2, 3) -> (N_rays, 2, 3)
+
+        return near, far, pts, mask
+
+    def ray_volume_intersection_in_occ_voxels(self, rays_o: torch.Tensor, rays_d: torch.Tensor, force=False):
+        """Ray volume intersection in occupied voxels only.
+
+        If the n_rays * n_volume is large, hard to calculate on all the volumes
+        (eg. 4096 rays * [128**3] volume, float32, near/far takes = 32GB memory each, can not afford.
+        It will calculate the result on largest remaining bounding voxels.
+        We only allow at most (n_rays * n_volume < 4096 * [32**3]) dense calculation, which takes 0.5GB-near/far
+        for this calculation, and it takes time even on GPU.
+
+        Args:
+            rays_o: ray origin, (N_rays, 3)
+            rays_d: ray direction, (N_rays, 3)
+            force: If True, only calculate in the largest bounding volume, instead of every voxels. By default False.
+                    But this is not accurate for every rays. Some rays not hit the dense voxel may be included.
+
+        Returns:
+            see returns in `ray_volume_intersection`
+        """
+        assert self.bitfield is not None, 'You must have the occupancy indicator, You should not use dense voxels.'
+
+        n_rays = rays_o.shape[0]
+        n_occ = self.get_n_occupied_voxel()
+        max_allow = 4096 * 32**3
+        if force or n_rays * n_occ > max_allow:  # find the largest bounding of remaining voxels
+            aabb_range = self.get_occupied_bounding_range()[None]  # (1, 3, 2)
+            near, far, pts, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)
+            pts = pts[:, 0, :, :]  # (N_rays, 1, 2, 3) -> (N_rays, 2, 3)
+        else:  # use all remaining voxels
             grid_pts = self.get_occupied_grid_pts()  # (n_occ, 3)
             aabb_range = torch.cat([grid_pts[:, 0, :].unsqueeze(-1), grid_pts[:, -1, :].unsqueeze(-1)], dim=-1)
             near, far, _, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)
-
             # find the rays near/far with any hit voxels
             near[~mask], far[~mask] = 1e6, -1e6
             near = torch.min(near, dim=1)[0][:, None]  # (n_rays, 1)
@@ -653,11 +688,6 @@ class Volume(nn.Module):
                 [get_ray_points_by_zvals(rays_o, rays_d, near),
                  get_ray_points_by_zvals(rays_o, rays_d, far)], dim=1
             )  # (n_rays, 2, 3)
-
-        else:  # full volume
-            aabb_range = self.get_range()[None].to(rays_o.device)  # (1, 3, 2)
-            near, far, pts, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)
-            pts = pts[:, 0, :, :]  # (N_rays, 1, 2, 3) -> (N_rays, 2, 3)
 
         return near, far, pts, mask
 
@@ -759,7 +789,7 @@ class Volume(nn.Module):
         """
         if len(occupancy.shape) == 1:
             assert occupancy.shape[0] == self.get_n_voxel(), 'Occupancy should cover each voxel...'
-            n_grid_occ = occupancy.shape[0]**(1 / 3)
+            n_grid_occ = round(occupancy.shape[0]**(1 / 3))
             occupancy = occupancy.view(n_grid_occ, n_grid_occ, n_grid_occ)
 
         assert occupancy.dtype == torch.bool, 'Must input bool tensor'
@@ -820,6 +850,59 @@ class Volume(nn.Module):
         occ_voxel_pts = self.get_voxel_pts_by_voxel_idx(occ_voxel_idx)
 
         return occ_voxel_pts
+
+    def get_occupied_bounding_range(self):
+        """Return the bounding volume range of the remaining voxels
+
+        Returns:
+            occ_aabb: (3, 2) bounding xyz range
+        """
+        if not torch.any(self.bitfield):  # empty field, return original volume
+            return self.get_range()
+
+        half_voxel_size = self.get_voxel_size(to_list=False) / 2.0  # (3,)
+        offset = torch.cat([-half_voxel_size[:, None], half_voxel_size[:, None]], dim=1)  # (3, 2)
+
+        # x dir
+        x_flatten = self.bitfield.reshape(-1)
+        x_voxel_idx = torch.where(x_flatten)[0]
+        x_idx = x_voxel_idx[[0, -1]]  # (2,)
+        x_idx = self.convert_flatten_index_to_xyz_index(x_idx, self.n_grid)
+        x_voxel_pts = self.get_voxel_pts_by_voxel_idx(x_idx)[:, 0:1].permute(1, 0)  # (1, 2)
+        x_range = x_voxel_pts + offset[0:1, :]  # (1, 2)
+
+        # y dir
+        y_flatten = self.bitfield.permute(1, 0, 2).reshape(-1)  # to yxz order
+        y_voxel_idx = torch.where(y_flatten)[0]
+        y_idx = y_voxel_idx[[0, -1]]  # (2,)
+        y_idx = self.convert_flatten_index_to_xyz_index(y_idx, self.n_grid)
+        y_idx = y_idx[:, [1, 0, 2]]  # to xyz order
+        y_voxel_pts = self.get_voxel_pts_by_voxel_idx(y_idx)[:, 1:2].permute(1, 0)  # (1, 2)
+        y_range = y_voxel_pts + offset[1:2, :]  # (1, 2)
+
+        # z dir
+        z_flatten = self.bitfield.permute(2, 0, 1).reshape(-1)  # to zxy order
+        z_voxel_idx = torch.where(z_flatten)[0]
+        z_idx = z_voxel_idx[[0, -1]]  # (2,)
+        z_idx = self.convert_flatten_index_to_xyz_index(z_idx, self.n_grid)
+        z_idx = z_idx[:, [1, 2, 0]]  # to xyz order
+        z_voxel_pts = self.get_voxel_pts_by_voxel_idx(z_idx)[:, 2:3].permute(1, 0)  # (1, 2)
+        z_range = z_voxel_pts + offset[2:3, :]  # (1, 2)
+
+        occ_aabb = torch.cat([x_range, y_range, z_range], dim=0)  # (3, 2)
+
+        return occ_aabb
+
+    def get_occupied_bounding_corner(self):
+        """Return the bounding volume range of the remaining voxels
+
+        Returns:
+            occ_corner: (8, 2) bounding xyz position like corner
+        """
+        occ_range = self.get_occupied_bounding_range()  # (3, 2)
+        occ_corner = self.get_eight_permutation(occ_range[0][:, None], occ_range[1][:, None], occ_range[2][:, None])
+
+        return occ_corner
 
     def set_up_voxel_opafield(self):
         """Set up the opacity as tensor in shape (n_grid, n_grid, n_grid), each value is the voxel density

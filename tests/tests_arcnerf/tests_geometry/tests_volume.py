@@ -11,6 +11,7 @@ import torch
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.transformation import normalize
 from arcnerf.geometry.volume import Volume
+from arcnerf.render.ray_helper import get_zvals_from_near_far
 from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.torch_utils import torch_to_np, np_wrapper
 from common.visual import get_combine_colors, get_colors
@@ -266,6 +267,119 @@ class TestDict(unittest.TestCase):
             point_colors=pts_colors,
             volume=volume_dict,
             title='occupied voxels with grid_pts and voxel_pts',
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True
+        )
+
+    def tests_ray_voxel_intersection(self):
+        n_grid = 8
+        offset = 2
+        volume = Volume(n_grid=n_grid, side=self.side)
+        volume.set_up_voxel_bitfield()
+        n_rays = 8
+        rays_o = np.random.rand(n_rays, 3) * 2.0
+        rays_d = -normalize(rays_o + 2.0 * np.random.rand(n_rays, 3))  # point to origin
+
+        # remove the outside voxels
+        occ = torch.zeros((n_grid, n_grid, n_grid)).type(torch.bool)
+        center_len = n_grid - 2 * offset
+        occ_center = torch.ones((center_len, center_len, center_len)).type(torch.bool)
+        occ[offset:n_grid - offset, offset:n_grid - offset, offset:n_grid - offset] = occ_center
+        np_wrapper(volume.update_bitfield, occ)
+
+        # make a coarse volume
+        empty_ratio = 0.8
+        voxel_idx = volume.get_occupied_voxel_idx()
+        n_occ = voxel_idx.shape[0]
+        empty_voxel_idx = torch.randperm(n_occ)[:int(n_occ * empty_ratio)]
+        empty_voxel_idx = voxel_idx[empty_voxel_idx]
+        volume.update_bitfield_by_voxel_idx(empty_voxel_idx, occ=False)
+
+        volume_dict = {
+            'lines': volume.get_occupied_lines(),  # (12N) * (2, 3)
+            'faces': volume.get_occupied_faces()  # (6N, 4, 3)
+        }
+
+        # on a full volume
+        lines = volume.get_lines_from_vertices(volume.get_corner(), 2)
+        line_colors = get_colors('red', to_int=False, to_np=True)
+        near, far, _, mask = np_wrapper(volume.ray_volume_intersection, rays_o, rays_d)
+        mask = mask[:, 0]
+        n_no_hit = np.sum(~mask)
+        near, far = near[mask].reshape(-1, 1), far[mask].reshape(-1, 1)
+        zvals = np_wrapper(get_zvals_from_near_far, near, far, 8)
+        pts = np_wrapper(get_ray_points_by_zvals, rays_o[mask], rays_d[mask], zvals).reshape(-1, 3)
+        ray_colors = get_combine_colors(['red'], [n_rays])
+        ray_colors[mask] = get_colors('blue', to_int=False, to_np=True)
+
+        file_path = osp.join(RESULT_DIR, 'ray_voxel_full_volume.png')
+        draw_3d_components(
+            points=pts,
+            lines=lines,
+            line_colors=line_colors,
+            rays=(rays_o, rays_d * 4.0),
+            ray_colors=ray_colors,
+            volume=volume_dict,
+            title='ray volume intersection on full volume, {}/{} rays no hit'.format(n_no_hit, n_rays),
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True
+        )
+
+        # on dense voxels
+        near, far, _, mask = np_wrapper(volume.ray_volume_intersection_in_occ_voxels, rays_o, rays_d)
+        mask = mask[:, 0]
+        n_no_hit = np.sum(~mask)
+        near, far = near[mask].reshape(-1, 1), far[mask].reshape(-1, 1)
+        zvals = np_wrapper(get_zvals_from_near_far, near, far, 8)
+        pts = np_wrapper(get_ray_points_by_zvals, rays_o[mask], rays_d[mask], zvals).reshape(-1, 3)
+        ray_colors = get_combine_colors(['red'], [n_rays])
+        ray_colors[mask] = get_colors('blue', to_int=False, to_np=True)
+
+        file_path = osp.join(RESULT_DIR, 'ray_voxel_dense_voxels.png')
+        draw_3d_components(
+            points=pts,
+            lines=lines,
+            line_colors=line_colors,
+            rays=(rays_o, rays_d * 4.0),
+            ray_colors=ray_colors,
+            volume=volume_dict,
+            title='ray volume intersection on dense voxels, {}/{} rays no hit'.format(n_no_hit, n_rays),
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True
+        )
+
+        # on dense voxels bounding volume
+        _, _, _, mask_dense = np_wrapper(volume.ray_volume_intersection_in_occ_voxels, rays_o, rays_d, False)
+        n_no_hit_dense = np.sum(~mask_dense)
+        near, far, _, mask = np_wrapper(volume.ray_volume_intersection_in_occ_voxels, rays_o, rays_d, True)
+        mask = mask[:, 0]
+        n_no_hit = np.sum(~mask)
+        near, far = near[mask].reshape(-1, 1), far[mask].reshape(-1, 1)
+        zvals = np_wrapper(get_zvals_from_near_far, near, far, 8)
+        pts = np_wrapper(get_ray_points_by_zvals, rays_o[mask], rays_d[mask], zvals).reshape(-1, 3)
+        ray_colors = get_combine_colors(['red'], [n_rays])
+        ray_colors[mask] = get_colors('blue', to_int=False, to_np=True)
+
+        lines = volume.get_lines_from_vertices(volume.get_corner(), 2)
+        line_colors = get_colors('red', to_int=False, to_np=True)
+        lines_bounding = volume.get_lines_from_vertices(volume.get_occupied_bounding_corner(), 2)
+        lines.extend(lines_bounding)
+
+        file_path = osp.join(RESULT_DIR, 'ray_voxel_dense_voxels_bounding.png')
+        title = 'ray volume intersection on bounding volume, '
+        title += '{}/{} rays no hit, '.format(n_no_hit, n_rays)
+        title += '{}/{} rays not hit dense but on bounding'.format(n_no_hit_dense - n_no_hit, n_rays)
+        draw_3d_components(
+            points=pts,
+            lines=lines,
+            line_colors=line_colors,
+            rays=(rays_o, rays_d * 4.0),
+            ray_colors=ray_colors,
+            volume=volume_dict,
+            title=title,
             save_path=file_path,
             plotly=True,
             plotly_html=True
