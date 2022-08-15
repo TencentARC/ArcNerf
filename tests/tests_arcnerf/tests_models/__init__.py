@@ -207,20 +207,28 @@ class TestModelDict(unittest.TestCase):
                     )
                 self.assertEqual(output['{}'.format(key)].shape, gt_shape)
 
-    def add_volume_structure_to_fg_model(self, model):
+    def add_volume_structure_to_fg_model(self, model, n_grid=128, offset=16, empty_ratio=0.8):
         """Add a bounding volume structure to the model """
-        volume_cfgs = {'volume': {'n_grid': 4, 'side': self.volume_side}}
+        volume_cfgs = {'volume': {'n_grid': n_grid, 'side': self.volume_side}}
         volume_cfgs = dict_to_obj(volume_cfgs)
-        model.get_fg_model().epoch_optim = 10  # ugly but fine
+        model.get_fg_model().set_optim_cfgs('epoch_optim', 10)
         model.get_fg_model().set_up_obj_bound_structure_by_cfgs(volume_cfgs)
         model = self.to_cuda(model)
 
-        # call optimization on fg model
+        # make sparsity
         volume = model.get_fg_model().get_obj_bound_and_type()[0]
-        full_voxel_idx = volume.get_full_voxel_idx(flatten=True)
-        rand_idx = torch.randperm(full_voxel_idx.shape[0])[:int(full_voxel_idx.shape[0] / 2)]
-        rand_voxel_idx = full_voxel_idx[rand_idx, ...]
-        volume.update_bitfield_by_voxel_idx(rand_voxel_idx, occ=False)  # mask 1/2 volume randomly
+        # remove the outside voxels
+        occ = torch.zeros((n_grid, n_grid, n_grid)).type(torch.bool)
+        center_len = n_grid - 2 * offset
+        occ_center = torch.ones((center_len, center_len, center_len)).type(torch.bool)
+        occ[offset:n_grid - offset, offset:n_grid - offset, offset:n_grid - offset] = occ_center
+        volume.update_bitfield(self.to_cuda(occ))
+        # make a coarse volume
+        voxel_idx = volume.get_occupied_voxel_idx()
+        n_occ = voxel_idx.shape[0]
+        empty_voxel_idx = torch.randperm(n_occ)[:int(n_occ * empty_ratio)]
+        empty_voxel_idx = voxel_idx[empty_voxel_idx]
+        volume.update_bitfield_by_voxel_idx(self.to_cuda(empty_voxel_idx), occ=False)
 
         return model
 

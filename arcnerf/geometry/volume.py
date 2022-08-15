@@ -308,14 +308,12 @@ class Volume(nn.Module):
         Returns:
             pts_in_boundary: (B, ) whether each pts is in boundary
         """
-        device = pts.device
-        _grid_pts = grid_pts.to(device)
         n_pts = pts.shape[0]
 
-        if len(_grid_pts.shape) == 2:
-            grid_pts_expand = torch.repeat_interleave(_grid_pts.unsqueeze(0), n_pts, 0)
+        if len(grid_pts.shape) == 2:
+            grid_pts_expand = torch.repeat_interleave(grid_pts.unsqueeze(0), n_pts, 0)
         else:
-            grid_pts_expand = _grid_pts
+            grid_pts_expand = grid_pts
 
         assert grid_pts_expand.shape[0] == n_pts, 'Invalid num of grid_pts, should be in (B, 8, 3) or (8, 3)'
 
@@ -339,10 +337,9 @@ class Volume(nn.Module):
             valid_idx: (B, ) mask that pts are in the volume. torch.BoolTensor
         """
         dtype = pts.dtype
-        device = pts.device
 
-        voxel_size = self.get_voxel_size(to_list=False).type(dtype).to(device)  # (3,)
-        start_point = self.get_range()[:, 0].to(device)  # min xyz (3,)
+        voxel_size = self.get_voxel_size(to_list=False).type(dtype)  # (3,)
+        start_point = self.get_range()[:, 0]  # min xyz (3,)
         voxel_idx = (pts - start_point) / voxel_size  # (B, 3)
 
         valid_idx = torch.logical_and(
@@ -416,12 +413,11 @@ class Volume(nn.Module):
         Returns:
             grid_pts_by_voxel_idx: select grid_pts xyz values by voxel_idx, (B, 8, 3), each pts of grid
         """
-        device = voxel_idx.device
         grid_pts_idx = self.get_grid_pts_idx_by_voxel_idx(voxel_idx, flatten=False)  # (B, 8, 3)
 
         # base position(xyz_min) and voxel size
-        voxel_size = self.get_voxel_size(to_list=False).to(device)  # (3,)
-        start_pos = self.get_range()[:, 0].to(device)  # (3,)
+        voxel_size = self.get_voxel_size(to_list=False)  # (3,)
+        start_pos = self.get_range()[:, 0]  # (3,)
 
         grid_pts_by_voxel_idx = grid_pts_idx * voxel_size + start_pos
 
@@ -436,11 +432,9 @@ class Volume(nn.Module):
         Returns:
             voxel_pts_by_voxel_idx: select voxel center xyz values by voxel_idx, (B, 3), each pts of voxel
         """
-        device = voxel_idx.device
-
         # base position(xyz_min) and voxel size
-        voxel_size = self.get_voxel_size(to_list=False).to(device)  # (3,)
-        start_pos = self.get_range()[:, 0].to(device)  # (3,)
+        voxel_size = self.get_voxel_size(to_list=False)  # (3,)
+        start_pos = self.get_range()[:, 0]  # (3,)
 
         voxel_pts_by_voxel_ids = voxel_idx * voxel_size + 0.5 * voxel_size + start_pos
 
@@ -465,11 +459,9 @@ class Volume(nn.Module):
             weights: weights to each grid pts in (B, 8) in (0~1). Order corresponding to grid_pts order.
         """
         n_pts = pts.shape[0]
-        device = pts.device
         assert grid_pts.shape == (n_pts, 8, 3), 'Shape not match'
-        _grid_pts = grid_pts.to(device)
 
-        w_xyz = (pts - _grid_pts[:, 0, :]) / (_grid_pts[:, -1, :] - _grid_pts[:, 0, :])  # (B, 3)
+        w_xyz = (pts - grid_pts[:, 0, :]) / (grid_pts[:, -1, :] - grid_pts[:, 0, :])  # (B, 3)
         w_xyz = w_xyz.clip(0.0, 1.0)  # in case some pts out of grid
 
         # linear interpolation
@@ -494,12 +486,11 @@ class Volume(nn.Module):
             grid_pts: (B_valid, 8), valid grid_pts xyz pos. Return None if no valid.
             grid_pts_weights: (B_valid, 8), weights on valid grid_pts. Return None if no valid.
         """
-        dtype = pts.dtype
         device = pts.device
 
         # get base info
-        voxel_size = self.get_voxel_size(to_list=False).type(dtype).to(device)  # (3,)
-        start_point = self.get_range()[:, 0].to(device)  # min xyz (3,)
+        voxel_size = self.get_voxel_size(to_list=False)  # (3,)
+        start_point = self.get_range()[:, 0]  # min xyz (3,)
         permute_index = self.get_eight_permutation_index().to(device)  # (8, 3)
 
         # get voxel and valid info

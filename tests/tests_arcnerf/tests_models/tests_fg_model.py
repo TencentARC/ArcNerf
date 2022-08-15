@@ -13,7 +13,7 @@ from arcnerf.models.base_modules.linear_network_module import BaseGeoNet
 from arcnerf.models.fg_model import FgModel
 from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.cfgs_utils import dict_to_obj
-from common.utils.torch_utils import torch_to_np, np_wrapper
+from common.utils.torch_utils import torch_to_np
 
 RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results'))
 os.makedirs(RESULT_DIR, exist_ok=True)
@@ -168,7 +168,8 @@ class TestModelDict(unittest.TestCase):
             'lines': volume.get_occupied_lines(),
             'faces': volume.get_occupied_faces()
         }
-        n_pts_in_occ_voxels = np_wrapper(volume.check_pts_in_occ_voxel, pts).sum()
+        pts_tensor = self.to_cuda(torch.tensor(pts))
+        n_pts_in_occ_voxels = int(volume.check_pts_in_occ_voxel(pts_tensor).sum())
         file_path = osp.join(self.result_dir, 'pruned_volume_no_acc_sample.png')
         draw_3d_components(
             points=pts,
@@ -189,7 +190,8 @@ class TestModelDict(unittest.TestCase):
             'lines': volume.get_occupied_lines(),
             'faces': volume.get_occupied_faces()
         }
-        n_pts_in_occ_voxels = np_wrapper(volume.check_pts_in_occ_voxel, pts).sum()
+        pts_tensor = self.to_cuda(torch.tensor(pts))
+        n_pts_in_occ_voxels = int(volume.check_pts_in_occ_voxel(pts_tensor).sum())
         file_path = osp.join(self.result_dir, 'pruned_volume_with_acc_sample.png')
         draw_3d_components(
             points=pts,

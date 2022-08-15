@@ -610,6 +610,11 @@ class ArcNerfTrainer(BasicTrainer):
 
         # optimize the model for its bounding structure
         self.model.optimize()
+        if self.model.get_fg_model().get_obj_bound_and_type()[1] == 'volume' and \
+                epoch % self.cfgs.progress.epoch_loss == 0:
+            volume = self.model.get_fg_model().get_obj_bound_and_type()[0]
+            occ_ratio = volume.get_n_occupied_voxel() / volume.get_n_voxel()
+            self.logger.add_log('Remaining voxel ratio is {:.2f}%'.format(occ_ratio * 100.0))
 
         # remake train dataset train crop
         crop_shuffle = self.crop_max_epoch is not None and epoch >= self.crop_max_epoch

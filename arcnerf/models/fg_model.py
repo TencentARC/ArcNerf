@@ -3,7 +3,9 @@
 import torch
 
 from .base_3d_model import Base3dModel
+from arcnerf.geometry.ray import surface_ray_intersection
 from arcnerf.geometry.sphere import Sphere
+from arcnerf.geometry.transformation import normalize
 from arcnerf.geometry.volume import Volume
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import MODEL_REGISTRY
@@ -34,6 +36,11 @@ class FgModel(Base3dModel):
         params = {}
         if get_value_from_cfgs_field(self.cfgs.model, 'obj_bound') is None:
             params['epoch_optim'] = None
+            params['ray_sample_acc'] = False
+            # default values
+            params['bkg_color'] = [1.0, 1.0, 1.0]  # white
+            params['depth_far'] = 10.0  # far distance
+            params['normal'] = [0.0, 1.0, 0.0]  # for eikonal loss cal, up direction
         else:
             cfgs = self.cfgs.model.obj_bound
             params['epoch_optim'] = get_value_from_cfgs_field(cfgs, 'epoch_optim', None)
@@ -43,9 +50,9 @@ class FgModel(Base3dModel):
             # whether use accelerated sampling or uniform sample in (near, far)
             params['ray_sample_acc'] = get_value_from_cfgs_field(cfgs, 'ray_sample_acc', False)
             # bkg color/depth/normal for invalid rays
-            params['bkg_color'] = get_value_from_cfgs_field(cfgs, 'bkg_color', [1.0, 1.0, 1.0])  # white
-            params['depth_far'] = get_value_from_cfgs_field(cfgs, 'depth_far', 10.0)  # far distance
-            params['normal'] = get_value_from_cfgs_field(cfgs, 'normal', [1.0, 0.0, 0.0])  # for eikonal loss cal
+            params['bkg_color'] = get_value_from_cfgs_field(self.cfgs, 'bkg_color', [1.0, 1.0, 1.0])  # white
+            params['depth_far'] = get_value_from_cfgs_field(self.cfgs, 'depth_far', 10.0)  # far distance
+            params['normal'] = get_value_from_cfgs_field(self.cfgs, 'normal', [0.0, 1.0, 0.0])  # for eikonal loss cal
 
         return params
 
@@ -112,12 +119,7 @@ class FgModel(Base3dModel):
         if self.obj_bound_type is not None:
             if self.obj_bound_type == 'volume':
                 in_occ = self.get_optim_cfgs('epoch_optim') is not None
-                # TODO: This calculation may be slow, or directly use large volume and find rays
-                # TODO: But it's accurate for filtering the rays, Otherwise some rays still samples pts
-                from common.utils.torch_utils import get_start_time, get_end_time
-                t0 = get_start_time()
                 near, far, _, mask = self.obj_bound.ray_volume_intersection(inputs['rays_o'], inputs['rays_d'], in_occ)
-                print('aabb full voxel time ', get_end_time(t0), near.shape, in_occ)
             elif self.obj_bound_type == 'sphere':
                 near, far, _, mask = self.obj_bound.ray_sphere_intersection(inputs['rays_o'], inputs['rays_d'])
             else:
@@ -153,21 +155,93 @@ class FgModel(Base3dModel):
     def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         """If you use a geometric structure bounding the object, some rays does not hit the bound can be ignored.
          You can assign a bkg color to them directly, with opacity=0.0 and depth=some far distance.
-         TODO: We can only support fix num of sampling for each rays now. Is this good enough.
+         TODO: We can only support fix num of sampling for each rays now. Is this good enough?
         """
         # find the near/far and mask
         near, far, mask = self.get_near_far_from_rays(inputs)
+
         if self.obj_bound_type is None or torch.all(mask):  # all the rays to run
             zvals = self.get_zvals_from_near_far(near, far, self.get_n_coarse_sample(), inference_only)
             output = self._forward(inputs, zvals, inference_only, get_progress, cur_epoch, total_epoch)
-        else:
-            print('Use this')
-            # rays_o = inputs['rays_o']  # (B, 3)
-            # rays_d = inputs['rays_d']  # (B, 3)
-            # n_rays = rays_o.shape[0]
-            # output = {}
-            zvals = self.get_zvals_from_near_far(near, far, self.get_n_coarse_sample(), inference_only)
-            output = self._forward(inputs, zvals, inference_only, get_progress, cur_epoch, total_epoch)
+        else:  # only on valid rays
+            zvals_valid = self.get_zvals_from_near_far(
+                near[mask], far[mask], self.get_n_coarse_sample(), inference_only
+            )
+
+            inputs_valid = {}
+            for k, v in inputs.items():
+                if isinstance(v, torch.Tensor):
+                    inputs_valid[k] = v[mask]
+                else:
+                    inputs_valid[k] = v
+
+            output_valid = self._forward(
+                inputs_valid, zvals_valid, inference_only, get_progress, cur_epoch, total_epoch
+            )
+
+            # update invalid rays by default values
+            output = self.update_default_values_for_invalid_rays(output_valid, mask)
+
+        return output
+
+    def update_default_values_for_invalid_rays(self, output_valid, mask: torch.Tensor):
+        """Update the default values for invalid rays
+
+        Args:
+            output_valid: that contains keys with `rgb*`/`mask*`/`depth*`/`normal*`/`progress_*` in (N_valid, ...) shape
+            For each keys, fill with
+                rgb/rgb_*: by self.optim_params['bkg_color'], by default (1, 1, 1) as white bkg
+            mask: mask indicating each rays' validity. in (N_rays, ), with B_valid `True` values.
+
+        Returns:
+            output: same keys with output_valid with filled in values. Each tensor will be (N_rays, ...)
+        """
+        n_rays = mask.shape[0]
+        output = {}
+
+        for k, v in output_valid.items():
+            if not isinstance(v, torch.Tensor):
+                output[k] = v
+            else:
+                dtype = v.dtype
+                device = v.device
+                new_shape = (n_rays, *v.shape[1:])
+                if k.startswith('rgb'):  # update bkg_color
+                    bkg_color = self.get_optim_cfgs('bkg_color')
+                    bkg_color = torch.tensor(bkg_color, dtype=dtype, device=device)[None]  # (1, 3)
+                    out_tensor = torch.ones(new_shape, dtype=dtype, device=device) * bkg_color
+                    out_tensor[mask] = v
+                    output[k] = out_tensor
+                elif k.startswith('depth'):  # update depth
+                    depth_far = self.get_optim_cfgs('depth_far')
+                    depth_far = torch.tensor(depth_far, dtype=dtype, device=device)[None]  # (1, 1)
+                    out_tensor = torch.ones(new_shape, dtype=dtype, device=device) * depth_far
+                    out_tensor[mask] = v
+                    output[k] = out_tensor
+                elif k.startswith('mask'):  # update mask, must be 0
+                    out_tensor = torch.zeros(new_shape, dtype=dtype, device=device)
+                    out_tensor[mask] = v
+                    output[k] = out_tensor
+                elif k.startswith('normal'):  # update normal
+                    normal = self.get_optim_cfgs('normal')
+                    normal = torch.tensor(normal, dtype=dtype, device=device)[None]  # (1, 3)
+                    normal = normalize(normal)
+                    if k == 'normal_pts':
+                        normal = normal[None]  # (1, 3, 3)
+                    out_tensor = torch.ones(new_shape, dtype=dtype, device=device) * normal
+                    out_tensor[mask] = v
+                    output[k] = out_tensor
+                elif k.startswith('progress'):  # in (N_valid, N_pts, ...)
+                    if 'sigma' in k and self.sigma_reverse():  # `sdf`
+                        out_tensor = -torch.ones(new_shape, dtype=dtype, device=device)  # make it outside
+                        out_tensor[mask] = v
+                        output[k] = out_tensor
+                    else:  # for all `sigma`/`zvals`/`alpha`/`trans_shift`/`weights`/`radiance`, they are all zeros
+                        out_tensor = torch.zeros(new_shape, dtype=dtype, device=device)
+                        out_tensor[mask] = v
+                        output[k] = out_tensor
+                else:
+                    output[k] = v
 
         return output
 
@@ -187,8 +261,7 @@ class FgModel(Base3dModel):
     def optimize(self, cur_epoch=0):
         """Optimize the obj bounding geometric structure. Support ['volume'] now."""
         epoch_optim = self.get_optim_cfgs('epoch_optim')
-        if cur_epoch > 0 and epoch_optim is not None and cur_epoch % epoch_optim:
-            print('Doing optimize ', cur_epoch)
+        if cur_epoch > 0 and epoch_optim is not None and cur_epoch % epoch_optim == 0:
             if self.obj_bound_type == 'volume':
                 self.optim_volume(cur_epoch)
 
@@ -249,3 +322,57 @@ class FgModel(Base3dModel):
         opacity = 1.0 - torch.exp(-torch.relu(density) * dt)  # (B,)
 
         return opacity
+
+    def surface_render(
+        self, inputs, method='sphere_tracing', n_step=128, n_iter=100, threshold=0.01, level=50.0, grad_dir='descent'
+    ):
+        """Surface rendering by finding the surface point and its color. Only for inference
+        Compare to the func in parent class(base_3d_model, you need to consider the case that some rays do not hit the
+        obj_bound structure, with helps to save computation.
+        """
+        rays_o = inputs['rays_o']  # (B, 3)
+        rays_d = inputs['rays_d']  # (B, 3)
+        dtype = rays_o.dtype
+        device = rays_o.device
+        n_rays = rays_o.shape[0]
+
+        # get bounds for object
+        near, far, valid_rays = self.get_near_far_from_rays(inputs)  # (B, 1) * 2
+
+        # get the network
+        geo_net, radiance_net = self.get_net()
+
+        # get surface pts for valid_rays
+        if valid_rays is None or torch.all(valid_rays):
+            zvals, pts, mask = surface_ray_intersection(
+                rays_o, rays_d, geo_net.forward_geo_value, method, near, far, n_step, n_iter, threshold, level, grad_dir
+            )
+        else:
+            zvals_valid, pts_valid, mask_valid = surface_ray_intersection(
+                rays_o[valid_rays], rays_d[valid_rays], geo_net.forward_geo_value, method, near[valid_rays],
+                far[valid_rays], n_step, n_iter, threshold, level, grad_dir
+            )
+
+            # full output update by valid rays
+            zvals = torch.ones((n_rays, 1), dtype=dtype, device=device) * zvals_valid.max()
+            pts = torch.ones((n_rays, 3), dtype=dtype, device=device)
+            mask = torch.zeros((n_rays, ), dtype=torch.bool, device=device)
+            zvals[valid_rays], pts[valid_rays], mask[valid_rays] = zvals_valid, pts_valid, mask_valid
+
+        rgb = torch.ones((n_rays, 3), dtype=dtype, device=device)  # white bkg
+        depth = zvals  # at max zvals after far
+        mask_float = mask.type(dtype)
+
+        # in case all rays do not hit the surface
+        if torch.any(mask):
+            # forward mask pts/dir for color
+            _, rgb_mask = self._forward_pts_dir(geo_net, radiance_net, pts[mask], rays_d[mask])
+            rgb[mask] = rgb_mask
+
+        output = {
+            'rgb': rgb,  # (B, 3)
+            'depth': depth,  # (B,)
+            'mask': mask_float,  # (B,)
+        }
+
+        return output

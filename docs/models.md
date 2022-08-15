@@ -174,9 +174,10 @@ We may set up the automatic helper in the future.
   - default values
     - If you use a obj_bound structure to bound the object, many rays may not hit the structure so that they can
     be skipped for computation. You need to set up a default value for them.
-    - bkg_color:
-    - depth_far:
-    - normal:
+    - bkg_color: color for invalid rays. float in `0~1`. By default `(1.0, 1.0, 1.0)`, white.
+    - depth_far: depth value for invalid rays. By default `10.0`.
+    - normal: normal for invalid rays. float in `0~1`. By default `(0.0, 1.0, 0.0)`, up direction.
+    - progress: For the progress(pts in rays), it will all be set with zeros values.
 
 Following are real modeling methods:
 

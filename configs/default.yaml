@@ -163,6 +163,20 @@ inference:
 
 model:
     type: NeRF
+#    obj_bound:                       # this helps to bound the obj in a smaller structure and save computation
+#        sphere:                      # sphere used for neus/volsdf and some sdf method
+#            radius: 2.0
+#        volume:                      # volume used for methods like `instant-ngp` and other volume based modeling
+#            n_grid: 128
+#            side: 2.0
+#        epoch_optim: 16              # num of epoch to update the obj_bound, only support volume now.
+#        epoch_optim_warmup: 256      # warmup epoch to update all the voxels
+#        ray_sampling_acc: True       # For coarse volume sampling. If True, skip the empty cells.
+#        ema_optim_decay: 0.95        # ema to update the opacity. If None, replace directly without ema.
+#        opa_thres: 0.01              # opacity to consider as an occupied voxel
+#        bkg_color: [1.0, 0.0, 0.2]   # color for invalid rays
+#        depth_far: 10.0              # depth value for invalid rays.
+#        normal: [0.0, 1.0, 0.0]      # normal for invalid rays
     rays:
         bounding_radius: 3.0          # bounding ray sampling region
         near: 1.0                     # hardcode near zvals
