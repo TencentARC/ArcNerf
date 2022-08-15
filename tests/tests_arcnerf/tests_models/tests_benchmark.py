@@ -27,10 +27,11 @@ class TestDict(unittest.TestCase):
         cls.n_rays = 4096
         cls.logger = Logger(path=osp.join(RESULT_DIR, './benchmark.txt'), keep_console=False)
         cls.n_run = 100  # repeat the run to get avg
+        cls.max_pos = 3.0
 
         # data
-        rays_o = torch.rand(cls.batch_size, cls.n_rays, 3) * 2.0
-        rays_d = -normalize(rays_o)  # point to origin
+        rays_o = torch.rand(cls.batch_size, cls.n_rays, 3) * cls.max_pos
+        rays_d = -normalize(rays_o + torch.rand_like(rays_o) * cls.max_pos)  # point to origin with noise
         rays_r = torch.rand(cls.batch_size, cls.n_rays, 1)
         bn3 = torch.ones(cls.batch_size, cls.n_rays, 3)
         bn1 = torch.ones(cls.batch_size, cls.n_rays, 1)
@@ -170,7 +171,7 @@ class TestDict(unittest.TestCase):
     def tests_nerf_ngp(self):
         cfgs_name = 'nerf_ngp.yaml'
         model = self.build_test_model(cfgs_name)
-        loss_func = self.build_loss_func(['rgb_fine'])
+        loss_func = self.build_loss_func(['rgb_coarse'])
 
         t_forward, t_backward, t_forward_only = self.get_avg_time(model, self.data, loss_func)
         self.log_time('NeRF-ngp ', t_forward, t_backward, t_forward_only)
