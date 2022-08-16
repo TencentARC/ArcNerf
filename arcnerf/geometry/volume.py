@@ -777,11 +777,16 @@ class Volume(nn.Module):
         else:
             self.bitfield = torch.zeros_like(self.bitfield, dtype=dtype, device=device)
 
-    def update_bitfield(self, occupancy):
+    def update_bitfield(self, occupancy, ops='and'):
         """Update each voxel indicator by occupancy. new occupancy is the union of old and new.
 
         Args:
             occupancy: torch.bool in shape (n_grid**3, ) or (n_grid, n_grid, n_grid)
+            ops: and/or/overwrite ops for update.
+                     `And` only allows shrinking the volume.
+                     `Or` can expand.
+                     `Overwrite` directly use new one.
+                      By default use and.
 
         Returns:
             bitfield: update by occupancy
@@ -793,7 +798,14 @@ class Volume(nn.Module):
 
         assert occupancy.dtype == torch.bool, 'Must input bool tensor'
 
-        self.bitfield = torch.logical_and(self.bitfield, occupancy)  # update
+        if ops == 'and':
+            self.bitfield = torch.logical_and(self.bitfield, occupancy)  # only shrink
+        elif ops == 'or':
+            self.bitfield = torch.logical_or(self.bitfield, occupancy)  # can go larger
+        elif ops == 'overwrite':
+            self.bitfield = occupancy
+        else:
+            raise NotImplementedError('Ops {} not support for update bitfield...'.format(ops))
 
     def update_bitfield_by_voxel_idx(self, voxel_idx: torch.Tensor, occ=True):
         """Update each bit by voxel_idx.
@@ -954,9 +966,9 @@ class Volume(nn.Module):
         else:
             update_opa = torch.max(self.opafield[voxel_idx[:, 0], voxel_idx[:, 1], voxel_idx[:, 2]] * ema, opacity)
 
-        # update only the occupied voxels
+        # update only the voxels with opacity > 0
         update_opa = torch.where(
-            self.bitfield[voxel_idx[:, 0], voxel_idx[:, 1], voxel_idx[:, 2]],
+            self.opafield[voxel_idx[:, 0], voxel_idx[:, 1], voxel_idx[:, 2]] >= 0,
             update_opa,
             self.opafield[voxel_idx[:, 0], voxel_idx[:, 1], voxel_idx[:, 2]],
         )
@@ -967,11 +979,11 @@ class Volume(nn.Module):
         """Get the min opacity value of density_field"""
         return float(self.opafield.clamp(min=0).mean())
 
-    def update_bitfield_by_opafield(self, threshold=0.01):
+    def update_bitfield_by_opafield(self, threshold=0.01, ops='and'):
         """Update the bitfield(occupancy) by opafield that is large enough"""
         thres = min(self.get_mean_voxel_opacity(), threshold)
         update_opafield = (self.opafield >= thres)  # (n_grid, n_grid, n_grid)
-        self.update_bitfield(update_opafield)  # only valid occupancy is updated
+        self.update_bitfield(update_opafield, ops)  # only valid occupancy is updated
 
     @staticmethod
     def get_lines_from_vertices(verts: torch.Tensor, n):

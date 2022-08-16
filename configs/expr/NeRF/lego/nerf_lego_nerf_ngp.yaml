@@ -29,13 +29,13 @@ n_rays: 4096
 worker: 4
 
 optim:
-    lr: 3e-3
+    lr: 1e-2
     optim_type: adam
-    weight_decay: 0.0 #1e-6
+    weight_decay: 0.0
     lr_scheduler:
-#        type: MultiStepLR
-#        lr_gamma: 0.33
-#        lr_steps: [5000, 10000]
+#        type: ExponentialLR
+#        lr_gamma: 0.1
+#        lr_steps: [15000]
         type: CosineAnnealingLR
         tmax: 15000
         eta_min: 1e-4
@@ -120,14 +120,15 @@ inference:
 
 model:
     type: NeRF
-    rays:
+    obj_bound:
         volume:
-            n_grid: None
+            n_grid: 128
             origin: [0.0, -0.11, 0.0]
             xyz_len: [1.2, 1.2, 2.0]
+        epoch_optim: 16
+        epoch_optim_warmup: 256
+    rays:
         n_sample: 1024
-#        n_importance: 128
-#        shared_network: True
         inverse_linear: False
         perturb: True
         add_inf_z: True
@@ -153,8 +154,6 @@ model:
             backend: tcnn
         W_feat: 16
         geometric_init: False
-#        out_act_cfg:
-#            type: TruncExp
     radiance:
         mode: 'vf'
         W: 64
@@ -171,6 +170,14 @@ loss:
     ImgLoss:
         keys: ['rgb_coarse']
         weight: 1.0
+
+#    RegMaskLoss:
+#        keys: ['mask_coarse']
+#        weight: 0.1
+#
+#    RegWeightsLoss:
+#        keys: ['weights']
+#        weight: 0.1
 
 metric:
     PSNR:

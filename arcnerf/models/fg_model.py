@@ -100,7 +100,7 @@ class FgModel(Base3dModel):
             volume_cfgs.n_grid = 128
         self.obj_bound = Volume(**volume_cfgs.__dict__)
         if self.get_optim_cfgs('epoch_optim') is not None:  # setup bitfield for pruning
-            self.obj_bound.set_up_voxel_bitfield()
+            self.obj_bound.set_up_voxel_bitfield(init_occ=False)
             self.obj_bound.set_up_voxel_opafield()
 
     def get_near_far_from_rays(self, inputs):
@@ -269,7 +269,7 @@ class FgModel(Base3dModel):
     def optimize(self, cur_epoch=0):
         """Optimize the obj bounding geometric structure. Support ['volume'] now."""
         epoch_optim = self.get_optim_cfgs('epoch_optim')
-        if cur_epoch > 0 and epoch_optim is not None and cur_epoch % epoch_optim == 0:
+        if cur_epoch >= 0 and epoch_optim is not None and cur_epoch % epoch_optim == 0:
             if self.obj_bound_type == 'volume':
                 self.optim_volume(cur_epoch)
 
@@ -310,7 +310,7 @@ class FgModel(Base3dModel):
 
         # update opacity and bitfield
         volume.update_opafield_by_voxel_idx(voxel_idx, opacity, ema=self.get_optim_cfgs('ema_optim_decay'))
-        volume.update_bitfield_by_opafield(threshold=self.get_optim_cfgs('opa_thres'))
+        volume.update_bitfield_by_opafield(threshold=self.get_optim_cfgs('opa_thres'), ops='overwrite')
 
     def get_est_opacity(self, dt, pts):
         """Get the estimated opacity at certain pts. This method is only for fg_model.

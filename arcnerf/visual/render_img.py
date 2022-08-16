@@ -105,7 +105,7 @@ def get_render_imgs(inputs, output):
     return img_dict
 
 
-def get_sample_ray_imgs(inputs, output, train=False, sample_num=16):
+def get_sample_ray_imgs(inputs, output, train=False, sample_num=32):
     """Get the sample rays image"""
     if not any([k.startswith('progress_') for k in output.keys()]):
         return None
