@@ -50,9 +50,9 @@ class FgModel(Base3dModel):
             # whether use accelerated sampling or uniform sample in (near, far)
             params['ray_sample_acc'] = get_value_from_cfgs_field(cfgs, 'ray_sample_acc', False)
             # bkg color/depth/normal for invalid rays
-            params['bkg_color'] = get_value_from_cfgs_field(self.cfgs, 'bkg_color', [1.0, 1.0, 1.0])  # white
-            params['depth_far'] = get_value_from_cfgs_field(self.cfgs, 'depth_far', 10.0)  # far distance
-            params['normal'] = get_value_from_cfgs_field(self.cfgs, 'normal', [0.0, 1.0, 0.0])  # for eikonal loss cal
+            params['bkg_color'] = get_value_from_cfgs_field(cfgs, 'bkg_color', [1.0, 1.0, 1.0])  # white
+            params['depth_far'] = get_value_from_cfgs_field(cfgs, 'depth_far', 10.0)  # far distance
+            params['normal'] = get_value_from_cfgs_field(cfgs, 'normal', [0.0, 1.0, 0.0])  # for eikonal loss cal
 
         return params
 
@@ -164,6 +164,11 @@ class FgModel(Base3dModel):
             zvals = self.get_zvals_from_near_far(near, far, self.get_n_coarse_sample(), inference_only)
             output = self._forward(inputs, zvals, inference_only, get_progress, cur_epoch, total_epoch)
         else:  # only on valid rays
+            empty_batch = False  # rare case, the batch send in are all from background
+            if torch.sum(mask) == 0:
+                empty_batch = True
+                mask[0] = True  # mask a valid rays to run
+
             zvals_valid = self.get_zvals_from_near_far(
                 near[mask], far[mask], self.get_n_coarse_sample(), inference_only
             )
@@ -178,6 +183,9 @@ class FgModel(Base3dModel):
             output_valid = self._forward(
                 inputs_valid, zvals_valid, inference_only, get_progress, cur_epoch, total_epoch
             )
+
+            if empty_batch:
+                mask[0] = False  # force to use all default value
 
             # update invalid rays by default values
             output = self.update_default_values_for_invalid_rays(output_valid, mask)

@@ -13,7 +13,7 @@ from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.cfgs_utils import pop_none_item
 from common.utils.img_utils import img_to_uint8
 from common.utils.torch_utils import torch_to_np, np_wrapper
-from common.visual import get_colors
+from common.visual import get_colors, get_combine_colors
 from common.visual.plot_2d import draw_2d_components
 
 
@@ -186,7 +186,7 @@ def get_sample_ray_imgs(inputs, output, train=False, sample_num=16):
 
 
 def write_progress_imgs(
-    files, folder, epoch=None, step=None, global_step=None, eval=False, radius=None, volume_dict=None
+    files, folder, model, epoch=None, step=None, global_step=None, eval=False, radius=None, volume_dict=None
 ):
     """Actual function to write the progress image from render image
 
@@ -195,14 +195,30 @@ def write_progress_imgs(
                 imgs: with ['names', 'imgs'], each is the image and names
               You can also add other types of files (figs, etc) for rendering.
         folder: the main folder to save the result
+        model: If obj_bound is in the fg_model, will add volume/sphere to the progress.
         epoch: epoch, use when eval is False
         step: step, use when eval is False
         global_step: global_step, use when eval is True
         eval: If true, save name as 'eval_xxx.png', else 'epoch_step_global.png'
         radius: if not None, draw the bounding radius for 3d rays
-        volume_dict: if not None, draw the volume for 3d rays
+        volume_dict: if not None, draw the volume for 3d rays.
+            If is from inference data. If foreground model contains volume, use it.
     """
     num_sample = len(files)
+
+    # fg_model
+    obj_bound, obj_bound_type = model.get_fg_model().get_obj_bound_and_type()
+    volume_density_pts = None
+    if obj_bound_type == 'sphere':
+        radius = obj_bound.get_radius(in_float=True)
+    elif obj_bound_type == 'volume':
+        volume_dict = {'grid_pts': torch_to_np(obj_bound.get_corner()), 'lines': obj_bound.get_bound_lines()}
+        if obj_bound.get_voxel_bitfield() is not None:
+            volume_density_pts = torch_to_np(obj_bound.get_occupied_voxel_pts())  # (N_occ, 3)
+            max_pts = 250000
+            if volume_density_pts.shape[0] > max_pts:
+                sample_idx = np.random.choice(volume_density_pts.shape[0], max_pts, replace=False)
+                volume_density_pts = volume_density_pts[sample_idx]
 
     # write the image
     if 'imgs' in files[0] and len(files[0]['imgs']['names']) > 0:
@@ -221,6 +237,15 @@ def write_progress_imgs(
 
             for idx, file in enumerate(files):
                 rays_3d = file['rays']['3d']
+                # update volume density values
+                if volume_density_pts is not None:
+                    n_pts_3d = rays_3d['points'].shape[0]
+                    n_pts_volume = volume_density_pts.shape[0]
+                    rays_3d['points'] = np.concatenate([rays_3d['points'], volume_density_pts], axis=0)
+                    rays_3d['point_colors'] = get_combine_colors(['red', 'green'], [n_pts_3d, n_pts_volume])
+                    rays_3d['point_size'] = np.concatenate([rays_3d['point_size'],
+                                                            np.ones(n_pts_volume) * 10.0],
+                                                           axis=0)
                 img_path = get_dst_path(rays_folder, eval, idx, num_sample, epoch, step, global_step)
                 draw_3d_components(
                     **rays_3d,

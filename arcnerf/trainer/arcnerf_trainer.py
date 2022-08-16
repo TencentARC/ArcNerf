@@ -585,7 +585,7 @@ class ArcNerfTrainer(BasicTrainer):
 
     def write_progress_imgs(self, files, folder, epoch=None, step=None, global_step=None, eval=False):
         """Actual function to write the progress images"""
-        write_progress_imgs(files, folder, epoch, step, global_step, eval, self.radius, self.volume_dict)
+        write_progress_imgs(files, folder, self.model, epoch, step, global_step, eval, self.radius, self.volume_dict)
 
     def evaluate(self, data, model, metric_summary, device, max_samples_eval):
         """Actual eval function for the model. Use run_eval since we want to run it locally as well"""
@@ -609,12 +609,13 @@ class ArcNerfTrainer(BasicTrainer):
         step_in_epoch = 1  # in nerf, each epoch is sampling of all rays in all training samples
 
         # optimize the model for its bounding structure
-        self.model.optimize()
+        self.model.optimize(epoch)
         if self.model.get_fg_model().get_obj_bound_and_type()[1] == 'volume' and \
                 epoch % self.cfgs.progress.epoch_loss == 0:
             volume = self.model.get_fg_model().get_obj_bound_and_type()[0]
-            occ_ratio = volume.get_n_occupied_voxel() / volume.get_n_voxel()
-            self.logger.add_log('Remaining voxel ratio is {:.2f}%'.format(occ_ratio * 100.0))
+            if volume.get_voxel_bitfield() is not None:
+                occ_ratio = volume.get_n_occupied_voxel() / volume.get_n_voxel()
+                self.logger.add_log('Remaining voxel ratio is {:.2f}%'.format(occ_ratio * 100.0))
 
         # remake train dataset train crop
         crop_shuffle = self.crop_max_epoch is not None and epoch >= self.crop_max_epoch
@@ -629,7 +630,12 @@ class ArcNerfTrainer(BasicTrainer):
             if full_shuffle:
                 self.process_train_data()
 
+        # each epoch just contains one step for nerf training
+        t_start = time.time()
         loss_all = self.train_step(epoch, 0, step_in_epoch, self.get_train_batch())
+        epoch_time = time.time() - t_start
+        if epoch % self.cfgs.progress.epoch_loss == 0:
+            self.logger.add_log('Epoch time {:.3f} s/iter'.format(epoch_time))
 
         self.lr_scheduler.step()
 
@@ -658,11 +664,7 @@ class ArcNerfTrainer(BasicTrainer):
             # train and record speed
             self.model.train()
 
-            t_start = time.time()
             loss_all, step_in_epoch = self.train_epoch(epoch)
-            epoch_time = time.time() - t_start
-            if epoch % self.cfgs.progress.epoch_loss == 0:
-                self.logger.add_log('Epoch time {:.3f} s/iter'.format(epoch_time))
 
             if (epoch + 1) % self.cfgs.progress.epoch_save_checkpoint == 0:
                 self.save_model(epoch + 1, loss_all)

@@ -34,6 +34,9 @@ class Volume(nn.Module):
         self.origin = nn.Parameter(torch.tensor([0.0, 0.0, 0.0], dtype=dtype), requires_grad=self.requires_grad)
         self.xyz_len = nn.Parameter(torch.tensor([0.0, 0.0, 0.0], dtype=dtype), requires_grad=self.requires_grad)
 
+        # whether init bitfield
+        self.contains_bitfield = False
+
         # set real value
         if origin is not None and (side is not None or xyz_len is not None):
             self.set_params(origin, side, xyz_len)
@@ -686,6 +689,7 @@ class Volume(nn.Module):
         self, rays_o: torch.Tensor, rays_d: torch.Tensor, return_voxel_idx=False, in_occ_voxel=False
     ):
         """Get voxel_idx that rays pass through. It takes all n**3 voxel for aabb intersection, will take time.
+        Do not use when n_rays * n_occ_voxel is large.
 
         Args:
             rays_o: ray origin, (N_rays, 3)
@@ -735,6 +739,7 @@ class Volume(nn.Module):
             bitfield: a (n_grid, n_grid, n_grid) bool tensor
         """
         assert self.n_grid is not None, 'Voxel bitfield must be set for known resolution volume'
+        self.contains_bitfield = True
 
         if init_occ:
             bitfield = torch.ones((self.n_grid, self.n_grid, self.n_grid), dtype=torch.bool)
@@ -743,7 +748,7 @@ class Volume(nn.Module):
         self.register_buffer('bitfield', bitfield)
 
     def get_voxel_bitfield(self, flatten=False):
-        """Get the voxel bitfield
+        """Get the voxel bitfield. Return None if bitfield no init.
 
         Args:
             flatten: whether to flatten the voxel idx
@@ -751,6 +756,9 @@ class Volume(nn.Module):
         Returns:
             bitfield: if flatten, return bool tensor in (n_grid**3, ), else in (n_grid, n_grid, n_grid)
         """
+        if not self.contains_bitfield:
+            return None
+
         if flatten:
             return self.bitfield.view(-1)
         else:
