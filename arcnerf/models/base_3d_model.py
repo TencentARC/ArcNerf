@@ -128,6 +128,7 @@ class Base3dModel(BaseModel):
 
         Returns:
             zvals: torch.tensor (B, N_sample)
+            mask_pts(None): should be a tensor of (B, N_sample) indicating the validity of each pts.
         """
         zvals = get_zvals_from_near_far(
             near,
@@ -137,7 +138,7 @@ class Base3dModel(BaseModel):
             perturb=self.get_ray_cfgs('perturb') if not inference_only else False
         )  # (B, N_sample)
 
-        return zvals
+        return zvals, None
 
     def ray_marching(
         self,

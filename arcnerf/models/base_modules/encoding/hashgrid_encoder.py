@@ -8,13 +8,8 @@ import torch.nn as nn
 
 from . import ENCODER_REGISTRY
 from arcnerf.geometry.volume import Volume
-# import customized hashgrid encode
-try:
-    from arcnerf.ops import HashGridEncode
-    CUDA_BACKEND_AVAILABLE = True
-except ImportError:
-    CUDA_BACKEND_AVAILABLE = False
-    warnings.warn('HashGridEncode not import correctly...Possibly not build yet...')
+from arcnerf.ops.hashgrid_encode import HashGridEncode, CUDA_BACKEND_AVAILABLE
+
 # import tcnn encoder
 try:
     import tinycudann as tcnn

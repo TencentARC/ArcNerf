@@ -27,5 +27,7 @@ Several renderers have been provided for rendered mesh/color mesh.
 Only use for geometry rendering, no backward is allowed. Can not be used for training.
 ## pytorch3d
 Batch process, allow mesh/color mesh rendering, can be used for training.
-## nvdiffras
+## nvdiffrast
+https://github.com/NVlabs/nvdiffrast
+
 To be implemented.

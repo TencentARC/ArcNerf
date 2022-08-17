@@ -7,7 +7,9 @@ import torch.nn as nn
 
 try:
     import _hashgrid_encode
+    CUDA_BACKEND_AVAILABLE = True
 except ImportError:
+    CUDA_BACKEND_AVAILABLE = False
     warnings.warn('HashGrid Ops not build...')
 
 

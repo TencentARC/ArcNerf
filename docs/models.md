@@ -228,6 +228,11 @@ The performance is worse than Neus as we test.
 [Instant-ngp](https://arxiv.org/abs/2201.05989) is not a model. It uses `HashGridEmbedder` and `SHEmbedder` to
 accelerate the training progress. For volume-based acceleration, you should set `obj_bound` as a volume, use do
 optim/ray_sample_acc for fast sampling.
+- cascade: Since we focus on modeling the main object in the scene, we do not use multi-cascade for sampling
+and density update. Only a single `N_grid**3` density bitfield is used for record and sampling.
+- As in original repo, the data are processed such that all sampling ray points are in `[0, 1]` already. We
+use the volume not normalized as a `[0, 1]` cuda but with customized position and length. The sampling is based
+on the customized volume.
 
 ------------------------------------------------------------------------
 ## bkg_model

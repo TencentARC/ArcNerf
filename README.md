@@ -14,15 +14,11 @@
 - 在线训练可视化， 前后端
 
 - 参考框架
-  - nerf(nerfpl) - DONE
-  - nerf++ - DONE
-  - neus/volsdf (sdf/occpancy) - neurcon - DONE
   - mip-nerf - Implemented. Benchmark not reach
   - instangp/hash_nerf
     - ff_mlp/gridencoder/shencoder/raychingmarching（torch版本， tinycudann版本， torchngp版本）
-  - nsvf/plenoxel/plenoctree
   - tensorRF
-
+  - octree structure
   - mip-nerf-360
   - diver (voxel interval representation)
   - neuraltex

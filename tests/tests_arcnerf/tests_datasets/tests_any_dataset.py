@@ -261,8 +261,9 @@ class TestDict(unittest.TestCase):
             'rays_d': torch.tensor(rays_d),
             'bounds': torch.tensor(bounds) if bounds is not None else None
         }
-        near, far = model.get_near_far_from_rays(inputs)
-        zvals = torch_to_np(model.get_zvals_from_near_far(near, far, n_pts))  # (n_rays*n_cam, n_pts)
+        near, far, _ = model.get_near_far_from_rays(inputs)
+        zvals, _ = model.get_zvals_from_near_far(near, far, n_pts)  # (n_rays*n_cam, n_pts)
+        zvals = torch_to_np(zvals)
         pts = np_wrapper(get_ray_points_by_zvals, rays_o, rays_d, zvals)  # (n_rays*n_cam, n_pts, 3)
         points = pts.reshape(-1, 3)  # (n_rays*n_cam*n_pts, 3)
         self.assertEqual(points.shape, (self.n_cam * n_rays * n_pts, 3))

@@ -6,13 +6,8 @@ import torch
 import torch.nn as nn
 
 from . import ENCODER_REGISTRY
-# import customized SH encode
-try:
-    from arcnerf.ops import SHEncode
-    CUDA_BACKEND_AVAILABLE = True
-except ImportError:
-    CUDA_BACKEND_AVAILABLE = False
-    warnings.warn('SHEncode not import correctly...Possibly not build yet...')
+from arcnerf.ops.sh_encode import SHEncode, CUDA_BACKEND_AVAILABLE
+
 # import tcnn encoder
 try:
     import tinycudann as tcnn

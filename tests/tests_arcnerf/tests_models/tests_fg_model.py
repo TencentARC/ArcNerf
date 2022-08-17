@@ -182,7 +182,7 @@ class TestModelDict(unittest.TestCase):
         )
 
         # pruning with acc sampling
-        model.ray_sample_acc = True
+        model.set_optim_cfgs('ray_sample_acc', True)
         near, far, pts = self.get_zvals_np_from_model(inputs, model)
         volume = model.get_obj_bound_and_type()[0]
         volume_dict = {
