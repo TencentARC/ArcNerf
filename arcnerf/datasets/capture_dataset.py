@@ -51,10 +51,15 @@ class Capture(Base3dPCDataset):
         # align if required
         self.align_cam_horizontal()
 
+        # to make fair comparison, remove test file from train
+        holdout_index = self.get_holdout_index()
+        img_list, _ = self.get_holdout_samples_with_list(holdout_index, img_list)
+
         # skip image and keep less samples
-        img_list = self.skip_samples_no_images(img_list)
+        img_list, _ = self.skip_samples_with_list(img_list)
         # read the real image after skip
         self.images = self.read_image_list(img_list)
+        # keep close-to-mean samples if set
         self.keep_eval_samples()
 
         # rescale image, call from parent class
@@ -69,18 +74,6 @@ class Capture(Base3dPCDataset):
 
         if self.precache:
             self.precache_ray()
-
-    def skip_samples_no_images(self, img_list):
-        """Capture dataset do not read all images at first."""
-        if self.skip > 1:
-            self.cameras = self.cameras[::self.skip]
-            self.bounds = self.bounds[::self.skip]
-            img_list = img_list[::self.skip]
-            self.n_imgs = len(img_list)
-            if 'vis' in self.point_cloud:
-                self.point_cloud['vis'] = self.point_cloud['vis'][::self.skip, :]
-
-        return img_list
 
     def get_image_list(self):
         """Get image list."""

@@ -44,8 +44,12 @@ class BlendedMVS(Base3dDataset):
         # exchange pose coord
         self.exchange_coord()
 
-        # skip image and keep less samples
+        # to make fair comparison, remove test file from train
+        holdout_index = self.get_holdout_index()
+        self.get_holdout_samples(holdout_index)
+        # skip samples
         self.skip_samples()
+        # keep close-to-mean samples if set
         self.keep_eval_samples()
 
         # rescale image, call from parent class

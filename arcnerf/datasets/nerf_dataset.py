@@ -51,6 +51,7 @@ class NeRF(Base3dDataset):
 
         # skip image and keep less samples
         self.skip_samples()
+        # keep close-to-mean samples if set
         self.keep_eval_samples()
 
         # rescale image, call from parent class

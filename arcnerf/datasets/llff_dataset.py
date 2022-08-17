@@ -40,8 +40,11 @@ class LLFF(Base3dDataset):
             cam.set_device(self.device)
 
         # to make fair comparison, remove test file from train
-        self.skip = get_value_from_cfgs_field(self.cfgs, 'skip', 8)
-        self.keep_samples()
+        holdout_index = self.get_holdout_index()
+        self.get_holdout_samples(holdout_index)
+        # skip samples
+        self.skip_samples()
+        # keep close-to-mean samples if set
         self.keep_eval_samples()
 
         # rescale image, call from parent class
@@ -53,24 +56,6 @@ class LLFF(Base3dDataset):
 
         if self.precache:
             self.precache_ray()
-
-    def keep_samples(self):
-        """Keep samples by mode and skip"""
-        if self.skip > 1:
-            if self.mode == 'train':
-                full_idx = list(range(self.n_imgs))
-                skip_idx = full_idx[::self.skip]
-                train_idx = [idx for idx in full_idx if idx not in skip_idx]
-                self.images = [self.images[idx] for idx in train_idx]
-                self.cameras = [self.cameras[idx] for idx in train_idx]
-                self.bounds = [self.bounds[idx] for idx in train_idx]
-                self.n_imgs = len(self.images)
-
-            else:
-                self.images = self.images[::self.skip]
-                self.cameras = self.cameras[::self.skip]
-                self.bounds = self.bounds[::self.skip]
-                self.n_imgs = len(self.images)
 
     def get_image_list(self, mode=None):
         """Get image list."""

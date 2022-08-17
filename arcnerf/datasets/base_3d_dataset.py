@@ -31,6 +31,7 @@ class Base3dDataset(BaseDataset):
         self.bounds = []
         # set for skip
         self.skip = get_value_from_cfgs_field(cfgs, 'skip', 1)
+        self.test_holdout = get_value_from_cfgs_field(cfgs, 'test_holdout', 8)
         # set for eval
         self.eval_max_sample = get_value_from_cfgs_field(cfgs, 'eval_max_sample')
 
@@ -54,14 +55,60 @@ class Base3dDataset(BaseDataset):
         for cam in self.cameras:
             cam.set_device(self.device)
 
+    def get_holdout_index(self):
+        """Keep samples by mode and test_holdout. This can split the train/(val/eval).
+        To use that, you should have n_imgs representing all the images
+        """
+        holdout_index = list(range(self.n_imgs))
+        if self.test_holdout > 1:
+            full_idx = list(range(self.n_imgs))
+            skip_idx = full_idx[::self.test_holdout]
+            if self.mode == 'train':
+                holdout_index = [idx for idx in full_idx if idx not in skip_idx]
+            else:
+                holdout_index = skip_idx
+
+        return holdout_index
+
+    def get_holdout_samples(self, holdout_index):
+        """Get the holdout split for images/camera, etc"""
+        self.n_imgs = len(holdout_index)
+        self.images = [self.images[idx] for idx in holdout_index]
+        self.masks = [self.masks[i] for i in holdout_index] if len(self.masks) > 0 else []
+        self.cameras = [self.cameras[idx] for idx in holdout_index]
+        self.bounds = [self.bounds[i] for i in holdout_index] if len(self.bounds) > 0 else []
+
+    def get_holdout_samples_with_list(self, holdout_index, img_list, mask_list=None):
+        """Get the holdout split for images/camera, etc, img are not read but given list"""
+        self.n_imgs = len(holdout_index)
+        self.cameras = [self.cameras[idx] for idx in holdout_index]
+        self.bounds = [self.bounds[i] for i in holdout_index] if len(self.bounds) > 0 else []
+        img_list = [img_list[idx] for idx in holdout_index]
+        if mask_list is not None:
+            mask_list = [mask_list[idx] for idx in holdout_index]
+
+        return img_list, mask_list
+
     def skip_samples(self):
         """For any mode, you can skip the samples in order."""
         if self.skip > 1:
             self.images = self.images[::self.skip]
-            self.cameras = self.cameras[::self.skip]
             self.masks = self.masks[::self.skip]
+            self.cameras = self.cameras[::self.skip]
             self.bounds = self.bounds[::self.skip]
             self.n_imgs = len(self.images)
+
+    def skip_samples_with_list(self, img_list, mask_list=None):
+        """Do not real image at the beginning, skip the img_list/mask_list for further loading."""
+        if self.skip > 1:
+            self.cameras = self.cameras[::self.skip]
+            self.bounds = self.bounds[::self.skip] if len(self.bounds) > 0 else []
+            img_list = img_list[::self.skip]
+            self.n_imgs = len(img_list)
+            if mask_list is not None:
+                mask_list = mask_list[::self.skip]
+
+        return img_list, mask_list
 
     def keep_eval_samples(self):
         """For eval model, only keep a small number of samples. Which are closer to the avg pose
@@ -159,6 +206,9 @@ class Base3dDataset(BaseDataset):
 
             for camera in self.cameras:
                 camera.rescale_pose(scale=self.cfgs.scale_radius / (max_cam_norm_t * 1.05))
+
+            if len(self.bounds) > 0:
+                self.bounds = [bound / max_cam_norm_t for bound in self.bounds]
 
         return max_cam_norm_t
 

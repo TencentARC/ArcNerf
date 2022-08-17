@@ -26,6 +26,7 @@ Will not touch intrinsic. If point cloud exists, rescale them by same factor to 
 - pc_radius(base_3d_pc_dataset): Remove point cloud that are outside such absolute radius(all scaled by extra `1.05`).
 - align_cam: Sometimes it can be used to align cam in a horizontal way.
 - exchange_coord: Flexible to exchange/flip the coord to a standard system.
+- eval_max_sample: To keep the closest-to-center_pose samples in the split.
 Done after camera `scale_radius`. The radius is restricted within `scale_radius` range.
 ## Augmentation:
 The augmentation is for all image process in all time.
@@ -104,8 +105,9 @@ which is close to object center, adjust cam/pc by this offset. This is optional 
 - Filter point cloud by `pc_radius` and remove point outside.
 - Recenter cam and point by setting the filtered point cloud center as (0,0,0).
 - Re-norm cam and point again to make cam on the surface of sphere with `scale_radius` and obj is centered.
+- test_holdout: is used for separating the train/test images.
 
-We test and show that the method is robust to make the coordinate system such that object is centered at (0,0,0),
+- We test and show that the method is robust to make the coordinate system such that object is centered at (0,0,0),
 cam is on surface with `scale_radius`. Only scale and translation is applied, do not affect the intrinsic.
 
 
@@ -118,6 +120,7 @@ Since NeRF split the dataset into train/val/eval, we load all the camera from al
 transformation of camera(like norm_pose) consistent over all split.
 - scene_name: scene_name that is the folder name under `NeRF`. Use it to be identifier.
 - poses: for the poses, we do transform so that it matches the coord system in our proj.
+  - Poses in all split are read and processed together for consistency.
 - images: The image are in `RGBA` channels, needs to blend rgb by alpha. You can get mask from `alpha`.
 
 ```
@@ -147,6 +150,7 @@ This is a forward facing dataset. Not object extraction is performed. Only used 
 For fair comparison, test/val images have not overlapping with train images.
 - The cameras are aligned flatten. Adjust the poses/bounds by range to avoid large xyz values.
 - scene_name: scene_name that is the folder name under `LLFF`. Use it to be identifier.
+- test_holdout: is used for separating the train/test images.
 - NDC: We support NDC Space conversion if you set `ndc_space=True` in dataset.
   - In the original implementation, even they use `ndc_space` rays for sampling, the view_dirs sent to radianceNet is
 still in non-ndc space. We don't follow it here but only used `ndc rays_d` as view_dirs. But notice that this affects
@@ -182,8 +186,9 @@ Ref: https://github.com/Fyusion/LLFF & https://github.com/bmild/nerf
 ### DTU
 Good for object reconstruction. Specified by scan_id, read image/mask/camera.
 We download the version process by the author of NeuS(total 15 scans).
+For fair comparison, test/val images have not overlapping with train images.(Just like `LLFF`)
 - scan_id: int num for item selection. Use it to be identifier.
-- eval_max_sample: Select the closest samples for eval. It has overlapping with training view.
+- test_holdout: is used for separating the train/test images.
 
 ```
 DTU
@@ -204,8 +209,9 @@ Ref: https://github.com/lioryariv/idr/blob/main/code/datasets/scene_dataset.py
 ### BlendedMVS
 Good for object reconstruction. Specified by scene_name, read image/camera.
 We download the version process by the author of VolSDF(total 9 scans).
+For fair comparison, test/val images have not overlapping with train images.(Just like `LLFF`)
 - scene_name: scene_name that is the folder name under `BlendedMVS`. Use it to be identifier.
-- eval_max_sample: Select the closest samples for eval. It has overlapping with training view.
+- test_holdout: is used for separating the train/test images.
 - In some case it uses `align_cam` and `exchange_coord` for changing the coordinate into a standard one.
 
 ```
@@ -227,6 +233,7 @@ Since NSVF split the dataset into train/val/eval, we load all the camera from al
 transformation of camera(like norm_pose) consistent over all split.
 - scene_name: scene_name that is the folder name under `NSVF`. Use it to be identifier.
 - poses: for the poses, we do transform so that it matches the coord system in our proj.
+  - - Poses in all split are read and processed together for consistency.
 - images: The image are in `RGBA` channels, needs to blend rgb by alpha. You can get mask from `alpha`.
 
 ```
@@ -254,7 +261,7 @@ Ref: https://lingjie0206.github.io/papers/NSVF/
 360 self-captured data. Like `LLFF`, processed with `Colmap`.
 For fair comparison, test/val images have not overlapping with train images.(Just like `LLFF`)
 - scene_name: scene_name that is the folder name under `MipNeRF360`. Use it to be identifier.
-- testhold: is used for separate the train/test images like `LLFF`. But `LLFF` use `skip` to do that.
+- test_holdout: is used for separating the train/test images.
 - skip: different from `LLFF`, skip here is used to skip the final train/test images for fast image loading.
 
 ```
@@ -285,8 +292,7 @@ Ref: https://jonbarron.info/mipnerf360/
 Captured outdoor 360 scene. A large object is at the center. Colmap processed poses and point_cloud is available
 for 3d reconstruction. We only download the `training` group with images.
 - scene_name: scene_name that is the folder name under `TanksAndTemples`. Use it to be identifier.
-- testhold: is used for separate the train/test images like `LLFF`. But `LLFF` use `skip` to do that.
-- skip: different from `LLFF`, skip here is used to skip the final train/test images for fast image loading.
+- test_holdout: is used for separating the train/test images like `LLFF`.
 - ply: We do not load the `.ply` file for this moment.
 
 ```
@@ -308,7 +314,7 @@ High quality synthetic dataset with objects. More than 300 scenes are provided, 
 `40_scenes` from 4 splits(`google_scanned`/`bricks->lego`/`amazon_berkely`/`abc`).
 - scene_name: scene_name that is the folder name under `TanksAndTemples`. Use it to be identifier.
   - The scene_name should be in the form of `split_name/scene_name` like `google_scanned/00000`
-- testhold: is used for separate the train/test images like `LLFF`. But `LLFF` use `skip` to do that.
+- testhold: is used for separate the train/test images like `LLFF`.
 - skip: different from `LLFF`, skip here is used to skip the final train/test images for fast image loading.
 - ply: We do not load the `.ply` file for this moment.
 
@@ -366,10 +372,10 @@ Use several closest camera(to avg_cam) for metric evaluation,
 use same resolution(Or scale if image really too large), and use custom cam paths for rendering video
 
 - eval_batch_size: batch size for eval
-- eval_max_sample: max num of sample in eval dataset.
+- test_holdout: In order to split train/eval images, use this to holdout testset, by default 8.
 only those will be fully rendered can calculate metric.
 
-For some standard benchmark(`NeRF`/`LLFF`), we follow the same split as they used for fair comparison.
+For some standard benchmark(`NeRF`/`NSVF`/`LLFF`), we follow the same split as they used for fair comparison.
 
 ------------------------------------------------------------------------
 ## Inference

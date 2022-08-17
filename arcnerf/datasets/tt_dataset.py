@@ -41,17 +41,14 @@ class TanksAndTemples(Base3dDataset):
         self.norm_cam_pose()
 
         # to make fair comparison, remove test file from train
-        self.test_holdout = get_value_from_cfgs_field(self.cfgs, 'test_holdout', 8)
         holdout_index = self.get_holdout_index()
-        # keep correct sample
-        img_list = [img_list[idx] for idx in holdout_index]
-        self.cameras = [self.cameras[idx] for idx in holdout_index]
-        self.n_imgs = len(holdout_index)
+        img_list, _ = self.get_holdout_samples_with_list(holdout_index, img_list)
 
         # skip image and keep less samples
-        img_list = self.skip_samples_no_images(img_list)
+        img_list, _ = self.skip_samples_with_list(img_list)
         # read the real image after skip
         self.images = self.read_image_list(img_list)
+        # keep close-to-mean samples if set
         self.keep_eval_samples()
 
         # rescale image, call from parent class
@@ -63,29 +60,6 @@ class TanksAndTemples(Base3dDataset):
 
         if self.precache:
             self.precache_ray()
-
-    def skip_samples_no_images(self, img_list):
-        """do not read all images at first."""
-        if self.skip > 1:
-            self.cameras = self.cameras[::self.skip]
-            img_list = img_list[::self.skip]
-            self.n_imgs = len(img_list)
-
-        return img_list
-
-    def get_holdout_index(self):
-        """Keep samples by mode and skip"""
-        holdout_index = list(range(self.n_imgs))
-        if self.test_holdout > 1:
-            if self.mode == 'train':
-                full_idx = list(range(self.n_imgs))
-                skip_idx = full_idx[::self.test_holdout]
-                holdout_index = [idx for idx in full_idx if idx not in skip_idx]
-
-            else:
-                holdout_index = holdout_index[::self.test_holdout]
-
-        return holdout_index
 
     def get_image_list(self, mode=None):
         """Get image list."""

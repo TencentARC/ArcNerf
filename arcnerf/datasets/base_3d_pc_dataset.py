@@ -35,6 +35,24 @@ class Base3dPCDataset(Base3dDataset):
         """string identifier of a dataset like scan_id/scene_name"""
         return self.identifier
 
+    def get_holdout_samples(self, holdout_index):
+        """Get the holdout split for images/camera, etc
+        holdout pts_vis as well
+        """
+        super().get_holdout_samples(holdout_index)
+        if 'vis' in self.point_cloud:
+            self.point_cloud['vis'] = self.point_cloud['vis'][holdout_index, :]
+
+    def get_holdout_samples_with_list(self, holdout_index, img_list, mask_list=None):
+        """Get the holdout split for images/camera, etc, img are not read but given list
+        holdout pts_vis as well
+        """
+        img_list, mask_list = super().get_holdout_samples_with_list(holdout_index, img_list, mask_list)
+        if 'vis' in self.point_cloud:
+            self.point_cloud['vis'] = self.point_cloud['vis'][holdout_index, :]
+
+        return img_list, mask_list
+
     def skip_samples(self):
         """For any mode, you can skip the samples in order.
         Skip pts_vis as well
@@ -43,6 +61,17 @@ class Base3dPCDataset(Base3dDataset):
         if self.skip > 1:
             if 'vis' in self.point_cloud:
                 self.point_cloud['vis'] = self.point_cloud['vis'][::self.skip, :]
+
+    def skip_samples_with_list(self, img_list, mask_list=None):
+        """Do not real image at the beginning, skip the img_list/mask_list for further loading.
+        Skip pts_vis as well
+        """
+        img_list, mask_list = super().skip_samples_with_list(img_list, mask_list)
+        if self.skip > 1:
+            if 'vis' in self.point_cloud:
+                self.point_cloud['vis'] = self.point_cloud['vis'][::self.skip, :]
+
+        return img_list, mask_list
 
     def keep_eval_samples(self):
         """For eval model, only keep a small number of samples. Which are closer to the avg pose

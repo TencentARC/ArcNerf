@@ -8,7 +8,7 @@ import numpy as np
 from .base_3d_dataset import Base3dDataset
 from arcnerf.geometry.poses import average_poses
 from arcnerf.render.camera import PerspectiveCamera
-from common.utils.cfgs_utils import get_value_from_cfgs_field, valid_key_in_cfgs
+from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import DATASET_REGISTRY
 
 
@@ -46,18 +46,14 @@ class MipNeRF360(Base3dDataset):
         self.align_cam_horizontal()
 
         # to make fair comparison, remove test file from train
-        self.test_holdout = get_value_from_cfgs_field(self.cfgs, 'test_holdout', 8)
         holdout_index = self.get_holdout_index()
-        # keep correct sample
-        img_list = [img_list[idx] for idx in holdout_index]
-        self.cameras = [self.cameras[idx] for idx in holdout_index]
-        self.bounds = [self.bounds[idx] for idx in holdout_index]
-        self.n_imgs = len(holdout_index)
+        img_list, _ = self.get_holdout_samples_with_list(holdout_index, img_list)
 
         # skip image and keep less samples
-        img_list = self.skip_samples_no_images(img_list)
+        img_list, _ = self.skip_samples_with_list(img_list)
         # read the real image after skip
         self.images = self.read_image_list(img_list)
+        # keep close-to-mean samples if set
         self.keep_eval_samples()
 
         # rescale image, call from parent class
@@ -70,30 +66,6 @@ class MipNeRF360(Base3dDataset):
         if self.precache:
             self.precache_ray()
 
-    def skip_samples_no_images(self, img_list):
-        """do not read all images at first."""
-        if self.skip > 1:
-            self.cameras = self.cameras[::self.skip]
-            self.bounds = self.bounds[::self.skip]
-            img_list = img_list[::self.skip]
-            self.n_imgs = len(img_list)
-
-        return img_list
-
-    def get_holdout_index(self):
-        """Keep samples by mode and skip"""
-        holdout_index = list(range(self.n_imgs))
-        if self.test_holdout > 1:
-            if self.mode == 'train':
-                full_idx = list(range(self.n_imgs))
-                skip_idx = full_idx[::self.test_holdout]
-                holdout_index = [idx for idx in full_idx if idx not in skip_idx]
-
-            else:
-                holdout_index = holdout_index[::self.test_holdout]
-
-        return holdout_index
-
     def get_image_list(self, mode=None):
         """Get image list."""
         img_dir = osp.join(self.data_spec_dir, 'images')
@@ -104,28 +76,11 @@ class MipNeRF360(Base3dDataset):
 
         return img_list, n_imgs
 
-    def norm_cam_pose(self):
-        """Normalize camera pose by scale_radius, place camera near a sphere surface. It affects extrinsic and bounds"""
-        max_cam_norm_t = None
-        assert len(self.cameras) > 0, 'Not camera in dataset, do not use this func'
-        if valid_key_in_cfgs(self.cfgs, 'scale_radius') and self.cfgs.scale_radius > 0:
-            cam_norm_t = []
-            for camera in self.cameras:
-                cam_norm_t.append(camera.get_cam_pose_norm())
-            max_cam_norm_t = max(cam_norm_t)
-
-            for camera in self.cameras:
-                camera.rescale_pose(scale=self.cfgs.scale_radius / (max_cam_norm_t * 1.05))
-
-            self.bounds /= max_cam_norm_t
-
-        return max_cam_norm_t
-
     def read_cameras(self):
         """Read camera from pose file"""
         poses = self.poses[:, :-2].reshape(-1, 3, 5)  # (N, 3, 5)
         hwf = poses[0, :, -1]  # (3)
-        intrinsic = self.get_llff_intrinsic(hwf)
+        intrinsic = self.get_mipnerf_intrinsic(hwf)
         c2w = poses[:, :, :4]  # (N, 3, 4)
         bottom = np.repeat(np.array([0, 0, 0, 1.]).reshape([1, 4])[None, ...], c2w.shape[0], axis=0)  # (N, 1, 4)
         c2w = np.concatenate([c2w, bottom], axis=1)  # (N, 4, 4)
@@ -145,7 +100,7 @@ class MipNeRF360(Base3dDataset):
         return cameras, bounds
 
     @staticmethod
-    def get_llff_intrinsic(hwf):
+    def get_mipnerf_intrinsic(hwf):
         """Get intrinsic (3, 3) from hwf"""
         intrinsic = np.eye(3)
         intrinsic[0, 0] = hwf[2]
