@@ -178,52 +178,69 @@ class FgModel(Base3dModel):
         mask_pts = volume.check_pts_in_occ_voxel(pts)  # (N_rays*N_pts,)
         mask_pts = mask_pts.view(-1, n_pts)  # (N_rays, N_pts)
 
+        # TODO:
+        # (1) mask_pts in volume, cuda kernel
+        # (2) mask_pts/zvals organize as the duplicate one at back
+        # (3) in child class, wrapper handle duplicated pts
+        # (4) check sparsity ratio and performance
+
         return zvals, mask_pts
 
     def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         """If you use a geometric structure bounding the object, some rays does not hit the bound can be ignored.
          You can assign a bkg color to them directly, with opacity=0.0 and depth=some far distance.
-         TODO: We can only support fix num of sampling for each rays now. Is this good enough?
+
+         We need to mask the rays coarsely using dense volume, then find the pts on each rays in a refined manner
+         using pruning volume. They skip those rays with empty pts for processing.
         """
+        output = {}
         rays_o, rays_d = inputs['rays_o'], inputs['rays_d'],
-        # find the near/far and mask of rays
+
+        # find the near/far/zvals and mask of rays and pts
         near, far, mask_rays = self.get_near_far_from_rays(inputs)
+        zvals, mask_pts = self.get_zvals_from_near_far(
+            near, far, self.get_n_coarse_sample(), inference_only, rays_o, rays_d
+        )
 
-        if self.obj_bound_type is None or torch.all(mask_rays):  # all the rays to run
-            zvals, mask_pts = self.get_zvals_from_near_far(
-                rays_o, rays_d, near, far, self.get_n_coarse_sample(), inference_only
-            )
-            # TODO: check the empty row of mask_pts, need to skip them as well
+        # mask_rays: (B, ) / mask_pts: (B, n_pts)
+        if mask_rays is None and mask_pts is None:  # process all the rays
+            output = self._forward(inputs, zvals, mask_pts, inference_only, get_progress, cur_epoch, total_epoch)
+        elif mask_rays is None:
+            raise RuntimeError('This case should not happen...Check it')
+        elif mask_pts is None:
+            pass
+        else:  # both not None, update real mask_rays
+            mask_rays = torch.logical_and(mask_rays, torch.any(mask_pts, dim=1))  # update the mask_rays
 
-            output = self._forward(inputs, zvals, inference_only, get_progress, cur_epoch, total_epoch)
-        else:  # only on valid rays
-            empty_batch = False  # rare case, the batch send in are all from background
-            if torch.sum(mask_rays) == 0:
-                empty_batch = True
-                mask_rays[0] = True  # mask a valid rays to run
+        # handle the case of sparse rays
+        if mask_rays is not None:
+            if torch.all(mask_rays):
+                output = self._forward(inputs, zvals, mask_pts, inference_only, get_progress, cur_epoch, total_epoch)
+            else:
+                zvals_valid = zvals[mask_rays]
+                mask_pts = mask_pts[mask_rays] if mask_pts is not None else None
 
-            zvals_valid, mask_pts = self.get_zvals_from_near_far(
-                rays_o[mask_rays], rays_d[mask_rays], near[mask_rays], far[mask_rays], self.get_n_coarse_sample(),
-                inference_only
-            )
-            # TODO: check the empty row of mask_pts, need to skip them as well
+                empty_batch = False  # rare case, the batch send in are all from background
+                if torch.sum(mask_rays) == 0:
+                    empty_batch = True
+                    mask_rays[0] = True  # mask a valid rays to run
 
-            inputs_valid = {}
-            for k, v in inputs.items():
-                if isinstance(v, torch.Tensor):
-                    inputs_valid[k] = v[mask_rays]
-                else:
-                    inputs_valid[k] = v
+                inputs_valid = {}
+                for k, v in inputs.items():
+                    if isinstance(v, torch.Tensor):
+                        inputs_valid[k] = v[mask_rays]
+                    else:
+                        inputs_valid[k] = v
 
-            output_valid = self._forward(
-                inputs_valid, zvals_valid, inference_only, get_progress, cur_epoch, total_epoch
-            )
+                output_valid = self._forward(
+                    inputs_valid, zvals_valid, mask_pts, inference_only, get_progress, cur_epoch, total_epoch
+                )
 
-            if empty_batch:
-                mask_rays[0] = False  # force to use all default value
+                if empty_batch:
+                    mask_rays[0] = False  # force to use all default value
 
-            # update invalid rays by default values
-            output = self.update_default_values_for_invalid_rays(output_valid, mask_rays)
+                # update invalid rays by default values
+                output = self.update_default_values_for_invalid_rays(output_valid, mask_rays)
 
         return output
 
@@ -288,13 +305,17 @@ class FgModel(Base3dModel):
 
         return output
 
-    def _forward(self, inputs, zvals, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+    def _forward(self, inputs, zvals, mask, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         """The method that really process all rays that have intersection with the bound
 
         Args:
             zvals: it is the valid coarse zvals get from foreground model.
                     If no obj_bound is provided, it uses near/far and bounding_radius to calculate in a large space
                     If obj_bound is volume/sphere, it use the zvals that rays hits the structure.
+            mask_pts: It is a tensor that indicator the validity of pts on each ray.
+                    False will at the end of each ray indicating they are the same as far pts.
+                    If None, all the pts are valid.
+                    This helps the child network to process pts without duplication.
         """
         raise NotImplementedError(
             'You should implement the _forward function that process rays with coarse zvals in child class...'

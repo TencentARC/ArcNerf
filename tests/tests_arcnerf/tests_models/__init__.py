@@ -207,11 +207,13 @@ class TestModelDict(unittest.TestCase):
                     )
                 self.assertEqual(output['{}'.format(key)].shape, gt_shape)
 
-    def add_volume_structure_to_fg_model(self, model, n_grid=128, offset=16, empty_ratio=0.8):
+    def add_volume_structure_to_fg_model(self, model, n_grid=128, offset=16, empty_ratio=0.5):
         """Add a bounding volume structure to the model """
         volume_cfgs = {'volume': {'n_grid': n_grid, 'side': self.volume_side}}
         volume_cfgs = dict_to_obj(volume_cfgs)
         model.get_fg_model().set_optim_cfgs('epoch_optim', 10)
+        if torch.cuda.is_available():
+            model.get_fg_model().set_optim_cfgs('ray_sample_acc', True)
         model.get_fg_model().set_up_obj_bound_structure_by_cfgs(volume_cfgs)
         model = self.to_cuda(model)
 
@@ -222,7 +224,7 @@ class TestModelDict(unittest.TestCase):
         center_len = n_grid - 2 * offset
         occ_center = torch.ones((center_len, center_len, center_len)).type(torch.bool)
         occ[offset:n_grid - offset, offset:n_grid - offset, offset:n_grid - offset] = occ_center
-        volume.update_bitfield(self.to_cuda(occ))
+        volume.update_bitfield(self.to_cuda(occ), ops='or')
         # make a coarse volume
         voxel_idx = volume.get_occupied_voxel_idx()
         n_occ = voxel_idx.shape[0]
