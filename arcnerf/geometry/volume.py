@@ -330,7 +330,7 @@ class Volume(nn.Module):
 
     def get_voxel_idx_from_xyz(self, pts: torch.Tensor):
         """Get the voxel idx from xyz pts. Directly calculate the offset index in each dim.
-
+            Due to some rounding error, the pts near the boundary may not be considered
         Args:
             pts: xyz position of points. (B, 3) tensor of xyz
 
@@ -477,6 +477,7 @@ class Volume(nn.Module):
 
     def get_voxel_grid_info_from_xyz(self, pts: torch.Tensor):
         """Get the voxel and grid pts info(index, pos) directly from xyz position
+            Due to some rounding error, the pts near the boundary may not be considered
 
         Args:
             pts: xyz position of points. (B, 3) tensor of xyz
@@ -612,7 +613,7 @@ class Volume(nn.Module):
 
         return values_by_grid_pts_idx
 
-    def ray_volume_intersection(self, rays_o: torch.Tensor, rays_d: torch.Tensor, in_occ_voxel=False):
+    def ray_volume_intersection(self, rays_o: torch.Tensor, rays_d: torch.Tensor, in_occ_voxel=False, force=False):
         """Calculate the rays intersection with the out-bounding surfaces
 
         Args:
@@ -620,6 +621,8 @@ class Volume(nn.Module):
             rays_d: ray direction, (N_rays, 3)
             in_occ_voxel: If True, only calculate intersection between rays and current occ rays.
                           It can reduced calculation. When some voxels are masked not occupied. By default False.
+            force: If True, only calculate in the smallest bounding volume, instead of every voxels. By default False.
+                    But this is not accurate for every rays. Some rays not hit the dense voxel may be included.
 
         Returns:
             near: near intersection zvals. (N_rays, 1)
@@ -631,7 +634,7 @@ class Volume(nn.Module):
             mask: (N_rays, 1), show whether each ray has intersection with the volume, BoolTensor
         """
         if in_occ_voxel:  # in occupied sample
-            near, far, pts, mask = self.ray_volume_intersection_in_occ_voxel(rays_o, rays_d)
+            near, far, pts, mask = self.ray_volume_intersection_in_occ_voxel(rays_o, rays_d, force)
         else:  # full volume
             aabb_range = self.get_range()[None].to(rays_o.device)  # (1, 3, 2)
             near, far, pts, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)
@@ -931,10 +934,11 @@ class Volume(nn.Module):
         valid_voxel_idx = voxel_idx[pts_in_occ_voxel]  # (B_valid, 3)
 
         # could take large memory
-        check_voxel_in_occ_voxel = torch.logical_and(
-            valid_voxel_idx.unsqueeze(1),
-            occ_voxel_idx.unsqueeze(0),
-        )  # (B_valid, N_occ, 3)
+        n_valid = valid_voxel_idx.shape[0]
+        n_occ = occ_voxel_idx.shape[0]
+        valid_voxel_idx = torch.repeat_interleave(valid_voxel_idx.unsqueeze(1), n_occ, dim=1)
+        occ_voxel_idx = torch.repeat_interleave(occ_voxel_idx.unsqueeze(0), n_valid, dim=0)
+        check_voxel_in_occ_voxel = (valid_voxel_idx == occ_voxel_idx)  # (B_valid, N_occ, 3)
         check_voxel_in_occ_voxel = torch.all(check_voxel_in_occ_voxel, dim=-1)  # (B_valid, N_occ)
         check_voxel_in_occ_voxel = torch.any(check_voxel_in_occ_voxel, dim=-1)  # (B_valid, )
         pts_in_occ_voxel[pts_in_occ_voxel.clone()] = check_voxel_in_occ_voxel

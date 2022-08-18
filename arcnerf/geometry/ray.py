@@ -255,7 +255,7 @@ def sphere_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, radius: 
     return near, far, pts, mask
 
 
-def aabb_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, aabb_range: torch.Tensor, eps=1e-5):
+def aabb_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, aabb_range: torch.Tensor, eps=1e-7):
     """Get intersection of ray with volume outside surface and the near/far zvals.
     This will be 6 cases: (1)outside no intersection -> near/far: 0, mask = 0
                           (2)outside 1 intersection  -> near = far, mask = 1
@@ -270,7 +270,7 @@ def aabb_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, aabb_range
         rays_o: ray origin, (N_rays, 3)
         rays_d: ray direction, assume normalized, (N_rays, 3)
         aabb_range: bbox range of volume, (N_v, 3, 2) of xyz_min/max of each volume
-        eps: error threshold for parallel comparison, by default 1e-5
+        eps: error threshold for parallel comparison, by default 1e-7
 
     Returns:
         near: near intersection zvals. (N_rays, N_v)
@@ -327,6 +327,10 @@ def aabb_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, aabb_range
     near = torch.clamp_min(near, 0.0)[:, None]
     far = torch.clamp_min(far, 0.0)[:, None]
     near[~mask], far[~mask] = 0.0, 0.0  # (N_rays*N_v, 1) * 2
+
+    # add some eps for reduce the rounding error
+    near[mask] += eps
+    far[mask] -= eps
 
     zvals = torch.cat([near, far], dim=1)  # (N_rays*N_v, 2)
     pts = get_ray_points_by_zvals(rays_o_repeat, rays_d_repeat, zvals)  # (N_rays*N_v, 2, 3)

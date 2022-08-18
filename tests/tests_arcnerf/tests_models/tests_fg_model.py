@@ -60,15 +60,24 @@ class TestModelDict(unittest.TestCase):
 
     def get_zvals_np_from_model(self, inputs, model):
         # call get_near_far_from_rays
-        near, far, mask = model.get_near_far_from_rays(inputs)
+        near, far, mask_rays = model.get_near_far_from_rays(inputs)
+        rays_o, rays_d = inputs['rays_o'], inputs['rays_d']
         self.assertEqual(near.shape, (self.n_rays, 1))
         self.assertEqual(far.shape, (self.n_rays, 1))
         # draw the sampling pts, only for hit rays
-        zvals = model.get_zvals_from_near_far(near, far, 16)
-        if mask is None:  # Not bounded in obj
-            pts = get_ray_points_by_zvals(inputs['rays_o'], inputs['rays_d'], zvals)
+        zvals, mask_pts = model.get_zvals_from_near_far(near, far, 16, rays_o=rays_o, rays_d=rays_d)
+        # mask on all rays
+        pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)
+
+        # mask on all pts
+        if mask_pts is not None:
+            if mask_rays is None:
+                pts = pts[mask_pts]
+            else:
+                pts = pts[torch.logical_and(mask_pts, torch.repeat_interleave(mask_rays[:, None], 16, dim=1))]
         else:
-            pts = get_ray_points_by_zvals(inputs['rays_o'][mask], inputs['rays_d'][mask], zvals[mask])
+            pts = pts[mask_rays] if mask_rays is not None else pts
+
         pts = torch_to_np(pts).reshape(-1, 3)
 
         near, far = torch_to_np(near), torch_to_np(far)
@@ -170,12 +179,16 @@ class TestModelDict(unittest.TestCase):
         }
         pts_tensor = self.to_cuda(torch.tensor(pts))
         n_pts_in_occ_voxels = int(volume.check_pts_in_occ_voxel(pts_tensor).sum())
+        occ_ratio = float(n_pts_in_occ_voxels) / float(pts.shape[0]) * 100.0
+        title = 'Pruned volume without acc sampling, {}/{}({:.1f}%) voxel remains in occ voxel'.format(
+            n_pts_in_occ_voxels, pts.shape[0], occ_ratio
+        )
         file_path = osp.join(self.result_dir, 'pruned_volume_no_acc_sample.png')
         draw_3d_components(
             points=pts,
             rays=(rays_o, far * rays_d),
             volume=volume_dict,
-            title='Pruned volume without acc sampling, {}/{} in occ voxel'.format(n_pts_in_occ_voxels, pts.shape[0]),
+            title=title,
             save_path=file_path,
             plotly=True,
             plotly_html=True
@@ -192,12 +205,16 @@ class TestModelDict(unittest.TestCase):
         }
         pts_tensor = self.to_cuda(torch.tensor(pts))
         n_pts_in_occ_voxels = int(volume.check_pts_in_occ_voxel(pts_tensor).sum())
+        occ_ratio = float(n_pts_in_occ_voxels) / float(pts.shape[0]) * 100.0
+        title = 'Pruned volume with acc sampling, {}/{}({:.1f}%) voxel remains in occ voxel'.format(
+            n_pts_in_occ_voxels, pts.shape[0], occ_ratio
+        )
         file_path = osp.join(self.result_dir, 'pruned_volume_with_acc_sample.png')
         draw_3d_components(
             points=pts,
             rays=(rays_o, far * rays_d),
             volume=volume_dict,
-            title='Pruned volume with acc sampling, {}/{} in occ voxel'.format(n_pts_in_occ_voxels, pts.shape[0]),
+            title=title,
             save_path=file_path,
             plotly=True,
             plotly_html=True

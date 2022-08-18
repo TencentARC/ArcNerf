@@ -384,3 +384,41 @@ class TestDict(unittest.TestCase):
             plotly=True,
             plotly_html=True
         )
+
+    def tests_check_in_volume(self):
+        # coarse volume
+        volume = Volume(n_grid=4, side=2.0)
+        volume.set_up_voxel_bitfield(init_occ=False)
+        voxel_idx = np.array([[0, 0, 0], [1, 1, 1], [2, 2, 2], [3, 3, 3]], dtype=np.int64)
+        np_wrapper(volume.update_bitfield_by_voxel_idx, voxel_idx)
+        # rays
+        rays_o = np.array([[1.2, 1.2, 1.2]])
+        rays_d = -normalize(rays_o)
+        rays_o[:, :2] += 0.1
+        # sample in range
+        near, far, _, _ = np_wrapper(volume.ray_volume_intersection_in_occ_voxel, rays_o, rays_d)
+        n_pts = 64
+        zvals = np_wrapper(get_zvals_from_near_far, near, far, n_pts)
+        pts = np_wrapper(get_ray_points_by_zvals, rays_o, rays_d, zvals)
+        pts = pts.reshape(-1, 3)
+        # mask pts not in volume
+        mask = np_wrapper(volume.check_pts_in_occ_voxel, pts)
+        # get different color
+        pts_in_occ = pts[mask]
+        pts_not_in_occ = pts[~mask]
+        pts = np.concatenate([pts_in_occ, pts_not_in_occ], axis=0)
+        pts_color = get_combine_colors(['green', 'red'], [pts_in_occ.shape[0], pts_not_in_occ.shape[0]])
+
+        volume_dict = {'lines': volume.get_occupied_lines(), 'faces': volume.get_occupied_faces()}
+
+        file_path = osp.join(RESULT_DIR, 'check_pts_in_occ_voxels.png')
+        draw_3d_components(
+            points=pts,
+            point_colors=pts_color,
+            rays=(rays_o, rays_d * 4.5),
+            volume=volume_dict,
+            title='check ray pts in occ voxels',
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True
+        )

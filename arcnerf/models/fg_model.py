@@ -4,10 +4,10 @@ import torch
 
 from .base_3d_model import Base3dModel
 from arcnerf.geometry.ray import surface_ray_intersection
+from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.sphere import Sphere
 from arcnerf.geometry.transformation import normalize
 from arcnerf.geometry.volume import Volume
-from arcnerf.ops.ray_marcher import CUDA_BACKEND_AVAILABLE
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import MODEL_REGISTRY
 
@@ -120,7 +120,12 @@ class FgModel(Base3dModel):
         if self.obj_bound_type is not None:
             if self.obj_bound_type == 'volume':
                 in_occ = self.get_optim_cfgs('epoch_optim') is not None
-                near, far, _, mask = self.obj_bound.ray_volume_intersection(inputs['rays_o'], inputs['rays_d'], in_occ)
+                near, far, _, mask = self.obj_bound.ray_volume_intersection(
+                    inputs['rays_o'],
+                    inputs['rays_d'],
+                    in_occ,
+                    force=True  # do not cal every single occ voxel
+                )
             elif self.obj_bound_type == 'sphere':
                 near, far, _, mask = self.obj_bound.ray_sphere_intersection(inputs['rays_o'], inputs['rays_d'])
             else:
@@ -132,25 +137,27 @@ class FgModel(Base3dModel):
 
         return near, far, mask
 
-    def get_zvals_from_near_far(self, near: torch.Tensor, far: torch.Tensor, n_pts, inference_only=False):
+    def get_zvals_from_near_far(self, near, far, n_pts, inference_only=False, rays_o=None, rays_d=None):
         """Get the zvals of the object with/without bounding structure
             If ray_sample_acc, Skip empty voxels to sample max up to n_pts points by some step.
             Else, find the rays's intersection with remaining voxels, and use near, far to sampling directly
+
+            rays_o/rays_d is for coarse sampling in the volume
         """
         zvals, mask_pts = None, None
         if self.obj_bound_type is not None:
             if self.obj_bound_type == 'volume' and self.get_optim_cfgs('epoch_optim') is not None\
                     and self.get_optim_cfgs('ray_sample_acc'):
-                zvals, mask_pts = self.get_zvals_from_sparse_volume(near, far, n_pts, inference_only)
+                zvals, mask_pts = self.get_zvals_from_sparse_volume(rays_o, rays_d, near, far, n_pts, inference_only)
 
         # only volume based method with pruning allowed acceleration
         if zvals is None:
-            zvals, _ = super().get_zvals_from_near_far(near, far, n_pts, inference_only)
+            zvals, _ = super().get_zvals_from_near_far(near, far, n_pts, inference_only=inference_only)
 
         return zvals, mask_pts
 
     @torch.no_grad()
-    def get_zvals_from_sparse_volume(self, near: torch.Tensor, far: torch.Tensor, n_pts, inference_only=False):
+    def get_zvals_from_sparse_volume(self, rays_o, rays_d, near, far, n_pts, inference_only=False):
         """Get the zvals from optimized coarse volume which skip the empty voxels
 
         The zvals are tensor in (N_rays, N_pts). But coarse sampling makes some rays do not have n_pts max sampling.
@@ -161,24 +168,31 @@ class FgModel(Base3dModel):
             zvals: (B, n_pts) tensor of zvals
             mask_pts: (B, n_pts) bool tensor of all the pts
         """
-        if CUDA_BACKEND_AVAILABLE:
-            pass
+        assert self.obj_bound_type == 'volume', 'Only volume allows'
+        volume = self.obj_bound
 
-        else:
-            print('Invalid ops')
+        # near/far uniform sampling and mask not in bound pts
+        zvals, _ = super().get_zvals_from_near_far(near, far, n_pts, inference_only=inference_only)
+        pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (N_rays, N_pts, 3)
+        pts = pts.view(-1, 3)  # (N_rays*N_pts, 3)
+        mask_pts = volume.check_pts_in_occ_voxel(pts)  # (N_rays*N_pts,)
+        mask_pts = mask_pts.view(-1, n_pts)  # (N_rays, N_pts)
 
-        return None, None
+        return zvals, mask_pts
 
     def forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         """If you use a geometric structure bounding the object, some rays does not hit the bound can be ignored.
          You can assign a bkg color to them directly, with opacity=0.0 and depth=some far distance.
          TODO: We can only support fix num of sampling for each rays now. Is this good enough?
         """
+        rays_o, rays_d = inputs['rays_o'], inputs['rays_d'],
         # find the near/far and mask of rays
         near, far, mask_rays = self.get_near_far_from_rays(inputs)
 
         if self.obj_bound_type is None or torch.all(mask_rays):  # all the rays to run
-            zvals, mask_pts = self.get_zvals_from_near_far(near, far, self.get_n_coarse_sample(), inference_only)
+            zvals, mask_pts = self.get_zvals_from_near_far(
+                rays_o, rays_d, near, far, self.get_n_coarse_sample(), inference_only
+            )
             # TODO: check the empty row of mask_pts, need to skip them as well
 
             output = self._forward(inputs, zvals, inference_only, get_progress, cur_epoch, total_epoch)
@@ -189,9 +203,9 @@ class FgModel(Base3dModel):
                 mask_rays[0] = True  # mask a valid rays to run
 
             zvals_valid, mask_pts = self.get_zvals_from_near_far(
-                near[mask_rays], far[mask_rays], self.get_n_coarse_sample(), inference_only
+                rays_o[mask_rays], rays_d[mask_rays], near[mask_rays], far[mask_rays], self.get_n_coarse_sample(),
+                inference_only
             )
-
             # TODO: check the empty row of mask_pts, need to skip them as well
 
             inputs_valid = {}

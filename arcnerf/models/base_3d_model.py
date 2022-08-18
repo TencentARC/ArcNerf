@@ -114,7 +114,7 @@ class Base3dModel(BaseModel):
 
         return near, far, None
 
-    def get_zvals_from_near_far(self, near: torch.Tensor, far: torch.Tensor, n_pts, inference_only=False):
+    def get_zvals_from_near_far(self, near: torch.Tensor, far: torch.Tensor, n_pts, inference_only=False, **kwargs):
         """Get the zvals from near/far.
 
         It will use ray_cfgs['n_sample'] to select coarse samples.
