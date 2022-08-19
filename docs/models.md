@@ -41,6 +41,29 @@ The dense grid embedder directly extracts density and feature from a dense volum
 Some encoders are implemented in [tiny-cuda-nn]() by Nvidia. You should clone the repo `--recursive`
 and install them by `sh scripts/install_tinycudann.sh`.
 
+------------------------------------------------------------------------
+## obj_bound
+This class serves for the foreground modeling that it uses a geometric structure(`volume`,`sphere`) to restrict the sampling
+on pts in a smaller region. In some case(like `volume`), the structure is allowed to be pruned based on volume density,
+and a more accurate and sparse sampling can be performed.
+
+This structure bounds the real object so that the fg_model can focus on modelling the object. Rays that does not hit
+the structure can be skipped from computation.
+
+You should set `model.obj_bound` to set the bounding structure.
+
+### BasicBound
+It does not contain any structure, and the sampling is performing based on ray configs. Points are either in a near/far
+range, or bounding by a sphere with larger radius that can cover all cameras.
+
+### VolumeBound
+It contains a dense volume with bitfield to record the density in every voxel. Optimization can be performed if you set.
+The points then will be sampled in remaining voxel. And rays computation can be largely reduced in coarse structure.
+- origin/n_grid/xyz_len/side: The information of the volume.
+
+### SphereBound
+It contains a smaller sphere bounding the real object. In sdf modeling like `Neus`, it samples inside such a sphere.
+- origin/radius: The information of the sphere.
 
 ------------------------------------------------------------------------
 ## BaseGeoNet/BaseRadianceNetwork
@@ -91,6 +114,9 @@ when input size is huge(like 512^3).
 # Model Configs
 To see the model configs, you can go to `configs/models`. They are also used in unittest to check the correctness and give
 information.
+
+## Obj_bound
+Ref to the `obj_bound` section above.
 
 ## Rays
 The dataset only provides `rays_o` and `rays_d`, but the actual sampling procedure is in model. Dataset may provide
@@ -161,23 +187,22 @@ if you actually need it. It generally contains geo_net and radiance_net for geom
 ## fg_model
 Here are the class of fg_model, which concentrates on building the foreground object part. You can choose to bound
 the main object in a volume/sphere for accurate and concentrate sampling, or without the structure to sampling in large space.
-- obj_bound: You can set a volume/sphere that bounding the obj. But you need to manually set the size of the structure.
-We may set up the automatic helper in the future.
-  - volume: It needs `n_grid`/`origin`/`xyz_len`or`side` to set up.
-  - sphere: It needs `origin`/`radius` to set up.
-  - Optimization: The optimization is only for volume now. The params are under `cfgs.models.obj_bound`
-    - epoch_optim: If not None, will set up the voxel occupancy and do pruning every this epoch.
-    - epoch_optim_warmup: If not None, will do different sampling in volume.
-    - ray_sampling_acc: If True, will do customized skip sampling in CUDA. Otherwise use simple uniform sampling in (near, far)
-    - ema_optim_decay: If None, directly write all `non-negative` opacity value by new one. Else, update old one by ema factor.
-    - opa_thres: The minimum opacity for considering a voxel as occupied.
-  - default values
-    - If you use a obj_bound structure to bound the object, many rays may not hit the structure so that they can
-    be skipped for computation. You need to set up a default value for them.
-    - bkg_color: color for invalid rays. float in `0~1`. By default `(1.0, 1.0, 1.0)`, white.
-    - depth_far: depth value for invalid rays. By default `10.0`.
-    - normal: normal for invalid rays. float in `0~1`. By default `(0.0, 1.0, 0.0)`, up direction.
-    - progress: For the progress(pts in rays), it will all be set with zeros values.
+- obj_bound: You can set a volume/sphere that bounding the obj. Look above section.
+  - We may set up the automatic helper in the future. To find a close bounding structure.
+
+- Optimization: The optimization is only for volume now. The params are under `cfgs.models.obj_bound`
+  - epoch_optim: If not None, will set up the voxel occupancy and do pruning every this epoch.
+  - epoch_optim_warmup: If not None, will do different sampling in volume.
+  - ray_sampling_acc: If True, will do customized skip sampling in CUDA. Otherwise use simple uniform sampling in (near, far)
+  - ema_optim_decay: If None, directly write all `non-negative` opacity value by new one. Else, update old one by ema factor.
+  - opa_thres: The minimum opacity for considering a voxel as occupied.
+- default values
+  - If you use a obj_bound structure to bound the object, many rays may not hit the structure so that they can
+  be skipped for computation. You need to set up a default value for them.
+  - bkg_color: color for invalid rays. float in `0~1`. By default `(1.0, 1.0, 1.0)`, white.
+  - depth_far: depth value for invalid rays. By default `10.0`.
+  - normal: normal for invalid rays. float in `0~1`. By default `(0.0, 1.0, 0.0)`, up direction.
+  - progress: For the progress(pts in rays), it will all be set with zeros values.
 
 Following are real modeling methods:
 

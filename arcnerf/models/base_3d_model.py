@@ -4,7 +4,7 @@ import torch
 
 from arcnerf.geometry.ray import surface_ray_intersection
 from arcnerf.geometry.transformation import normalize
-from arcnerf.render.ray_helper import get_near_far_from_rays, get_zvals_from_near_far, ray_marching
+from arcnerf.render.ray_helper import ray_marching
 from common.models.base_model import BaseModel
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.torch_utils import chunk_processing
@@ -92,53 +92,6 @@ class Base3dModel(BaseModel):
         """
         geo_net = self.get_net()[0]
         geo_net.pretrain_siren()
-
-    def get_near_far_from_rays(self, inputs):
-        """Get the near/far zvals from rays given settings
-
-        Args:
-            inputs: a dict of torch tensor:
-                rays_o: torch.tensor (B, 3), cam_loc/ray_start position
-                rays_d: torch.tensor (B, 3), view dir(assume normed)
-                bounds: torch.tensor (B, 2). optional
-            Returns:
-                near, far:  torch.tensor (B, 1) each
-        """
-        bounds = None
-        if 'bounds' in inputs:
-            bounds = inputs['bounds'] if 'bounds' in inputs else None
-        near, far = get_near_far_from_rays(
-            inputs['rays_o'], inputs['rays_d'], bounds, self.get_ray_cfgs('near'), self.get_ray_cfgs('far'),
-            self.get_ray_cfgs('bounding_radius')
-        )
-
-        return near, far, None
-
-    def get_zvals_from_near_far(self, near: torch.Tensor, far: torch.Tensor, n_pts, inference_only=False, **kwargs):
-        """Get the zvals from near/far.
-
-        It will use ray_cfgs['n_sample'] to select coarse samples.
-        Other sample keys are not allowed.
-
-        Args:
-            near: torch.tensor (B, 1) near z distance
-            far: torch.tensor (B, 1) far z distance
-            n_pts: num of points for zvals sampling. It is generally the `rays.n_sample` in the model_cfgs.
-            inference_only: If True, will not pertube the zvals. used in eval/infer model. Default False.
-
-        Returns:
-            zvals: torch.tensor (B, N_sample)
-            mask_pts(None): should be a tensor of (B, N_sample) indicating the validity of each pts.
-        """
-        zvals = get_zvals_from_near_far(
-            near,
-            far,
-            n_pts,
-            inverse_linear=self.get_ray_cfgs('inverse_linear'),
-            perturb=self.get_ray_cfgs('perturb') if not inference_only else False
-        )  # (B, N_sample)
-
-        return zvals, None
 
     def ray_marching(
         self,

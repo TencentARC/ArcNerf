@@ -94,8 +94,8 @@ class TestModelDict(unittest.TestCase):
 
         # sphere or volume
         volume_dict = None
-        if model.get_obj_bound_and_type()[1] == 'volume':
-            volume = model.get_obj_bound_and_type()[0]
+        if model.get_obj_bound_type() == 'volume':
+            volume = model.get_obj_bound_structure()
             volume_dict = {
                 'grid_pts': torch_to_np(volume.get_corner()),
                 'lines': volume.get_bound_lines(),
@@ -103,8 +103,8 @@ class TestModelDict(unittest.TestCase):
             }
 
         radius = [self.bounding_radius]
-        if model.get_obj_bound_and_type()[1] == 'sphere':
-            radius_obj = model.get_obj_bound_and_type()[0].get_radius(in_float=True)
+        if model.get_obj_bound_type() == 'sphere':
+            radius_obj = model.get_obj_bound_structure().get_radius(in_float=True)
             radius.append(radius_obj)
 
         file_path = osp.join(self.result_dir, 'struct_{}_sampling_pts.png'.format(type))
@@ -129,7 +129,7 @@ class TestModelDict(unittest.TestCase):
         model.set_factor(100.0)
         model.optimize(16)  # warmup
 
-        volume = model.get_obj_bound_and_type()[0]
+        volume = model.get_obj_bound_structure()
         volume_dict = {
             'grid_pts': torch_to_np(volume.get_occupied_grid_pts().view(-1, 3)),
             'lines': volume.get_occupied_lines(),
@@ -151,7 +151,7 @@ class TestModelDict(unittest.TestCase):
         model.set_factor(1.0)
         model.optimize(512)  # not warmup
 
-        volume = model.get_obj_bound_and_type()[0]
+        volume = model.get_obj_bound_structure()
         volume_dict = {
             'grid_pts': torch_to_np(volume.get_occupied_grid_pts().view(-1, 3)),
             'lines': volume.get_occupied_lines(),
@@ -171,7 +171,7 @@ class TestModelDict(unittest.TestCase):
 
         # pruning without acc sampling
         near, far, pts = self.get_zvals_np_from_model(inputs, model)
-        volume = model.get_obj_bound_and_type()[0]
+        volume = model.get_obj_bound_structure()
         volume_dict = {
             'grid_pts': torch_to_np(volume.get_occupied_grid_pts().view(-1, 3)),
             'lines': volume.get_occupied_lines(),
@@ -197,7 +197,7 @@ class TestModelDict(unittest.TestCase):
         # pruning with acc sampling
         model.set_optim_cfgs('ray_sample_acc', True)
         near, far, pts = self.get_zvals_np_from_model(inputs, model)
-        volume = model.get_obj_bound_and_type()[0]
+        volume = model.get_obj_bound_structure()
         volume_dict = {
             'grid_pts': torch_to_np(volume.get_occupied_grid_pts().view(-1, 3)),
             'lines': volume.get_occupied_lines(),

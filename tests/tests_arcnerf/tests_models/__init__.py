@@ -209,16 +209,15 @@ class TestModelDict(unittest.TestCase):
 
     def add_volume_structure_to_fg_model(self, model, n_grid=128, offset=16, empty_ratio=0.5):
         """Add a bounding volume structure to the model """
-        volume_cfgs = {'volume': {'n_grid': n_grid, 'side': self.volume_side}}
+        volume_cfgs = {'obj_bound': {'volume': {'n_grid': n_grid, 'side': self.volume_side}, 'epoch_optim': 10}}
         volume_cfgs = dict_to_obj(volume_cfgs)
-        model.get_fg_model().set_optim_cfgs('epoch_optim', 10)
+        model.get_fg_model().set_up_obj_bound_by_cfgs(volume_cfgs)
         if torch.cuda.is_available():
             model.get_fg_model().set_optim_cfgs('ray_sample_acc', True)
-        model.get_fg_model().set_up_obj_bound_structure_by_cfgs(volume_cfgs)
         model = self.to_cuda(model)
 
         # make sparsity
-        volume = model.get_fg_model().get_obj_bound_and_type()[0]
+        volume = model.get_fg_model().get_obj_bound_structure()
         # remove the outside voxels
         occ = torch.zeros((n_grid, n_grid, n_grid)).type(torch.bool)
         center_len = n_grid - 2 * offset
@@ -236,9 +235,9 @@ class TestModelDict(unittest.TestCase):
 
     def add_sphere_structure_to_fg_model(self, model):
         """Add a bounding volume structure to the model """
-        sphere_cfgs = {'sphere': {'radius': self.radius}}
+        sphere_cfgs = {'obj_bound': {'sphere': {'radius': self.radius}}}
         sphere_cfgs = dict_to_obj(sphere_cfgs)
-        model.get_fg_model().set_up_obj_bound_structure_by_cfgs(sphere_cfgs)
+        model.get_fg_model().set_up_obj_bound_by_cfgs(sphere_cfgs)
         model = self.to_cuda(model)
 
         return model
