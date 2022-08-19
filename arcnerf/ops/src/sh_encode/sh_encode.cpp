@@ -4,18 +4,9 @@
 //
 // spherical harmonics embedding of direction xyz
 
-#include <torch/extension.h>
 #include <torch/torch.h>
 
-
-#define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x " must be a CUDA tensor")
-#define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be a contiguous tensor")
-#define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
-#define CHECK_IS_INT(x) TORCH_CHECK(x.scalar_type() == at::ScalarType::Int, #x " must be an int tensor")
-#define CHECK_IS_FLOATING(x) TORCH_CHECK(x.scalar_type() == at::ScalarType::Float || \
-                                         x.scalar_type() == at::ScalarType::Half || \
-                                         x.scalar_type() == at::ScalarType::Double, \
-                                         #x " must be a floating tensor")
+#include "utils.h"
 
 
 // define the real cuda function to be called by c++ wrapper.
@@ -58,10 +49,7 @@ torch::Tensor sh_encode_backward_cuda(
    @param: degree, int num
    @return: grad_xyz, torch float tensor of (B, 3)
 */
-torch::Tensor sh_encode_backward(
-    const torch::Tensor grad_out,
-    const torch::Tensor xyz,
-    const uint32_t degree) {
+torch::Tensor sh_encode_backward(const torch::Tensor grad_out, const torch::Tensor xyz, const uint32_t degree) {
     // checking
     CHECK_INPUT(xyz)
     CHECK_INPUT(grad_out)

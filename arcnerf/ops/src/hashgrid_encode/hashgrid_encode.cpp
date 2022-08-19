@@ -4,21 +4,9 @@
 //
 // multi-res grid vertices hash embeddings
 
-#include <torch/extension.h>
 #include <torch/torch.h>
 
-
-#define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x " must be a CUDA tensor")
-#define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be a contiguous tensor")
-#define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
-#define CHECK_IS_INT(x) TORCH_CHECK(x.scalar_type() == at::ScalarType::Int, #x " must be an int tensor")
-#define CHECK_IS_LONG(x) TORCH_CHECK(x.scalar_type() == at::ScalarType::Long, #x " must be an long(int64) tensor")
-#define CHECK_IS_FLOATING(x) TORCH_CHECK(x.scalar_type() == at::ScalarType::Float || \
-                                         x.scalar_type() == at::ScalarType::Half || \
-                                         x.scalar_type() == at::ScalarType::Double, \
-                                         #x " must be a floating tensor")
-#define CHECK_IS_BOOL(x) TORCH_CHECK(x.scalar_type() == at::ScalarType::Bool, #x " must be an bool tensor")
-
+#include "utils.h"
 
 // define the real cuda function to be called by c++ wrapper.
 torch::Tensor hashgrid_encode_forward_cuda(
@@ -26,8 +14,8 @@ torch::Tensor hashgrid_encode_forward_cuda(
     const torch::Tensor embeddings,
     const uint32_t L,
     const uint32_t F,
-    const torch::Tensor offsets,
-    const torch::Tensor resolutions,
+    const std::vector<uint32_t> offsets,
+    const std::vector<uint32_t> resolutions,
     const torch::Tensor min_xyz,
     const torch::Tensor max_xyz,
     const bool cal_grad,
@@ -44,8 +32,8 @@ torch::Tensor hashgrid_encode_forward_cuda(
    @param: embeddings, torch float tensor of (n_total_embed, F)
    @param: L, num of levels of embedding(L), by default 16
    @param: F, num of feat for each entry in hashmap(F), by default 2
-   @param: offsets, torch float tensor of (L+1, ), offset of each level, len is L+1
-   @param: resolutions, torch float tensor of (L, ), resolution at each level, len is L
+   @param: offsets, list of (L+1, ), offset of each level, len is L+1
+   @param: resolutions, list of (L, ), resolution at each level, len is L
    @param: min_xyz, torch float tensor of (D, ), the min_xyz position of the grid
    @param: max_xyz, torch float tensor of (D, ), the max_xyz position of the grid
    @param: cal_grad, bool value decide whether to cal grad
@@ -60,8 +48,8 @@ torch::Tensor hashgrid_encode_forward(
     const torch::Tensor embeddings,
     const uint32_t L,
     const uint32_t F,
-    const torch::Tensor offsets,
-    const torch::Tensor resolutions,
+    const std::vector<uint32_t> offsets,
+    const std::vector<uint32_t> resolutions,
     const torch::Tensor min_xyz,
     const torch::Tensor max_xyz,
     const bool cal_grad,
@@ -74,10 +62,6 @@ torch::Tensor hashgrid_encode_forward(
     CHECK_IS_FLOATING(xyz)
     CHECK_INPUT(embeddings)
     CHECK_IS_FLOATING(embeddings)
-    CHECK_INPUT(offsets)
-    CHECK_IS_INT(offsets)
-    CHECK_INPUT(resolutions)
-    CHECK_IS_INT(resolutions)
     CHECK_INPUT(min_xyz)
     CHECK_IS_FLOATING(min_xyz)
     CHECK_INPUT(max_xyz)
@@ -92,16 +76,16 @@ torch::Tensor hashgrid_encode_forward(
     CHECK_IS_FLOATING(dw_dxyz)
 
 
-    if (offsets.size(0) != L + 1) {
+    if (offsets.size() != L + 1) {
         throw std::runtime_error{"Offset length must be L+1."};
     }
 
-    int n_total_embed = offsets[L].item<int>();
+    int n_total_embed = offsets[L];
     if (embeddings.size(0) != n_total_embed || embeddings.size(1) != F) {
         throw std::runtime_error{"embeddings tensor must be (n_total_embed, F)."};
     }
 
-    if (resolutions.size(0) != L) {
+    if (resolutions.size() != L) {
         throw std::runtime_error{"Resolutions length must be L."};
     }
 

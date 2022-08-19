@@ -1,14 +1,14 @@
-#include <cuda.h>
-#include <cuda_runtime.h>
+// Copyright 2022 Tencent Inc. All rights reserved.
+//
+// Author: leoyluo@tencent.com (Yue Luo)
+//
+// multi-res grid vertices hash embeddings
 
 #include <torch/extension.h>
 
+#include "helper.h"
+#include "utils.h"
 
-// CUDA function for simple calculation on any type
-template <typename T>
-__host__ __device__ T div_round_up(T val, T divisor) {
-	return (val + divisor - 1) / divisor;
-}
 
 // hash function turning grid pts index to hash value, % by hashmap_size
 template <uint32_t D>
@@ -32,8 +32,8 @@ __global__ void forward_kernel(
     const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> xyz,  // (B, D)
     const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> embeddings,  // (n_total_embed, F)
     const uint32_t L,  // n_levels
-    const torch::PackedTensorAccessor32<int, 1, torch::RestrictPtrTraits> offsets,  // L+1
-    const torch::PackedTensorAccessor32<int, 1, torch::RestrictPtrTraits> resolutions,  // L
+    const uint32_t* __restrict__ offsets,  // L+1
+    const uint32_t* __restrict__ resolutions,  // L
     const torch::PackedTensorAccessor32<scalar_t, 1, torch::RestrictPtrTraits> min_xyz,  // D
     const torch::PackedTensorAccessor32<scalar_t, 1, torch::RestrictPtrTraits> max_xyz,  // D
     const bool cal_grad,
@@ -193,8 +193,8 @@ template <typename scalar_t> void forward_kernel_wrapper(
     const uint32_t L,  // n_levels
     const uint32_t F,  // n_feat_per_entry
     const uint32_t D,  // input dim
-    const torch::PackedTensorAccessor32<int, 1, torch::RestrictPtrTraits> offsets,  // L+1
-    const torch::PackedTensorAccessor32<int, 1, torch::RestrictPtrTraits> resolutions,  // L
+    const uint32_t* __restrict__ offsets,  // L+1
+    const uint32_t* __restrict__ resolutions,  // L
     const torch::PackedTensorAccessor32<scalar_t, 1, torch::RestrictPtrTraits> min_xyz,  // D
     const torch::PackedTensorAccessor32<scalar_t, 1, torch::RestrictPtrTraits> max_xyz,  // D
     const bool cal_grad,
@@ -303,8 +303,8 @@ torch::Tensor hashgrid_encode_forward_cuda(
     const torch::Tensor embeddings,
     const uint32_t L,
     const uint32_t F,
-    const torch::Tensor offsets,
-    const torch::Tensor resolutions,
+    const std::vector<uint32_t> offsets,
+    const std::vector<uint32_t> resolutions,
     const torch::Tensor min_xyz,
     const torch::Tensor max_xyz,
     const bool cal_grad,
@@ -316,6 +316,10 @@ torch::Tensor hashgrid_encode_forward_cuda(
     const uint32_t B = xyz.size(0);  // B
     const uint32_t D = xyz.size(1);  // D
 
+    // vector to gpu
+    uint32_t* offsets_gpu = vec_to_gpu(offsets);
+    uint32_t* resolutions_gpu = vec_to_gpu(resolutions);
+
     // Init the output tensor
     torch::Tensor output = torch::zeros({B, L, F}, xyz.dtype()).to(xyz.device());  // (B, L, F)
 
@@ -326,8 +330,8 @@ torch::Tensor hashgrid_encode_forward_cuda(
             xyz.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
             embeddings.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
             L, F, D,
-            offsets.packed_accessor32<int, 1, torch::RestrictPtrTraits>(),
-            resolutions.packed_accessor32<int, 1, torch::RestrictPtrTraits>(),
+            offsets_gpu,
+            resolutions_gpu,
             min_xyz.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
             max_xyz.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
             cal_grad,

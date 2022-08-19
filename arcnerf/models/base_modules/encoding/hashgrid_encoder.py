@@ -122,8 +122,6 @@ class HashGridEmbedder(nn.Module):
         """To make those tensor into the same device"""
         self.register_buffer('min_xyz', self.volume.get_range()[:, 0])  # (3,)
         self.register_buffer('max_xyz', self.volume.get_range()[:, 1])  # (3,)
-        self.register_buffer('t_offsets', torch.tensor(self.offsets, dtype=torch.int))  # (L+1,)
-        self.register_buffer('t_resolutions', torch.tensor(self.resolutions, dtype=torch.int))  # (L,)
 
     def init_embeddings(self, init_emb, std=1e-4):
         """Init embedding. To save memory, at lower level, do not init large embeddings
@@ -183,7 +181,7 @@ class HashGridEmbedder(nn.Module):
 
         if self.backend == 'cuda' and CUDA_BACKEND_AVAILABLE:
             hashgrid_embed = self.hashgrid_encode_cuda(
-                xyz, self.embeddings, self.t_offsets, self.t_resolutions, self.min_xyz, self.max_xyz
+                xyz, self.embeddings, self.offsets, self.resolutions, self.min_xyz, self.max_xyz
             )
         elif self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
             norm_xyz = (xyz - self.min_xyz) / (self.max_xyz - self.min_xyz)  # to (0~1)
