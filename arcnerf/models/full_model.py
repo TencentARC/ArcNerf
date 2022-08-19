@@ -50,8 +50,9 @@ class FullModel(nn.Module):
         max_far = 2.0 * self.bkg_model.get_ray_cfgs('bounding_radius')
         fg_model_far = self.fg_model.get_ray_cfgs('far')
         if fg_model_far is None:
-            assert self.fg_model.get_ray_cfgs('bounding_radius') <= self.bkg_model.get_ray_cfgs('bounding_radius'),\
-                'fg_model radius should not exceed bkg_model radius'
+            if self.fg_model.get_ray_cfgs('bounding_radius') is not None:
+                assert self.fg_model.get_ray_cfgs('bounding_radius') <= self.bkg_model.get_ray_cfgs('bounding_radius'),\
+                    'fg_model radius should not exceed bkg_model radius'
         else:
             assert fg_model_far is None or fg_model_far <= max_far,\
                 'Do not set fg_model far exceed {}'.format(max_far)
