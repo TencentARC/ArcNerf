@@ -256,6 +256,57 @@ def get_zvals_from_near_far(
     return zvals
 
 
+def get_zvals_from_near_far_fix_step(
+    near: torch.Tensor, far: torch.Tensor, fix_t, n_pts, inclusive=True, perturb=False
+):
+    """Get zvals from near/far distance with fix step t
+
+    Args:
+        near: tensor(N_rays, 1), near zvals
+        far: tensor(N_rays, 1), far zvals
+        fix_t: fix step t
+        n_pts: num of points sampled in (near, far)
+        inclusive: If True, zvals include near,far. If False, only in range not inclusive. By default True.
+        perturb: If True, disturb sampling in all segment. By default False.
+
+    Returns:
+        zvals: (N_rays, n_pts), each ray samples n_pts points.
+                If zvals >= far, will keep the far in following pts.
+        mask_pts: (N_rays, n_pts), bool tensor indicating each ray samples points validity.
+                If zvals >= far, will mask duplicated points as False
+    """
+    assert fix_t > 0, 'Only allow positive step...'
+    n_rays = near.shape[0]
+    dtype = near.dtype
+    device = near.device
+
+    zvals = torch.ones((n_rays, n_pts), dtype=dtype, device=device)  # (N_rays, N_pts)
+    mask_pts = torch.ones((n_rays, n_pts), dtype=torch.bool, device=device)  # (N_rays, N_pts)
+
+    # init as near
+    if inclusive:
+        zvals = zvals * near
+    else:
+        zvals = zvals * (near + fix_t)
+
+    # step forward and clamp in (near, far)
+    step = torch.arange(0, n_pts, 1, device=device)[None]  # (1, N_pts)
+    zvals = zvals + step * fix_t  # (N_rays, N_pts)
+    zvals = zvals.clamp(near, far)
+
+    # invalid for the pts that is same as last column
+    zvals_col_diff = (zvals[:, 1:] - zvals[:, :-1] == 0.0)  # (N_rays, N_pts-1)
+    zvals_col_diff = torch.cat([torch.zeros((n_rays, 1), dtype=torch.bool, device=device), zvals_col_diff],
+                               dim=1)  # (N_rays, N_pts)
+    mask_pts[zvals_col_diff] = False
+
+    # perturb valid pts only
+    if perturb or True:
+        zvals = perturb_interval_with_mask(zvals, mask_pts)
+
+    return zvals, mask_pts
+
+
 def get_zvals_outside_sphere(rays_o: torch.Tensor, rays_d: torch.Tensor, n_pts, radius, perturb=False):
     """Get zvals outside a bounding radius
 
@@ -306,7 +357,7 @@ def perturb_interval(vals: torch.Tensor):
         vals: tensor (B, N), sampling in N pts.
 
     Return:
-        vals: pertube sampling (B, N)
+        vals: perturb sampling (B, N)
     """
     dtype = vals.dtype
     device = vals.device
@@ -317,6 +368,35 @@ def perturb_interval(vals: torch.Tensor):
     vals = _lower + (_upper - _lower) * _z_rand  # (N_rays, N_pts)
 
     return vals
+
+
+def perturb_interval_with_mask(vals: torch.Tensor, mask=None):
+    """Perturb sampling in the intervals with mask.
+    Since the unmasked values in each row is the same as the last masked val, change them as well.
+
+    Args:
+        vals: tensor (B, N), sampling in N pts. vals in each row will ending with same values if mask=False.
+        mask: tensor (B, N), each pts
+
+    Return:
+        vals: perturb sampling (B, N) on valid vals
+    """
+    device = vals.device
+    vals_perturb = perturb_interval(vals)
+    if mask is None:
+        return vals_perturb
+
+    if mask is not None:
+        vals[mask] = vals_perturb[mask]
+        # last valid pts
+        last_idx = torch.sum(mask, dim=1) - 1  # (B, )
+        row_idx = torch.arange(vals.shape[0], dtype=last_idx.dtype, device=device)  # (B, )
+        last_idx = torch.cat([row_idx[:, None], last_idx[:, None]], dim=1)  # (B, 2)
+        last_value = vals[last_idx[:, 0], last_idx[:, 1]][:, None]  # (B, 1)
+        # clamp the other vals
+        vals = vals.clamp(vals[:, 0:1], last_value)
+
+        return vals
 
 
 def sample_pdf(bins: torch.Tensor, weights: torch.Tensor, n_sample, det=False, eps=1e-5):

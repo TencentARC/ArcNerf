@@ -172,6 +172,7 @@ model:
 #        epoch_optim: 16              # num of epoch to update the obj_bound, only support volume now.
 #        epoch_optim_warmup: 256      # warmup epoch to update all the voxels
 #        ray_sampling_acc: True       # For coarse volume sampling. If True, skip the empty cells.
+#        ray_sample_fix_step: True    # For coarse volume sampling, use a fix step to sample, which reduce samples num
 #        ema_optim_decay: 0.95        # ema to update the opacity. If None, replace directly without ema.
 #        opa_thres: 0.01              # opacity to consider as an occupied voxel
 #        bkg_color: [1.0, 0.0, 0.2]   # color for invalid rays

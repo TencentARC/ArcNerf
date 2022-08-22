@@ -207,7 +207,8 @@ def write_progress_imgs(
     num_sample = len(files)
 
     # fg_model
-    obj_bound, obj_bound_type = model.get_fg_model().get_obj_bound_and_type()
+    obj_bound_type = model.get_fg_model().get_obj_bound_type()
+    obj_bound = model.get_fg_model().get_obj_bound_structure()
     volume_density_pts = None
     if obj_bound_type == 'sphere':
         radius = obj_bound.get_radius(in_float=True)

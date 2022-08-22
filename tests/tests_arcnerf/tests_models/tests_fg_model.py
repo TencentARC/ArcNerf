@@ -221,6 +221,32 @@ class TestModelDict(unittest.TestCase):
             plotly_html=True
         )
 
+        # pruning with acc sampling and fix step
+        model.set_optim_cfgs('ray_sample_fix_step', True)
+        near, far, pts = self.get_zvals_np_from_model(inputs, model)
+        volume = model.get_obj_bound_structure()
+        volume_dict = {
+            'grid_pts': torch_to_np(volume.get_occupied_grid_pts().view(-1, 3)),
+            'lines': volume.get_occupied_lines(),
+            'faces': volume.get_occupied_faces()
+        }
+        pts_tensor = self.to_cuda(torch.tensor(pts))
+        n_pts_in_occ_voxels = int(volume.check_pts_in_occ_voxel(pts_tensor).sum())
+        occ_ratio = float(n_pts_in_occ_voxels) / float(pts.shape[0]) * 100.0
+        title = 'Pruned volume with acc sampling and fix step, {}/{}({:.1f}%) voxel remains in occ voxel'.format(
+            n_pts_in_occ_voxels, pts.shape[0], occ_ratio
+        )
+        file_path = osp.join(self.result_dir, 'pruned_volume_with_acc_sample_fix_step.png')
+        draw_3d_components(
+            points=pts,
+            rays=(rays_o, far * rays_d),
+            volume=volume_dict,
+            title=title,
+            save_path=file_path,
+            plotly=True,
+            plotly_html=True
+        )
+
     def tests_set_up_volume_bound_model(self):
         volume_model_cfgs = self.base_cfgs.copy()
         volume_cfgs = {'volume': {'n_grid': 4, 'side': 2.0}}

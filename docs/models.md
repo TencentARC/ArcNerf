@@ -190,12 +190,26 @@ the main object in a volume/sphere for accurate and concentrate sampling, or wit
 - obj_bound: You can set a volume/sphere that bounding the obj. Look above section.
   - We may set up the automatic helper in the future. To find a close bounding structure.
 
+- mask_rays:
+  - Using bounding structure may reduce the calculation on some useless rays. You need to assign default values to this
+  rays.
+
+- mask_pts:
+  - Use sparse structure like pruned volume make some ray sampling sparse. Some pts are not in the occupied voxels
+  will be masked as useless. The fg model provides a wrapper `get_density_radiance_by_mask_pts` to do `_forward_pts_dir`
+  with only masked points, it helps to save computation on useless pts.
+  - For the mask, they are packed to `[T, T, T, F, F, F]` with `False` value only at the end of each ray. This will
+  not harm the following raymarching/upsample funcitno.
+
 - Optimization: The optimization is only for volume now. The params are under `cfgs.models.obj_bound`
   - epoch_optim: If not None, will set up the voxel occupancy and do pruning every this epoch.
   - epoch_optim_warmup: If not None, will do different sampling in volume.
   - ray_sampling_acc: If True, will do customized skip sampling in CUDA. Otherwise use simple uniform sampling in (near, far)
+  - ray_sampling_fix_step: If True, use fix step to init all sample rather than uniformly sample in (near, far).
+                           It reduces sample num with less computation.
   - ema_optim_decay: If None, directly write all `non-negative` opacity value by new one. Else, update old one by ema factor.
   - opa_thres: The minimum opacity for considering a voxel as occupied.
+
 - default values
   - If you use a obj_bound structure to bound the object, many rays may not hit the structure so that they can
   be skipped for computation. You need to set up a default value for them.

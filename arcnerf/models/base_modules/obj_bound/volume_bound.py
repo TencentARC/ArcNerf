@@ -6,7 +6,7 @@ from . import BOUND_REGISTRY
 from .basic_bound import BasicBound
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.volume import Volume
-from arcnerf.render.ray_helper import handle_valid_mask_zvals
+from arcnerf.render.ray_helper import handle_valid_mask_zvals, get_zvals_from_near_far_fix_step
 from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
 
 
@@ -29,7 +29,7 @@ class VolumeBound(BasicBound):
 
         # set bitfield for pruning
         if self.get_optim_cfgs('epoch_optim') is not None:  # setup bitfield for pruning
-            self.volume.set_up_voxel_bitfield(init_occ=False)
+            self.volume.set_up_voxel_bitfield(init_occ=True)
             self.volume.set_up_voxel_opafield()
 
     def get_obj_bound(self):
@@ -42,6 +42,8 @@ class VolumeBound(BasicBound):
 
         # whether use accelerated sampling or uniform sample in (near, far)
         params['ray_sample_acc'] = get_value_from_cfgs_field(self.cfgs, 'ray_sample_acc', False)
+        # whether to use fix step for zvals
+        params['ray_sample_fix_step'] = get_value_from_cfgs_field(self.cfgs, 'ray_sample_fix_step', False)
 
         return params
 
@@ -102,17 +104,42 @@ class VolumeBound(BasicBound):
             zvals: (B, n_pts) tensor of zvals
             mask_pts: (B, n_pts) bool tensor of all the pts
         """
-        # near/far uniform sampling and mask not in bound pts
-        zvals, _ = super().get_zvals_from_near_far(
-            near, far, n_pts, inference_only, inverse_linear, perturb
-        )  # (N_rays, N_pts)
-        pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (N_rays, N_pts, 3)
-        pts = pts.view(-1, 3)  # (N_rays*N_pts, 3)
-        mask_pts = self.volume.check_pts_in_occ_voxel(pts)  # (N_rays*N_pts,)
-        mask_pts = mask_pts.view(-1, n_pts)  # (N_rays, N_pts)
+        if self.get_optim_cfgs('ray_sample_fix_step'):
+            zvals, mask_pts = self.get_zvals_from_near_far_fix_step(
+                near, far, n_pts, inference_only, perturb
+            )  # (N_rays, N_pts)
+            pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (N_rays, N_pts, 3)
+            pts_valid = pts[mask_pts].view(-1, 3)  # (N_valid_pts, 3)
+            mask_valid_pts = self.volume.check_pts_in_occ_voxel(pts_valid)  # (N_valid_pts, 3)
+            # update those pts not in occ voxel
+            mask_pts[mask_pts.clone()] = torch.logical_and(mask_pts[mask_pts.clone()], mask_valid_pts)
+        else:
+            # near/far uniform sampling and mask not in bound pts
+            zvals, _ = super().get_zvals_from_near_far(
+                near, far, n_pts, inference_only, inverse_linear, perturb
+            )  # (N_rays, N_pts)
+            pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (N_rays, N_pts, 3)
+            pts = pts.view(-1, 3)  # (N_rays*N_pts, 3)
+            mask_pts = self.volume.check_pts_in_occ_voxel(pts)  # (N_rays*N_pts,)
+            mask_pts = mask_pts.view(-1, n_pts)  # (N_rays, N_pts)
 
         # realign the valid zvals and mask_pts
         zvals, mask_pts = handle_valid_mask_zvals(zvals, mask_pts)
+
+        return zvals, mask_pts
+
+    def get_zvals_from_near_far_fix_step(self, near, far, n_pts, inference_only=False, perturb=False, **kwargs):
+        """Get zvals from near to far with fix step. Use this will sample less pts
+        compared to directly sample in (near, far) uniformly
+
+        Returns:
+            zvals: (B, n_pts) tensor of zvals
+            mask_pts: (B, n_pts) bool tensor of all the pts
+        """
+        fix_t = self.volume.get_diag_len() / n_pts  # diag len based
+        zvals, mask_pts = get_zvals_from_near_far_fix_step(
+            near, far, fix_t, n_pts, perturb=perturb if not inference_only else False
+        )
 
         return zvals, mask_pts
 
@@ -126,7 +153,7 @@ class VolumeBound(BasicBound):
         epoch_optim = self.get_optim_cfgs('epoch_optim')
         epoch_optim_warmup = self.get_optim_cfgs('epoch_optim_warmup')
 
-        if cur_epoch < 0 or epoch_optim is None or cur_epoch % epoch_optim != 0:
+        if cur_epoch <= 0 or epoch_optim is None or cur_epoch % epoch_optim != 0:
             return
 
         # select pts randomly in some voxels

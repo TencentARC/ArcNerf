@@ -4,10 +4,11 @@ import torch
 
 from .base_3d_model import Base3dModel
 from .base_modules.obj_bound import build_obj_bound
-from arcnerf.geometry.ray import surface_ray_intersection
+from arcnerf.geometry.ray import surface_ray_intersection, get_ray_points_by_zvals
 from arcnerf.geometry.transformation import normalize
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import MODEL_REGISTRY
+from common.utils.torch_utils import chunk_processing
 
 
 @MODEL_REGISTRY.register()
@@ -142,7 +143,6 @@ class FgModel(Base3dModel):
             if torch.all(mask_rays):
                 output = self._forward(inputs, zvals, mask_pts, inference_only, get_progress, cur_epoch, total_epoch)
             else:
-
                 zvals_valid = zvals[mask_rays]
                 mask_pts_valid = mask_pts[mask_rays] if mask_pts is not None else None
 
@@ -150,6 +150,11 @@ class FgModel(Base3dModel):
                 if torch.sum(mask_rays) == 0:
                     empty_batch = True
                     mask_rays[0] = True  # mask a valid rays to run
+                    zvals_valid = torch.zeros((1, zvals.shape[1]), dtype=zvals.dtype, device=zvals.device)
+                    zvals_valid[0, 1:] = 1.0
+                    if mask_pts is not None:
+                        mask_pts_valid = torch.zeros((1, mask_pts.shape[1]), dtype=torch.bool, device=mask_pts.device)
+                        mask_pts_valid[0, :2] = True
 
                 inputs_valid = {}
                 for k, v in inputs.items():
@@ -163,7 +168,7 @@ class FgModel(Base3dModel):
                 )
 
                 if empty_batch:
-                    mask_rays[0] = False  # force to use all default value
+                    mask_rays[0] = False  # force to synthetic ray to use all default value
 
                 # update invalid rays by default values
                 output = self.update_default_values_for_invalid_rays(output_valid, mask_rays)
@@ -185,6 +190,55 @@ class FgModel(Base3dModel):
         raise NotImplementedError(
             'You should implement the _forward function that process rays with coarse zvals in child class...'
         )
+
+    def get_density_radiance_by_mask_pts(self, rays_o, rays_d, zvals, mask_pts=None):
+        """Process the pts/dir by mask_pts. Only process valid zvals to save computation
+
+        Args:
+            rays_o: (B, 3) rays origin
+            rays_d: (B, 3) rays direction(normalized)
+            zvals: (B, N_pts) zvals on each ray
+            mask_pts: (B, N_pts) whether each pts is valid. If None, process all the pts
+
+        Returns:
+            sigma: (B, N_pts) sigma on all pts. Duplicated pts share the same value
+            radiance: (B, N_pts, 3) rgb on all pts. Duplicated pts share the same value
+        """
+        n_rays = zvals.shape[0]
+        n_pts = zvals.shape[1]
+        dtype = zvals.dtype
+        device = zvals.device
+
+        # get points, expand rays_d to all pts
+        pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (B, N_pts, 3)
+        rays_d_repeat = torch.repeat_interleave(rays_d.unsqueeze(1), n_pts, dim=1)  # (B, N_pts, 3)
+
+        if mask_pts is None:
+            pts = pts.view(-1, 3)  # (B*N_pts, 3)
+            rays_d_repeat = rays_d_repeat.view(-1, 3)  # (B*N_pts, 3)
+        else:
+            pts = pts[mask_pts].view(-1, 3)  # (N_valid_pts, 3)
+            rays_d_repeat = rays_d_repeat[mask_pts].view(-1, 3)  # (N_valid_pts, 3)
+
+        # get sigma and rgb, . shape in (N_valid_pts, ...)
+        _sigma, _radiance = chunk_processing(
+            self._forward_pts_dir, self.chunk_pts, False, self.coarse_geo_net, self.coarse_radiance_net, pts,
+            rays_d_repeat
+        )
+
+        # reshape to (B, N_sample, ...) by fill duplicating pts
+        if mask_pts is None:
+            sigma = _sigma.view(n_rays, -1)  # (B, N_sample)
+            radiance = _radiance.view(n_rays, -1, 3)  # (B, N_sample, 3)
+        else:
+            last_pts_idx = torch.cumsum(mask_pts.sum(dim=1), dim=0) - 1  # index on flatten sigma/radiance
+            last_sigma, last_radiance = _sigma[last_pts_idx], _radiance[last_pts_idx]  # (B,) (B, 3)
+            sigma = torch.ones((n_rays, n_pts), dtype=dtype, device=device) * last_sigma.unsqueeze(1)
+            radiance = torch.ones((n_rays, n_pts, 3), dtype=dtype, device=device) * last_radiance.unsqueeze(1)
+            sigma[mask_pts] = _sigma
+            radiance[mask_pts] = _radiance
+
+        return sigma, radiance
 
     def update_default_values_for_invalid_rays(self, output_valid, mask: torch.Tensor):
         """Update the default values for invalid rays

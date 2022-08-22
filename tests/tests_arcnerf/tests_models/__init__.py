@@ -214,6 +214,7 @@ class TestModelDict(unittest.TestCase):
         model.get_fg_model().set_up_obj_bound_by_cfgs(volume_cfgs)
         if torch.cuda.is_available():
             model.get_fg_model().set_optim_cfgs('ray_sample_acc', True)
+            model.get_fg_model().set_optim_cfgs('ray_sample_fix_step', True)
         model = self.to_cuda(model)
 
         # make sparsity
