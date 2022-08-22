@@ -654,3 +654,67 @@ def make_sample_rays(near=2.0, far=4.0, n_pts=32, v_max=2.0, v_min=-1.0, sdf=Tru
     }
 
     return output
+
+
+def handle_valid_mask_zvals(zvals: torch.Tensor, mask: torch.Tensor):
+    """This function helps to move the valid pts at the beginning of each ray.
+
+    ----------------------------------––----------
+    e.g. (For a single rays)
+    zvals = [0.0,  0.2,   0.4,   0.6,  0.8,  1.0]
+    mask =  [True, False, False, True, True, False]
+    ->
+    zvals = [0.0,  0.6,  0.8,  0.8,   0.8,   0.8]
+    mask =  [True, True, True, False, False, False]
+    ----------------------------------––----------
+
+    It could helps the network to process valid pts in geoNet/radianceNet with duplication,
+    but do upsample/raymarching without each ray having a different number of pts.
+
+    Args:
+        zvals: (N_rays, N_pts) 2d tensor of zvals for pts on each rays
+                zvals on each rays should be increase, or all is 0.
+        mask: (N_rays, N_pts) indicating validity of each pts on each ray. Bool tensor.
+               The T/F is located
+
+    Returns:
+        zvals: (N_rays, N_pts) with processed zvals
+        mask: (N_rays, N_pts) with process mask
+    """
+    dtype = zvals.dtype
+    device = zvals.device
+    assert len(zvals.shape) == 2 and zvals.shape == mask.shape, 'Both tensor should be in (B, N)'
+
+    # pts on the whole ray is invalid, make all zvals to be 0
+    invalid_idx = torch.all(~mask, dim=1)  # (N_rays)
+    zvals[invalid_idx] = 0.0
+
+    # pts on the same rays has same zvals, and all pts are valid
+    zvals_diff = zvals[:, 1:] - zvals[:, :-1]
+    keep_one_idx = torch.logical_and(torch.all(torch.abs(zvals_diff) < 1e-7, dim=1), torch.all(mask, dim=1))  # (N_rays)
+    mask[keep_one_idx, 1:] = False  # just keep one valid pts
+
+    # other rays
+    valid_idx = torch.logical_and(~invalid_idx, ~keep_one_idx)  # (N_rays)
+    zvals_valid = zvals[valid_idx]  # (N_valid, N_pts)
+    mask_valid = mask[valid_idx]  # (N_valid, N_pts)
+
+    # mask True value/zvals at beginning for each rays
+    mask_sort = torch.sort(
+        mask_valid.type(torch.uint8), descending=True, dim=1
+    )[0].type(torch.bool)  # sort on n_valid rays only, int for cuda
+    zvals_valid[mask_sort] = zvals_valid[mask_valid]
+
+    # make the final values
+    last_idx = torch.sum(mask_sort, dim=1) - 1  # (N_valid, )
+    row_idx = torch.arange(zvals_valid.shape[0], dtype=last_idx.dtype, device=device)  # (N_valid, )
+    last_idx = torch.cat([row_idx[:, None], last_idx[:, None]], dim=1)  # (N_valid, 2)
+    last_value = zvals_valid[last_idx[:, 0], last_idx[:, 1]][:, None]  # (N_valid, 1)
+    zvals_last_value = torch.ones_like(zvals_valid, dtype=dtype, device=device) * last_value  # (N_valid, N_pts)
+    zvals_last_value[mask_sort] = zvals_valid[mask_sort]
+
+    # write back
+    zvals[valid_idx] = zvals_last_value
+    mask[valid_idx] = mask_sort
+
+    return zvals, mask

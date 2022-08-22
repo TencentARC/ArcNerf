@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 
 from .ray import aabb_ray_intersection, get_ray_points_by_zvals
+from arcnerf.ops.volume_func import check_pts_in_occ_voxel_cuda, CUDA_BACKEND_AVAILABLE
 from common.utils.torch_utils import torch_to_np
 
 
@@ -927,6 +928,9 @@ class Volume(nn.Module):
         Returns:
             pts_in_occ_voxel: (B, ) whether each pts is in occupied voxels
         """
+        if CUDA_BACKEND_AVAILABLE:
+            return check_pts_in_occ_voxel_cuda(pts, self.bitfield, self.get_range(), self.n_grid)
+
         voxel_idx, pts_in_occ_voxel = self.get_voxel_idx_from_xyz(pts)  # (B, 3), (B, )
         occ_voxel_idx = self.get_occupied_voxel_idx()  # (N_occ, 3)
 

@@ -6,6 +6,7 @@ from . import BOUND_REGISTRY
 from .basic_bound import BasicBound
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.volume import Volume
+from arcnerf.render.ray_helper import handle_valid_mask_zvals
 from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
 
 
@@ -52,7 +53,7 @@ class VolumeBound(BasicBound):
             mask_rays: torch.tensor (B,), each rays validity
         """
         in_occ = self.get_optim_cfgs('epoch_optim') is not None
-        # do not cal every single occ voxel, on bounding volume aabb only
+        # do not cal every single occ voxel, on bounding volume aabb only, but not all occ voxels
         near, far, _, mask_rays = self.volume.ray_volume_intersection(inputs['rays_o'], inputs['rays_d'], in_occ, True)
 
         return near, far, mask_rays[:, 0]
@@ -102,18 +103,16 @@ class VolumeBound(BasicBound):
             mask_pts: (B, n_pts) bool tensor of all the pts
         """
         # near/far uniform sampling and mask not in bound pts
-        zvals, _ = super().get_zvals_from_near_far(near, far, n_pts, inference_only, inverse_linear, perturb)
+        zvals, _ = super().get_zvals_from_near_far(
+            near, far, n_pts, inference_only, inverse_linear, perturb
+        )  # (N_rays, N_pts)
         pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (N_rays, N_pts, 3)
         pts = pts.view(-1, 3)  # (N_rays*N_pts, 3)
         mask_pts = self.volume.check_pts_in_occ_voxel(pts)  # (N_rays*N_pts,)
         mask_pts = mask_pts.view(-1, n_pts)  # (N_rays, N_pts)
 
-        # TODO:
-        # (1) mask_pts in volume, cuda kernel
-        # (2) mask_pts/zvals organize as the duplicate one at back
-        # (3) in child class, wrapper handle duplicated pts
-        # (4) check sparsity ratio and performance
-        # (5) two mode to sample pts, One this use near/far, one is constant distance
+        # realign the valid zvals and mask_pts
+        zvals, mask_pts = handle_valid_mask_zvals(zvals, mask_pts)
 
         return zvals, mask_pts
 

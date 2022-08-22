@@ -24,6 +24,7 @@ class TestModelDict(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.n_rays = 32
+        cls.n_pts = 16
         cls.bounding_radius = 3.0
         cls.base_cfgs = {
             'model': {
@@ -65,7 +66,7 @@ class TestModelDict(unittest.TestCase):
         self.assertEqual(near.shape, (self.n_rays, 1))
         self.assertEqual(far.shape, (self.n_rays, 1))
         # draw the sampling pts, only for hit rays
-        zvals, mask_pts = model.get_zvals_from_near_far(near, far, 16, rays_o=rays_o, rays_d=rays_d)
+        zvals, mask_pts = model.get_zvals_from_near_far(near, far, self.n_pts, rays_o=rays_o, rays_d=rays_d)
         # mask on all rays
         pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)
 
@@ -74,7 +75,7 @@ class TestModelDict(unittest.TestCase):
             if mask_rays is None:
                 pts = pts[mask_pts]
             else:
-                pts = pts[torch.logical_and(mask_pts, torch.repeat_interleave(mask_rays[:, None], 16, dim=1))]
+                pts = pts[torch.logical_and(mask_pts, torch.repeat_interleave(mask_rays[:, None], self.n_pts, dim=1))]
         else:
             pts = pts[mask_rays] if mask_rays is not None else pts
 

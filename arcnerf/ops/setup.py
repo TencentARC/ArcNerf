@@ -29,6 +29,11 @@ setup(
             name='_hashgrid_encode',
             sources=['./src/hashgrid_encode/hashgrid_encode.cpp', './src/hashgrid_encode/hashgrid_encode_kernel.cu'],
             include_dirs=include_dirs
+        ),
+        CUDAExtension(  # volume related func
+            name='_volume_func',
+            sources=['./src/volume_func/volume_func.cpp', './src/volume_func/volume_func_kernel.cu'],
+            include_dirs=include_dirs
         )
     ],
 

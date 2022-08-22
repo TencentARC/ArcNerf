@@ -10,7 +10,7 @@ try:
     CUDA_BACKEND_AVAILABLE = True
 except ImportError:
     CUDA_BACKEND_AVAILABLE = False
-    warnings.warn('HashGrid Ops not build...')
+    warnings.warn('SHEncode Ops not build...')
 
 
 class SHEncodeOps(torch.autograd.Function):
