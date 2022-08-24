@@ -19,7 +19,6 @@ torch::Tensor check_pts_in_occ_voxel_cuda(
 
 
 /* c++ wrapper of check_pts_in_occ_voxel forward func
-   py: check_pts_in_occ_voxel(xyz, degree)
    @param: xyz, torch float tensor of (B, 3)
    @param: (N_grid, N_grid, N_grid), bool tensor indicating each voxel's occupancy
    @param: range, torch float tensor of (3, 2), range of xyz boundary
@@ -56,6 +55,48 @@ torch::Tensor check_pts_in_occ_voxel(
 }
 
 
+// define the real cuda function to be called by c++ wrapper.
+std::vector<torch::Tensor> aabb_intersection_cuda(
+    const torch::Tensor rays_o,
+    const torch::Tensor rays_d,
+    const torch::Tensor aabb_range,
+    const float eps);
+
+
+/* c++ wrapper of aabb intersection forward func
+   @param: ray origin, (N_rays, 3)
+   @param: ray direction, assume normalized, (N_rays, 3)
+   @param: bbox range of volume, (N_v, 3, 2) of xyz_min/max of each volume
+   @return: near, near intersection zvals. (N_rays, N_v)
+   @return: far, far intersection zvals. (N_rays, N_v)
+   @return: mask, (N_rays, N_v), show whether each ray has intersection with the volume, BoolTensor
+*/
+std::vector<torch::Tensor> aabb_intersection(
+    const torch::Tensor rays_o,
+    const torch::Tensor rays_d,
+    const torch::Tensor aabb_range,
+    const float eps){
+    // checking
+    CHECK_INPUT(rays_o)
+    CHECK_IS_FLOATING(rays_o)
+    CHECK_INPUT(rays_d)
+    CHECK_IS_FLOATING(rays_d)
+    CHECK_INPUT(aabb_range)
+    CHECK_IS_FLOATING(aabb_range)
+
+    if (rays_o.size(1) != 3 || rays_d.size(1) != 3) {
+        throw std::runtime_error{"Input rays tensor must be (B, 3)."};
+    }
+
+    if (aabb_range.size(1) != 3 || aabb_range.size(2) != 2) {
+        throw std::runtime_error{"xyz range should be in (B, 3, 2)."};
+    }
+
+    // call actual cuda function
+    return aabb_intersection_cuda(rays_o, rays_d, aabb_range, eps);
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("check_pts_in_occ_voxel", &check_pts_in_occ_voxel, "check pts in occ voxel (CUDA)");
+    m.def("aabb_intersection", &aabb_intersection, "aabb intersection (CUDA)");
 }

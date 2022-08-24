@@ -54,9 +54,8 @@ class VolumeBound(BasicBound):
             near, far: torch.tensor (B, 1) each
             mask_rays: torch.tensor (B,), each rays validity
         """
-        in_occ = self.get_optim_cfgs('epoch_optim') is not None
-        # do not cal every single occ voxel, on bounding volume aabb only, but not all occ voxels
-        near, far, _, mask_rays = self.volume.ray_volume_intersection(inputs['rays_o'], inputs['rays_d'], in_occ, True)
+        # in the coarse volume to save aabb cal time
+        near, far, _, mask_rays = self.volume.ray_volume_intersection(inputs['rays_o'], inputs['rays_d'])
 
         return near, far, mask_rays[:, 0]
 

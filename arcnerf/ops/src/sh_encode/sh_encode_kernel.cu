@@ -273,7 +273,7 @@ __global__ void backward_kernel(
 torch::Tensor sh_encode_backward_cuda(
     const torch::Tensor grad_out, const torch::Tensor xyz, const uint32_t degree) {
 
-    torch::Tensor grad_xyz = torch::zeros_like(xyz);  // (B, 3)
+    torch::Tensor grad_xyz = torch::zeros_like(xyz).to(xyz.device());  // (B, 3)
 
     const uint32_t n_row = xyz.size(0);  // B
     const uint32_t n_col = xyz.size(1);  // 3

@@ -39,7 +39,7 @@ __global__ void forward_kernel(
     const bool cal_grad,
     torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> output,  // (B, L, F)
     torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> weights,  // (B, L, 1<<D)
-    torch::PackedTensorAccessor32<int64_t, 3, torch::RestrictPtrTraits> hash_idx,  // (B, L, 1<<D)
+    torch::PackedTensorAccessor64<int64_t, 3, torch::RestrictPtrTraits> hash_idx,  // (B, L, 1<<D)
     torch::PackedTensorAccessor32<bool, 1, torch::RestrictPtrTraits> valid,  // (B,)
     torch::PackedTensorAccessor32<scalar_t, 4, torch::RestrictPtrTraits> dw_dxyz) {  // (B, L, 1<<D, D)
 
@@ -200,7 +200,7 @@ template <typename scalar_t> void forward_kernel_wrapper(
     const bool cal_grad,
     torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> output,  // (B, L, F)
     torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> weights,  // (B, L, 1<<D)
-    torch::PackedTensorAccessor32<int64_t, 3, torch::RestrictPtrTraits> hash_idx,  // (B, L, 1<<D)
+    torch::PackedTensorAccessor64<int64_t, 3, torch::RestrictPtrTraits> hash_idx,  // (B, L, 1<<D)
     torch::PackedTensorAccessor32<bool, 1, torch::RestrictPtrTraits> valid,  // (B,)
     torch::PackedTensorAccessor32<scalar_t, 4, torch::RestrictPtrTraits> dw_dxyz) {  // (B, L, 1<<D, D)
 
@@ -337,7 +337,7 @@ torch::Tensor hashgrid_encode_forward_cuda(
             cal_grad,
             output.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
             weights.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
-            hash_idx.packed_accessor32<int64_t, 3, torch::RestrictPtrTraits>(),
+            hash_idx.packed_accessor64<int64_t, 3, torch::RestrictPtrTraits>(),
             valid.packed_accessor32<bool, 1, torch::RestrictPtrTraits>(),
             dw_dxyz.packed_accessor32<scalar_t, 4, torch::RestrictPtrTraits>()
         );
@@ -355,7 +355,7 @@ __global__ void backward_kernel(
     const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> xyz,  // (B, D)
     const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> embeddings,  // (n_total_embed, F)
     const torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> weights,  // (B, L, 1<<D)
-    const torch::PackedTensorAccessor32<int64_t, 3, torch::RestrictPtrTraits> hash_idx,  // (B, L, 1<<D)
+    const torch::PackedTensorAccessor64<int64_t, 3, torch::RestrictPtrTraits> hash_idx,  // (B, L, 1<<D)
     const torch::PackedTensorAccessor32<bool, 1, torch::RestrictPtrTraits> valid,  // (B,)
     const torch::PackedTensorAccessor32<scalar_t, 4, torch::RestrictPtrTraits> dw_dxyz,  // (B, L, 1<<D, D)
     torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> grad_xyz,
@@ -401,7 +401,7 @@ template <typename scalar_t> void backward_kernel_wrapper(
     const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> xyz,  // (B, D)
     const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> embeddings,  // (n_total_embed, F)
     const torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> weights,  // (B, L, 1<<D)
-    const torch::PackedTensorAccessor32<int64_t, 3, torch::RestrictPtrTraits> hash_idx,  // (B, L, 1<<D)
+    const torch::PackedTensorAccessor64<int64_t, 3, torch::RestrictPtrTraits> hash_idx,  // (B, L, 1<<D)
     const torch::PackedTensorAccessor32<bool, 1, torch::RestrictPtrTraits> valid,  // (B,)
     const torch::PackedTensorAccessor32<scalar_t, 4, torch::RestrictPtrTraits> dw_dxyz,  // (B, L, 1<<D, D)
     torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> grad_xyz,
@@ -508,7 +508,7 @@ std::vector<torch::Tensor> hashgrid_encode_backward_cuda(
             xyz.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
             embeddings.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
             weights.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
-            hash_idx.packed_accessor32<int64_t, 3, torch::RestrictPtrTraits>(),
+            hash_idx.packed_accessor64<int64_t, 3, torch::RestrictPtrTraits>(),
             valid.packed_accessor32<bool, 1, torch::RestrictPtrTraits>(),
             dw_dxyz.packed_accessor32<scalar_t, 4, torch::RestrictPtrTraits>(),
             grad_xyz.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),

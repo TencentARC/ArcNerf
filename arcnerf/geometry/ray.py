@@ -4,6 +4,7 @@ import numpy as np
 import torch
 
 from .transformation import batch_dot_product
+from arcnerf.ops.volume_func import ray_aabb_intersection_cuda, CUDA_BACKEND_AVAILABLE
 from common.utils.torch_utils import set_tensor_to_zeros
 
 
@@ -199,7 +200,6 @@ def sphere_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, radius: 
         far:  far intersection zvals. (N_rays, N_r)
               If only 1 intersection: if not tangent, same as far; else 0.
         pts: (N_rays, N_r, 2, 3), each ray has near/far two points with each sphere.
-                                  if nan, means no intersection at this ray
         mask: (N_rays, N_r), show whether each ray has intersection with the sphere, BoolTensor
      """
     device = rays_o.device
@@ -278,68 +278,71 @@ def aabb_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, aabb_range
         far:  far intersection zvals. (N_rays, N_v)
               If only 1 intersection: if not tangent, same as far; else 0.
         pts: (N_rays, N_v, 2, 3), each ray has near/far two points with each volume.
-                                  if nan, means no intersection at this ray
         mask: (N_rays, N_v), show whether each ray has intersection with the volume, BoolTensor
-     """
+    """
     device = rays_o.device
     dtype = rays_o.dtype
     n_rays = rays_o.shape[0]
     n_volume = aabb_range.shape[0]
     assert aabb_range.shape[1] == 3 and aabb_range.shape[2] == 2, 'AABB range must be (N, 3, 2)'
 
-    near = torch.zeros((n_rays * n_volume, ), dtype=dtype, device=device)  # (N_rays*N_v,)
-    far = torch.ones((n_rays * n_volume, ), dtype=dtype, device=device) * 10000.0  # (N_rays*N_v,)
+    if CUDA_BACKEND_AVAILABLE and rays_o.is_cuda:
+        near, far, pts, mask = ray_aabb_intersection_cuda(rays_o, rays_d, aabb_range, eps)
+    else:
+        near = torch.zeros((n_rays * n_volume, ), dtype=dtype, device=device)  # (N_rays*N_v,)
+        far = torch.ones((n_rays * n_volume, ), dtype=dtype, device=device) * 10000.0  # (N_rays*N_v,)
+        aabb_range_repeat = torch.repeat_interleave(aabb_range.unsqueeze(0), n_rays, 0).view(-1, 3, 2)  # (*, 3, 2)
+        min_range, max_range = aabb_range_repeat[..., 0], aabb_range_repeat[..., 1]  # (N_rays*N_v, 3)
+        mask = torch.ones(size=(n_rays * n_volume, ), dtype=torch.bool, device=device)
 
-    rays_o_repeat = torch.repeat_interleave(rays_o, n_volume, 0)  # (N_rays*N_v, 3)
-    rays_d_repeat = torch.repeat_interleave(rays_d, n_volume, 0)  # (N_rays*N_v, 3)
-    aabb_range_repeat = torch.repeat_interleave(aabb_range.unsqueeze(0), n_rays, 0).view(-1, 3, 2)  # (N_rays*N_v, 3, 2)
-    min_range, max_range = aabb_range_repeat[..., 0], aabb_range_repeat[..., 1]  # (N_rays*N_v, 3)
+        rays_o_repeat = torch.repeat_interleave(rays_o, n_volume, 0)  # (N_rays*N_v, 3)
+        rays_d_repeat = torch.repeat_interleave(rays_d, n_volume, 0)  # (N_rays*N_v, 3)
 
-    mask = torch.ones(size=(n_rays * n_volume, ), dtype=torch.bool, device=device)
+        def update_bound(_rays_o, _rays_d, _min_range, _max_range, _mask, _near, _far, dim=0):
+            """Update bound and mask on each dim"""
+            _mask_axis = (torch.abs(_rays_d[..., dim]) < eps)  # (N_rays*N_v,)
+            _mask_axis_out = torch.logical_or((_rays_o[..., dim] < _min_range[..., dim]),
+                                              (_rays_o[..., dim] > _max_range[..., dim]))  # outside the plane
+            _mask[torch.logical_and(_mask_axis, _mask_axis_out)] = False
 
-    def update_bound(_rays_o, _rays_d, _min_range, _max_range, _mask, _near, _far, dim=0):
-        """Update bound and mask on each dim"""
-        _mask_axis = (torch.abs(_rays_d[..., dim]) < eps)  # (N_rays*N_v,)
-        _mask_axis_out = torch.logical_or((_rays_o[..., dim] < _min_range[..., dim]),
-                                          (_rays_o[..., dim] > _max_range[..., dim]))  # outside the plane
-        _mask[torch.logical_and(_mask_axis, _mask_axis_out)] = False
+            t1 = (_min_range[..., dim] - _rays_o[..., dim]) / _rays_d[..., dim]
+            t2 = (_max_range[..., dim] - _rays_o[..., dim]) / _rays_d[..., dim]
+            t = torch.cat([t1[:, None], t2[:, None]], dim=-1)
+            t1, _ = torch.min(t, dim=-1)
+            t2, _ = torch.max(t, dim=-1)
+            update_near = torch.logical_and(_mask, t1 > _near)
+            _near[update_near] = t1[update_near]
+            update_far = torch.logical_and(_mask, t2 < _far)
+            _far[update_far] = t2[update_far]
+            _mask[_near > _far] = False
 
-        t1 = (_min_range[..., dim] - _rays_o[..., dim]) / _rays_d[..., dim]
-        t2 = (_max_range[..., dim] - _rays_o[..., dim]) / _rays_d[..., dim]
-        t = torch.cat([t1[:, None], t2[:, None]], dim=-1)
-        t1, _ = torch.min(t, dim=-1)
-        t2, _ = torch.max(t, dim=-1)
-        update_near = torch.logical_and(_mask, t1 > _near)
-        _near[update_near] = t1[update_near]
-        update_far = torch.logical_and(_mask, t2 < _far)
-        _far[update_far] = t2[update_far]
-        _mask[_near > _far] = False
+            return _mask, _near, _far
 
-        return _mask, _near, _far
+        # x plane
+        mask, near, far = update_bound(rays_o_repeat, rays_d_repeat, min_range, max_range, mask, near, far, 0)
+        # y plane
+        mask, near, far = update_bound(rays_o_repeat, rays_d_repeat, min_range, max_range, mask, near, far, 1)
+        # z plane
+        mask, near, far = update_bound(rays_o_repeat, rays_d_repeat, min_range, max_range, mask, near, far, 2)
 
-    # x plane
-    mask, near, far = update_bound(rays_o_repeat, rays_d_repeat, min_range, max_range, mask, near, far, 0)
-    # y plane
-    mask, near, far = update_bound(rays_o_repeat, rays_d_repeat, min_range, max_range, mask, near, far, 1)
-    # z plane
-    mask, near, far = update_bound(rays_o_repeat, rays_d_repeat, min_range, max_range, mask, near, far, 2)
+        near, far, mask = near[:, None], far[:, None], mask[:, None]  # (N_rays*N_v, 1)
 
-    near = torch.clamp_min(near, 0.0)[:, None]
-    far = torch.clamp_min(far, 0.0)[:, None]
-    near[~mask], far[~mask] = 0.0, 0.0  # (N_rays*N_v, 1) * 2
+        near = torch.clamp_min(near, 0.0)
+        far = torch.clamp_min(far, 0.0)
+        near[~mask], far[~mask] = 0.0, 0.0  # (N_rays*N_v, 1) * 2
 
-    # add some eps for reduce the rounding error
-    near[mask] += eps
-    far[mask] -= eps
+        # add some eps for reduce the rounding error
+        near[mask] += eps
+        far[mask] -= eps
 
-    zvals = torch.cat([near, far], dim=1)  # (N_rays*N_v, 2)
-    pts = get_ray_points_by_zvals(rays_o_repeat, rays_d_repeat, zvals)  # (N_rays*N_v, 2, 3)
+        zvals = torch.cat([near, far], dim=1)  # (N_rays*N_v, 2)
+        pts = get_ray_points_by_zvals(rays_o_repeat, rays_d_repeat, zvals)  # (N_rays*N_v, 2, 3)
 
-    # reshape
-    near = near.contiguous().view(n_rays, n_volume)
-    far = far.contiguous().view(n_rays, n_volume)
-    mask = mask.contiguous().view(n_rays, n_volume)
-    pts = pts.contiguous().view(n_rays, n_volume, 2, 3)
+        # reshape
+        near = near.contiguous().view(n_rays, n_volume)
+        far = far.contiguous().view(n_rays, n_volume)
+        mask = mask.contiguous().view(n_rays, n_volume)
+        pts = pts.contiguous().view(n_rays, n_volume, 2, 3)
 
     return near, far, pts, mask
 

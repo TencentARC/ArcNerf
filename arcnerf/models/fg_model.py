@@ -88,6 +88,7 @@ class FgModel(Base3dModel):
         """Set optim cfgs by optional key in the obj bound class"""
         return self.obj_bound.set_optim_cfgs(key, value)
 
+    @torch.no_grad()
     def get_near_far_from_rays(self, inputs):
         """Call the get near_far func in bounding class. Allow them to access the ray cfgs"""
         return self.obj_bound.get_near_far_from_rays(
@@ -97,6 +98,7 @@ class FgModel(Base3dModel):
             bounding_radius=self.get_ray_cfgs('bounding_radius')
         )
 
+    @torch.no_grad()
     def get_zvals_from_near_far(self, near, far, n_pts, inference_only=False, rays_o=None, rays_d=None):
         """Call the get zvals func in bounding class. Allow them to access the ray cfgs"""
         return self.obj_bound.get_zvals_from_near_far(
@@ -179,10 +181,11 @@ class FgModel(Base3dModel):
         """The method that really process all rays that have intersection with the bound
 
         Args:
-            zvals: it is the valid coarse zvals get from foreground model.
+            inputs: valid rays with (B, 3) shape and other fields like mask/rgb
+            zvals: it is the valid coarse zvals get from foreground model. (B, N_pts) tensor
                     If no obj_bound is provided, it uses near/far and bounding_radius to calculate in a large space
                     If obj_bound is volume/sphere, it use the zvals that rays hits the structure.
-            mask_pts: It is a tensor that indicator the validity of pts on each ray.
+            mask_pts: It is a tensor that indicator the validity of pts on each ray. (B, N_pts) tensor
                     False will at the end of each ray indicating they are the same as far pts.
                     If None, all the pts are valid.
                     This helps the child network to process pts without duplication.
@@ -191,7 +194,7 @@ class FgModel(Base3dModel):
             'You should implement the _forward function that process rays with coarse zvals in child class...'
         )
 
-    def get_density_radiance_by_mask_pts(self, rays_o, rays_d, zvals, mask_pts=None):
+    def get_sigma_radiance_by_mask_pts(self, rays_o, rays_d, zvals, mask_pts=None):
         """Process the pts/dir by mask_pts. Only process valid zvals to save computation
 
         Args:

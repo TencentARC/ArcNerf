@@ -31,3 +31,10 @@ T* vec_to_gpu(const std::vector<T> vec_cpu) {
 
     return vec_gpu;
 }
+
+
+//Swap value
+template <typename T>
+inline __host__ __device__ void host_device_swap(T& a, T& b) {
+	T c(a); a=b; b=c;
+}
