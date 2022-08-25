@@ -33,7 +33,8 @@ def log_base_model_info(logger, model, feed_in, n_pts):
     if torch.cuda.is_available():
         model = model.cuda()
         feed_in = feed_in.cuda()
+        torch.cuda.synchronize()
         time0 = time.time()
         _ = model(feed_in)
         torch.cuda.synchronize()
-        logger.add_log('For {} pts time {:.2f}s'.format(n_pts, time.time() - time0))
+        logger.add_log('For {} pts time {:.5f}s'.format(n_pts, time.time() - time0))

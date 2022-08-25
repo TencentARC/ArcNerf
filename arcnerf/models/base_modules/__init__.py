@@ -10,18 +10,18 @@ from common.utils.registry import MODULE_REGISTRY
 
 from .activation import get_activation, Sine
 from .encoding import build_encoder, FreqEmbedder
-from .linear_network_module import GeoNet, RadianceNet
+from .geo_rad_model import GeoNet, RadianceNet, FusedMLPGeoNet, FusedMLPRadianceNet
 from .linear import DenseLayer, SirenLayer
 
 __all__ = [
     'get_activation', 'Sine', 'build_encoder', 'FreqEmbedder', 'DenseLayer', 'SirenLayer', 'build_geo_model',
-    'build_radiance_model', 'GeoNet', 'RadianceNet'
+    'build_radiance_model', 'GeoNet', 'RadianceNet', 'FusedMLPGeoNet', 'FusedMLPRadianceNet'
 ]
 
 module_folder = osp.dirname(osp.abspath(__file__))
 module_filenames = [osp.splitext(osp.basename(v))[0] for v in scan_dir(module_folder) if v.endswith('_module.py')]
 _modules_modules = [
-    importlib.import_module(f'arcnerf.models.base_modules.{file_name}') for file_name in module_filenames
+    importlib.import_module(f'arcnerf.models.base_modules.geo_rad_model.{file_name}') for file_name in module_filenames
 ]
 
 

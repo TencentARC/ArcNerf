@@ -6,16 +6,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from . import MODULE_REGISTRY
-from .activation import get_activation
-from .base_netwok import BaseGeoNet, BaseRadianceNet
-from .encoding import build_encoder
-from .linear import DenseLayer, SirenLayer
-from arcnerf.geometry.transformation import normalize
+from .encoder_mlp_network import EncoderMLPGeoNet, EncoderMLPRadainceNet
+from arcnerf.models.base_modules import MODULE_REGISTRY
+from arcnerf.models.base_modules.activation import get_activation
+from arcnerf.models.base_modules.linear import DenseLayer, SirenLayer
 
 
 @MODULE_REGISTRY.register()
-class GeoNet(BaseGeoNet):
+class GeoNet(EncoderMLPGeoNet):
     """Geometry network with linear network implementation.
         ref: https://github.com/ventusff/neurecon/blob/main/models/base.py
     """
@@ -62,44 +60,66 @@ class GeoNet(BaseGeoNet):
                          Nerf do not use it. Only for surface modeling methods(idr/neus/volsdf/unisurf)
             out_act_cfg: if not None, will perform an activation ops for output sigma.
         """
-        super(GeoNet, self).__init__()
+        super(GeoNet, self).__init__(W_feat=W_feat, out_act_cfg=out_act_cfg)
         self.W = W
         self.D = D
-        self.W_feat = W_feat
-        self.skips = skips
         self.is_pretrained = False
-        self.radius_init = radius_init
+        self.skips = skips
+        self.norm_skip = norm_skip
         self.geometric_init = geometric_init
         self.use_siren = use_siren
+        self.radius_init = radius_init
+
+        # build encoder
+        input_ch, embed_freq = self.build_encoder(encoder)
+
+        # build mlp
+        self.layers = self.build_mlp(
+            input_ch, embed_freq, W_feat, skips, skip_reduce_output, norm_skip, act_cfg, geometric_init, radius_init,
+            use_siren, weight_norm
+        )
+
+    def build_mlp(
+        self,
+        input_ch,
+        embed_freq,
+        W_feat=256,
+        skips=[4],
+        skip_reduce_output=False,
+        norm_skip=False,
+        act_cfg=None,
+        geometric_init=True,
+        radius_init=1.0,
+        use_siren=False,
+        weight_norm=False
+    ):
+        """Return a list of linear layers"""
         if use_siren:
             assert len(skips) == 0, 'do not use skips for siren'
-        self.norm_skip = norm_skip
-        self.embed_fn, input_ch, embed_freq = build_encoder(encoder)
-        embed_dim = self.embed_fn.get_output_dim()
 
         layers = []
-        for i in range(D + 1):
+        for i in range(self.D + 1):
             # input dim for each fc
             if i == 0:
-                in_dim = embed_dim
+                in_dim = self.embed_dim
             elif not skip_reduce_output and i > 0 and (i - 1) in skips:  # skip at current layer, add input
-                in_dim = embed_dim + W
+                in_dim = self.embed_dim + self.W
             else:
-                in_dim = W
+                in_dim = self.W
 
             # out dim for each fc
-            if i == D:  # last layer:
+            if i == self.D:  # last layer:
                 if W_feat > 0:
                     out_dim = 1 + W_feat
                 else:
                     out_dim = 1
             elif skip_reduce_output and i in skips:  # skip at next, reduce current output
-                out_dim = W - embed_dim
+                out_dim = self.W - self.embed_dim
             else:
-                out_dim = W
+                out_dim = self.W
 
             # select layers. Last layer will not have activation
-            if i != D:
+            if i != self.D:
                 if use_siren:
                     layer = SirenLayer(in_dim, out_dim, is_first=(i == 0))
                 else:
@@ -110,7 +130,7 @@ class GeoNet(BaseGeoNet):
             # geo_init for denseLayer. For any layer inputs, it should be [feature, x, embed_x]
             # This assumes include_input in encoder is True
             if geometric_init and not use_siren:
-                if i == D:  # last layer
+                if i == self.D:  # last layer
                     nn.init.normal_(layer.weight, mean=np.sqrt(np.pi) / np.sqrt(in_dim), std=0.0001)
                     nn.init.constant_(layer.bias[:1], -radius_init)  # bias only for geo value
                 elif embed_freq > 0:
@@ -120,7 +140,7 @@ class GeoNet(BaseGeoNet):
                         torch.nn.init.normal_(layer.weight[:, :input_ch], 0.0, np.sqrt(2) / np.sqrt(out_dim))
                     elif i > 0 and (i - 1) in skips:  # skip layer, [feature, x, embed_x], do not init for embed_x
                         torch.nn.init.normal_(layer.weight, 0.0, np.sqrt(2) / np.sqrt(out_dim))
-                        torch.nn.init.constant_(layer.weight[:, -(embed_dim - input_ch):], 0.0)
+                        torch.nn.init.constant_(layer.weight[:, -(self.embed_dim - input_ch):], 0.0)
                     else:
                         nn.init.normal_(layer.weight, 0.0, np.sqrt(2) / np.sqrt(out_dim))
                 else:
@@ -133,12 +153,9 @@ class GeoNet(BaseGeoNet):
 
             layers.append(layer)
 
-        self.layers = nn.ModuleList(layers)
+        layers = nn.ModuleList(layers)
 
-        # out_act
-        self.out_act = None
-        if out_act_cfg is not None:
-            self.out_act = get_activation(cfg=out_act_cfg)
+        return layers
 
     def pretrain_siren(self, n_iter=5000, lr=1e-4, thres=0.01, n_pts=5000):
         """Pretrain the siren params."""
@@ -167,15 +184,8 @@ class GeoNet(BaseGeoNet):
                 if self.norm_skip:
                     out = out / math.sqrt(2)
 
-        out_geo, out_feat = None, None
-        if self.W_feat <= 0:  # (B, 1), None
-            out_geo = out
-        else:  # (B, 1), (B, W_feat)
-            out_geo = out[:, 0].unsqueeze(-1)
-            out_feat = out[:, 1:]
-
-        if self.out_act is not None:
-            out_geo = self.out_act(out_geo)
+        # separate geo and feat
+        out_geo, out_feat = self.handle_output(out)
 
         return out_geo, out_feat
 
@@ -214,7 +224,7 @@ def pretrain_siren(model, radius_init, sample_radius, n_iter=5000, lr=1e-4, thre
 
 
 @MODULE_REGISTRY.register()
-class RadianceNet(BaseRadianceNet):
+class RadianceNet(EncoderMLPRadainceNet):
     """Radiance network with linear network implementation.
         ref: https://github.com/ventusff/neurecon/blob/main/models/base.py
     """
@@ -247,44 +257,35 @@ class RadianceNet(BaseRadianceNet):
             weight_norm: If weight_norm, do extra weight_normalization. By default False.
                          Nerf do not use it. Only for surface modeling methods(idr/neus/volsdf/unisurf)
         """
-        super(RadianceNet, self).__init__()
-        self.mode = mode
-        assert len(mode) > 0 and all([m in 'pvnf' for m in mode]), 'Invalid mode only pvnf allowed...'
+        super(RadianceNet, self).__init__(mode=mode)
         self.W = W
         self.D = D
         self.W_feat_in = W_feat_in
 
-        self.init_input_dim = 0
-        # embedding for pts and view, calculate input shape
-        if 'p' in mode:
-            self.embed_fn_pts, _, _ = build_encoder(encoder.pts if encoder is not None else None)
-            embed_pts_dim = self.embed_fn_pts.get_output_dim()
-            self.init_input_dim += embed_pts_dim
-        if 'v' in mode:
-            self.embed_fn_view, _, _ = build_encoder(encoder.view if encoder is not None else None)
-            embed_view_dim = self.embed_fn_view.get_output_dim()
-            self.init_input_dim += embed_view_dim
-        if 'n' in mode:
-            self.init_input_dim += 3
-        if 'f' in mode and W_feat_in > 0:
-            self.init_input_dim += W_feat_in
+        # build encoder
+        self.build_encoder(encoder, W_feat_in)
 
+        # build the MLP
+        self.layers = self.build_mlp(act_cfg, use_siren, weight_norm)
+
+    def build_mlp(self, act_cfg=None, use_siren=False, weight_norm=False):
+        """Return a list of linear layers"""
         layers = []
-        for i in range(D + 1):
+        for i in range(self.D + 1):
             # input dim for each fc
             if i == 0:
                 in_dim = self.init_input_dim
             else:
-                in_dim = W
+                in_dim = self.W
 
             # out dim for each fc
-            if i == D:  # last layer: rgb
+            if i == self.D:  # last layer: rgb
                 out_dim = 3
             else:
-                out_dim = W
+                out_dim = self.W
 
             # select layers. Last layer has sigmoid
-            if i != D:
+            if i != self.D:
                 if use_siren:
                     layer = SirenLayer(in_dim, out_dim, is_first=(i == 0))
                 else:
@@ -298,7 +299,9 @@ class RadianceNet(BaseRadianceNet):
 
             layers.append(layer)
 
-        self.layers = nn.ModuleList(layers)
+        layers = nn.ModuleList(layers)
+
+        return layers
 
     def forward(self, x: torch.Tensor, view_dirs: torch.Tensor, normals: torch.Tensor, geo_feat: torch.Tensor):
         """
@@ -312,20 +315,7 @@ class RadianceNet(BaseRadianceNet):
         Returns:
             out: tensor in shape (B, 3) for radiance value(rgb).
         """
-        inputs = []
-        if 'p' in self.mode:
-            x_embed = self.embed_fn_pts(x)  # input_ch_pts -> embed_pts_dim
-            inputs.append(x_embed)
-        if 'v' in self.mode:  # always normalize view_dirs
-            view_embed = self.embed_fn_view(normalize(view_dirs))  # input_ch_view -> embed_view_dim
-            inputs.append(view_embed)
-        if 'n' in self.mode:
-            inputs.append(normals)
-        if 'f' in self.mode:
-            inputs.append(geo_feat)
-
-        out = torch.cat(inputs, dim=-1)
-        assert out.shape[-1] == self.init_input_dim, 'Shape not match'
+        out = self.fuse_radiance_inputs(x, view_dirs, normals, geo_feat)
 
         for i in range(self.D + 1):
             out = self.layers[i](out)

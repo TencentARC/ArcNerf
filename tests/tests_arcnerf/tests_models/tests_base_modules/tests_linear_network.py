@@ -48,6 +48,13 @@ class TestDict(unittest.TestCase):
         y, feat = model(x)
         self.assertEqual(y.shape, (self.batch_size, 1))
         self.assertEqual(feat.shape, (self.batch_size, 256))
+        # output act
+        cfg = {'type': 'truncexp'}
+        cfg = dict_to_obj(cfg)
+        model = GeoNet(input_ch=3, out_act_cfg=cfg)
+        y, feat = model(x)
+        self.assertEqual(y.shape, (self.batch_size, 1))
+        self.assertEqual(feat.shape, (self.batch_size, 256))
         # siren
         model = GeoNet(input_ch=3, use_siren=True, skips=[])
         y, feat = model(x)

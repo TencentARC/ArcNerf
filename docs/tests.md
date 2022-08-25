@@ -73,6 +73,8 @@ Test encoders speed and time.
 Test linear layers
 #### tests_linear_network
 Test implicit/radiance function with encoder and linear network.
+#### tests_tcnn_fusedmlp_network
+Test implicit/radiance function with encoder and tcnn_fusemlp network. Much faster that torch linear.
 ### tests_benchmark
 Test all the model and get the speed/time.
 ### tests_fg_model

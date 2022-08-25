@@ -19,12 +19,14 @@ model:
     chunk_rays: 32768                 # each chunk to process 1024*32(ray), enough for 32 GB
     chunk_pts: 131072                 # each chunk to progress 4096*32(pts), for model forward
     geometry:
+        type: FusedMLPGeoNet          # fused mlp
         W: 64                         # linear hidden neuron
         D: 1                          # num of linear, not include final
         skips: []                     # pos to add input embedding
         encoder:                      # encoder
             type: HashGridEmbedder    # type of encoder
             input_dim: 3              # xyz input channel
+            include_input: False      # do not include input
             side: 2.0                 # bounding volume
             n_freqs: 0                # this one controls the geo init
             n_levels: 16              # num of levels for multi-res hashing, increase from base_res to max_res
@@ -34,16 +36,17 @@ model:
             max_res: 512              # last res
             backend: tcnn             # backend: support torch/cuda/tcnn
         W_feat: 16                    # extra feature output
-        geometric_init: False         # whether to use geometric init. need radius_init
         out_act_cfg:
             type: TruncExp            # follow official implementation
     radiance:
+        type: FusedMLPRadianceNet     # fused mlp
         mode: 'vf'                    # view_dir and feature only
         W: 64                         # linear hidden dim
         D: 2                          # num of linear, not include final
         encoder:
             view:
                 type: SHEmbedder      # type of encoder
+                include_input: False  # do not include input
                 input_dim: 3          # view input channel
                 n_freqs: 4            # view embed freq, output is degree**2
                 backend: tcnn         # backend: support torch/cuda/tcnn

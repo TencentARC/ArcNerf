@@ -9,7 +9,7 @@ import torch
 
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.transformation import normalize
-from arcnerf.models.base_modules.linear_network_module import BaseGeoNet
+from arcnerf.models.base_modules.geo_rad_model.base_network import BaseGeoNet
 from arcnerf.models.fg_model import FgModel
 from arcnerf.visual.plot_3d import draw_3d_components
 from common.utils.cfgs_utils import dict_to_obj

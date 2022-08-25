@@ -71,15 +71,27 @@ These models serve as the basic block for modeling obj geometry and radiance. It
 mix of volume and network, sparse octree, multi-res volume with hashing, tensorRF etc. All the blocks can be select from
 `geometry/radiance` part in `cfgs.model`.
 
-### Linear Network Model
-implicit network for mapping xyz -> sigma/sdf/rgb, etc. Pure linear network
+### EncoderMLPGeoNet/EncoderMLPRadianceNetwork
+This class use a `encoder`+`mlp network` for modeling the geometry and color. You can build the encoder/mlp differently
+if you introduce a new class.
+
+#### Linear Network Model
+implicit network for mapping xyz -> sigma/sdf/rgb, etc. Encoder + pure linear network
 Specify the type as `GeoNet/RadianceNet`(or leave it blank, which will be default)
-#### GeoNet
+
+- GeoNet
 Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
-- geometric_init: If True, init the geonet such that represent a sdf of sphere with radius_init(inner sdf < 0).
-siren layer will use pretrain, dense layer will use weight/bias init(But like an oval than sphere).
-#### RadianceNet
+  - geometric_init: If True, init the geonet such that represent a sdf of sphere with radius_init(inner sdf < 0).
+  siren layer will use pretrain, dense layer will use weight/bias init(But like an oval than sphere).
+
+- RadianceNet
 Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
+
+#### TCNN FusedMLP Model
+Same structure with `Linear Network Model`. But multi-layer mlp is replaced by the fusedmlp
+from [tiny-cuda-nn](https://github.com/NVlabs/tiny-cuda-nn). It is must faster than original linear network,
+but loses flexibility(Only fix neuron size, hard to init the params, hard to modify source code, etc.)
+Specify the type as `FusedMLPGeoNet/FusedMLPRadianceNet`.
 
 ------------------------------------------------------------------------
 # chunk_size
