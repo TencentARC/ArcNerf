@@ -38,3 +38,8 @@ template <typename T>
 inline __host__ __device__ void host_device_swap(T& a, T& b) {
 	T c(a); a=b; b=c;
 }
+
+
+// Used to index into the PRNG stream. Must be larger than the number of
+// samples consumed by any given training ray.
+inline constexpr __device__ __host__ uint32_t N_MAX_RANDOM_SAMPLES_PER_RAY() { return 8; }

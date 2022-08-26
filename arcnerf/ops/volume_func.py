@@ -65,3 +65,42 @@ def ray_aabb_intersection_cuda(rays_o, rays_d, aabb_range, eps=1e-7):
         mask: (N_rays, N_v), show whether each ray has intersection with the volume, BoolTensor
     """
     return AABBOps.apply(rays_o, rays_d, aabb_range, eps)
+
+
+class SparseVolumeSampleOps(torch.autograd.Function):
+    """Python wrapper of the CUDA function"""
+
+    @staticmethod
+    def forward(ctx, rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb):
+        pts, mask = _volume_func.sparse_volume_sampling(
+            rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb
+        )
+
+        return pts, mask
+
+
+@torch.no_grad()
+def sparse_volume_sampling(
+    rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance=0.0, perturb=False
+):
+    """Sample pts in sparse volume. The output is a compact tensor
+
+    Args:
+        rays_o: ray origin, (N_rays, 3)
+        rays_d: ray direction, assume normalized, (N_rays, 3)
+        near: (N_rays, 1) near distance for each ray
+        near: (N_rays, 1) far distance for each ray
+        n_pts: max num of sampling pts on each ray,
+        dt: const dt for searching
+        near_distance: near distance for sampling. By default 0.0.
+        perturb: whether to perturb the first zval, use in training only. by default False
+
+    Return:
+        pts: (N_rays, N_pts, 3), sampled points on each rays. At mose n_pts for each ray,
+                but generally it only samples <100, pts in 128*3 sparse volume.
+                Remaining pts will be the same as last pts and masked as False.
+        mask: (N_rays, N_pts), show whether each pts is valid in the rays
+    """
+    return SparseVolumeSampleOps.apply(
+        rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb
+    )

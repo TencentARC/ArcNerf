@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 
-import tinycudann as tcnn
+import warnings
+
 import torch
 
 from arcnerf.models.base_modules import MODULE_REGISTRY
 from .encoder_mlp_network import EncoderMLPGeoNet, EncoderMLPRadainceNet
+try:
+    import tinycudann as tcnn
+except ImportError:
+    warnings.warn('TCNN Not build...')
 
 
 @MODULE_REGISTRY.register()
