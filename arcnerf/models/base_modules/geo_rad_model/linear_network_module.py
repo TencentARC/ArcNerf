@@ -25,6 +25,7 @@ class GeoNet(EncoderMLPGeoNet):
         skips=[4],
         encoder=None,
         W_feat=256,
+        use_bias=True,
         skip_reduce_output=False,
         norm_skip=False,
         act_cfg=None,
@@ -44,6 +45,7 @@ class GeoNet(EncoderMLPGeoNet):
                     For any skip layer, it is concat in [feature, embed] order.
             encoder: cfgs for encoder.
             W_feat: Num of feature output. If <1, not output any feature. By default 256
+            use_bias: Whether to use bias in the mlp layers. By default True
             skip_reduce_output: If True, reduce output dim by embed_dim, else cat embed to hidden. By default False.
                                Nerf do not use it. Only for surface modeling methods(idr/neus/volsdf/unisurf)
             norm_skip: If True, when concat [h, input], will norm by sqrt(2). By default False.
@@ -75,8 +77,8 @@ class GeoNet(EncoderMLPGeoNet):
 
         # build mlp
         self.layers = self.build_mlp(
-            input_ch, embed_freq, W_feat, skips, skip_reduce_output, norm_skip, act_cfg, geometric_init, radius_init,
-            use_siren, weight_norm
+            input_ch, embed_freq, W_feat, skips, use_bias, skip_reduce_output, norm_skip, act_cfg, geometric_init,
+            radius_init, use_siren, weight_norm
         )
 
     def build_mlp(
@@ -85,6 +87,7 @@ class GeoNet(EncoderMLPGeoNet):
         embed_freq,
         W_feat=256,
         skips=[4],
+        use_bias=True,
         skip_reduce_output=False,
         norm_skip=False,
         act_cfg=None,
@@ -121,20 +124,22 @@ class GeoNet(EncoderMLPGeoNet):
             # select layers. Last layer will not have activation
             if i != self.D:
                 if use_siren:
-                    layer = SirenLayer(in_dim, out_dim, is_first=(i == 0))
+                    layer = SirenLayer(in_dim, out_dim, is_first=(i == 0), bias=use_bias)
                 else:
-                    layer = DenseLayer(in_dim, out_dim, activation=get_activation(act_cfg))
+                    layer = DenseLayer(in_dim, out_dim, activation=get_activation(act_cfg), bias=use_bias)
             else:
-                layer = nn.Linear(in_dim, out_dim)
+                layer = nn.Linear(in_dim, out_dim, bias=use_bias)
 
             # geo_init for denseLayer. For any layer inputs, it should be [feature, x, embed_x]
             # This assumes include_input in encoder is True
             if geometric_init and not use_siren:
                 if i == self.D:  # last layer
                     nn.init.normal_(layer.weight, mean=np.sqrt(np.pi) / np.sqrt(in_dim), std=0.0001)
-                    nn.init.constant_(layer.bias[:1], -radius_init)  # bias only for geo value
+                    if use_bias:
+                        nn.init.constant_(layer.bias[:1], -radius_init)  # bias only for geo value
                 elif embed_freq > 0:
-                    torch.nn.init.constant_(layer.bias, 0.0)
+                    if use_bias:
+                        torch.nn.init.constant_(layer.bias, 0.0)
                     if i == 0:  # first layer, [x, embed_x], do not init for embed_x
                         torch.nn.init.constant_(layer.weight[:, input_ch:], 0.0)
                         torch.nn.init.normal_(layer.weight[:, :input_ch], 0.0, np.sqrt(2) / np.sqrt(out_dim))
@@ -144,7 +149,8 @@ class GeoNet(EncoderMLPGeoNet):
                     else:
                         nn.init.normal_(layer.weight, 0.0, np.sqrt(2) / np.sqrt(out_dim))
                 else:
-                    nn.init.constant_(layer.bias, 0.0)
+                    if use_bias:
+                        nn.init.constant_(layer.bias, 0.0)
                     nn.init.normal_(layer.weight, 0.0, np.sqrt(2) / np.sqrt(out_dim))
 
             # extra weight normalization
@@ -236,9 +242,11 @@ class RadianceNet(EncoderMLPRadainceNet):
         D=8,
         encoder=None,
         W_feat_in=256,
+        use_bias=True,
         act_cfg=None,
         use_siren=False,
         weight_norm=False,
+        out_act_cfg='Sigmoid',
         *args,
         **kwargs
     ):
@@ -251,11 +259,13 @@ class RadianceNet(EncoderMLPRadainceNet):
             encoder: cfgs for encoder. Contains 'pts'/'view' fields for different input embedding.
             W_feat_in: Num of feature input if mode contains 'f'. Used to calculate the first layer input dim.
                     By default 256
+            use_bias: Whether to use bias in the mlp layers. By default True
             act_cfg: cfg obj for selecting activation. None for relu.
                      For surface modeling, usually use SoftPlus(beta=100)
             use_siren: If True, use SirenLayer instead of DenseLayer with sine activation. By fault False.
             weight_norm: If weight_norm, do extra weight_normalization. By default False.
                          Nerf do not use it. Only for surface modeling methods(idr/neus/volsdf/unisurf)
+            out_act_cfg: By default use 'Sigmoid' on rgb
         """
         super(RadianceNet, self).__init__(mode=mode)
         self.W = W
@@ -266,9 +276,9 @@ class RadianceNet(EncoderMLPRadainceNet):
         self.build_encoder(encoder, W_feat_in)
 
         # build the MLP
-        self.layers = self.build_mlp(act_cfg, use_siren, weight_norm)
+        self.layers = self.build_mlp(use_bias, act_cfg, use_siren, weight_norm, out_act_cfg)
 
-    def build_mlp(self, act_cfg=None, use_siren=False, weight_norm=False):
+    def build_mlp(self, use_bias=True, act_cfg=None, use_siren=False, weight_norm=False, out_act_cfg='Sigmoid'):
         """Return a list of linear layers"""
         layers = []
         for i in range(self.D + 1):
@@ -287,11 +297,11 @@ class RadianceNet(EncoderMLPRadainceNet):
             # select layers. Last layer has sigmoid
             if i != self.D:
                 if use_siren:
-                    layer = SirenLayer(in_dim, out_dim, is_first=(i == 0))
+                    layer = SirenLayer(in_dim, out_dim, is_first=(i == 0), bias=use_bias)
                 else:
-                    layer = DenseLayer(in_dim, out_dim, activation=get_activation(act_cfg))
+                    layer = DenseLayer(in_dim, out_dim, activation=get_activation(act_cfg), bias=use_bias)
             else:
-                layer = DenseLayer(in_dim, out_dim, activation=nn.Sigmoid())
+                layer = DenseLayer(in_dim, out_dim, activation=get_activation(out_act_cfg), bias=use_bias)
 
             # extra weight normalization
             if weight_norm:

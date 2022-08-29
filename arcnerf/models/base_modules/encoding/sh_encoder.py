@@ -110,12 +110,14 @@ class SHEmbedder(nn.Module):
         if self.include_input:
             out.append(xyz)  # (B, 3)
 
+        # norm all the dir (-1, 1) -> (0, 1) for spherical harmonic
+        xyz_norm = (xyz + 1) / 2.0
         if self.backend == 'cuda' and CUDA_BACKEND_AVAILABLE:
-            sh_embed = self.sh_encode_cuda(xyz)
+            sh_embed = self.sh_encode_cuda(xyz_norm)
         elif self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
-            sh_embed = self.sh_encode_tcnn(xyz)
+            sh_embed = self.sh_encode_tcnn(xyz_norm)
         else:
-            sh_embed = self.sh_encode_torch(xyz)
+            sh_embed = self.sh_encode_torch(xyz_norm)
         out.append(sh_embed)  # (B, n_freqs**2)
 
         return torch.cat(out, dim=-1)  # (B, out_dim)

@@ -72,11 +72,11 @@ class SparseVolumeSampleOps(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb):
-        pts, mask = _volume_func.sparse_volume_sampling(
+        zvals, mask = _volume_func.sparse_volume_sampling(
             rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb
         )
 
-        return pts, mask
+        return zvals, mask
 
 
 @torch.no_grad()
@@ -96,9 +96,9 @@ def sparse_volume_sampling(
         perturb: whether to perturb the first zval, use in training only. by default False
 
     Return:
-        pts: (N_rays, N_pts, 3), sampled points on each rays. At mose n_pts for each ray,
+        zvals: (N_rays, N_pts), sampled points zvals on each rays. At mose n_pts for each ray,
                 but generally it only samples <100, pts in 128*3 sparse volume.
-                Remaining pts will be the same as last pts and masked as False.
+                Remaining zvals will be the same as last zval and masked as False.
         mask: (N_rays, N_pts), show whether each pts is valid in the rays
     """
     return SparseVolumeSampleOps.apply(

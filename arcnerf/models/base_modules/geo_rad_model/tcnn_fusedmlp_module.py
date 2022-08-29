@@ -20,6 +20,7 @@ class FusedMLPGeoNet(EncoderMLPGeoNet):
        Compared to linear_network_module, it is faster but lose flexibility(initialization, etc. )
 
        (FullyFusedMLP only processes fix num of neurons: 16, 21, 64, 128)
+       No bias is used in the fc layer.
     """
 
     def __init__(
@@ -101,7 +102,17 @@ class FusedMLPRadianceNet(EncoderMLPRadainceNet):
     """
 
     def __init__(
-        self, mode='vf', W=128, D=8, encoder=None, W_feat_in=128, act_cfg=None, dtype=torch.float32, *args, **kwargs
+        self,
+        mode='vf',
+        W=128,
+        D=8,
+        encoder=None,
+        W_feat_in=128,
+        act_cfg=None,
+        out_act_cfg=None,
+        dtype=torch.float32,
+        *args,
+        **kwargs
     ):
         """
         Args:
@@ -114,6 +125,7 @@ class FusedMLPRadianceNet(EncoderMLPRadainceNet):
                     By default 128
             act_cfg: cfg obj for selecting activation. None for relu.
                      For surface modeling, usually use SoftPlus(beta=100)
+            out_act_cfg: By default use 'Sigmoid' on rgb
             dtype: cast the output f16 to f32/64. By default use float32
         """
         super(FusedMLPRadianceNet, self).__init__(mode=mode)
@@ -126,9 +138,9 @@ class FusedMLPRadianceNet(EncoderMLPRadainceNet):
         self.build_encoder(encoder, W_feat_in)
 
         # build the fusedMLP
-        self.layers = self.build_mlp(act_cfg)
+        self.layers = self.build_mlp(act_cfg, out_act_cfg)
 
-    def build_mlp(self, act_cfg=None):
+    def build_mlp(self, act_cfg=None, out_act_cfg=None):
         """Return a fused mlp layer"""
         layers = \
             tcnn.Network(
@@ -137,7 +149,7 @@ class FusedMLPRadianceNet(EncoderMLPRadainceNet):
                 network_config={
                     'otype': 'FullyFusedMLP',
                     'activation': get_tcnn_activation_from_cfgs(act_cfg, 'ReLU'),
-                    'output_activation': 'Sigmoid',
+                    'output_activation': get_tcnn_activation_from_cfgs(out_act_cfg, 'Sigmoid'),
                     'n_neurons': self.W,
                     'n_hidden_layers': self.D,
                 }

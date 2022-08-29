@@ -10,7 +10,6 @@
 #include "helper.h"
 #include "volume_func.h"
 #include "pcg32.h"
-#include "utils.h"
 
 
 // The real cuda kernel
@@ -174,19 +173,6 @@ std::vector<torch::Tensor> aabb_intersection_cuda(
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 // The real cuda kernel
 template <typename scalar_t>
 __global__ void sparse_volume_sampling_cuda_kernel(
@@ -202,33 +188,59 @@ __global__ void sparse_volume_sampling_cuda_kernel(
     const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> aabb_range,
     const float n_grid,
     const torch::PackedTensorAccessor32<bool, 3, torch::RestrictPtrTraits> bitfield,
-    torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> pts,  //(N_rays, N_pts, 3)
+    torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> zvals,  //(N_rays, N_pts)
     torch::PackedTensorAccessor32<bool, 2, torch::RestrictPtrTraits> mask) {  //(N_rays, N_pts)
 
     const uint32_t n = blockIdx.x * blockDim.x + threadIdx.x;  // ray id
     if (n >= rays_o.size(0)) return;
 
     scalar_t startt = fmaxf(near[n][0], near_distance);
+    scalar_t far_end = far[n][0];
     rng.advance(n * N_MAX_RANDOM_SAMPLES_PER_RAY());
 
+    const float3 xyz_min = make_float3(aabb_range[0][0], aabb_range[1][0], aabb_range[2][0]);
+    const float3 xyz_max = make_float3(aabb_range[0][1], aabb_range[1][1], aabb_range[2][1]);
+
+    // perturb init zvals
     if (perturb) {
         startt += dt * rng.next_float();
-        startt = 0.817255f;  // force, remember to delete
     }
 
     const float3 _rays_o = make_float3(rays_o[n][0], rays_o[n][1], rays_o[n][2]);
     const float3 _rays_d = make_float3(rays_d[n][0], rays_d[n][1], rays_d[n][2]);
+    float3 inv_d = 1.0f / _rays_d;
 
-    printf("startt %f\n", startt);
     uint32_t j = 0;
     scalar_t t = startt;
+    float3 pos;
 
+    while (t <= far_end && j < N_pts && \\
+                check_pts_in_aabb(get_ray_points_by_zvals(_rays_o, _rays_d, t), xyz_min, xyz_max)) {
+        float3 voxel_idx = cal_voxel_idx_from_xyz(_rays_o + t * _rays_d, xyz_min, xyz_max, (float) n_grid);
+        if (voxel_idx.x >= 0 && bitfield[(uint8_t)voxel_idx.x][(uint8_t)voxel_idx.y][(uint8_t)voxel_idx.z]) {
+            // update the pts and mask
+            zvals[n][j] = t;
+            mask[n][j] = true;
+            ++j;
+            t += dt;
+        } else {
+            pos = get_ray_points_by_zvals(_rays_o, _rays_d, t);
+            t = advance_to_next_voxel(t, dt, CONE_ANGLE(), pos, _rays_d, xyz_min, xyz_max, n_grid);
+        }
+    }
+
+    // make the remaining zvals the same as last
+    float last_zval;
+    if (j > 0 && j < N_pts) {
+        last_zval = zvals[n][j-1];
+    }
+    while (j > 0 && j < N_pts) {
+        zvals[n][j] = last_zval;
+        ++j;
+    }
 
     return;
 }
-
-
-
 
 
 /* CUDA instantiate of sparse_volume_sampling func
@@ -238,9 +250,10 @@ __global__ void sparse_volume_sampling_cuda_kernel(
    @param: far, far intersection zvals. (N_rays, 1)
    @param: N_pts, max num of sampling pts on each ray.
    @param: dt, fix step length
+   @param: aabb_range, bbox range of volume, (3, 2) of xyz_min/max of each volume
    @param: near_distance, near distance for sampling. By default 0.0.
    @param: perturb, whether to perturb the first zval, use in training only
-   @return: pts, (N_rays, N_pts, 3), sampled points on each rays.
+   @return: zvals, (N_rays, N_pts), sampled points zvals on each rays.
    @return: mask, (N_rays, N_pts), show whether each ray has intersection with the volume, BoolTensor
 */
 std::vector<torch::Tensor> sparse_volume_sampling_cuda(
@@ -268,7 +281,7 @@ std::vector<torch::Tensor> sparse_volume_sampling_cuda(
     // random seed to perturb the first value
     pcg32 rng = pcg32{(uint64_t)623};
 
-    torch::Tensor pts = torch::zeros({N_rays, N_pts, 3}, dtype).to(device);  // (N_rays, N_pts, 3)
+    torch::Tensor zvals = torch::zeros({N_rays, N_pts}, dtype).to(device);  // (N_rays, N_pts)
     torch::Tensor mask = torch::zeros({N_rays, N_pts}, torch::kBool).to(device);  // (N_rays, N_pts)
 
     // instantiate the real executable kernel
@@ -283,10 +296,10 @@ std::vector<torch::Tensor> sparse_volume_sampling_cuda(
             aabb_range.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
             n_grid,
             bitfield.packed_accessor32<bool, 3, torch::RestrictPtrTraits>(),
-            pts.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            zvals.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
             mask.packed_accessor32<bool, 2, torch::RestrictPtrTraits>()
         );
     }));
 
-    return {pts, mask};
+    return {zvals, mask};
 }

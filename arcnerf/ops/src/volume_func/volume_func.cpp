@@ -121,9 +121,10 @@ std::vector<torch::Tensor> sparse_volume_sampling_cuda(
    @param: far, far intersection zvals. (N_rays, 1)
    @param: N_pts, max num of sampling pts on each ray.
    @param: dt, fix step length
+   @param: aabb_range, bbox range of volume, (3, 2) of xyz_min/max of whole volume
    @param: near_distance, near distance for sampling. By default 0.0.
    @param: perturb, whether to perturb the first zval, use in training only
-   @return: pts, (N_rays, N_pts, 3), sampled points on each rays.
+   @return: zvals, (N_rays, N_pts), sampled points zvals on each rays.
    @return: mask, (N_rays, N_pts), show whether each ray has intersection with the volume, BoolTensor
 */
 std::vector<torch::Tensor> sparse_volume_sampling(

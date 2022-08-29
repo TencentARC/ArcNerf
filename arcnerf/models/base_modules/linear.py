@@ -11,17 +11,18 @@ from .activation import Sine
 class DenseLayer(nn.Linear):
     """Dense Layer(Linear) with activation"""
 
-    def __init__(self, input_dim, out_dim, activation=nn.ReLU(inplace=True)):
+    def __init__(self, input_dim, out_dim, activation=nn.ReLU(inplace=True), bias=True):
         """
         Args:
             input_dim: input dim
             out_dim: output dim
             activation: activation function.
                     By default use ReLU. Others can be (LeakyReLU, Sigmoid, Tanh, Softplus) etc
+            bias: Whether to use bias. By default True
         Returns:
             out: (B, out_dim) tensor
         """
-        super().__init__(input_dim, out_dim)
+        super().__init__(input_dim, out_dim, bias=bias)
         self.activation = activation
 
     def forward(self, x: torch.Tensor):
@@ -38,13 +39,14 @@ class SirenLayer(nn.Linear):
              https://github.com/ventusff/neurecon/blob/main/models/base.py
     """
 
-    def __init__(self, input_dim, out_dim, is_first=False):
+    def __init__(self, input_dim, out_dim, is_first=False, bias=True):
         """
         Args:
             input_dim: input dim
             out_dim: output dim
             is_first: bool. If first layer, use 1/input_dim for weight init,
                             else use sqrt(c/input_dim) / w0 for init
+            bias: Whether to use bias. By default True
         Returns:
             out: (B, out_dim) tensor
         """
@@ -52,7 +54,7 @@ class SirenLayer(nn.Linear):
         self.input_dim = input_dim
         self.w0 = 30
         self.c = 6
-        super().__init__(input_dim, out_dim)
+        super().__init__(input_dim, out_dim, bias=bias)
         self.activation = Sine(self.w0)
 
     def reset_parameters(self):

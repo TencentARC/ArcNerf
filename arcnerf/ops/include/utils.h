@@ -35,11 +35,7 @@ T* vec_to_gpu(const std::vector<T> vec_cpu) {
 
 //Swap value
 template <typename T>
-inline __host__ __device__ void host_device_swap(T& a, T& b) {
-	T c(a); a=b; b=c;
-}
+inline __host__ __device__ void host_device_swap(T& a, T& b) { T c(a); a=b; b=c; }
 
-
-// Used to index into the PRNG stream. Must be larger than the number of
-// samples consumed by any given training ray.
-inline constexpr __device__ __host__ uint32_t N_MAX_RANDOM_SAMPLES_PER_RAY() { return 8; }
+// Sign func
+inline __host__ __device__ float signf(float x) { return copysignf(1.0, x); }
