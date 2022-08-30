@@ -24,6 +24,7 @@ class DenseGridEmbedder(nn.Module):
         radius_init=None,
         include_input=False,
         W_feat=0,
+        feat_only=False,
         *args,
         **kwargs
     ):
@@ -39,10 +40,11 @@ class DenseGridEmbedder(nn.Module):
             radius_init: If not None, init the geo value as sdf of a sphere
             include_input: if True, raw input is included in the embedding. Appear at beginning. By default is True
             W_feat: output feature if W_feat > 0
+            feat_only: If W_feat > 0 and feat_only, output feat only
 
         Returns:
             Embedded inputs with shape:
-                1 + include_input * input_dim + W_feat
+                include_input * input_dim + W_feat +  ((1 - feat_only) * W_feat)
         """
         super(DenseGridEmbedder, self).__init__()
 
@@ -60,8 +62,9 @@ class DenseGridEmbedder(nn.Module):
         self.grid_value_param, self.grid_feat_param = self.init_volume_params(W_feat, radius_init)
         self.radius = radius_init
         self.W_feat = W_feat
+        self.feat_only = feat_only
 
-        self.out_dim = 1 + include_input * input_dim + W_feat
+        self.out_dim = include_input * input_dim + W_feat + ((1 - feat_only) * W_feat)
 
     def get_output_dim(self):
         """Get output dim"""
@@ -130,5 +133,8 @@ class DenseGridEmbedder(nn.Module):
             out.append(feat)  # (B, W_feat)
 
         out = torch.cat(out, dim=-1)  # (B, 1 + include_input * input_dim + W_feat)
+
+        if self.feat_only and self.W_feat > 0:
+            out = out[:, 1:]  # only feature
 
         return out

@@ -36,6 +36,27 @@ It only embeds xyz direction rather than positions.
 You can select the backend by setting `backend`=`torch`/`cuda`/`tcnn`.
 ### DenseGridEmbedder
 The dense grid embedder directly extracts density and feature from a dense volume. It only embeds xyz direction rather than positions.
+### CompositeEmbedder
+It takes any combinations of the embedders. You need to specify the encoder like
+```
+encoder:  # This is the encoder in NSVF
+    type: CompositeEmbedder
+    sub_encoder_types: ['DenseGridEmbedder', 'FreqEmbedder']
+    input_dim: 3
+    n_freqs: 0
+    sub_encoder1:
+        type: DenseGridEmbedder,
+        include_input: False,
+        feat_only: True,
+        n_grid: 128,
+        side: 1,
+        W_feat': 32
+    sub_encoder2:
+        type: FreqEmbedder
+        n_freqs: 6
+```
+You need to specify the `sub_encoder_types` and `sub_encoder#` for ordered encoders. You only need the input_dim
+for init input and it will calculate the input/output dims.
 
 ## Tiny-cuda-nn
 Some encoders are implemented in [tiny-cuda-nn]() by Nvidia. You should clone the repo `--recursive`

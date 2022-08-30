@@ -9,8 +9,9 @@ import torch
 
 from arcnerf.geometry.transformation import normalize
 from arcnerf.models.base_modules.encoding import (
-    DenseGridEmbedder, FreqEmbedder, GaussianEmbedder, Gaussian, HashGridEmbedder, SHEmbedder
+    build_encoder, DenseGridEmbedder, FreqEmbedder, GaussianEmbedder, Gaussian, HashGridEmbedder, SHEmbedder
 )
+from common.utils.cfgs_utils import dict_to_obj
 from common.utils.logger import Logger
 from tests.tests_arcnerf.tests_ops import log_custom_benchmark
 
@@ -172,11 +173,43 @@ class TestDict(unittest.TestCase):
                 inputs = [xyz.clone().detach().requires_grad_(True)]
 
                 out_torch, out_custom, out_custom_forward_only, grad_torch, grad_custom = log_custom_benchmark(
-                    self.logger, 'HashGrid Encode(n_level {} - n_feat {})'.format(level, n_feat), hashgrid_torch,
-                    hashgrid_custom, inputs
+                    self.logger,
+                    'HashGrid Encode(n_level {} - n_feat {})'.format(level, n_feat),
+                    hashgrid_torch,
+                    hashgrid_custom,
+                    inputs,
+                    n_iter=1
                 )
 
                 # the accumulate grad gets quite large error
                 self.check_output_and_grad(
                     out_torch, out_custom, out_custom_forward_only, grad_torch, grad_custom, atol=1e-4
                 )  # 5e-5 level
+
+    def tests_composite_encoder(self):
+        # that is the feat used in nsvf
+        composite_cfgs = {
+            'type': 'CompositeEmbedder',
+            'sub_encoder_types': ['DenseGridEmbedder', 'FreqEmbedder'],
+            'input_dim': 3,
+            'n_freqs': 0,
+            'sub_encoder1': {
+                'type': 'DenseGridEmbedder',
+                'include_input': False,
+                'feat_only': True,
+                'n_grid': 128,
+                'side': 1,
+                'W_feat': 32
+            },
+            'sub_encoder2': {
+                'type': 'FreqEmbedder',
+                'n_freqs': 6
+            }
+        }
+
+        model, _, _ = build_encoder(dict_to_obj(composite_cfgs))
+        xyz = torch.rand((self.batch_size, 3))
+        out = model(xyz)
+        out_dim = model.get_output_dim()
+        self.assertEqual(out_dim, out_dim)
+        self.assertEqual(out.shape, (self.batch_size, out_dim))
