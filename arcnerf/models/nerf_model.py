@@ -55,7 +55,9 @@ class NeRF(FgModel):
         output = {}
 
         # get coarse pts sigma/rgb  (B, N_sample, ...)
-        sigma, radiance = self.get_sigma_radiance_by_mask_pts(rays_o, rays_d, zvals, mask)
+        sigma, radiance = self.get_sigma_radiance_by_mask_pts(
+            self.coarse_geo_net, self.coarse_radiance_net, rays_o, rays_d, zvals, mask
+        )
         # ray marching for coarse network, keep the coarse weights for next stage
         output_coarse = self.ray_marching(sigma, radiance, zvals, inference_only=inference_only)
         coarse_weights = output_coarse['weights']
@@ -69,7 +71,9 @@ class NeRF(FgModel):
             zvals = self.upsample_zvals(zvals, coarse_weights, inference_only)
 
             # get upsampled pts sigma/rgb  (B, N_total, ...)
-            sigma, radiance = self.get_sigma_radiance_by_mask_pts(rays_o, rays_d, zvals, None)
+            sigma, radiance = self.get_sigma_radiance_by_mask_pts(
+                self.fine_geo_net, self.fine_radiance_net, rays_o, rays_d, zvals, None
+            )
 
             # ray marching for fine network
             output_fine = self.ray_marching(sigma, radiance, zvals, inference_only=inference_only)

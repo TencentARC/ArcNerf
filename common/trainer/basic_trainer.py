@@ -206,7 +206,6 @@ class BasicTrainer(object):
         """Get the params groups for different lr if required. Needed to be implemented in custom trainer"""
         names, params = [], []
         for n, p in model.named_parameters():
-            print(n)
             names.append(n)
             params.append(p)
 
