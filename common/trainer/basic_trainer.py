@@ -166,7 +166,7 @@ class BasicTrainer(object):
         """Set up the model and optimizer and distribute to machines"""
         model = self.distribute_model(model)
 
-        params = self.get_lr_params_groups(model)
+        _, params = self.get_lr_params_groups(model)
 
         optimizer = create_optimizer(parameters=params, **self.cfgs.optim.__dict__)
 
@@ -204,9 +204,13 @@ class BasicTrainer(object):
     @staticmethod
     def get_lr_params_groups(model):
         """Get the params groups for different lr if required. Needed to be implemented in custom trainer"""
-        params = model.parameters()
+        names, params = [], []
+        for n, p in model.named_parameters():
+            print(n)
+            names.append(n)
+            params.append(p)
 
-        return params
+        return names, params
 
     def set_lr_scheduler(self):
         """Set the lr scheduler"""

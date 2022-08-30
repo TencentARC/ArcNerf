@@ -14,6 +14,7 @@ from arcnerf.eval.infer_func import Inferencer
 from arcnerf.loss import build_loss
 from arcnerf.metric import build_metric
 from arcnerf.models import build_model
+from arcnerf.trainer.ema import EMA
 from arcnerf.visual.plot_3d import draw_3d_components
 from arcnerf.visual.render_img import render_progress_imgs, write_progress_imgs
 from common.loss.loss_dict import LossDictCounter
@@ -36,10 +37,11 @@ class ArcNerfTrainer(BasicTrainer):
         # for inference only
         self.intrinsic = None
         self.wh = None
-        # for progress save
+        # for progress visual
         self.radius = None
         self.volume_dict = None
 
+        # call parent init
         super(ArcNerfTrainer, self).__init__(cfgs)
         self.get_progress = get_value_from_cfgs_field(self.cfgs.debug, 'get_progress', False)
         self.total_epoch = self.cfgs.progress.epoch
@@ -53,6 +55,15 @@ class ArcNerfTrainer(BasicTrainer):
         self.logger.add_log('-' * 60)
         self.logger.add_log('Pretrain siren layers')
         self.model.pretrain_siren()
+
+        # ema update
+        self.ema = None
+        if get_value_from_cfgs_field(self.cfgs.optim, 'ema') is not None:
+            decay = get_value_from_cfgs_field(self.cfgs.optim.ema, 'decay', 0.95)
+            self.ema = EMA(self.model, decay)
+            self.ema.set_n_step(self.cfgs.progress.start_epoch)
+            self.logger.add_log('-' * 60)
+            self.logger.add_log('EMA Update with decay {}'.format(decay))
 
     def get_model(self):
         """Get custom model"""
@@ -446,6 +457,10 @@ class ArcNerfTrainer(BasicTrainer):
         # grad clipping and step
         self.clip_gradients(epoch)
         self.optimizer.step()
+
+        # ema update
+        if self.ema is not None:
+            self.ema.ema_step()
 
         # print grad for debug
         self.debug_print_grad(epoch, step)
