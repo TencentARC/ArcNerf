@@ -34,7 +34,7 @@ class MipNeRF(FgModel):
         """make one more sample for interval modeling"""
         return self.get_ray_cfgs('n_sample') + 1
 
-    def _forward(self, inputs, zvals, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+    def _forward(self, inputs, zvals, mask, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         """zvals is in shape (n_sample+1)"""
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)

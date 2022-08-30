@@ -95,11 +95,12 @@ class BasicBound(nn.Module):
         return zvals, None
 
     @torch.no_grad()
-    def optimize(self, cur_epoch=0, get_est_opacity=None):
+    def optimize(self, cur_epoch=0, n_pts=128, get_est_opacity=None):
         """Optimize the inner structure. Only volume needs it
 
         Args:
             cur_epoch: current epoch. only process periodically
+            n_pts: use to find the dt
             get_est_opacity: A function that process dt/pts to get the opacity at this pts.
         """
         return

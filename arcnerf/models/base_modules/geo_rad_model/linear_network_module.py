@@ -10,6 +10,7 @@ from .encoder_mlp_network import EncoderMLPGeoNet, EncoderMLPRadainceNet
 from arcnerf.models.base_modules import MODULE_REGISTRY
 from arcnerf.models.base_modules.activation import get_activation
 from arcnerf.models.base_modules.linear import DenseLayer, SirenLayer
+from common.utils.cfgs_utils import dict_to_obj
 
 
 @MODULE_REGISTRY.register()
@@ -246,7 +247,7 @@ class RadianceNet(EncoderMLPRadainceNet):
         act_cfg=None,
         use_siren=False,
         weight_norm=False,
-        out_act_cfg='Sigmoid',
+        out_act_cfg=None,
         *args,
         **kwargs
     ):
@@ -278,7 +279,7 @@ class RadianceNet(EncoderMLPRadainceNet):
         # build the MLP
         self.layers = self.build_mlp(use_bias, act_cfg, use_siren, weight_norm, out_act_cfg)
 
-    def build_mlp(self, use_bias=True, act_cfg=None, use_siren=False, weight_norm=False, out_act_cfg='Sigmoid'):
+    def build_mlp(self, use_bias=True, act_cfg=None, use_siren=False, weight_norm=False, out_act_cfg=None):
         """Return a list of linear layers"""
         layers = []
         for i in range(self.D + 1):
@@ -301,7 +302,8 @@ class RadianceNet(EncoderMLPRadainceNet):
                 else:
                     layer = DenseLayer(in_dim, out_dim, activation=get_activation(act_cfg), bias=use_bias)
             else:
-                layer = DenseLayer(in_dim, out_dim, activation=get_activation(out_act_cfg), bias=use_bias)
+                sigmoid_cfg = dict_to_obj({'type': 'Sigmoid'})
+                layer = DenseLayer(in_dim, out_dim, activation=get_activation(out_act_cfg, sigmoid_cfg), bias=use_bias)
 
             # extra weight normalization
             if weight_norm:

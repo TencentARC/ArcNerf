@@ -92,14 +92,7 @@ class HuberLoss(nn.Module):
             y: any torch tensor with same shape as x
         """
         abs_diff = (x - y).abs()
-
-        loss = torch.empty_like(x, dtype=x.dtype, device=x.device)
-        # |x-y| < delta
-        m1 = abs_diff < self.delta
-        loss[m1] = 0.5 / self.delta * (abs_diff[m1]**2)
-        # |x-y| >= delta
-        m2 = abs_diff >= self.delta
-        loss[m2] = self.delta * (abs_diff[m2] - 0.5 * self.delta)
+        loss = torch.where(abs_diff < self.delta, 0.5 / self.delta * (abs_diff**2), abs_diff - 0.5 * self.delta)
 
         if self.reduction == 'mean':
             return loss.mean()

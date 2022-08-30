@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from arcnerf.ops.trunc_exp import TruncExp
-from common.utils.cfgs_utils import get_value_from_cfgs_field
+from common.utils.cfgs_utils import get_value_from_cfgs_field, dict_to_obj
 
 
 class Sine(nn.Module):
@@ -21,10 +21,10 @@ class Sine(nn.Module):
         return torch.sin(self.w0 * x)
 
 
-def get_activation(cfg):
+def get_activation(cfg, default=dict_to_obj({'type': 'relu'})):
     """Get activation from cfg. Type is specified by cfg.type"""
     if cfg is None:
-        return nn.ReLU(inplace=True)
+        cfg = default
 
     if cfg.type.lower() == 'relu':
         act = nn.ReLU(inplace=True)

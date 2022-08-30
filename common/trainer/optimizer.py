@@ -11,7 +11,7 @@ def create_optimizer(
     use_nesterov=True,
     beta1=0.9,
     beta2=0.999,
-    epsilon=1e-8,
+    eps=1e-8,
     weight_decay=0.0,
     centered=False,
     rmsprop_alpha=0.99,
@@ -20,7 +20,7 @@ def create_optimizer(
 ):
     """Creates the optimizer. Now support [adam, sgd, lbfgs, rmsprop]. """
     if optim_type == 'adam':
-        return optim.Adam(parameters, lr=lr, betas=(beta1, beta2), weight_decay=weight_decay)
+        return optim.Adam(parameters, lr=lr, betas=(beta1, beta2), eps=eps, weight_decay=weight_decay)
     elif optim_type == 'sgd':
         return optim.SGD(parameters, lr=lr, momentum=momentum, weight_decay=weight_decay, nesterov=use_nesterov)
     elif optim_type == 'lbfgs':
@@ -29,7 +29,7 @@ def create_optimizer(
         return optim.RMSprop(
             parameters,
             lr=lr,
-            epsilon=epsilon,
+            epsilon=eps,
             alpha=rmsprop_alpha,
             weight_decay=weight_decay,
             momentum=momentum,
