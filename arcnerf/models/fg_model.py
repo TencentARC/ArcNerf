@@ -194,10 +194,12 @@ class FgModel(Base3dModel):
             'You should implement the _forward function that process rays with coarse zvals in child class...'
         )
 
-    def get_sigma_radiance_by_mask_pts(self, rays_o, rays_d, zvals, mask_pts=None):
+    def get_sigma_radiance_by_mask_pts(self, geo_net, radiance_net, rays_o, rays_d, zvals, mask_pts=None):
         """Process the pts/dir by mask_pts. Only process valid zvals to save computation
 
         Args:
+            geo_net: geometry net
+            radiance_net: radiance net
             rays_o: (B, 3) rays origin
             rays_d: (B, 3) rays direction(normalized)
             zvals: (B, N_pts) zvals on each ray
@@ -225,8 +227,7 @@ class FgModel(Base3dModel):
 
         # get sigma and rgb, . shape in (N_valid_pts, ...)
         _sigma, _radiance = chunk_processing(
-            self._forward_pts_dir, self.chunk_pts, False, self.coarse_geo_net, self.coarse_radiance_net, pts,
-            rays_d_repeat
+            self._forward_pts_dir, self.chunk_pts, False, geo_net, radiance_net, pts, rays_d_repeat
         )
 
         # reshape to (B, N_sample, ...) by fill duplicating pts

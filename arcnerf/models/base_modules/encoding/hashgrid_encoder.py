@@ -32,7 +32,7 @@ class HashGridEmbedder(nn.Module):
         n_feat_per_entry=2,
         hashmap_size=19,
         base_res=16,
-        max_res=512,
+        max_res=2048,
         origin=(0, 0, 0),
         side=None,
         xyz_len=None,
@@ -49,7 +49,7 @@ class HashGridEmbedder(nn.Module):
             n_feat_per_entry: num of feat for each entry in hashmap(F), by default 2
             hashmap_size: 2-based hashmap size for each level(T), by default 19 (2**19 table)
             base_res: base resolution. By default 16.
-            max_res: max res. By default 512.
+            max_res: max res. By default 2048.
                 The scale factor is exp(ln(max_res/base_res) / (L-1)).
                 Each level res is base * (scale ** L).
             The following are for volume:

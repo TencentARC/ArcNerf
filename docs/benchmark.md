@@ -12,13 +12,13 @@ Expname are in the format of `{dataset}_{scene}_{model}_{other_settings}`.
 | Method |        cfg         | PSNR |    Official repo   |    Official PSNR     | paper PSNR  | Others |
 |:------:|:------------------:|:----:|:------------------:|:--------------------:|:-----------:|:-------|
 |  NeRF  |configs/expr/NeRF/lego/nerf_lego_nerf.yaml|32.86|https://github.com/yenchenlin/nerf-pytorch|32.3|32.54|  |
-|  NeuS  |configs/expr/NeRF/lego/nerf_lego_neus.yaml|30.78|https://github.com/Totoro97/NeuS| 31.12 |  NA |-30.84 in smaller sphere /-embed_pts=10 following official repo|
-| VolSDF |configs/expr/NeRF/lego/nerf_lego_volsdf.yaml|28.14| https://github.com/lioryariv/volsdf | 20.77 |NA| Official repo not converge well on lego scene  |
-|MipNeRF |configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml|32.93| https://github.com/google/mipnerf | TODO |35.74||
+|  NeuS  |configs/expr/NeRF/lego/nerf_lego_neus.yaml|30.81|https://github.com/Totoro97/NeuS| 31.12 |  NA |embed_pts=10 following official repo|
+| VolSDF |configs/expr/NeRF/lego/nerf_lego_volsdf.yaml|28.25| https://github.com/lioryariv/volsdf | 20.77 |NA| Official repo not converge well on lego scene  |
+|MipNeRF |configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml|32.95| https://github.com/google/mipnerf | TODO |35.74| TODO: Not match up yet|
 
 #### Instant-NGP
 The highly optimized [instant-ngp](https://github.com/NVlabs/instant-ngp) model, official performance:
-- max_samples: 1024, color space: sRGB, max_res: 512(per_level_scale: 1.2599)
+- max_samples: 1024, color space: sRGB, max_res: 512(per_level_scale: 1.2599), lr=1e-2
 
 | Num steps | time | PSNR in sRGB space | PSNR in linear space|
 |:---------:|:----:|:--------------------:|:-----------------:|
@@ -31,7 +31,7 @@ The highly optimized [instant-ngp](https://github.com/NVlabs/instant-ngp) model,
 
 ## LLFF
 ### Fern  (378*504, 3 eval images)
-We only use non-ndc version.
+We only use non-ndc version. For ndc space, you need to refer to our [simplenerf]() project.
 
 | Method |        cfg         | PSNR |    Official repo   |    Official PSNR     | paper PSNR  |
 |:------:|:------------------:|:----:|:------------------:|:--------------------:|:-----------:|
