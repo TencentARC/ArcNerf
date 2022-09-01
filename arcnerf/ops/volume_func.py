@@ -43,6 +43,8 @@ class AABBOps(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, rays_o, rays_d, aabb_range, eps):
+        rays_o = rays_o.contiguous()  # make it contiguous
+        rays_d = rays_d.contiguous()  # make it contiguous
         near, far, pts, mask = _volume_func.aabb_intersection(rays_o, rays_d, aabb_range, eps)
 
         return near, far, pts, mask
@@ -72,6 +74,8 @@ class SparseVolumeSampleOps(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb):
+        rays_o = rays_o.contiguous()  # make it contiguous
+        rays_d = rays_d.contiguous()  # make it contiguous
         zvals, mask = _volume_func.sparse_volume_sampling(
             rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb
         )

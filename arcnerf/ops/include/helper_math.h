@@ -240,6 +240,11 @@ inline __host__ __device__ float3 fminf(float3 a, float3 b)
     return make_float3(fminf(a.x,b.x), fminf(a.y,b.y), fminf(a.z,b.z));
 }
 
+inline __host__ __device__ float fminf3(float3 a)
+{
+    return fminf(fminf(a.x, a.y), a.z);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // max
 ////////////////////////////////////////////////////////////////////////////////
@@ -247,6 +252,11 @@ inline __host__ __device__ float3 fminf(float3 a, float3 b)
 inline __host__ __device__ float3 fmaxf(float3 a, float3 b)
 {
     return make_float3(fmaxf(a.x,b.x), fmaxf(a.y,b.y), fmaxf(a.z,b.z));
+}
+
+inline __host__ __device__ float fmaxf3(float3 a)
+{
+    return fmaxf(fmaxf(a.x, a.y), a.z);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

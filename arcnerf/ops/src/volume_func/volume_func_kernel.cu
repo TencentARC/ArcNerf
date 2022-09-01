@@ -208,7 +208,6 @@ __global__ void sparse_volume_sampling_cuda_kernel(
 
     const float3 _rays_o = make_float3(rays_o[n][0], rays_o[n][1], rays_o[n][2]);
     const float3 _rays_d = make_float3(rays_d[n][0], rays_d[n][1], rays_d[n][2]);
-    float3 inv_d = 1.0f / _rays_d;
 
     uint32_t j = 0;
     scalar_t t = startt;
@@ -225,7 +224,7 @@ __global__ void sparse_volume_sampling_cuda_kernel(
             t += dt;
         } else {
             pos = get_ray_points_by_zvals(_rays_o, _rays_d, t);
-            t = advance_to_next_voxel(t, dt, CONE_ANGLE(), pos, _rays_d, xyz_min, xyz_max, n_grid);
+            t = advance_to_next_voxel(t, dt, pos, _rays_d, xyz_min, xyz_max, n_grid);
         }
     }
 
