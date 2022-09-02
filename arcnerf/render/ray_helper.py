@@ -248,7 +248,7 @@ def get_zvals_from_near_far(
     if inverse_linear:  # +1e-8 in case nan
         zvals = 1.0 / (1.0 / (near + 1e-8) * (1.0 - t_vals) + 1.0 / (far + 1e-8) * t_vals)  # (N_rays, N_pts)
     else:
-        zvals = near * (1 - t_vals) + far * t_vals
+        zvals = near + (far - near) * t_vals
 
     if perturb:
         zvals = perturb_interval(zvals)  # (N_rays, N_pts)

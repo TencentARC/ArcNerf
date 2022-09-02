@@ -314,6 +314,10 @@ class FgModel(Base3dModel):
         In density model, when density is high, opacity = 1 - exp(-sigma*dt), when sigma is large, opacity is large.
         You have to rewrite this function in sdf-like models
 
+        For opacity calculation:
+            - in instant-ngp, the opacity is used as `density * dt`,
+            - you can also used `1.0 - torch.exp(-torch.relu(density) * dt)` as its real definition.
+
         Args:
             dt: the dt used for calculated
             pts: the pts in the field. (B, 3) xyz position. Need geometric model to process
@@ -324,7 +328,7 @@ class FgModel(Base3dModel):
             When opacity is large(Than some thresold), pts can be considered as in the object.
         """
         density = self.forward_pts(pts)  # (B,)
-        opacity = 1.0 - torch.exp(-torch.relu(density) * dt)  # (B,)
+        opacity = density * dt  # (B,)
 
         return opacity
 

@@ -8,6 +8,8 @@ try:
     import _volume_func
     CUDA_BACKEND_AVAILABLE = True
 except ImportError:
+    print('Now right!!!')
+    exit()
     CUDA_BACKEND_AVAILABLE = False
     warnings.warn('Volume_func Ops not build...')
 
@@ -108,3 +110,30 @@ def sparse_volume_sampling(
     return SparseVolumeSampleOps.apply(
         rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb
     )
+
+
+class ReduceMaxOps(torch.autograd.Function):
+    """Python wrapper of the CUDA function"""
+
+    @staticmethod
+    def forward(ctx, full_tensor, idx, n_group):
+        full_tensor = full_tensor.contiguous()  # make it contiguous
+        idx = idx.contiguous()  # make it contiguous
+        uni_tensor = _volume_func.tensor_reduce_max(full_tensor, idx, n_group)
+
+        return uni_tensor
+
+
+@torch.no_grad()
+def tensor_reduce_max(full_tensor, idx, n_group):
+    """Get the max by index group
+
+    Args:
+        full_tensor: full value tensor, (N, )
+        idx: index of each row (N, )
+        n_group: num of group (N_uni)
+
+    Return:
+        uni_tensor: (N_uni. ) maximum of each unique group
+    """
+    return ReduceMaxOps.apply(full_tensor, idx, n_group)

@@ -961,6 +961,18 @@ class Volume(nn.Module):
         opafield = torch.zeros((self.n_grid, self.n_grid, self.n_grid), dtype=self.dtype)
         self.register_buffer('opafield', opafield)
 
+    def get_voxel_opafield(self, flatten=False):
+        """Return the opafield tensor
+
+        Returns:
+            opafield: a (n_grid, n_grid, n_grid) float tensor.
+                      If flatten, return (n_grid ** 3) tensor
+        """
+        if flatten:
+            return self.opafield.view(-1)
+        else:
+            return self.opafield
+
     def update_opafield_by_voxel_idx(self, voxel_idx, opacity, ema=None):
         """Update the opafield by voxel_idx. Only update if original value >= 0
 
@@ -984,8 +996,12 @@ class Volume(nn.Module):
         self.opafield[voxel_idx[:, 0], voxel_idx[:, 1], voxel_idx[:, 2]] = update_opa
 
     def get_mean_voxel_opacity(self):
-        """Get the min opacity value of density_field"""
+        """Get the mean opacity value of density_field"""
         return float(self.opafield.clamp(min=0).mean())
+
+    def get_mean_occ_voxel_opacity(self):
+        """Get the mean opacity value of occ density field"""
+        return float(self.opafield[self.get_voxel_bitfield(flatten=False)].clamp(min=0).mean())
 
     def update_bitfield_by_opafield(self, threshold=0.01, ops='and'):
         """Update the bitfield(occupancy) by opafield that is large enough"""

@@ -6,7 +6,7 @@ from . import BOUND_REGISTRY
 from .basic_bound import BasicBound
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.volume import Volume
-from arcnerf.ops.volume_func import sparse_volume_sampling, CUDA_BACKEND_AVAILABLE
+from arcnerf.ops.volume_func import sparse_volume_sampling, tensor_reduce_max, CUDA_BACKEND_AVAILABLE
 from arcnerf.render.ray_helper import handle_valid_mask_zvals, get_zvals_from_near_far_fix_step
 from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
 
@@ -106,7 +106,7 @@ class VolumeBound(BasicBound):
             mask_pts: (B, n_pts) bool tensor of all the pts
         """
         if CUDA_BACKEND_AVAILABLE:  # use the customized cuda volume sampling method, will be fast
-            const_dt = self.volume.get_diag_len() / n_pts * 0.5
+            const_dt = self.volume.get_diag_len() / n_pts
             zvals, mask_pts = sparse_volume_sampling(
                 rays_o,
                 rays_d,
@@ -152,7 +152,7 @@ class VolumeBound(BasicBound):
             zvals: (B, n_pts) tensor of zvals
             mask_pts: (B, n_pts) bool tensor of all the pts
         """
-        fix_t = self.volume.get_diag_len() / n_pts * 0.5  # diag len based
+        fix_t = self.volume.get_diag_len() / n_pts  # diag len based
         zvals, mask_pts = get_zvals_from_near_far_fix_step(
             near, far, fix_t, n_pts, perturb=perturb if not inference_only else False
         )
@@ -201,6 +201,14 @@ class VolumeBound(BasicBound):
         dt = self.volume.get_diag_len() / float(n_pts)  # only consider n coarse sample pts
         opacity = get_est_opacity(dt, voxel_pts)  # (N,)
 
+        # max opa in the same group, official used index_reduce_('amax') but this is now support in lower torch verison
+        uni_voxel_idx, idx = torch.unique(voxel_idx, dim=0, return_inverse=True)
+        uni_opa = torch.zeros((uni_voxel_idx.shape[0], ), dtype=dtype, device=device).index_add_(0, idx, opacity)
+
+        if CUDA_BACKEND_AVAILABLE:  # index_reduce_('amax')
+            # handle by max
+            uni_opa = tensor_reduce_max(opacity, idx, uni_voxel_idx.shape[0])
+
         # update opacity and bitfield
-        self.volume.update_opafield_by_voxel_idx(voxel_idx, opacity, ema=self.get_optim_cfgs('ema_optim_decay'))
+        self.volume.update_opafield_by_voxel_idx(uni_voxel_idx, uni_opa, ema=self.get_optim_cfgs('ema_optim_decay'))
         self.volume.update_bitfield_by_opafield(threshold=self.get_optim_cfgs('opa_thres'), ops='overwrite')

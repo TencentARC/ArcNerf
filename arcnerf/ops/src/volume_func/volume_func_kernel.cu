@@ -302,3 +302,55 @@ std::vector<torch::Tensor> sparse_volume_sampling_cuda(
 
     return {zvals, mask};
 }
+
+
+// The real cuda kernel
+template <typename scalar_t>
+__global__ void tensor_reduce_max_cuda_kernel(
+    const torch::PackedTensorAccessor32<scalar_t, 1, torch::RestrictPtrTraits> full_tensor,  //(N, )
+    const torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> group_idx,  //(N, )
+    const uint32_t n_group,
+    const torch::PackedTensorAccessor32<scalar_t, 1, torch::RestrictPtrTraits> uni_tensor) {  //(N_uni, )
+
+    const uint32_t n = blockIdx.x * blockDim.x + threadIdx.x;  // ray id
+    if (n >= full_tensor.size(0)) return;
+
+    int64_t real_idx = group_idx[n];
+    atomicMax((uint32_t *)&uni_tensor[real_idx], __float_as_uint(full_tensor[n]));
+}
+
+/* CUDA instantiate of tensor_reduce_max func
+   @param: full_tensor: full value tensor, (N, )
+   @param: group_idx: index of each row (N, )
+   @param: n_group: num of group (N_uni)
+   @return: uni_tensor: (N_uni. ) maximum of each unique group
+*/
+torch::Tensor tensor_reduce_max_cuda(
+    const torch::Tensor full_tensor,
+    const torch::Tensor group_idx,
+    const uint32_t n_group) {
+
+    const uint32_t N = full_tensor.size(0);  // N
+
+    const uint32_t threads = 512;
+    const uint32_t blocks(div_round_up(N, threads));
+
+    // Init the output tensor
+    auto dtype = full_tensor.dtype();
+    auto device = full_tensor.device();
+
+    torch::Tensor uni_tensor = torch::zeros({n_group,}, dtype).to(device);  // (N_uni,)
+
+    // instantiate the real executable kernel
+    AT_DISPATCH_FLOATING_TYPES(full_tensor.scalar_type(), "tensor_reduce_max_cuda",
+    ([&] {
+        tensor_reduce_max_cuda_kernel<scalar_t><<<blocks, threads>>>(
+            full_tensor.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
+            group_idx.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>(),
+            n_group,
+            uni_tensor.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>()
+        );
+    }));
+
+    return uni_tensor;
+}

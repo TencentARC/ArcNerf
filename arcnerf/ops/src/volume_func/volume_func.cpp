@@ -176,8 +176,39 @@ std::vector<torch::Tensor> sparse_volume_sampling(
 }
 
 
+// define the real cuda function to be called by c++ wrapper.
+torch::Tensor tensor_reduce_max_cuda(
+    const torch::Tensor full_tensor,
+    const torch::Tensor group_idx,
+    const uint32_t n_group);
+
+/* c++ wrapper of tensor_reduce_max forward func
+   @param: full_tensor: full value tensor, (N, )
+   @param: group_idx: index of each row (N, )
+   @param: n_group: num of group (N_uni)
+   @return: uni_tensor: (N_uni. ) maximum of each unique group
+*/
+torch::Tensor tensor_reduce_max(
+    const torch::Tensor full_tensor,
+    const torch::Tensor group_idx,
+    const uint32_t n_group){
+    // checking
+    CHECK_INPUT(full_tensor)
+    CHECK_IS_FLOATING(full_tensor)
+    CHECK_INPUT(group_idx)
+    CHECK_IS_LONG(group_idx)
+
+    if (full_tensor.size(0) != group_idx.size(0)) {
+        throw std::runtime_error{"Full tensor same as idx."};
+    }
+
+    // call actual cuda function
+    return tensor_reduce_max_cuda(full_tensor, group_idx, n_group);
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("check_pts_in_occ_voxel", &check_pts_in_occ_voxel, "check pts in occ voxel (CUDA)");
     m.def("aabb_intersection", &aabb_intersection, "aabb intersection (CUDA)");
     m.def("sparse_volume_sampling", &sparse_volume_sampling, "sparse volume sampling (CUDA)");
+    m.def("tensor_reduce_max", &tensor_reduce_max, "tensor reduce max (CUDA)");
 }
