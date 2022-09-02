@@ -654,6 +654,8 @@ class ArcNerfTrainer(BasicTrainer):
 
         self.lr_scheduler.step()
 
+        self.empty_gpu_cache()
+
         return loss_all, step_in_epoch
 
     def train(self):

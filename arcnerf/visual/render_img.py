@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 import torch
 
+from arcnerf.geometry.point_cloud import save_point_cloud
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.render.ray_helper import sample_ray_marching_output_by_index
 from arcnerf.visual.plot_3d import draw_3d_components
@@ -247,6 +248,13 @@ def write_progress_imgs(
                     rays_3d['point_size'] = np.concatenate([rays_3d['point_size'],
                                                             np.ones(n_pts_volume) * 10.0],
                                                            axis=0)
+                    # write to ply file
+                    pc_path = get_dst_path(rays_folder, eval, idx, num_sample, epoch, step, global_step)
+                    pc_path = pc_path.replace('.png', '.ply')
+                    volume_density_pts_pc = volume_density_pts.copy()
+                    volume_density_pts_pc[:, 1] *= -1.0  # up-down
+                    save_point_cloud(pc_path, volume_density_pts_pc)
+
                 img_path = get_dst_path(rays_folder, eval, idx, num_sample, epoch, step, global_step)
                 draw_3d_components(
                     **rays_3d,

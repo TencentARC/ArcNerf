@@ -1,4 +1,4 @@
-name: nerf_lego_nerf_ngp
+name: nerf_lego_nerf_ngp_tcnnmlp
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_ngp'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_ngp_tcnnmlp'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_ngp/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_ngp_tcnnmlp/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -52,7 +52,7 @@ progress:
     epoch_loss: 100
     iter_loss: 1
     save_progress: True
-    epoch_save_progress: 5000
+    epoch_save_progress: 1000
     iter_save_progress: 1
 
     epoch_save_checkpoint: 10000
@@ -109,7 +109,7 @@ inference:
         n_grid: 512
         #origin: [0.0, -0.11, 0.0]
         #xyz_len: [1.2, 1.2, 2.0]
-        origin: [ 0.5, 0.5, 0.5 ]
+        origin: [0.5, 0.5, 0.5]
         side: 1.0
         level: 50.0
         chunk_pts_factor: 32
@@ -141,6 +141,7 @@ model:
     chunk_rays: 32768
     chunk_pts: 131072
     geometry:
+        type: FusedMLPGeoNet
         W: 64
         D: 1
         skips: []
@@ -161,7 +162,10 @@ model:
             backend: tcnn
         W_feat: 16
         geometric_init: False
+        out_act_cfg:
+            type: TruncExp
     radiance:
+        type: FusedMLPRadianceNet
         mode: 'vf'
         W: 64
         D: 2

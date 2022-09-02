@@ -150,6 +150,11 @@ class NeRF(Base3dDataset):
                 poses = poses[[0, 2, 1, 3], :]
                 poses[1, :] *= -1
 
+                # debug only TODO: Remove for actual
+                poses[:3, 3] = poses[:3, 3] * 0.33 + np.array([0.5, -0.5, 0.5])
+                poses = poses[[2, 1, 0, 3], :]
+                poses[1, :] *= -1
+
                 cameras.append(
                     PerspectiveCamera(
                         intrinsic=self.get_intrinsic_by_angle(float(cam_json[m]['camera_angle_x'])),

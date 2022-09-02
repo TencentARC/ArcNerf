@@ -60,10 +60,13 @@ class FusedMLPGeoNet(EncoderMLPGeoNet):
 
     def build_mlp(self, W_feat, act_cfg):
         """Return a fused mlp layer"""
+        if W_feat > 0:
+            assert W_feat in [8, 16, 32, 64, 128], 'Restrict num of layers for fused mlp.'
+
         layers = \
             tcnn.Network(
                 n_input_dims=self.embed_dim,
-                n_output_dims=1 + W_feat if W_feat > 0 else 1,
+                n_output_dims=W_feat if W_feat > 0 else 1,
                 network_config={
                     'otype': 'FullyFusedMLP',
                     'activation': get_tcnn_activation_from_cfgs(act_cfg, 'ReLU'),
@@ -89,7 +92,21 @@ class FusedMLPGeoNet(EncoderMLPGeoNet):
         out = self.layers(x_embed).type(self.dtype)  # cast type
 
         # separate geo and feat
-        out_geo, out_feat = self.handle_output(out)
+        out_geo, out_feat = self.handle_output_combine(out)
+
+        return out_geo, out_feat
+
+    def handle_output_combine(self, out):
+        """Use the output as feat, first val as density"""
+        out_geo, out_feat = None, None
+        if self.W_feat <= 0:  # (B, 1), None
+            out_geo = out
+        else:  # (B, 1), (B, W_feat)
+            out_geo = out[:, 0].unsqueeze(-1).clone()
+            out_feat = out.clone()
+
+        if self.out_act is not None:
+            out_geo = self.out_act(out_geo)
 
         return out_geo, out_feat
 
