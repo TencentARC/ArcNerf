@@ -8,8 +8,6 @@ try:
     import _volume_func
     CUDA_BACKEND_AVAILABLE = True
 except ImportError:
-    print('Now right!!!')
-    exit()
     CUDA_BACKEND_AVAILABLE = False
     warnings.warn('Volume_func Ops not build...')
 

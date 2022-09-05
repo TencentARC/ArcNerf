@@ -282,6 +282,7 @@ class FullModel(nn.Module):
 
         Args:
             inputs: a dict of torch tensor:
+                inputs['img']: torch.tensor (B, N, 3), rgb image color in (0, 1)
                 inputs['rays_o']: torch.tensor (B, N, 3), cam_loc/ray_start position
                 inputs['rays_d']: torch.tensor (B, N, 3), view dir(assume normed)
                 inputs['rays_r']: torch.tensor (B, N, 1), radius
@@ -293,11 +294,13 @@ class FullModel(nn.Module):
                 value in inputs flatten into (BN, ...)
         """
         flat_inputs = {}
+        img = inputs['img'].view(-1, 3)  # (BN, 3)
         rays_o = inputs['rays_o'].view(-1, 3)  # (BN, 3)
         rays_d = inputs['rays_d'].view(-1, 3)  # (BN, 3)
         rays_r = inputs['rays_r'].view(-1, 1)  # (BN, 1)
         batch_size, n_rays_per_batch = inputs['rays_o'].shape[:2]
 
+        flat_inputs['img'] = img
         flat_inputs['rays_o'] = rays_o
         flat_inputs['rays_d'] = rays_d
         flat_inputs['rays_r'] = rays_r
@@ -333,6 +336,7 @@ class FullModel(nn.Module):
 
         Args:
             inputs: a dict of torch tensor:
+                inputs['img']: torch.tensor (B, N, 3), rgb image color in (0, 1)
                 inputs['rays_o']: torch.tensor (B, N, 3), cam_loc/ray_start position
                 inputs['rays_d']: torch.tensor (B, N, 3), view dir(assume normed)
                 inputs['rays_r']: torch.tensor (B, N, 1), radius
@@ -390,6 +394,7 @@ class FullModel(nn.Module):
 
         Args:
             inputs: a dict of torch tensor:
+                inputs['img']: torch.tensor (B, N, 3), rgb image color in (0, 1)
                 inputs['rays_o']: torch.tensor (B, N, 3), cam_loc/ray_start position
                 inputs['rays_d']: torch.tensor (B, N, 3), view dir(assume normed)
                 inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
