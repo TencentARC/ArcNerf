@@ -175,7 +175,7 @@ class VolumeBound(BasicBound):
         # select pts randomly in some voxels
         if epoch_optim_warmup is not None and cur_epoch < epoch_optim_warmup:
             voxel_idx = self.volume.get_full_voxel_idx(flatten=True)  # (N_grid**3, 3)
-            voxel_pts = self.volume.get_volume_pts()  # (N_grid**3, 3)
+            voxel_pts = self.volume.get_volume_pts().clone()  # (N_grid**3, 3)
         else:
             n_grid = self.volume.get_n_grid()
             n_sample = self.volume.get_n_voxel() // 4  # (N_grid**3) / 4
@@ -188,7 +188,7 @@ class VolumeBound(BasicBound):
             occ_voxel_idx = self.volume.get_occupied_voxel_idx()[:n_sample, :]  # (N_sample, 3)
 
             voxel_idx = torch.cat([uni_voxel_idx, occ_voxel_idx], dim=0)  # (2*N_sample, 3)
-            voxel_pts = self.volume.get_voxel_pts_by_voxel_idx(voxel_idx)  # (2*N_sample, 3)
+            voxel_pts = self.volume.get_voxel_pts_by_voxel_idx(voxel_idx).clone()  # (2*N_sample, 3)
 
         # add noise to perturb in the voxel
         dtype = voxel_pts.dtype
@@ -201,7 +201,7 @@ class VolumeBound(BasicBound):
         dt = self.volume.get_diag_len() / float(n_pts)  # only consider n coarse sample pts
         opacity = get_est_opacity(dt, voxel_pts)  # (N,)
 
-        # max opa in the same group, official used index_reduce_('amax') but this is now support in lower torch verison
+        # max opa in the same group, official used index_reduce_('amax') but this is not support in lower torch version
         uni_voxel_idx, idx = torch.unique(voxel_idx, dim=0, return_inverse=True)
         uni_opa = torch.zeros((uni_voxel_idx.shape[0], ), dtype=dtype, device=device).index_add_(0, idx, opacity)
 

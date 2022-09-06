@@ -256,6 +256,7 @@ class Base3dModel(BaseModel):
 
         Args:
             inputs: a dict of torch tensor:
+                inputs['img']: torch.tensor (B, N, 3), rgb image color in (0, 1)
                 inputs['rays_o']: torch.tensor (B, 3), cam_loc/ray_start position
                 inputs['rays_d']: torch.tensor (B, 3), view dir(assume normed)
                 inputs['mask']: torch.tensor (B,), mask value in {0, 1}. optional
@@ -290,6 +291,7 @@ class Base3dModel(BaseModel):
 
         Args:
             inputs: a dict of torch tensor:
+                inputs['img']: torch.tensor (B, N, 3), rgb image color in (0, 1)
                 inputs['rays_o']: torch.tensor (B, 3), cam_loc/ray_start position
                 inputs['rays_d']: torch.tensor (B, 3), view dir(assume normed)
                 inputs['mask']: torch.tensor (B,), mask value in {0, 1}. optional
