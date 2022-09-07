@@ -473,7 +473,8 @@ def ray_marching(
     noise_std=0.0,
     weights_only=False,
     white_bkg=False,
-    alpha: torch.Tensor = None
+    alpha: torch.Tensor = None,
+    bkg_color: torch.Tensor = None
 ):
     """Ray marching and get color for each ray, get weight for each ray
         For p_i, the delta_i is p_i -> p_i+1 on the right side
@@ -498,6 +499,7 @@ def ray_marching(
         weights_only: If True, return weights only, used in inference time for hierarchical sampling
         white_bkg: If True, make the accum weight=0 rays as 1.
         alpha: (N_rays, N_pts), if provide, do not use sigma to calculate alpha, optional
+        bkg_color: If not None, a (N_rays, 3) or (1, 3) tensor attaching the background. will not use white_bkg anyway.
 
     Returns:
         output a dict with following keys:
@@ -559,8 +561,12 @@ def ray_marching(
     # rgb = sum(weight_i * radiance_i)
     if _radiance is not None:
         rgb = torch.sum(weights.unsqueeze(-1) * _radiance, -2)  # (N_rays, 3)
-        if white_bkg:  # where mask = 0, rgb = 1
-            rgb = rgb + (1.0 - mask[:, None])
+        if bkg_color is not None:
+            assert bkg_color.shape[0] == rgb.shape[0] or bkg_color.shape[0] == 1, 'Only bkg with N_rays/1 allowed...'
+            rgb = rgb + trans_shift[:, -1:] * bkg_color  # or you can use tran_shift[-1]
+        else:
+            if white_bkg:  # where mask = 0, rgb = 1
+                rgb = rgb + (1.0 - mask[:, None])  # or you can use tran_shift[-1]
     else:
         rgb = None
 

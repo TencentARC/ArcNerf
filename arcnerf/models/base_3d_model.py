@@ -47,6 +47,7 @@ class Base3dModel(BaseModel):
             'add_inf_z': get_value_from_cfgs_field(self.cfgs.model.rays, 'add_inf_z', False),
             'noise_std': get_value_from_cfgs_field(self.cfgs.model.rays, 'noise_std', False),
             'white_bkg': get_value_from_cfgs_field(self.cfgs.model.rays, 'white_bkg', False),
+            'rand_bkg_color': get_value_from_cfgs_field(self.cfgs.model.rays, 'rand_bkg_color', False),
         }
         return ray_cfgs
 
@@ -101,7 +102,8 @@ class Base3dModel(BaseModel):
         add_inf_z: bool = None,
         alpha: torch.Tensor = None,
         inference_only=False,
-        weights_only=False
+        weights_only=False,
+        bkg_color=None
     ):
         """Ray marching and get output
 
@@ -119,6 +121,7 @@ class Base3dModel(BaseModel):
                     Allow directly blending. By default None.
             inference_only: If True, will not pertube the zvals. used in eval/infer model. Default False.
             weights_only: Return weights only if True. By default False.
+            bkg_color: If not None, attach the background color to the rendering.
 
         Returns:
             output a dict with following keys:
@@ -132,7 +135,8 @@ class Base3dModel(BaseModel):
             self.get_ray_cfgs('noise_std') if not inference_only else 0.0,
             weights_only=weights_only,
             white_bkg=self.get_ray_cfgs('white_bkg'),
-            alpha=alpha
+            alpha=alpha,
+            bkg_color=bkg_color
         )
 
         return output

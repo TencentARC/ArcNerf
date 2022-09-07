@@ -338,7 +338,9 @@ class BasicTrainer(object):
             self.write_progress_imgs([files], progress_mode_dir, epoch, step, global_step, eval=False)
 
     @master_only
-    def train_step_writer(self, epoch, step, step_in_epoch, loss, learning_rate, global_step, inputs, output, **kwargs):
+    def train_step_writer(
+        self, epoch, step, step_in_epoch, loss, learning_rate, global_step, feed_in, inputs, output, **kwargs
+    ):
         """Write to monitor for saving"""
         self.monitor.add_loss(loss, global_step, mode='train')
         self.monitor.add_scalar('learning_rate', learning_rate, global_step)
@@ -353,10 +355,10 @@ class BasicTrainer(object):
                 if step % self.cfgs.progress.iter_save_progress == 0:
                     self.save_progress(epoch, step, global_step, inputs, output, mode='train')
 
-    def step_optimize(self, epoch, step, feed_in, inputs):
+    def step_optimize(self, epoch, step, feed_in):
         """Core step function for optimize in one step. You can rewrite it if you need some more flexibility """
         output = self.model(feed_in)
-        loss = self.calculate_loss(inputs, output)
+        loss = self.calculate_loss(feed_in, output)
 
         self.optimizer.zero_grad()
         loss['sum'].backward()
@@ -375,7 +377,7 @@ class BasicTrainer(object):
         loss_all = 0.0
         try:
             feed_in, _ = self.get_model_feed_in(inputs, self.device)
-            output, loss = self.step_optimize(epoch, step, feed_in, inputs)
+            output, loss = self.step_optimize(epoch, step, feed_in)
             loss_all = loss['sum']
 
             # for simplicity, we don't broadcast the loss from all device.
@@ -383,7 +385,9 @@ class BasicTrainer(object):
             global_step = step_in_epoch * epoch + step
 
             # write to monitor, include loss, output/gt visual
-            self.train_step_writer(epoch, step, step_in_epoch, loss, learning_rate, global_step, inputs, output)
+            self.train_step_writer(
+                epoch, step, step_in_epoch, loss, learning_rate, global_step, feed_in, inputs, output
+            )
 
             # save model after a period of time
             if self.cfgs.progress.save_time is not None and (self.cfgs.progress.save_time > 0) \

@@ -414,10 +414,12 @@ class ArcNerfTrainer(BasicTrainer):
         return get_model_feed_in(inputs, device)
 
     @master_only
-    def train_step_writer(self, epoch, step, step_in_epoch, loss, learning_rate, global_step, inputs, output, **kwargs):
+    def train_step_writer(
+        self, epoch, step, step_in_epoch, loss, learning_rate, global_step, feed_in, inputs, output, **kwargs
+    ):
         """Write to monitor for saving, add params"""
         super().train_step_writer(
-            epoch, step, step_in_epoch, loss, learning_rate, global_step, inputs, output, **kwargs
+            epoch, step, step_in_epoch, loss, learning_rate, global_step, feed_in, inputs, output, **kwargs
         )
 
         # write psnr
@@ -426,7 +428,7 @@ class ArcNerfTrainer(BasicTrainer):
                 metric_msg = 'Epoch {:06d} - Iter {}/{} - lr {:.8f}: '.format(
                     epoch, step, step_in_epoch - 1, learning_rate
                 )
-                metric = float(self.train_metric['metric'](inputs, output))
+                metric = float(self.train_metric['metric'](feed_in, output))
                 metric_msg += '{} [{:.3f}] '.format(self.train_metric['name'], metric)
                 self.logger.add_log(metric_msg)
 
@@ -446,10 +448,10 @@ class ArcNerfTrainer(BasicTrainer):
         loss_msg += '--> Loss Sum [{:.4f}]'.format(float(loss['sum']))
         self.logger.add_log(loss_msg)
 
-    def step_optimize(self, epoch, step, feed_in, inputs):
+    def step_optimize(self, epoch, step, feed_in):
         """Set get progress for training"""
         output = self.model(feed_in, get_progress=self.get_progress, cur_epoch=epoch, total_epoch=self.total_epoch)
-        loss = self.calculate_loss(inputs, output)
+        loss = self.calculate_loss(feed_in, output)
 
         self.optimizer.zero_grad()
         loss['sum'].backward()

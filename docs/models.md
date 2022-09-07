@@ -172,6 +172,8 @@ For ray marching(color blending):
     - If you add a separate background model, you should not use it, so that ray inside the sphere focus on the object.
 - noise_std: if >0.0, add to sigma when ray marching. good for training.
 - white_bkg: If True, will make the rays with mask = 0 as rgb = 1.0
+- rand_bkg_color: If True, will use the mask to blend a random background color to the input images. This helps to
+                    facilitate the training of some synthetic scenes. Only used in training and data with mask.
 
 ------------------------------------------------------------------------
 # background

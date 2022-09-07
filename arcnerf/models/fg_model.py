@@ -122,7 +122,8 @@ class FgModel(Base3dModel):
          They skip those rays with empty pts for processing.
         """
         output = {}
-        rays_o, rays_d = inputs['rays_o'], inputs['rays_d'],
+        rays_o, rays_d = inputs['rays_o'], inputs['rays_d']
+        rand_bkg_color = inputs['rand_bkg_color']
 
         # find the near/far/zvals and mask of rays and pts
         near, far, mask_rays = self.get_near_far_from_rays(inputs)
@@ -130,9 +131,14 @@ class FgModel(Base3dModel):
             near, far, self.get_n_coarse_sample(), inference_only, rays_o, rays_d
         )
 
+        # put them to the input keys
+        inputs['zvals'] = zvals
+        inputs['mask_pts'] = mask_pts
+        inputs['bkg_color'] = rand_bkg_color
+
         # mask_rays: (B, ) / mask_pts: (B, n_pts)
         if mask_rays is None and mask_pts is None:  # process all the rays
-            output = self._forward(inputs, zvals, mask_pts, inference_only, get_progress, cur_epoch, total_epoch)
+            output = self._forward(inputs, inference_only, get_progress, cur_epoch, total_epoch)
         elif mask_rays is None:
             raise RuntimeError('This case should not happen...Check it')
         elif mask_pts is None:
@@ -143,12 +149,13 @@ class FgModel(Base3dModel):
         # handle the case of sparse rays
         if mask_rays is not None:
             if torch.all(mask_rays):
-                output = self._forward(inputs, zvals, mask_pts, inference_only, get_progress, cur_epoch, total_epoch)
+                output = self._forward(inputs, inference_only, get_progress, cur_epoch, total_epoch)
             else:
                 zvals_valid = zvals[mask_rays]
                 mask_pts_valid = mask_pts[mask_rays] if mask_pts is not None else None
 
-                empty_batch = False  # rare case, the batch send in are all from background
+                # rare case, the batch send in are all from background
+                empty_batch = False
                 if torch.sum(mask_rays) == 0:
                     empty_batch = True
                     mask_rays[0] = True  # mask a valid rays to run
@@ -165,30 +172,36 @@ class FgModel(Base3dModel):
                     else:
                         inputs_valid[k] = v
 
-                output_valid = self._forward(
-                    inputs_valid, zvals_valid, mask_pts_valid, inference_only, get_progress, cur_epoch, total_epoch
-                )
+                # force to use the revised case
+                inputs_valid['zvals'] = zvals_valid
+                inputs_valid['mask_pts'] = mask_pts_valid
+                inputs_valid['bkg_color'] = rand_bkg_color[mask_rays] if rand_bkg_color is not None else None
+
+                output_valid = self._forward(inputs_valid, inference_only, get_progress, cur_epoch, total_epoch)
 
                 if empty_batch:
                     mask_rays[0] = False  # force to synthetic ray to use all default value
 
                 # update invalid rays by default values
-                output = self.update_default_values_for_invalid_rays(output_valid, mask_rays)
+                output = self.update_default_values_for_invalid_rays(output_valid, mask_rays, rand_bkg_color)
 
         return output
 
-    def _forward(self, inputs, zvals, mask, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+    def _forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         """The method that really process all rays that have intersection with the bound
 
         Args:
             inputs: valid rays with (B, 3) shape and other fields like mask/rgb
-            zvals: it is the valid coarse zvals get from foreground model. (B, N_pts) tensor
-                    If no obj_bound is provided, it uses near/far and bounding_radius to calculate in a large space
-                    If obj_bound is volume/sphere, it use the zvals that rays hits the structure.
-            mask_pts: It is a tensor that indicator the validity of pts on each ray. (B, N_pts) tensor
-                    False will at the end of each ray indicating they are the same as far pts.
-                    If None, all the pts are valid.
-                    This helps the child network to process pts without duplication.
+                zvals: it is the valid coarse zvals get from foreground model. (B, N_pts) tensor
+                        If no obj_bound is provided, it uses near/far and bounding_radius to calculate in a large space
+                        If obj_bound is volume/sphere, it use the zvals that rays hits the structure.
+                mask_pts: It is a tensor that indicator the validity of pts on each ray. (B, N_pts) tensor
+                        False will at the end of each ray indicating they are the same as far pts.
+                        If None, all the pts are valid.
+                        This helps the child network to process pts without duplication.
+                bkg_color: It is a tensor that used to attach bkg_color to the rendering output. (B, 3) tensor
+                           If None, do not multiply the color
+                           In training, we can use random bkg color to accelerate the converge of synthetic scenes
         """
         raise NotImplementedError(
             'You should implement the _forward function that process rays with coarse zvals in child class...'
@@ -225,6 +238,23 @@ class FgModel(Base3dModel):
             pts = pts[mask_pts].view(-1, 3)  # (N_valid_pts, 3)
             rays_d_repeat = rays_d_repeat[mask_pts].view(-1, 3)  # (N_valid_pts, 3)
 
+        # log
+        # print("-" * 60)
+        # print("     Num of non empty rays {}/{}".format(n_rays, 4096))
+        # print("     Num of empty rays count {}".format(4096 - n_rays))
+        # if (mask_pts is not None):
+        #     print("         - Non empty avg sample pts: {}/1024".format(int(mask_pts.sum() / n_rays)))
+        #     print("         - Overall avg sample pts: {}/1024".format(int(mask_pts.sum() / 4096)))
+        #
+        # n_occ = self.get_obj_bound_structure().get_n_occupied_voxel()
+        # n_voxel = self.get_obj_bound_structure().get_n_voxel()
+        # print("         - Num of occ bit count voxel : {}/{} - {:.2f}%".format(
+        #     n_occ, n_voxel, float(n_occ) / float(n_voxel) * 100.0)
+        # )
+        #
+        # print("         - Mean grid ", self.get_obj_bound_structure().get_mean_voxel_opacity())
+        # print("         - Mean occ grid ", self.get_obj_bound_structure().get_mean_occ_voxel_opacity())
+
         # get sigma and rgb, . shape in (N_valid_pts, ...)
         _sigma, _radiance = chunk_processing(
             self._forward_pts_dir, self.chunk_pts, False, geo_net, radiance_net, pts, rays_d_repeat
@@ -244,7 +274,7 @@ class FgModel(Base3dModel):
 
         return sigma, radiance
 
-    def update_default_values_for_invalid_rays(self, output_valid, mask: torch.Tensor):
+    def update_default_values_for_invalid_rays(self, output_valid, mask, rand_bkg_color=None):
         """Update the default values for invalid rays
 
         Args:
@@ -252,6 +282,7 @@ class FgModel(Base3dModel):
             For each keys, fill with
                 rgb/rgb_*: by self.optim_params['bkg_color'], by default (1, 1, 1) as white bkg
             mask: mask indicating each rays' validity. in (N_rays, ), with B_valid `True` values.
+            rand_bkg_color: the rand bkg color for training. By default None.
 
         Returns:
             output: same keys with output_valid with filled in values. Each tensor will be (N_rays, ...)
@@ -267,9 +298,12 @@ class FgModel(Base3dModel):
                 device = v.device
                 new_shape = (n_rays, *v.shape[1:])
                 if k.startswith('rgb'):  # update bkg_color
-                    bkg_color = self.get_render_cfgs('bkg_color')
-                    bkg_color = torch.tensor(bkg_color, dtype=dtype, device=device)[None]  # (1, 3)
-                    out_tensor = torch.ones(new_shape, dtype=dtype, device=device) * bkg_color
+                    if rand_bkg_color is not None:
+                        out_tensor = torch.ones(new_shape, dtype=dtype, device=device) * rand_bkg_color
+                    else:
+                        bkg_color = self.get_render_cfgs('bkg_color')
+                        bkg_color = torch.tensor(bkg_color, dtype=dtype, device=device)[None]  # (B, 3)
+                        out_tensor = torch.ones(new_shape, dtype=dtype, device=device) * bkg_color
                     out_tensor[mask] = v
                     output[k] = out_tensor
                 elif k.startswith('depth'):  # update depth

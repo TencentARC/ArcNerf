@@ -276,8 +276,25 @@ class FullModel(nn.Module):
 
         return final_output
 
-    @staticmethod
-    def prepare_flatten_inputs(inputs):
+    def blend_rand_bkg_color(self, inputs, flat_inputs, inference_only):
+        """Blend random bkg color to the rgb inputs"""
+        dtype = inputs['img'].dtype
+        device = inputs['img'].device
+        batch_size, n_rays_per_batch = inputs['img'].shape[:2]
+
+        rand_bkg_color = self.fg_model.get_ray_cfgs('rand_bkg_color')
+        if rand_bkg_color and not inference_only and flat_inputs['mask'] is not None:
+            mask = flat_inputs['mask']
+            rand_bkg_color = torch.rand((batch_size * n_rays_per_batch, 3), dtype=dtype,
+                                        device=device).detach()  # (BN, 3)
+            flat_inputs['rand_bkg_color'] = rand_bkg_color.clone()
+            flat_inputs['img'] = flat_inputs['img'] * mask[:, None] + rand_bkg_color * (1.0 - mask[:, None])
+            # modify original inputs for loss calculation as well
+            inputs['img'] = flat_inputs['img'].view(batch_size, n_rays_per_batch, 3)
+        else:
+            flat_inputs['rand_bkg_color'] = None
+
+    def prepare_flatten_inputs(self, inputs, inference_only=False):
         """Prepare the inputs by flatten them from (B, N, ...) to (BN, ...)
 
         Args:
@@ -288,6 +305,7 @@ class FullModel(nn.Module):
                 inputs['rays_r']: torch.tensor (B, N, 1), radius
                 inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
                 inputs['bounds']: torch.tensor (B, N, 2). optional
+            inference_only: this device whether to use the random bkg_color
 
         Returns:
             flatten_inputs:
@@ -315,6 +333,9 @@ class FullModel(nn.Module):
         if 'mask' in inputs:
             mask = inputs['mask'].view(-1)  # (BN,)
         flat_inputs['mask'] = mask
+
+        # blend random bkg color
+        self.blend_rand_bkg_color(inputs, flat_inputs, inference_only)
 
         return flat_inputs, batch_size, n_rays_per_batch
 
@@ -355,14 +376,14 @@ class FullModel(nn.Module):
             If get_progress is True, output will contain keys like 'progress_xx' for xx in ['sigma', 'zvals', etc].
         """
         # prepare flatten inputs
-        flat_inputs, batch_size, n_rays_per_batch = self.prepare_flatten_inputs(inputs)
+        flat_inputs, batch_size, n_rays_per_batch = self.prepare_flatten_inputs(inputs, inference_only)
 
-        # get fg output and bkg output
         get_progress_fg = True if (self.bkg_model is not None) else get_progress  # need the progress to blend
         fg_output = chunk_processing(
             self.fg_model.forward, self.fg_model.get_chunk_rays(), False, flat_inputs, inference_only, get_progress_fg,
             cur_epoch, total_epoch
         )
+
         bkg_output = None
         if self.bkg_model is not None:
             bkg_output = chunk_processing(

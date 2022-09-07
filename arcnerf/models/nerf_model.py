@@ -49,17 +49,20 @@ class NeRF(FgModel):
         if self.get_ray_cfgs('n_importance') > 0:
             self.fine_geo_net.pretrain_siren()
 
-    def _forward(self, inputs, zvals, mask, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+    def _forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)
+        zvals = inputs['zvals']  # (B, n_pts)
+        mask_pts = inputs['mask_pts']  # (B, n_pts)
+        bkg_color = inputs['bkg_color']  # (B, 3)
         output = {}
 
         # get coarse pts sigma/rgb  (B, N_sample, ...)
         sigma, radiance = self.get_sigma_radiance_by_mask_pts(
-            self.coarse_geo_net, self.coarse_radiance_net, rays_o, rays_d, zvals, mask
+            self.coarse_geo_net, self.coarse_radiance_net, rays_o, rays_d, zvals, mask_pts
         )
         # ray marching for coarse network, keep the coarse weights for next stage
-        output_coarse = self.ray_marching(sigma, radiance, zvals, inference_only=inference_only)
+        output_coarse = self.ray_marching(sigma, radiance, zvals, inference_only=inference_only, bkg_color=bkg_color)
         coarse_weights = output_coarse['weights']
 
         # handle progress
@@ -68,15 +71,20 @@ class NeRF(FgModel):
         # fine model
         if self.get_ray_cfgs('n_importance') > 0:
             # get upsampled zvals
-            zvals = self.upsample_zvals(zvals, coarse_weights, inference_only)
+            zvals = self.upsample_zvals(zvals, coarse_weights, inference_only)  # TODO: Upsample new mask
 
             # get upsampled pts sigma/rgb  (B, N_total, ...)
             sigma, radiance = self.get_sigma_radiance_by_mask_pts(
-                self.fine_geo_net, self.fine_radiance_net, rays_o, rays_d, zvals, None
+                self.fine_geo_net,
+                self.fine_radiance_net,
+                rays_o,
+                rays_d,
+                zvals,
+                None  # TODO: Full mask
             )
 
             # ray marching for fine network
-            output_fine = self.ray_marching(sigma, radiance, zvals, inference_only=inference_only)
+            output_fine = self.ray_marching(sigma, radiance, zvals, inference_only=inference_only, bkg_color=bkg_color)
 
             # handle progress
             output['fine'] = self.output_get_progress(output_fine, get_progress)
