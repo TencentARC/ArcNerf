@@ -48,6 +48,7 @@ class Base3dModel(BaseModel):
             'noise_std': get_value_from_cfgs_field(self.cfgs.model.rays, 'noise_std', False),
             'white_bkg': get_value_from_cfgs_field(self.cfgs.model.rays, 'white_bkg', False),
             'rand_bkg_color': get_value_from_cfgs_field(self.cfgs.model.rays, 'rand_bkg_color', False),
+            'early_stop': get_value_from_cfgs_field(self.cfgs.model.rays, 'early_stop', None),
         }
         return ray_cfgs
 
@@ -136,7 +137,8 @@ class Base3dModel(BaseModel):
             weights_only=weights_only,
             white_bkg=self.get_ray_cfgs('white_bkg'),
             alpha=alpha,
-            bkg_color=bkg_color
+            bkg_color=bkg_color,
+            early_stop=self.get_ray_cfgs('early_stop')
         )
 
         return output

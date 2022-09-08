@@ -238,23 +238,6 @@ class FgModel(Base3dModel):
             pts = pts[mask_pts].view(-1, 3)  # (N_valid_pts, 3)
             rays_d_repeat = rays_d_repeat[mask_pts].view(-1, 3)  # (N_valid_pts, 3)
 
-        # log
-        # print("-" * 60)
-        # print("     Num of non empty rays {}/{}".format(n_rays, 4096))
-        # print("     Num of empty rays count {}".format(4096 - n_rays))
-        # if (mask_pts is not None):
-        #     print("         - Non empty avg sample pts: {}/1024".format(int(mask_pts.sum() / n_rays)))
-        #     print("         - Overall avg sample pts: {}/1024".format(int(mask_pts.sum() / 4096)))
-        #
-        # n_occ = self.get_obj_bound_structure().get_n_occupied_voxel()
-        # n_voxel = self.get_obj_bound_structure().get_n_voxel()
-        # print("         - Num of occ bit count voxel : {}/{} - {:.2f}%".format(
-        #     n_occ, n_voxel, float(n_occ) / float(n_voxel) * 100.0)
-        # )
-        #
-        # print("         - Mean grid ", self.get_obj_bound_structure().get_mean_voxel_opacity())
-        # print("         - Mean occ grid ", self.get_obj_bound_structure().get_mean_occ_voxel_opacity())
-
         # get sigma and rgb, . shape in (N_valid_pts, ...)
         _sigma, _radiance = chunk_processing(
             self._forward_pts_dir, self.chunk_pts, False, geo_net, radiance_net, pts, rays_d_repeat

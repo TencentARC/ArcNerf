@@ -474,7 +474,8 @@ def ray_marching(
     weights_only=False,
     white_bkg=False,
     alpha: torch.Tensor = None,
-    bkg_color: torch.Tensor = None
+    bkg_color: torch.Tensor = None,
+    early_stop=None
 ):
     """Ray marching and get color for each ray, get weight for each ray
         For p_i, the delta_i is p_i -> p_i+1 on the right side
@@ -500,6 +501,8 @@ def ray_marching(
         white_bkg: If True, make the accum weight=0 rays as 1.
         alpha: (N_rays, N_pts), if provide, do not use sigma to calculate alpha, optional
         bkg_color: If not None, a (N_rays, 3) or (1, 3) tensor attaching the background. will not use white_bkg anyway.
+        early_stop: If not None, use it as a float threshold to accumulate the rgb/weights in early stages.
+                    It does not accelerate the computation, but affects the grads.
 
     Returns:
         output a dict with following keys:
@@ -549,26 +552,44 @@ def ray_marching(
 
     trans_shift, weights = alpha_to_weights(alpha)  # (N_rays, N_p) * 2
 
-    if weights_only:
-        output = {'weights': weights}
-        return output
+    # early stop make points with remaining transmittance < threshold invalid for computation
+    if early_stop is not None:
+        assert early_stop > 0.0, 'Must be a positive threshold...'
+        # only add up to those > threshold and non-repeat points
+        valid_T = extent_mask(trans_shift > early_stop)
+        valid_sigmas = extent_mask(deltas > 0.0)
+        valid_mask = torch.logical_and(valid_T, valid_sigmas)  # (N_rays, n_pts)
+        # handle weights/trans_shift for converged points
+        weights_zeros = torch.zeros_like(weights, device=device)
+        weights_zeros[valid_mask] = weights[valid_mask]
+        weights = weights_zeros
+        trans_shift_zeros = torch.zeros_like(trans_shift, device=device)
+        trans_shift_zeros[valid_mask] = trans_shift[valid_mask]
+        trans_shift = trans_shift_zeros
 
     # depth = sum(weight_i * zvals_i)
     depth = torch.sum(weights * _zvals, -1)  # (N_rays)
     # accumulated weight(mask)
     mask = torch.sum(weights, -1)  # (N_rays)
 
+    print(weights)
+    print(trans_shift)
+
     # rgb = sum(weight_i * radiance_i)
     if _radiance is not None:
         rgb = torch.sum(weights.unsqueeze(-1) * _radiance, -2)  # (N_rays, 3)
         if bkg_color is not None:
-            assert bkg_color.shape[0] == rgb.shape[0] or bkg_color.shape[0] == 1, 'Only bkg with N_rays/1 allowed...'
-            rgb = rgb + trans_shift[:, -1:] * bkg_color  # or you can use tran_shift[-1]
+            assert bkg_color.shape[0] == rgb.shape[0] or bkg_color.shape[0] == 1, 'Only bkg with N_rays/1 allowed..'
+            rgb = rgb + trans_shift[:, -1:] * bkg_color
         else:
             if white_bkg:  # where mask = 0, rgb = 1
                 rgb = rgb + (1.0 - mask[:, None])  # or you can use tran_shift[-1]
     else:
         rgb = None
+
+    if weights_only:
+        output = {'weights': weights}
+        return output
 
     output = {
         'rgb': rgb,  # (N_rays, 3)
@@ -804,3 +825,21 @@ def handle_valid_mask_zvals(zvals: torch.Tensor, mask: torch.Tensor):
     mask[valid_idx] = mask_sort
 
     return zvals, mask
+
+
+def extent_mask(mask):
+    """Extent the last True value of mask into next value
+
+    Mask should be in [True, True, True, False, False, False] T->F order
+    extent to [True, True, True, ##True##, False, False]
+    """
+    assert len(mask.shape) == 2, 'Only allow dim=2 tensor'
+    n_rays, n_pts = mask.shape[:2]
+
+    last_pos = mask.sum(dim=1)
+    last_pos = torch.clamp_max(last_pos, n_pts - 1)  # in case all True
+    mask_ext = torch.zeros_like(mask, dtype=torch.bool, device=mask.device)
+    mask_ext[torch.arange(n_rays), last_pos] = True
+    mask_ext = torch.logical_or(mask, mask_ext)
+
+    return mask_ext
