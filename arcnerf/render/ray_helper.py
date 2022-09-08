@@ -559,13 +559,23 @@ def ray_marching(
         valid_T = extent_mask(trans_shift > early_stop)
         valid_sigmas = extent_mask(deltas > 0.0)
         valid_mask = torch.logical_and(valid_T, valid_sigmas)  # (N_rays, n_pts)
-        # handle weights/trans_shift for converged points
+        # handle weights for converged points
         weights_zeros = torch.zeros_like(weights, device=device)
         weights_zeros[valid_mask] = weights[valid_mask]
         weights = weights_zeros
-        trans_shift_zeros = torch.zeros_like(trans_shift, device=device)
-        trans_shift_zeros[valid_mask] = trans_shift[valid_mask]
-        trans_shift = trans_shift_zeros
+        # handle transmittance for converged points
+        stop_mask = (valid_T.sum(dim=-1) >= valid_sigmas.sum(dim=-1))
+        last_trans = torch.where(
+            stop_mask, trans_shift[torch.arange(n_rays), valid_sigmas.sum(dim=-1) - 1],
+            torch.zeros((n_rays, ), dtype=dtype, device=device)
+        )
+        trans_shift_ = torch.ones_like(trans_shift, device=device) * last_trans[:, None]
+        trans_shift_[valid_mask] = trans_shift[valid_mask]
+        trans_shift = trans_shift_
+
+    # print("-"*60)
+    # print(weights)
+    # print(trans_shift)
 
     # depth = sum(weight_i * zvals_i)
     depth = torch.sum(weights * _zvals, -1)  # (N_rays)

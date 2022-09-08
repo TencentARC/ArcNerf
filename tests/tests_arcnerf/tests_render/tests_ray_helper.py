@@ -65,7 +65,7 @@ class TestDict(unittest.TestCase):
             save_path=file_path
         )
 
-    def create_systhesis_ray_input(self):
+    def create_systhesis_ray_input(self, append=False):
         """Sample density distribution and test ray marching"""
         offset = int(self.n_pts / 3.0)
         level = 20
@@ -78,6 +78,10 @@ class TestDict(unittest.TestCase):
         sigma = np.array(sigma[:self.n_pts])[None, :]
         # zvals
         zvals = np.linspace(self.near, self.far, self.n_pts)[None, :]
+
+        if append:  # append same pts
+            zvals = np.concatenate([zvals, np.repeat(zvals[:, -1:], int(self.n_pts / 8), 1)], axis=-1)
+            sigma = np.concatenate([sigma, np.repeat(sigma[:, -1:], int(self.n_pts / 8), 1)], axis=-1)
 
         return sigma, zvals
 
@@ -158,7 +162,7 @@ class TestDict(unittest.TestCase):
         )
 
         # some negative
-        sigma, zvals = self.create_systhesis_ray_input()
+        sigma, zvals = self.create_systhesis_ray_input(append=True)
         sigma -= (sigma.max(1) / 2.0)
         output = np_wrapper(ray_marching, sigma, None, zvals)
 
