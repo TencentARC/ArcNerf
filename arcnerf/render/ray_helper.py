@@ -572,9 +572,6 @@ def ray_marching(
     # accumulated weight(mask)
     mask = torch.sum(weights, -1)  # (N_rays)
 
-    print(weights)
-    print(trans_shift)
-
     # rgb = sum(weight_i * radiance_i)
     if _radiance is not None:
         rgb = torch.sum(weights.unsqueeze(-1) * _radiance, -2)  # (N_rays, 3)
