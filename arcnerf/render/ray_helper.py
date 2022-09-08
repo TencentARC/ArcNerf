@@ -573,10 +573,6 @@ def ray_marching(
         trans_shift_[valid_mask] = trans_shift[valid_mask]
         trans_shift = trans_shift_
 
-    # print("-"*60)
-    # print(weights)
-    # print(trans_shift)
-
     # depth = sum(weight_i * zvals_i)
     depth = torch.sum(weights * _zvals, -1)  # (N_rays)
     # accumulated weight(mask)
