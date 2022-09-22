@@ -158,6 +158,16 @@ Below is the several implementations of `instant-ngp`.
 }
 ```
 
+- [XRNeRF](https://github.com/openxrlab/xrnerf)
+```
+@misc{xrnerf,
+    title={OpenXRLab Neural Radiance Field Toolbox and Benchmark},
+    author={XRNeRF Contributors},
+    howpublished = {\url{https://github.com/openxrlab/xrnerf}},
+    year={2022}
+}
+```
+
 ------------------------------------------------------------------------
 Thanks Xintao for the project template
 https://github.com/xinntao/ProjectTemplate-Python/
