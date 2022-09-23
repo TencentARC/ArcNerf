@@ -68,6 +68,7 @@ regroup each face to 2 triangles for visual
 - save_path: if `None`, will show the fig, otherwise save it
 - axis range: update by the component with max values (xyz), show in a cube with same lengths.
 - return_fig: If set to True and save_path is None, will return the fig(plt) or numpy array(plotly) for further usage.
+- show_axis: If False, do not show axis but only the fig. By default True.
 
 ------------------------------------------------------------------------
 # plot2d
