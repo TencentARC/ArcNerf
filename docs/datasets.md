@@ -32,6 +32,7 @@ Done after camera `scale_radius`. The radius is restricted within `scale_radius`
 The augmentation is for all image process in all time.
 - n_rays: Sample `n_rays` instead of using all. But calling it every time may sample overlapping rays, not use in train.
 - shuffle: shuffle all the rays from the same image together
+- blend_bkg_color: Merge custom background to the image. Must have `mask` in inputs key.
 - transfer_rgb: transfer the rgb space
 ## rgb and mask
 - All color are in `rgb` order and normed by `255` into `0~1` range.
@@ -44,6 +45,7 @@ The augmentation is for all image process in all time.
 - `get_rays` generate rays in `(wh)` flatten order, but if you read by cv2 and reshape, img will be in `(hw)` order.
 You need to get_rays by setting `wh_order=False` to change the order.
     - ndc_space: makes the rays in ndc space. You need to specify the near distance as well.
+    - center_pixel: If set True, use (0.5, 1.5,...) instead of (0, 1, 2) as the pixel location.
 ## point cloud
 - pts: `(n_pts, 3)` in world coordinate, `xyz` order
 - color: `(n_pts, 3)`, `rgb` order, should be normed into `0~1` range.

@@ -37,6 +37,8 @@ class Base3dDataset(BaseDataset):
 
         # whether in ndc space
         self.ndc_space = get_value_from_cfgs_field(cfgs, 'ndc_space', False)
+        # center pixel
+        self.center_pixel = get_value_from_cfgs_field(cfgs, 'center_pixel', False)
 
         # device
         self.device = get_value_from_cfgs_field(cfgs, 'device', 'cpu')
@@ -267,7 +269,9 @@ class Base3dDataset(BaseDataset):
         if self.ray_bundles is None:
             self.ray_bundles = []
             for i in range(self.n_imgs):
-                self.ray_bundles.append(self.cameras[i].get_rays(wh_order=False, ndc=self.ndc_space))
+                self.ray_bundles.append(
+                    self.cameras[i].get_rays(wh_order=False, ndc=self.ndc_space, center_pixel=self.center_pixel)
+                )
 
     def __len__(self):
         """Len of dataset"""
@@ -303,8 +307,8 @@ class Base3dDataset(BaseDataset):
 
         if self.precache:
             ray_bundle = self.ray_bundles[idx]
-        else:
-            ray_bundle = self.cameras[idx].get_rays(wh_order=False, ndc=self.ndc_space)  # We don't sample rays here
+        else:  # We don't sample rays here
+            ray_bundle = self.cameras[idx].get_rays(wh_order=False, ndc=self.ndc_space, center_pixel=self.center_pixel)
 
         inputs = {
             'img': img,  # (hw, 3), in rgb order / (n_rays, 3) if sample rays

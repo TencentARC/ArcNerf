@@ -29,7 +29,7 @@ class NeRF(Base3dDataset):
 
         # read image in the split
         img_list, self.n_imgs = self.get_image_list(mode)
-        self.images, self.masks = self.read_image_list(img_list)
+        self.images, self.masks = self.read_image_list(img_list, mode)
         self.H, self.W = self.images[0].shape[:2]
 
         # load all camera together in all split for consistent camera normalization
@@ -105,15 +105,16 @@ class NeRF(Base3dDataset):
         return img_list, n_imgs
 
     @staticmethod
-    def read_image_list(img_list):
+    def read_image_list(img_list, mode):
         """Read image from list. Original bkg is black, change it to white"""
         images, masks = [], []
         for path in img_list:
             img = cv2.imread(path, cv2.IMREAD_UNCHANGED)[..., [2, 1, 0, 3]].astype(np.float32) / 255.0  # rgba
-            mask = img[:, :, -1:]
-            img = img[..., :3] * mask + (1.0 - mask)
+            mask = img[:, :, -1]
+            img = img[..., :3]
+
             images.append(img)
-            masks.append(mask[..., 0])
+            masks.append(mask)
 
         return images, masks
 
@@ -146,14 +147,14 @@ class NeRF(Base3dDataset):
             for cam_idx in range(len(cam_json[m]['frames'])):
                 poses = np.array(cam_json[m]['frames'][cam_idx]['transform_matrix']).astype(np.float32)  # (4, 4)
                 # correct the poses in our system
-                poses[:, 1:3] *= -1.0
-                poses = poses[[0, 2, 1, 3], :]
-                poses[1, :] *= -1
+                # poses[:, 1:3] *= -1.0
+                # poses = poses[[0, 2, 1, 3], :]
+                # poses[1, :] *= -1
 
                 # debug only TODO: Remove for actual
-                poses[:3, 3] = poses[:3, 3] * 0.33 + np.array([0.5, -0.5, 0.5])
-                poses = poses[[2, 1, 0, 3], :]
-                poses[1, :] *= -1
+                poses = poses[[1, 2, 0, 3], :]
+                poses[:, 1:3] *= -1.0
+                poses[:3, 3] = poses[:3, 3] * 0.33 + np.array([0.5, 0.5, 0.5])
 
                 cameras.append(
                     PerspectiveCamera(

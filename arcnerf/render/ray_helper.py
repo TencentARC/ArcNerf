@@ -19,7 +19,8 @@ def get_rays(
     n_rays=-1,
     to_np=False,
     ndc=False,
-    ndc_near=1.0
+    ndc_near=1.0,
+    center_pixel=False
 ):
     """Get rays in world coord from camera.
     No batch processing allow. Rays are produced by setting z=1 and get location.
@@ -37,6 +38,7 @@ def get_rays(
         to_np: if to np, return np array instead of torch.tensor
         ndc: If True, change rays to ndc space, you can then change near far to 0,1. By default False
         ndc_near: near zvals. By default 1.0.
+        center_pixel: If True, use the center pixel from (0.5, 0.5) instead of corner(0, 0)
 
     Returns:
         rays_o: origin (N_ray, 3) tensor. If no sampler is used, return (WH, 3) num of rays
@@ -53,6 +55,10 @@ def get_rays(
         torch.linspace(0, H - 1, H, dtype=dtype, device=device)
     )  # i, j: (W, H)
     pixels = torch.stack([i, j], dim=-1).view(-1, 2).unsqueeze(0)  # (1, WH, 2)
+
+    if center_pixel:
+        pixels += 0.5
+        print('Center pixel!!!')
 
     # index unroll
     if index is not None:

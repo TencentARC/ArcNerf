@@ -71,6 +71,7 @@ dataset:
         type: NeRF
         scene_name: lego
         img_scale: 1.0
+        center_pixel: True
         #scale_radius: 3.0
         precache: True
         device: gpu
@@ -80,9 +81,13 @@ dataset:
 #        type: NeRF
 #        scene_name: lego
 #        img_scale: 1.0
+#        center_pixel: True
 #        #scale_radius: 3.0
 #        precache: False
 #        device: gpu
+#        augmentation:
+#            blend_bkg_color:
+#                bkg_color: [1.0, 1.0, 1.0]
 
     eval:
         eval_batch_size: 1
@@ -90,10 +95,14 @@ dataset:
         type: NeRF
         scene_name: lego
         img_scale: 1.0
+        center_pixel: True
         #scale_radius: 3.0
         precache: False
         device: gpu
-#
+        augmentation:
+            blend_bkg_color:
+                bkg_color: [1.0, 1.0, 1.0]
+
 #inference:
 #    to_gpu: True
 #    render:
@@ -188,7 +197,6 @@ loss:
 
 metric:
     PSNR:
-        key: 'rgb_coarse'
 
 train_metric:
     PSNR:

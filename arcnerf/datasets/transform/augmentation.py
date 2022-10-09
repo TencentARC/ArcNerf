@@ -27,6 +27,11 @@ def get_transforms(cfgs):
             transforms_list.append(TransferRGBSpace(type))
             aug_info += '  Add RGB space transfer - {}\n'.format(type)
 
+        if valid_key_in_cfgs(cfgs.augmentation, 'blend_bkg_color'):
+            bkg_color = get_value_from_cfgs_field(cfgs.augmentation.blend_bkg_color, 'bkg_color', [1.0, 1.0, 1.0])
+            transforms_list.append(BlendBkgColor(bkg_color))
+            aug_info += '  Add Blend bkg color - {}\n'.format(bkg_color)
+
     return transforms.Compose(transforms_list), aug_info
 
 
@@ -64,6 +69,24 @@ class ShuffleRays(object):
 
         if 'mask' in inputs:
             inputs['mask'] = inputs['mask'][select_idx, ...]
+
+        return inputs
+
+
+class BlendBkgColor(object):
+    """Blend bkg color"""
+
+    def __init__(self, bkg_color):
+        self.bkg_color = bkg_color
+
+    def __call__(self, inputs):
+        dtype = inputs['img'].dtype
+        device = inputs['img'].device
+
+        bkg_color = torch.tensor(self.bkg_color, dtype=dtype, device=device)[None]  # (1, 3)
+        mask = inputs['mask'][:, None]  # (B, 1)
+
+        inputs['img'] = inputs['img'] * mask + (1.0 - mask) * bkg_color
 
         return inputs
 
