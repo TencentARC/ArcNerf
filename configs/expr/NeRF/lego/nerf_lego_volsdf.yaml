@@ -71,6 +71,9 @@ dataset:
         scale_radius: 3.0
         precache: True
         device: gpu
+        augmentation:
+            blend_bkg_color:
+                bkg_color: [1.0, 1.0, 1.0]
 
     val:
         skip: 8
@@ -80,6 +83,9 @@ dataset:
         scale_radius: 3.0
         precache: False
         device: gpu
+        augmentation:
+            blend_bkg_color:
+                bkg_color: [1.0, 1.0, 1.0]
 
     eval:
         eval_batch_size: 1
@@ -90,6 +96,9 @@ dataset:
         scale_radius: 3.0
         precache: True
         device: gpu
+        augmentation:
+            blend_bkg_color:
+                bkg_color: [1.0, 1.0, 1.0]
 
 inference:
     to_gpu: True

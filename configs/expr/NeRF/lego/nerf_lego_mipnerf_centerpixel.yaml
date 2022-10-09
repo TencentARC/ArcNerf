@@ -1,4 +1,4 @@
-name: nerf_lego_neus
+name: nerf_lego_mipnerf_centerpixel
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_neus'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_mipnerf_centerpixel'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_neus/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_mipnerf_centerpixel/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -25,7 +25,7 @@ dist:
     slurm: False
 
 batch_size: 2
-n_rays: 512
+n_rays: 4096
 worker: 4
 
 optim:
@@ -33,9 +33,9 @@ optim:
     optim_type: adam
     weight_decay: 0.0
     lr_scheduler:
-        type: WarmUpCosineLR        # follow the original implementation
-        lr_steps: [5000]
-        min_factor: 0.05
+        type: ExponentialLR
+        lr_gamma: 0.1
+        lr_steps: [500000]
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -69,11 +69,16 @@ dataset:
         scene_name: lego
         img_scale: 1.0
         scale_radius: 3.0
+        center_pixel: True
         precache: True
         device: gpu
         augmentation:
             blend_bkg_color:
                 bkg_color: [1.0, 1.0, 1.0]
+        scheduler:
+            precrop:
+                ratio: 0.5
+                max_epoch: 500
 
     val:
         skip: 8
@@ -81,6 +86,7 @@ dataset:
         scene_name: lego
         img_scale: 0.5
         scale_radius: 3.0
+        center_pixel: True
         precache: False
         device: gpu
         augmentation:
@@ -94,6 +100,7 @@ dataset:
         scene_name: lego
         img_scale: 1.0
         scale_radius: 3.0
+        center_pixel: True
         precache: True
         device: gpu
         augmentation:
@@ -110,87 +117,55 @@ inference:
         u_start: 0.5
         v_range: [-0.6, -0.2]
         fps: 5
-        surface_render:
-            chunk_rays_factor: 1024
-            method: sphere_tracing
-
-    volume:
-        n_grid: 512
-        side: 2.0
-        level: 0.0
-        grad_dir: ascent
-        chunk_pts_factor: 1
-        render_mesh:
-            backend: pytorch3d
 
 model:
-    type: Neus
-    obj_bound: # use a sphere bound for sampling. No need to optimize it.
-        sphere:
-            radius: 1.5
+    type: MipNeRF
     rays:
-        radius_bound: 1.5
-        n_sample: 64
-        n_importance: 64
-        n_iter: 4
+        # bounding_radius: 3.0
+        near: 1.5
+        far: 4.5
+        n_sample: 128
+        n_importance: 128
+        gaussian:
+            gaussian_fn: cone        # ['cone', 'cylinder'] to get mean/cov
+        blur_coarse_weights: True
         inverse_linear: False
         perturb: True
-        add_inf_z: False
+        add_inf_z: True
         noise_std: 0.0
         white_bkg: True
-    params:
-        speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
-        init_var: 0.05                # init var, when it approaches 0, cdf more close
-        anneal_end: 50000             # for anneal param, only set during training. please
-    chunk_rays: 4096
+    chunk_rays: 32768
     chunk_pts: 131072
     geometry:
         W: 256
         D: 8
         skips: [4]
         encoder:
-            type: FreqEmbedder
+            type: GaussianEmbedder    # Use gaussian embedder
             input_dim: 3
-            n_freqs: 10
+            n_freqs: 16
         W_feat: 256
-        geometric_init: True          # use geometric init. need radius_init
-        radius_init: 0.5              # geometric init sphere radius
-        weight_norm: True
-        skip_reduce_output: True
-        norm_skip: True
-        act_cfg: # activation function for dense layer
-            type: softplus
-            beta: 100
+        geometric_init: False
     radiance:
-        mode: 'pvnf'
-        W: 256
-        D: 4
+        mode: 'vf'
+        W: 128
+        D: 1
         encoder:
-            pts:
-                type: FreqEmbedder
-                input_dim: 3
-                n_freqs: 0            # xyz embed freq, not embedding performed
             view:
                 type: FreqEmbedder
                 input_dim: 3
                 n_freqs: 4
         W_feat_in: 256
-        weight_norm: True
 
 loss:
     ImgLoss:
-        loss_type: L1
-        use_mask: True
+        keys: ['rgb_coarse', 'rgb_fine']
+        internal_weights: [0.1, 1.0]
         weight: 1.0
-    MaskLoss:
-        loss_type: BCE
-        weight: 0.1
-    EikonalLoss:
-        key: normal_pts
-        weight: 0.1
 
 metric:
     PSNR:
 
 train_metric:
     PSNR:
+        key: 'rgb_fine'

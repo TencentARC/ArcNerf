@@ -9,13 +9,16 @@ dataset:
         img_scale: 1.0
         scale_radius: 3.0
         precache: False
+        augmentation:
+            blend_bkg_color:
+                bkg_color: [1.0, 1.0, 1.0]
 
 model:
     obj_bound:
         volume:
             n_grid: None
-            origin: [ 0.0, -0.11, 0.0 ]
-            xyz_len: [ 1.2, 1.2, 2.0 ]
+            origin: [0.0, -0.11, 0.0]
+            xyz_len: [1.2, 1.2, 2.0]
     rays:
         # bounding_radius: 3.0
         near: 1.5

@@ -58,7 +58,6 @@ def get_rays(
 
     if center_pixel:
         pixels += 0.5
-        print('Center pixel!!!')
 
     # index unroll
     if index is not None:

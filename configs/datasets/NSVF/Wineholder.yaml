@@ -9,6 +9,10 @@ dataset:
         img_scale: 1.0
         scale_radius: 3.0
         precache: False
+        augmentation:
+            blend_bkg_color:
+                bkg_color: [1.0, 1.0, 1.0]
+
 
 model:
     rays:

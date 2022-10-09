@@ -227,7 +227,7 @@ class Base3dDataset(BaseDataset):
             rays_o = []
             rays_d = []
             for idx in range(len(self.cameras)):
-                ray = self.cameras[idx].get_rays(index=center_idx, to_np=True)
+                ray = self.cameras[idx].get_rays(index=center_idx, to_np=True, center_pixel=self.center_pixel)
                 rays_o.append(ray[0])
                 rays_d.append(ray[1])
             rays = (np.concatenate(rays_o, axis=0), np.concatenate(rays_d, axis=0))

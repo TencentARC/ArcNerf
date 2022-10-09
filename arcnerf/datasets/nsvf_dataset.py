@@ -92,10 +92,11 @@ class NSVF(Base3dDataset):
         images, masks = [], []
         for path in img_list:
             img = cv2.imread(path, cv2.IMREAD_UNCHANGED)[..., [2, 1, 0, 3]].astype(np.float32) / 255.0  # rgba
-            mask = img[:, :, -1:]
-            img = img[..., :3] * mask + (1.0 - mask)
+            mask = img[:, :, -1]
+            img = img[..., :3]
+
             images.append(img)
-            masks.append(mask[..., 0])
+            masks.append(mask)
 
         return images, masks
 
