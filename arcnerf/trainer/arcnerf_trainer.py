@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 
-import math
 import os
 import os.path as osp
 import time
 
 import torch
 
+from .pipeline import Pipeline
 from arcnerf.datasets import get_dataset, get_model_feed_in, POTENTIAL_KEYS
 from arcnerf.datasets.transform.augmentation import get_transforms
 from arcnerf.eval.eval_func import run_eval
@@ -29,10 +29,8 @@ class ArcNerfTrainer(BasicTrainer):
     """Trainer for Customized case"""
 
     def __init__(self, cfgs):
-        # cfgs for n_rays in training
-        self.train_sample_info = {'sample_mode': 'full', 'sample_cross_view': True}
-        self.crop_max_epoch = None
-        self.init_precrop = False
+        # train pipeline for handling the inputs
+        self.train_pipeline = Pipeline()
 
         # for inference only
         self.intrinsic = None
@@ -80,14 +78,13 @@ class ArcNerfTrainer(BasicTrainer):
     def prepare_data(self):
         """Prepare dataset for train, val, eval, inference. Gets data loader and sampler"""
         self.logger.add_log('-' * 60)
-        self.train_sample_info['n_rays'] = get_value_from_cfgs_field(self.cfgs, 'n_rays', 1024)
-        self.logger.add_log('Num of rays for each training batch: {}'.format(self.train_sample_info['n_rays']))
+        self.train_pipeline.set_n_rays(self.logger, get_value_from_cfgs_field(self.cfgs, 'n_rays', 1024))
 
         data = {}
         # train
         data['train'] = self.set_train_dataset()
         # train data process cfgs
-        data['train_scheduler'] = get_value_from_cfgs_field(self.cfgs.dataset.train, 'scheduler', None)
+        self.train_pipeline.setup_cfgs(get_value_from_cfgs_field(self.cfgs.dataset.train, 'scheduler', None))
 
         # val. Only eval one sample per epoch.
         if not valid_key_in_cfgs(self.cfgs.dataset, 'val'):
@@ -215,169 +212,11 @@ class ArcNerfTrainer(BasicTrainer):
 
     def process_train_data(self):
         """Process all concat data"""
-        # reset sample index
-        self.train_sample_info['sample_img_count'] = 0
-        self.train_sample_info['sample_total_count'] = 0
-
-        # scheduler cfgs
-        scheduler_cfg = self.data['train_scheduler']
-        self.logger.add_log('-' * 60)
-        self.logger.add_log('handle training samples...')
-
-        # crop center image only in the beginning
-        if scheduler_cfg is not None and \
-           valid_key_in_cfgs(scheduler_cfg, 'precrop') and \
-           get_value_from_cfgs_field(scheduler_cfg.precrop, 'ratio', 1.0) < 1.0 and \
-           not self.init_precrop and get_value_from_cfgs_field(scheduler_cfg.precrop, 'max_epoch', -1) > 0:
-            # make sure rays in each image has not been shuffle
-            assert not valid_key_in_cfgs(self.cfgs.dataset.train, 'augmentation') or \
-                   not valid_key_in_cfgs(self.cfgs.dataset.train.augmentation, 'shuffle') or \
-                   not get_value_from_cfgs_field(self.cfgs.dataset.train.augmentation, 'shuffle', False), \
-                   'shuffle in train data augmentation is not allow if you use precroping'
-
-            self.init_precrop = True  # only precrop in the init stage
-            self.crop_max_epoch = get_value_from_cfgs_field(scheduler_cfg.precrop, 'max_epoch', None)
-            if self.crop_max_epoch is not None:
-                self.logger.add_log('Crop sample on first {} epoch'.format(self.crop_max_epoch))
-            keep_ratio = get_value_from_cfgs_field(scheduler_cfg.precrop, 'ratio', 1.0)
-            self.logger.add_log('Crop training samples...keep ratio - {}'.format(keep_ratio))
-            h, w = self.data['train']['H'], self.data['train']['W']
-            for k, v in self.data['train'].items():
-                if isinstance(v, torch.Tensor):
-                    full_tensor = v.view(-1, h, w, *v.shape[2:])  # (N, H, W, ...)
-                    dh, dw = int((1 - keep_ratio) * h / 2.0), int((1 - keep_ratio) * w / 2.0)
-                    crop_tensor = full_tensor[:, dh:-dh, dw:-dw, ...]  # (N, H_c, W_c, ...)
-                    self.data['train']['H'], self.data['train']['W'] = crop_tensor.shape[1], crop_tensor.shape[2]
-                    crop_total_samples = crop_tensor.shape[0] * crop_tensor.shape[1] * crop_tensor.shape[2]
-                    self.train_sample_info['total_samples'] = crop_total_samples
-                    self.train_sample_info['n_train_img'] = crop_tensor.shape[0]
-                    self.train_sample_info['n_train_hw'] = crop_tensor.shape[1] * crop_tensor.shape[2]
-                    self.data['train'][k] = crop_tensor.reshape(crop_tensor.shape[0], -1, *crop_tensor.shape[3:])
-        else:
-            self.crop_max_epoch = None
-            for k, v in self.data['train'].items():
-                if isinstance(v, torch.Tensor):
-                    total_sample = v.shape[0] * v.shape[1]
-                    self.train_sample_info['total_samples'] = total_sample
-                    self.train_sample_info['n_train_img'] = v.shape[0]
-                    self.train_sample_info['n_train_hw'] = v.shape[1]
-
-        # ray sample preparation
-        if valid_key_in_cfgs(scheduler_cfg, 'ray_sample'):
-            self.train_sample_info['sample_mode'] = get_value_from_cfgs_field(scheduler_cfg.ray_sample, 'mode', 'full')
-            self.train_sample_info['sample_cross_view'] = get_value_from_cfgs_field(
-                scheduler_cfg.ray_sample, 'cross_view', True
-            )
-        assert self.train_sample_info['sample_mode'] in ['random', 'full'], \
-            'Invalid mode {}'.format(self.train_sample_info['sample_mode'])
-        self.logger.add_log(
-            'Sample mode: {}, Cross view: {}'.format(
-                self.train_sample_info['sample_mode'], self.train_sample_info['sample_cross_view']
-            )
-        )
-
-        # prepare all the rays in (1, nhw, dim)
-        if self.train_sample_info['sample_mode'] == 'full':
-            if self.train_sample_info['sample_cross_view']:  # directly concat and shuffle all rays from all images
-                random_idx = torch.randperm(self.train_sample_info['total_samples'])
-
-            else:
-                # concat batches from different images in sequence. By last batches may mix different rays
-                self.logger.add_log('Merge rays from different images into continuous batches..')
-                n_train_hw = self.train_sample_info['n_train_hw']
-                n_rays = self.train_sample_info['n_rays']
-                random_idx_per_img = torch.randperm(n_train_hw)
-                random_idx = []
-                # get the index in concat images
-                for start_idx in range(0, n_train_hw, n_rays):
-                    random_img_idx = torch.randperm(self.train_sample_info['n_train_img'])
-                    for img_idx in random_img_idx:
-                        random_idx.append(img_idx * n_train_hw + random_idx_per_img[start_idx:start_idx + n_rays])
-                random_idx = torch.cat(random_idx, dim=0)
-
-            # to (1, nhw, dim) and sample
-            for k, v in self.data['train'].items():
-                if isinstance(v, torch.Tensor):
-                    self.data['train'][k] = v.view(1, -1, *v.shape[2:])[:, random_idx, ...]  # (1, n_total, ...)
-
-        # random mode, keep the rays in (n, hw, dim)
-        elif self.train_sample_info['sample_mode'] == 'random':
-            pass
-
-        # bkg color
-        if scheduler_cfg is not None and valid_key_in_cfgs(scheduler_cfg, 'bkg_color') \
-                and 'mask' in self.data['train'].keys():
-            self.logger.add_log('Train with bkg color: {}'.format(scheduler_cfg.bkg_color.color))
-
-        self.logger.add_log(
-            'Need {} epoch to run all the {} rays...'.format(
-                math.ceil(float(self.train_sample_info['total_samples']) / float(self.train_sample_info['n_rays'])),
-                self.train_sample_info['total_samples']
-            )
-        )
-        self.logger.add_log('-' * 60)
-
-        # set h/w as 0 to avoid writing of process image
-        self.data['train']['H'] = [0]
-        self.data['train']['W'] = [0]
+        self.data['train'] = self.train_pipeline.process_train_data(self.logger, self.data['train'])
 
     def get_train_batch(self):
         """Get the train batch base on mode"""
-        data_batch = {}
-        total_samples = self.train_sample_info['total_samples']
-        sample_total_count = self.train_sample_info['sample_total_count']
-        n_rays = self.train_sample_info['n_rays']
-        n_train_hw = self.train_sample_info['n_train_hw']
-        n_train_img = self.train_sample_info['n_train_img']
-
-        # random sample, do not need to keep count
-        if self.train_sample_info['sample_mode'] == 'random':
-            if self.train_sample_info['sample_cross_view']:
-                # when the ray is large, it takes too much time for indexing
-                random_idx = torch.randperm(total_samples)[:n_rays]  # random from all rays
-                for k, v in self.data['train'].items():
-                    if isinstance(v, torch.Tensor):  # tensor in (n_images, n_rays_per_image, ...)
-                        data_batch[k] = v.view(1, -1, *v.shape[2:])[:, random_idx, ...]
-
-            else:  # not cross view, sample in each image randomly
-                randim_img_idx = torch.randint(0, n_train_img, [1])[0]
-                random_idx = torch.randperm(n_train_hw)[:n_rays]  # random from single image rays
-                for k, v in self.data['train'].items():
-                    if isinstance(v, torch.Tensor):  # tensor in (n_images, n_rays_per_image, ...)
-                        data_batch[k] = v[randim_img_idx, random_idx, ...].unsqueeze(0)
-
-        # full sample, keep count record
-        elif self.train_sample_info['sample_mode'] == 'full':
-            assert sample_total_count < total_samples, \
-                'All rays have been sampled, please reset train dataset...'
-
-            for k, v in self.data['train'].items():
-                if isinstance(v, torch.Tensor):  # tensor in (1, n_images * n_rays_per_image, ...)
-                    data_batch[k] = v[:, sample_total_count:sample_total_count + n_rays, ...]
-
-            self.train_sample_info['sample_total_count'] += n_rays
-
-        #  handle background, only write when mask exist and set cfgs
-        scheduler_cfg = self.data['train_scheduler']
-        if scheduler_cfg is not None and valid_key_in_cfgs(scheduler_cfg, 'bkg_color') and 'mask' in data_batch.keys():
-            if get_value_from_cfgs_field(scheduler_cfg.bkg_color, 'color', 'random') == 'random':
-                bkg_color = torch.rand_like(data_batch['img'], device=data_batch['img'].device).detach()
-            else:
-                bkg_color = torch.tensor(
-                    scheduler_cfg.bkg_color.color, dtype=data_batch['img'].dtype, device=data_batch['img'].device
-                ).detach()[None, None]  # (B, N, 3)
-
-                bkg_color = torch.ones_like(data_batch['img'], device=data_batch['img'].device).detach() * bkg_color
-
-            # rewrite bkg color and image for loss computation
-            img = data_batch['img'] * data_batch['mask'][..., None] + (1.0 - data_batch['mask'][..., None]) * bkg_color
-            data_batch['bkg_color'] = bkg_color
-            data_batch['img'] = img
-
-        # other type data
-        for k, v in self.data['train'].items():
-            if not isinstance(v, torch.Tensor):
-                data_batch[k] = v
+        data_batch = self.train_pipeline.get_train_batch(self.data['train'])
 
         return data_batch
 
@@ -656,16 +495,15 @@ class ArcNerfTrainer(BasicTrainer):
                 self.logger.add_log('Remaining voxel ratio is {:.2f}%'.format(occ_ratio * 100.0))
 
         # remake train dataset train crop
-        crop_shuffle = self.crop_max_epoch is not None and epoch >= self.crop_max_epoch
+        crop_shuffle = self.train_pipeline.check_crop_shuffle(epoch)
+        full_shuffle = self.train_pipeline.check_full_shuffle()
         if crop_shuffle:
             self.data['train'] = self.set_train_dataset()
             self.process_train_data()
         else:
-            # shuffle data only after run up
-            full_mode = self.train_sample_info['sample_mode'] == 'full'
-            full_run_up = self.train_sample_info['sample_total_count'] >= self.train_sample_info['total_samples']
-            full_shuffle = full_mode and full_run_up
             if full_shuffle:
+                if not self.train_pipeline.get_info('sample_cross_view'):  # reset data in this mode
+                    self.data['train'] = self.set_train_dataset()
                 self.process_train_data()
 
         # each epoch just contains one step for nerf training

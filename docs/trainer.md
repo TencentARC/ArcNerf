@@ -5,8 +5,11 @@ We use this for general nerf model training. (NeRF/Neus and their improved versi
 The scheduler handles train data only. It can customize the ray selection every time when all rays have been trained.
 Add `scheduler` in `dataset.train` for specification.
 
+A `Pipeline` class is in the trainer dir to process all the data, and sample data_batch for training.
+
 - precrop: precrop and keep only the center rays.
-  - max_epoch: Only crop when epoch < max_shuffle. By default -1. Set positive num to use it in the init rounds.
+  - max_epoch: Only crop when epoch < max_epoch. By default None(crop all the time).
+  Set positive num to use it in the init rounds.
   - ratio: Ratio to keep in each dim.
   - If precrop is used, you are not allowed to use `shuffle` in data augmentation.
 
