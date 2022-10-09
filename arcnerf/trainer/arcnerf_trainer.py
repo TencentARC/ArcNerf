@@ -304,6 +304,11 @@ class ArcNerfTrainer(BasicTrainer):
         elif self.train_sample_info['sample_mode'] == 'random':
             pass
 
+        # bkg color
+        if scheduler_cfg is not None and valid_key_in_cfgs(scheduler_cfg, 'bkg_color') \
+                and 'mask' in self.data['train'].keys():
+            self.logger.add_log('Train with bkg color: {}'.format(scheduler_cfg.bkg_color.color))
+
         self.logger.add_log(
             'Need {} epoch to run all the {} rays...'.format(
                 math.ceil(float(self.train_sample_info['total_samples']) / float(self.train_sample_info['n_rays'])),
@@ -351,6 +356,23 @@ class ArcNerfTrainer(BasicTrainer):
                     data_batch[k] = v[:, sample_total_count:sample_total_count + n_rays, ...]
 
             self.train_sample_info['sample_total_count'] += n_rays
+
+        #  handle background, only write when mask exist and set cfgs
+        scheduler_cfg = self.data['train_scheduler']
+        if scheduler_cfg is not None and valid_key_in_cfgs(scheduler_cfg, 'bkg_color') and 'mask' in data_batch.keys():
+            if get_value_from_cfgs_field(scheduler_cfg.bkg_color, 'color', 'random') == 'random':
+                bkg_color = torch.rand_like(data_batch['img'], device=data_batch['img'].device).detach()
+            else:
+                bkg_color = torch.tensor(
+                    scheduler_cfg.bkg_color.color, dtype=data_batch['img'].dtype, device=data_batch['img'].device
+                ).detach()[None, None]  # (B, N, 3)
+
+                bkg_color = torch.ones_like(data_batch['img'], device=data_batch['img'].device).detach() * bkg_color
+
+            # rewrite bkg color and image for loss computation
+            img = data_batch['img'] * data_batch['mask'][..., None] + (1.0 - data_batch['mask'][..., None]) * bkg_color
+            data_batch['bkg_color'] = bkg_color
+            data_batch['img'] = img
 
         # other type data
         for k, v in self.data['train'].items():

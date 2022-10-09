@@ -14,7 +14,7 @@ datasets_folder = osp.dirname(osp.abspath(__file__))
 datasets_filenames = [osp.splitext(osp.basename(v))[0] for v in scan_dir(datasets_folder) if v.endswith('_dataset.py')]
 _dataset_modules = [importlib.import_module(f'arcnerf.datasets.{file_name}') for file_name in datasets_filenames]
 
-POTENTIAL_KEYS = ['img', 'mask', 'rays_o', 'rays_d', 'rays_r', 'bounds']
+POTENTIAL_KEYS = ['img', 'mask', 'rays_o', 'rays_d', 'rays_r', 'bounds', 'bkg_color']
 
 
 def get_mode_cfgs(cfgs, mode='train'):

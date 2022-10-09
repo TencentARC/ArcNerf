@@ -63,7 +63,7 @@ progress:
     max_samples_val: 1
 
     init_eval: False
-    epoch_eval: 5000
+    epoch_eval: 10000
     max_samples_eval: 25
 
 dataset:
@@ -75,6 +75,12 @@ dataset:
         #scale_radius: 3.0
         precache: True
         device: gpu
+        scheduler:
+            precrop: # precrop
+                ratio: 0.5
+                max_epoch: 500
+            bkg_color:
+                color: random
 
 #    val:
 #        skip: 8

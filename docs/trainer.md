@@ -16,6 +16,11 @@ Add `scheduler` in `dataset.train` for specification.
     - 'random': random sample rays in batch randomly with replacement. Some rays may not be sampled in this mode.
   - cross_view: used in both mode. If True, each sample takes rays from different image. Else on in one image.
 
+- bkg_color:
+  - used to blend any bkg_color to the training batch. Only when 'mask' exists.
+  - color: If you use `random`, will use random bkg color for background rays. Otherwise, you can use (1, 1, 1) or other
+  to set the rgb value.
+
 
 ------------------------------------------------------------------------
 ## Common_Trainer

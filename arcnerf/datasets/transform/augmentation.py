@@ -99,8 +99,10 @@ class TransferRGBSpace(object):
         assert self.t_type in ['linear_to_srgb', 'srgb_to_linear'], 'Not support {}'.format(t_type)
 
     def __call__(self, inputs):
+        mask = inputs['mask'] if 'mask' in inputs else None
+
         if self.t_type == 'linear_to_srgb':
-            inputs['img'] = linear_to_srgb(inputs['img'])
+            inputs['img'] = linear_to_srgb(inputs['img'], mask)
         elif self.t_type == 'srgb_to_linear':
             inputs['img'] = srgb_to_linear(inputs['img'])
         else:
@@ -109,20 +111,27 @@ class TransferRGBSpace(object):
         return inputs
 
 
-def linear_to_srgb(x: torch.Tensor):
-    """RGB from linear space to sRGB Space
+def linear_to_srgb(x: torch.Tensor, mask=None):
+    """RGB from linear space to sRGB Space, alpha must be applied
     ref: https://entropymine.com/imageworsener/srgbformula/
 
     Args:
         x: linear rgb value in (B, 3), should be in (0~1)
+        mask: mask in (B, ), alpha channel, could be None
 
     Returns:
         y: rgb value in sRGB space
 
     """
-    assert torch.all(x <= 1.0) and torch.all(x >= 0.0), 'Input should be in (0~1)'
+    # apply alpha
+    if mask is not None:
+        _mask = torch.repeat_interleave(mask[:, None], x.shape[1], dim=1)
+        x = torch.where(_mask != 0, x / _mask, x)
 
-    return torch.where(x <= 0.00313066844250063, 12.92 * x, 1.055 * x**(1.0 / 2.4) - 0.055)
+    # transfer func
+    x = torch.where(x <= 0.00313066844250063, 12.92 * x, 1.055 * x**(1.0 / 2.4) - 0.055)
+
+    return x
 
 
 def srgb_to_linear(x):
@@ -136,6 +145,4 @@ def srgb_to_linear(x):
         y: rgb value in linear space
 
     """
-    assert torch.all(x <= 1.0) and torch.all(x >= 0.0), 'Input should be in (0~1)'
-
     return torch.where(x <= 0.0404482362771082, x / 12.92, ((x + 0.055) / 1.055)**2.4)

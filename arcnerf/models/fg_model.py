@@ -123,7 +123,7 @@ class FgModel(Base3dModel):
         """
         output = {}
         rays_o, rays_d = inputs['rays_o'], inputs['rays_d']
-        rand_bkg_color = inputs['rand_bkg_color']
+        bkg_color = inputs['bkg_color']
 
         # find the near/far/zvals and mask of rays and pts
         near, far, mask_rays = self.get_near_far_from_rays(inputs)
@@ -134,7 +134,6 @@ class FgModel(Base3dModel):
         # put them to the input keys
         inputs['zvals'] = zvals
         inputs['mask_pts'] = mask_pts
-        inputs['bkg_color'] = rand_bkg_color
 
         # mask_rays: (B, ) / mask_pts: (B, n_pts)
         if mask_rays is None and mask_pts is None:  # process all the rays
@@ -175,7 +174,7 @@ class FgModel(Base3dModel):
                 # force to use the revised case
                 inputs_valid['zvals'] = zvals_valid
                 inputs_valid['mask_pts'] = mask_pts_valid
-                inputs_valid['bkg_color'] = rand_bkg_color[mask_rays] if rand_bkg_color is not None else None
+                inputs_valid['bkg_color'] = bkg_color[mask_rays] if bkg_color is not None else None
 
                 output_valid = self._forward(inputs_valid, inference_only, get_progress, cur_epoch, total_epoch)
 
@@ -183,7 +182,7 @@ class FgModel(Base3dModel):
                     mask_rays[0] = False  # force to synthetic ray to use all default value
 
                 # update invalid rays by default values
-                output = self.update_default_values_for_invalid_rays(output_valid, mask_rays, rand_bkg_color)
+                output = self.update_default_values_for_invalid_rays(output_valid, mask_rays, bkg_color)
 
         return output
 
