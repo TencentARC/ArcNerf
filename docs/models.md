@@ -27,13 +27,13 @@ The multi-res hashing embedding introduced in [Instant-ngp](https://arxiv.org/ab
 It only embeds xyz positions rather than direction. It uses multi-res volume grid index, hash them and get the
 embedding of grid_pts from hashmap, and get the embedding by interpolation.
 
-You can select the backend by setting `backend`=`torch`/`cuda`/`tcnn`.
+You can select the backend by setting `backend`=`torch`/`tcnn`.
 ### SHEmbedder
 The spherical harmonic hashing embedding introduced in [Instant-ngp](https://arxiv.org/abs/2201.05989).
 
 It only embeds xyz direction rather than positions.
 
-You can select the backend by setting `backend`=`torch`/`cuda`/`tcnn`.
+You can select the backend by setting `backend`=`torch`/`tcnn`.
 ### DenseGridEmbedder
 The dense grid embedder directly extracts density and feature from a dense volume. It only embeds xyz direction rather than positions.
 ### CompositeEmbedder

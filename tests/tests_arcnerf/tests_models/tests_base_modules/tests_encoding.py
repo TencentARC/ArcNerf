@@ -7,13 +7,11 @@ import unittest
 
 import torch
 
-from arcnerf.geometry.transformation import normalize
 from arcnerf.models.base_modules.encoding import (
     build_encoder, DenseGridEmbedder, FreqEmbedder, GaussianEmbedder, Gaussian, HashGridEmbedder, SHEmbedder
 )
 from common.utils.cfgs_utils import dict_to_obj
 from common.utils.logger import Logger
-from tests.tests_arcnerf.tests_ops import log_custom_benchmark
 
 RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results'))
 os.makedirs(RESULT_DIR, exist_ok=True)
@@ -110,27 +108,6 @@ class TestDict(unittest.TestCase):
                 self.assertEqual(out_dim, degree**2 + include * 3)
                 self.assertEqual(out.shape, (self.batch_size, degree**2 + include * 3))
 
-    def tests_sh_embedder_comp(self):
-        if not torch.cuda.is_available():
-            return
-
-        # double gets the check
-        dirs = torch.rand((self.batch_size, 3), dtype=torch.double)
-        dirs_norm = dirs / normalize(dirs)
-
-        for degree in range(1, 6):
-            sh_torch = SHEmbedder(n_freqs=degree, include_input=True)
-            sh_custom = SHEmbedder(n_freqs=degree, include_input=True, backend='cuda')
-
-            inputs = [dirs_norm.clone().detach().requires_grad_(True)]
-
-            out_torch, out_custom, out_custom_forward_only, grad_torch, grad_custom = log_custom_benchmark(
-                self.logger, 'SH Encode(degree {})'.format(degree), sh_torch, sh_custom, inputs
-            )
-
-            # the accumulate grad gets quite large error
-            self.check_output_and_grad(out_torch, out_custom, out_custom_forward_only, grad_torch, grad_custom)
-
     def tests_hashgrid_encoder(self):
         n_levels = 16
         n_feat_per_entry = 2
@@ -141,50 +118,6 @@ class TestDict(unittest.TestCase):
         out_dim = model.get_output_dim()
         self.assertEqual(out_dim, n_levels * n_feat_per_entry + 3)
         self.assertEqual(out.shape, (self.batch_size, n_levels * n_feat_per_entry + 3))
-
-    def tests_hashgrid_embedder_comp(self):
-        if not torch.cuda.is_available():
-            return
-
-        n_levels = [8, 16]
-        n_feat_per_entry = [2, 4, 8]
-        hashmap_size = 19
-        side = 1.5  # to make pts outside the volume
-
-        # double gets the check
-        xyz = torch.rand((self.batch_size, 3), dtype=torch.double)
-
-        for level in n_levels:
-            for n_feat in n_feat_per_entry:
-                hashgrid_torch = HashGridEmbedder(
-                    n_levels=level, n_feat_per_entry=n_feat, hashmap_size=hashmap_size, side=side, include_input=True
-                ).double().cuda()  # embeddings param needs double
-                embeddings_data = hashgrid_torch.get_embeddings()
-                hashgrid_custom = HashGridEmbedder(
-                    n_levels=level,
-                    n_feat_per_entry=n_feat,
-                    hashmap_size=hashmap_size,
-                    side=side,
-                    include_input=True,
-                    backend='cuda'
-                ).double().cuda()  # embeddings param needs double
-                hashgrid_custom.set_embeddings(embeddings_data.clone())  # make sure use the same embeddings
-
-                inputs = [xyz.clone().detach().requires_grad_(True)]
-
-                out_torch, out_custom, out_custom_forward_only, grad_torch, grad_custom = log_custom_benchmark(
-                    self.logger,
-                    'HashGrid Encode(n_level {} - n_feat {})'.format(level, n_feat),
-                    hashgrid_torch,
-                    hashgrid_custom,
-                    inputs,
-                    n_iter=1
-                )
-
-                # the accumulate grad gets quite large error
-                self.check_output_and_grad(
-                    out_torch, out_custom, out_custom_forward_only, grad_torch, grad_custom, atol=1e-4
-                )  # 5e-5 level
 
     def tests_composite_encoder(self):
         # that is the feat used in nsvf

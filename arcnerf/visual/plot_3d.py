@@ -402,7 +402,7 @@ def draw_3d_components(
     sphere_radius=None,
     sphere_origin=(0, 0, 0),
     title='',
-    show_axis=True,  # TODO: do False and check
+    show_axis=True,
     save_path=None,
     plotly=False,
     plotly_html=False,

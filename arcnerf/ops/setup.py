@@ -20,21 +20,11 @@ setup(
     description='custom cuda ops in arcnerf',
     long_description='custom cuda ops in arcnerf for view synthesis and 3d reconstruction',
     ext_modules=[
-        CUDAExtension(  # spherical harmonics embedding
-            name='_sh_encode',
-            sources=['./src/sh_encode/sh_encode.cpp', './src/sh_encode/sh_encode_kernel.cu'],
-            include_dirs=include_dirs,
-        ),
-        CUDAExtension(  # mul-res hashgrid embedding
-            name='_hashgrid_encode',
-            sources=['./src/hashgrid_encode/hashgrid_encode.cpp', './src/hashgrid_encode/hashgrid_encode_kernel.cu'],
-            include_dirs=include_dirs
-        ),
         CUDAExtension(  # volume related func
             name='_volume_func',
             sources=['./src/volume_func/volume_func.cpp', './src/volume_func/volume_func_kernel.cu'],
             include_dirs=include_dirs
-        )
+        ),
     ],
 
     cmdclass={

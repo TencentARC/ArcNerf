@@ -8,7 +8,6 @@ import torch.nn as nn
 
 from . import ENCODER_REGISTRY
 from arcnerf.geometry.volume import Volume
-from arcnerf.ops.hashgrid_encode import HashGridEncode, CUDA_BACKEND_AVAILABLE
 
 # import tcnn encoder
 try:
@@ -92,13 +91,11 @@ class HashGridEmbedder(nn.Module):
         # backend
         if backend is None:
             backend = 'torch'
-        assert backend in ['torch', 'cuda', 'tcnn'], 'Invalid backend used, only torch/cuda/tcnn allowed'
+        assert backend in ['torch', 'tcnn'], 'Invalid backend used, only torch/tcnn allowed'
         self.backend = backend
 
-        # set up cuda backend
-        if self.backend == 'cuda' and CUDA_BACKEND_AVAILABLE:
-            self.hashgrid_encode_cuda = HashGridEncode(self.n_levels, self.n_feat_per_entry)
-        elif self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
+        # set up tcnn backend
+        if self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
             self.hashgrid_encode_tcnn = tcnn.Encoding(
                 n_input_dims=input_dim,
                 encoding_config={
@@ -179,11 +176,7 @@ class HashGridEmbedder(nn.Module):
         if self.include_input:
             out.append(xyz)  # (B, 3)
 
-        if self.backend == 'cuda' and CUDA_BACKEND_AVAILABLE:
-            hashgrid_embed = self.hashgrid_encode_cuda(
-                xyz, self.embeddings, self.offsets, self.resolutions, self.min_xyz, self.max_xyz
-            )
-        elif self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
+        if self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
             norm_xyz = (xyz - self.min_xyz) / (self.max_xyz - self.min_xyz)  # to (0~1)
             hashgrid_embed = self.hashgrid_encode_tcnn(norm_xyz)
         else:

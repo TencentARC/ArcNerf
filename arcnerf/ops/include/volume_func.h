@@ -13,6 +13,11 @@
 // samples consumed by any given training ray.
 inline constexpr __device__ __host__ uint32_t N_MAX_RANDOM_SAMPLES_PER_RAY() { return 8; }
 
+inline constexpr __device__ __host__ uint32_t NERF_STEPS() { return 1024; }
+inline constexpr __device__ __host__ float SQRT3() { return 1.73205080757f; }
+inline constexpr __device__ __host__ float STEPSIZE() { return (SQRT3() / NERF_STEPS()); }
+inline constexpr __device__ __host__ float MIN_CONE_STEPSIZE() { return STEPSIZE(); }
+inline constexpr __device__ __host__ float DT() { return MIN_CONE_STEPSIZE(); }
 
 // aabb intersection.
 inline __device__ float2 ray_aabb_intersect(

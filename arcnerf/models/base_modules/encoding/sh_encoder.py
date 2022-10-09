@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 
 from . import ENCODER_REGISTRY
-from arcnerf.ops.sh_encode import SHEncode, CUDA_BACKEND_AVAILABLE
 
 # import tcnn encoder
 try:
@@ -48,13 +47,11 @@ class SHEmbedder(nn.Module):
         # backend
         if backend is None:
             backend = 'torch'
-        assert backend in ['torch', 'cuda', 'tcnn'], 'Invalid backend used, only torch/cuda/tcnn allowed'
+        assert backend in ['torch', 'tcnn'], 'Invalid backend used, only torch/tcnn allowed'
         self.backend = backend
 
-        # set up cuda backend
-        if self.backend == 'cuda' and CUDA_BACKEND_AVAILABLE:
-            self.sh_encode_cuda = SHEncode(n_freqs)
-        elif self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
+        # set up tcnn backend if required
+        if self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
             self.sh_encode_tcnn = tcnn.Encoding(
                 n_input_dims=input_dim, encoding_config={
                     'otype': 'SphericalHarmonics',
@@ -112,9 +109,7 @@ class SHEmbedder(nn.Module):
 
         # norm all the dir (-1, 1) -> (0, 1) for spherical harmonic
         xyz_norm = (xyz + 1) / 2.0
-        if self.backend == 'cuda' and CUDA_BACKEND_AVAILABLE:
-            sh_embed = self.sh_encode_cuda(xyz_norm)
-        elif self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
+        if self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
             sh_embed = self.sh_encode_tcnn(xyz_norm)
         else:
             sh_embed = self.sh_encode_torch(xyz_norm)

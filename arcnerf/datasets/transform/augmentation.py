@@ -73,7 +73,7 @@ class TransferRGBSpace(object):
 
     def __init__(self, t_type):
         self.t_type = t_type
-        assert self.t_type in ['linear_to_srgb' and 'srgb_to_linear'], 'Not support {}'.format(t_type)
+        assert self.t_type in ['linear_to_srgb', 'srgb_to_linear'], 'Not support {}'.format(t_type)
 
     def __call__(self, inputs):
         if self.t_type == 'linear_to_srgb':

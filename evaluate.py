@@ -40,7 +40,13 @@ if __name__ == '__main__':
 
     # set dataset
     eval_bs = get_value_from_cfgs_field(cfgs.dataset.eval, 'eval_batch_size', 1)
-    tkwargs_eval = {'batch_size': eval_bs, 'num_workers': cfgs.worker, 'pin_memory': True, 'drop_last': False}
+    data_on_gpu = (get_value_from_cfgs_field(cfgs.dataset.eval, 'device', 'cpu') == 'gpu')
+    tkwargs_eval = {
+        'batch_size': eval_bs,
+        'num_workers': cfgs.worker if not data_on_gpu else 0,
+        'pin_memory': not data_on_gpu,
+        'drop_last': False
+    }
     eval_transform, _ = get_transforms(getattr(cfgs.dataset, 'eval'))
     dataset = get_dataset(cfgs.dataset, cfgs.dir.data_dir, logger=logger, mode='eval', transfroms=eval_transform)
 

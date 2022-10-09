@@ -18,20 +18,21 @@ Expname are in the format of `{dataset}_{scene}_{model}_{other_settings}`.
 
 #### Instant-NGP
 The highly optimized [instant-ngp](https://github.com/NVlabs/instant-ngp) model, official performance:
-- max_samples: 1024, color space: sRGB, max_res: 512(per_level_scale: 1.2599), lr=1e-2
+- max_samples: 1024, color space: sRGB, max_res: 2048, lr=1e-2
+- The original eval uses black background, but original `NeRF` uses white bkg
 
-| Num steps | time | PSNR in sRGB space | PSNR in linear space|
-|:---------:|:----:|:--------------------:|:-----------------:|
-| 100 | ~1s | 21.46 | 21.79 |
-| 500 | ~5s | 29.62 | 29.83 |
-| 2k  | ~15s| 33.42 | 33.67 |
-| 1w  |~1min| 35.67 | 35.11 |
-| 5w  |~5min| 36.36 | 35.78 |
+| Num steps | time | PSNR in sRGB space | PSNR in linear space| PSNR in white bkg, sRGB | PSNR in white bkg, linear |
+|:---------:|:----:|:--------------------:|:-----------------:|:-----------------:|:-----------------:|
+| 100 | ~1s | 21.46 | 21.79 | 21.49 | 21.59 |
+| 500 | ~5s | 29.62 | 29.83 | 29.34 | 29.02 |
+| 2k  | ~15s| 33.42 | 33.67 | 33.06 | 32.73 |
+| 1w  |~1min| 35.67 | 35.11 | 35.22 | 34.61 |
+| 5w  |~5min| 36.36 | 35.78 | 36.02 | 35.12 |
 
 
 ## LLFF
 ### Fern  (378*504, 3 eval images)
-We only use non-ndc version. For ndc space, you need to refer to our [simplenerf]() project.
+We only use non-ndc version. For ndc space, you need to refer to our [simplenerf](https://github.com/TencentARC/simplenerf) project.
 
 | Method |        cfg         | PSNR |    Official repo   |    Official PSNR     | paper PSNR  |
 |:------:|:------------------:|:----:|:------------------:|:--------------------:|:-----------:|

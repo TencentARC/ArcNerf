@@ -54,7 +54,6 @@ class TestDict(unittest.TestCase):
             t0 = get_start_time()
             loss.backward()
             t_backward += get_end_time(t0)
-
             # forward only
             with torch.no_grad():
                 t0 = get_start_time()
@@ -140,10 +139,6 @@ class TestDict(unittest.TestCase):
         model = SHEmbedder(3, 4, include_input=True)
         self.run_sh_embedder(model)
 
-    def tests_sh_embedder_cuda(self):
-        model = SHEmbedder(3, 4, include_input=True, backend='cuda')
-        self.run_sh_embedder(model, 'cuda')
-
     def tests_sh_embedder_tcnn(self):
         model = SHEmbedder(3, 4, include_input=True, backend='tcnn')
         self.run_sh_embedder(model, 'tcnn')
@@ -160,13 +155,9 @@ class TestDict(unittest.TestCase):
         self.log_time('HashGrid Embedder, {}-based:'.format(backend), t_f, t_b, t_f_o, dim=pts.shape)
 
     def tests_hashgrid_embedder_torch(self):
-        model = HashGridEmbedder(3, include_input=True)
+        model = HashGridEmbedder(3, side=2.0, include_input=False)
         self.run_hashgrid_embedder(model)
 
-    def tests_hashgrid_embedder_cuda(self):
-        model = HashGridEmbedder(3, include_input=True, backend='cuda')
-        self.run_hashgrid_embedder(model, 'cuda')
-
     def tests_hashgrid_embedder_tcnn(self):
-        model = HashGridEmbedder(3, include_input=True, backend='tcnn')
+        model = HashGridEmbedder(3, side=2.0, include_input=False, backend='tcnn')
         self.run_hashgrid_embedder(model, 'tcnn')

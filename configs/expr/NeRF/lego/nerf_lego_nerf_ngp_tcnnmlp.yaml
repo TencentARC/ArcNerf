@@ -5,7 +5,7 @@ resume: None
 debug:
     debug_mode: False
     print_all_grad: False
-    get_progress: True  # remove this when real run
+    get_progress: False  # remove this when real run
 
 dir:
     expr_dir: None
@@ -52,7 +52,7 @@ progress:
     epoch_loss: 100
     iter_loss: 1
     save_progress: True
-    epoch_save_progress: 1000
+    epoch_save_progress: 5000
     iter_save_progress: 1
 
     epoch_save_checkpoint: 10000
@@ -75,14 +75,14 @@ dataset:
         precache: True
         device: gpu
 
-    val:
-        skip: 8
-        type: NeRF
-        scene_name: lego
-        img_scale: 1.0
-        #scale_radius: 3.0
-        precache: False
-        device: gpu
+#    val:
+#        skip: 8
+#        type: NeRF
+#        scene_name: lego
+#        img_scale: 1.0
+#        #scale_radius: 3.0
+#        precache: False
+#        device: gpu
 
     eval:
         eval_batch_size: 1
@@ -93,28 +93,28 @@ dataset:
         #scale_radius: 3.0
         precache: False
         device: gpu
-
-inference:
-    to_gpu: True
-    render:
-        type: [spiral]
-        n_cam: [60]
-        repeat: [1]
-        radius: 3.0
-        u_start: 0.5
-        v_range: [-0.6, -0.2]
-        fps: 5
-
-    volume:
-        n_grid: 512
-        #origin: [0.0, -0.11, 0.0]
-        #xyz_len: [1.2, 1.2, 2.0]
-        origin: [0.5, 0.5, 0.5]
-        side: 1.0
-        level: 50.0
-        chunk_pts_factor: 32
-        render_mesh:
-            backend: pytorch3d
+#
+#inference:
+#    to_gpu: True
+#    render:
+#        type: [spiral]
+#        n_cam: [60]
+#        repeat: [1]
+#        radius: 3.0
+#        u_start: 0.5
+#        v_range: [-0.6, -0.2]
+#        fps: 5
+#
+#    volume:
+#        n_grid: 512
+#        #origin: [0.0, -0.11, 0.0]
+#        #xyz_len: [1.2, 1.2, 2.0]
+#        origin: [0.5, 0.5, 0.5]
+#        side: 1.0
+#        level: 50.0
+#        chunk_pts_factor: 32
+#        render_mesh:
+#            backend: pytorch3d
 
 model:
     type: NeRF
@@ -137,7 +137,8 @@ model:
         perturb: True
         add_inf_z: False
         noise_std: 0.0
-        white_bkg: True
+        white_bkg: True  # for eval only
+        rand_bkg_color: True  # for training
     chunk_rays: 32768
     chunk_pts: 131072
     geometry:
@@ -181,18 +182,13 @@ model:
 loss:
     ImgLoss:
         keys: ['rgb_coarse']
-        weight: 1.0
-
-#    RegMaskLoss:
-#        keys: ['mask_coarse']
-#        weight: 0.1
-#
-#    RegWeightsLoss:
-#        keys: ['weights']
-#        weight: 0.1
+        loss_type: Huber
+        delta: 0.1
+        weight: 5
 
 metric:
     PSNR:
+        key: 'rgb_coarse'
 
 train_metric:
     PSNR:

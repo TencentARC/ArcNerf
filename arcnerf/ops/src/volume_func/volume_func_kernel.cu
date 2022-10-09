@@ -202,9 +202,10 @@ __global__ void sparse_volume_sampling_cuda_kernel(
     const float3 xyz_max = make_float3(aabb_range[0][1], aabb_range[1][1], aabb_range[2][1]);
 
     // perturb init zvals
-    if (perturb) {
-        startt += dt * rng.next_float();
-    }
+    startt += dt * rng.next_float();
+//     if (perturb) {
+//         startt += dt * rng.next_float();
+//     }
 
     const float3 _rays_o = make_float3(rays_o[n][0], rays_o[n][1], rays_o[n][2]);
     const float3 _rays_d = make_float3(rays_d[n][0], rays_d[n][1], rays_d[n][2]);

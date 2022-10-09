@@ -2,7 +2,6 @@
 
 ------------------------------------------------------------------------
 # TODO:
-- cuda实现的geometry函数和数据结构(Some are good)
 - tetrahedra相关
 - nvdiffras vs pytorch3d (The renderer is not fully tested yet. Inconsistency appears in rendering)
 
@@ -15,8 +14,6 @@
 
 - 参考框架
   - mip-nerf - Implemented. Benchmark not reach
-  - instangp/hash_nerf
-    - ff_mlp/gridencoder/shencoder/raychingmarching（torch版本， tinycudann版本， torchngp版本）
   - tensorRF
   - octree structure
   - mip-nerf-360

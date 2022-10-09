@@ -257,11 +257,10 @@ class ArcNerfTrainer(BasicTrainer):
             self.crop_max_epoch = None
             for k, v in self.data['train'].items():
                 if isinstance(v, torch.Tensor):
-                    self.data['train'][k] = self.data['train'][k]  # get all (n_img, n_rays, ...)
-                    total_sample = self.data['train'][k].shape[0] * self.data['train'][k].shape[1]
+                    total_sample = v.shape[0] * v.shape[1]
                     self.train_sample_info['total_samples'] = total_sample
-                    self.train_sample_info['n_train_img'] = self.data['train'][k].shape[0]
-                    self.train_sample_info['n_train_hw'] = self.data['train'][k].shape[1]
+                    self.train_sample_info['n_train_img'] = v.shape[0]
+                    self.train_sample_info['n_train_hw'] = v.shape[1]
 
         # ray sample preparation
         if valid_key_in_cfgs(scheduler_cfg, 'ray_sample'):
