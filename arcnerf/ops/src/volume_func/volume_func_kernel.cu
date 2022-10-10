@@ -183,7 +183,6 @@ __global__ void sparse_volume_sampling_cuda_kernel(
     const uint32_t n_pts,
     const float dt,
     const float near_distance,
-    const bool perturb,
     default_rng_t rng,
     float *__restrict__ zvals,  //(N_rays, N_pts)
     bool *__restrict__ mask) {  //(N_rays, N_pts)
@@ -246,7 +245,6 @@ __global__ void sparse_volume_sampling_cuda_kernel(
    @param: dt, fix step length
    @param: aabb_range, bbox range of volume, (2, 3) of xyz_min/max of each volume
    @param: near_distance, near distance for sampling. By default 0.0.
-   @param: perturb, whether to perturb the first zval, use in training only
    @return: zvals, (N_rays, N_pts), sampled points zvals on each rays.
    @return: mask, (N_rays, N_pts), show whether each ray has intersection with the volume, BoolTensor
 */
@@ -261,7 +259,6 @@ void sparse_volume_sampling_cuda(
     const int n_grid,
     const torch::Tensor bitfield,
     const float near_distance,
-    const bool perturb,
     torch::Tensor zvals,
     torch::Tensor mask) {
 
@@ -283,7 +280,7 @@ void sparse_volume_sampling_cuda(
 
     linear_kernel(sparse_volume_sampling_cuda_kernel, 0, stream, n_rays,
         rays_o_p, rays_d_p, near_p, far_p, aabb_range_p, bitfield_p,
-        (uint32_t)n_grid, (uint32_t)n_pts, dt, near_distance, perturb,
+        (uint32_t)n_grid, (uint32_t)n_pts, dt, near_distance,
         rng, zvals_p, mask_p);
 
     rng.advance();

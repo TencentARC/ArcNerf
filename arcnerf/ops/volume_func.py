@@ -91,7 +91,7 @@ class SparseVolumeSampleOps(torch.autograd.Function):
     """Python wrapper of the CUDA function"""
 
     @staticmethod
-    def forward(ctx, rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb):
+    def forward(ctx, rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance):
         rays_o = rays_o.contiguous()  # make it contiguous
         rays_d = rays_d.contiguous()  # make it contiguous
         n_rays = rays_o.shape[0]
@@ -101,16 +101,14 @@ class SparseVolumeSampleOps(torch.autograd.Function):
         mask = torch.zeros((n_rays, n_pts), dtype=torch.bool, device=rays_o.device)
 
         _volume_func.sparse_volume_sampling(
-            rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb, zvals, mask
+            rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, zvals, mask
         )
 
         return zvals, mask
 
 
 @torch.no_grad()
-def sparse_volume_sampling(
-    rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance=0.0, perturb=False
-):
+def sparse_volume_sampling(rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance=0.0):
     """Sample pts in sparse volume. The output is a compact tensor
 
     Args:
@@ -124,7 +122,7 @@ def sparse_volume_sampling(
         n_grid: resolution
         bitfield: bitfield in (n_grid, n_grid, n_grid) bool tensor
         near_distance: near distance for sampling. By default 0.0.
-        perturb: whether to perturb the first zval, use in training only. by default False
+
 
     Return:
         zvals: (N_rays, N_pts), sampled points zvals on each rays. At mose n_pts for each ray,
@@ -133,7 +131,7 @@ def sparse_volume_sampling(
         mask: (N_rays, N_pts), show whether each pts is valid in the rays
     """
     return SparseVolumeSampleOps.apply(
-        rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb
+        rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance
     )
 
 

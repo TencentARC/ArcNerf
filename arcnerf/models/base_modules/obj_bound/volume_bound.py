@@ -117,8 +117,7 @@ class VolumeBound(BasicBound):
                 self.volume.get_range(),
                 self.volume.get_n_grid(),
                 self.volume.get_voxel_bitfield(),
-                near_distance=self.get_optim_cfgs('near_distance'),
-                perturb=perturb if not inference_only else False
+                near_distance=self.get_optim_cfgs('near_distance')
             )
         else:  # easy sampling in pure torch
             if self.get_optim_cfgs('ray_sample_fix_step'):  # fix step sampling

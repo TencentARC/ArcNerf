@@ -153,7 +153,6 @@ void sparse_volume_sampling_cuda(
     const int n_grid,
     const torch::Tensor bitfield,
     const float near_distance,
-    const bool perturb,
     torch::Tensor zvals,
     torch::Tensor mask);
 
@@ -167,7 +166,6 @@ void sparse_volume_sampling_cuda(
    @param: dt, fix step length
    @param: aabb_range, bbox range of volume, (2, 3) of xyz_min/max of whole volume
    @param: near_distance, near distance for sampling. By default 0.0.
-   @param: perturb, whether to perturb the first zval, use in training only
    @return: zvals, (N_rays, N_pts), sampled points zvals on each rays.
    @return: mask, (N_rays, N_pts), show whether each ray has intersection with the volume, BoolTensor
 */
@@ -182,7 +180,6 @@ void sparse_volume_sampling(
     const int n_grid,
     const torch::Tensor bitfield,
     const float near_distance,
-    const bool perturb,
     torch::Tensor zvals,
     torch::Tensor mask){
     // checking
@@ -229,7 +226,7 @@ void sparse_volume_sampling(
 
     // call actual cuda function
     return sparse_volume_sampling_cuda(
-        rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb,
+        rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance,
         zvals, mask
     );
 }
