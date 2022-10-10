@@ -90,6 +90,7 @@ dataset:
         align_cam: False             # whether to use avg pose to adjust cam rotation. Only for cam that are not horizontally distributed.
         # exchange_coord: [y, z, x]  # exchange and flip coord. Generally not use
         ndc_space: False             # change the rays into ndc_space. You must assure the near is 1.0 before that. You should set near/far as 1 if used ndc_space
+        center_pixel: False          # whether to use pixel from (0.5, 1.5,...) instead of (0, 1, 2)
         precache: True               # precache all the rays at once
         device: cpu                  # ['cpu', 'gpu'], gpu brings all tensor to GPU, takes memory but fast in data preparation
         augmentation:                # augmentation is for rays on a single image. Do not change in whole progress
@@ -110,6 +111,7 @@ dataset:
         pc_radius: 2.0
         skip: 10
         align_cam: False
+        center_pixel: False
         precache: False
         device: cpu
 
@@ -123,6 +125,7 @@ dataset:
         pc_radius: 2.0
         skip: 10
         align_cam: False
+        center_pixel: False
         precache: True
         device: cpu
 
@@ -141,6 +144,7 @@ inference:
         n_rot: 3                    # n_rot of camera path
         reverse: False              # reverse u range for swing mode only
         fps: 5                      # render video fps
+        center_pixel: False         # whether to use pixel from (0.5, 1.5,...) instead of (0, 1, 2)
         # surface_render:           # whether to add surface rendering, good for sdf model
         #     chunk_rays_factor: 1024 # set this to allow model to process more rays in surface_render mode
         #     method: sphere_tracing  # method to find surface pts, ['sphere_tracing', 'secant_root_finding']

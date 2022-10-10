@@ -31,6 +31,7 @@ dataset:
         pc_radius: 2.0
         skip: 10
         align_cam: False
+        center_pixel: False
         precache: True
         device: cpu
 

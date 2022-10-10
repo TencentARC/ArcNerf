@@ -95,6 +95,7 @@ class Inferencer(object):
                 'normal': tuple(get_value_from_cfgs_field(self.cfgs.render, 'normal', [0.0, 1.0, 0.0])),
                 'reverse': get_value_from_cfgs_field(self.cfgs.render, 'reverse', False),
                 'fps': get_value_from_cfgs_field(self.cfgs.render, 'fps', 5),
+                'center_pixel': get_value_from_cfgs_field(self.cfgs.render, 'center_pixel', False),
                 'surface_render': get_value_from_cfgs_field(self.cfgs.render, 'surface_render', None)
             }
             render_cfgs['repeat'] = get_value_from_cfgs_field(
@@ -191,6 +192,7 @@ class Inferencer(object):
                         t_intrinsic,
                         t_c2w,
                         wh_order=False,
+                        center_pixel=self.render_cfgs['center_pixel']
                     )  # (HW, 3) * 2
                     input_per_img = {
                         'c2w': c2w[cam_id],  # (4, 4) np array

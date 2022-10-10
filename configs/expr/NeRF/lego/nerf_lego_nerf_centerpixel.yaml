@@ -1,4 +1,4 @@
-name: nerf_lego_mipnerf_centerpixel
+name: nerf_lego_nerf_centerpixel
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_mipnerf_centerpixel'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_centerpixel'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_mipnerf_centerpixel/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_centerpixel/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -119,17 +119,22 @@ inference:
         fps: 5
         center_pixel: True
 
+    volume:
+        n_grid: 512
+        side: 2.0
+        level: 50.0
+        chunk_pts_factor: 32
+        render_mesh:
+            backend: pytorch3d
+
 model:
-    type: MipNeRF
+    type: NeRF
     rays:
         # bounding_radius: 3.0
         near: 1.5
         far: 4.5
-        n_sample: 128
+        n_sample: 64
         n_importance: 128
-        gaussian:
-            gaussian_fn: cone        # ['cone', 'cylinder'] to get mean/cov
-        blur_coarse_weights: True
         inverse_linear: False
         perturb: True
         add_inf_z: True
@@ -142,9 +147,9 @@ model:
         D: 8
         skips: [4]
         encoder:
-            type: GaussianEmbedder    # Use gaussian embedder
+            type: FreqEmbedder
             input_dim: 3
-            n_freqs: 16
+            n_freqs: 10
         W_feat: 256
         geometric_init: False
     radiance:
@@ -161,7 +166,6 @@ model:
 loss:
     ImgLoss:
         keys: ['rgb_coarse', 'rgb_fine']
-        internal_weights: [0.1, 1.0]
         weight: 1.0
 
 metric:

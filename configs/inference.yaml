@@ -44,6 +44,7 @@ inference:
         n_rot: 3                    # n_rot of camera path
         reverse: False              # reverse u range for swing mode only
         fps: 5                      # render video fps
+        center_pixel: False         # whether to use pixel from (0.5, 1.5,...) instead of (0, 1, 2)
         # surface_render:           # whether to add surface rendering, good for sdf model
         #     chunk_rays_factor: 1024 # set this to allow model to process more rays in surface_render mode
         #     method: sphere_tracing  # method to find surface pts, ['sphere_tracing', 'secant_root_finding']
