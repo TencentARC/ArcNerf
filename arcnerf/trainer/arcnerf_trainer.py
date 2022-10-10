@@ -51,8 +51,8 @@ class ArcNerfTrainer(BasicTrainer):
 
         # pretrain siren layer in implicit model
         self.logger.add_log('-' * 60)
-        self.logger.add_log('Pretrain siren layers')
-        self.model.pretrain_siren()
+        self.logger.add_log('Init Setting of the model...')
+        self.model.init_setting()
 
         # ema update
         self.ema = None

@@ -85,11 +85,11 @@ class FullModel(nn.Module):
         if self.bkg_model is not None:
             self.bkg_model.set_chunk_pts(chunk_pts)
 
-    def pretrain_siren(self):
-        """Pretrain siren layer of implicit network for both models."""
-        self.fg_model.pretrain_siren()
+    def init_setting(self):
+        """Init the setting like pretrain siren layers."""
+        self.fg_model.init_setting()
         if self.bkg_model is not None:
-            self.bkg_model.pretrain_siren()
+            self.bkg_model.init_setting()
 
     def is_cuda(self):
         """Check whether the model is on cuda"""

@@ -87,8 +87,8 @@ class Base3dModel(BaseModel):
         """
         return self.geo_net, self.radiance_net
 
-    def pretrain_siren(self):
-        """Pretrain siren layer of implicit model.
+    def init_setting(self):
+        """include pretrain siren layer of implicit model.
         Need to rewrite if your network name is different
         """
         geo_net = self.get_net()[0]

@@ -43,7 +43,7 @@ class NeRF(FgModel):
 
         return geo_net, radiance_net
 
-    def pretrain_siren(self):
+    def init_setting(self):
         """Pretrain siren layer of implicit model"""
         self.coarse_geo_net.pretrain_siren()
         if self.get_ray_cfgs('n_importance') > 0:
