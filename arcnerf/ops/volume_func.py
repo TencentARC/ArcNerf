@@ -18,8 +18,10 @@ class CheckOccOps(torch.autograd.Function):
     @staticmethod
     def forward(ctx, xyz, bitfield, aabb_range, n_grid):
         n_pts = xyz.shape[0]
-        aabb_range = torch.permute(aabb_range, (1, 0))  # (2, 3)
+        aabb_range = torch.permute(aabb_range, (1, 0)).contiguous()  # (2, 3)
+
         output = torch.zeros((n_pts, ), dtype=torch.bool, device=xyz.device)
+
         _volume_func.check_pts_in_occ_voxel(xyz, bitfield, aabb_range, n_grid, output)
 
         return output
@@ -61,7 +63,6 @@ class AABBOps(torch.autograd.Function):
         mask = torch.zeros((n_rays, n_v), dtype=torch.bool, device=rays_o.device)
 
         _volume_func.aabb_intersection(rays_o, rays_d, aabb_range, near, far, pts, mask)
-
         return near, far, pts, mask
 
 
@@ -148,6 +149,7 @@ class ReduceMaxOps(torch.autograd.Function):
         idx = idx.contiguous()  # make it contiguous
 
         uni_tensor = torch.zeros((n_group, ), dtype=full_tensor.dtype, device=full_tensor.device)
+
         _volume_func.tensor_reduce_max(full_tensor, idx, n_group, uni_tensor)
 
         return uni_tensor

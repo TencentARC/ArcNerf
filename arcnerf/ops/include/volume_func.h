@@ -52,13 +52,12 @@ HOST_DEVICE Vector2f aabb_ray_intersect(
 }
 
 // convert 3d xyz index to 1d index. We don't use the morton code, which is not consistent with torch volume
-inline HOST_DEVICE float convert_xyz_index_to_flatten_index(Vector3f xyz_index, uint32_t n_grid) {
-    float x = xyz_index.x();
-    float y = xyz_index.y();
-    float z = xyz_index.z();
+inline HOST_DEVICE uint32_t convert_xyz_index_to_flatten_index(Vector3f xyz_index, uint32_t n_grid) {
+    uint32_t x = (uint32_t) floorf(xyz_index.x());
+    uint32_t y = (uint32_t) floorf(xyz_index.y());
+    uint32_t z = (uint32_t) floorf(xyz_index.z());
 
-    float n = (float)n_grid;
-    float flatten_index = x * (n * n) + y * n + z;
+    uint32_t flatten_index = x * (n_grid * n_grid) + y * n_grid + z;
 
     return flatten_index;
 }
@@ -74,11 +73,11 @@ inline HOST_DEVICE bool density_grid_occupied_at(
 ) {
     Vector3f voxel_size = (xyz_max - xyz_min) / (float)n_grid;
     Vector3f voxel_idx = (xyz - xyz_min).array() / voxel_size.array();
-    if (voxel_idx.minCoeff() < 0 || voxel_idx.maxCoeff() > (float)n_grid) {
+    if (voxel_idx.minCoeff() < 0 || voxel_idx.maxCoeff() >= (float)n_grid) {
         return false;
     }
 
-    uint32_t flatten_index = (uint32_t)convert_xyz_index_to_flatten_index(voxel_idx, n_grid);
+    uint32_t flatten_index = convert_xyz_index_to_flatten_index(voxel_idx, n_grid);
     if (bitfield[flatten_index]) { return true; }
 
     return false;
