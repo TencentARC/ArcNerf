@@ -16,49 +16,63 @@ class CheckOccOps(torch.autograd.Function):
     """Python wrapper of the CUDA function"""
 
     @staticmethod
-    def forward(ctx, xyz, bitfield, range, n_grid):
-        output = _volume_func.check_pts_in_occ_voxel(xyz, bitfield, range, n_grid)
+    def forward(ctx, xyz, bitfield, aabb_range, n_grid):
+        n_pts = xyz.shape[0]
+        aabb_range = torch.permute(aabb_range, (1, 0))  # (2, 3)
+        output = torch.zeros((n_pts, ), dtype=torch.bool, device=xyz.device)
+        _volume_func.check_pts_in_occ_voxel(xyz, bitfield, aabb_range, n_grid, output)
 
         return output
 
 
 @torch.no_grad()
-def check_pts_in_occ_voxel_cuda(xyz, bitfield, xyz_range, n_grid):
+def check_pts_in_occ_voxel_cuda(xyz, bitfield, aabb_range, n_grid):
     """Check whether voxel_idx are the same as occ voxel_idx
 
     Args:
         xyz: (B, 3), pts position
         bitfield: (N_grid, N_grid, N_grid), bool tensor indicating each voxel's occupancy
-        xyz_range: (3, 2) min/max xyz position
+        aabb_range: (3, 2) min/max xyz position
         n_grid: resolution of the volume
 
     Return:
         pts_in_occ_voxel: (B, ) bool tensor whether each pts is in occupied voxels
     """
-    return CheckOccOps.apply(xyz, bitfield, xyz_range, n_grid)
+    return CheckOccOps.apply(xyz, bitfield, aabb_range, n_grid)
+
+
+# ------------------------------------------------------------------------------------------------ #
 
 
 class AABBOps(torch.autograd.Function):
     """Python wrapper of the CUDA function"""
 
     @staticmethod
-    def forward(ctx, rays_o, rays_d, aabb_range, eps):
+    def forward(ctx, rays_o, rays_d, aabb_range):
         rays_o = rays_o.contiguous()  # make it contiguous
         rays_d = rays_d.contiguous()  # make it contiguous
-        near, far, pts, mask = _volume_func.aabb_intersection(rays_o, rays_d, aabb_range, eps)
+        aabb_range = torch.permute(aabb_range, (0, 2, 1)).contiguous()  # (N_v, 2, 3)
+
+        n_rays = rays_o.shape[0]
+        n_v = aabb_range.shape[0]
+        near = torch.zeros((n_rays, n_v), dtype=rays_o.dtype, device=rays_o.device)
+        far = torch.zeros((n_rays, n_v), dtype=rays_o.dtype, device=rays_o.device)
+        pts = torch.zeros((n_rays, n_v, 2, 3), dtype=rays_o.dtype, device=rays_o.device)
+        mask = torch.zeros((n_rays, n_v), dtype=torch.bool, device=rays_o.device)
+
+        _volume_func.aabb_intersection(rays_o, rays_d, aabb_range, near, far, pts, mask)
 
         return near, far, pts, mask
 
 
 @torch.no_grad()
-def ray_aabb_intersection_cuda(rays_o, rays_d, aabb_range, eps=1e-7):
+def ray_aabb_intersection_cuda(rays_o, rays_d, aabb_range):
     """Ray aabb intersection with volume range
 
     Args:
         rays_o: ray origin, (N_rays, 3)
         rays_d: ray direction, assume normalized, (N_rays, 3)
         aabb_range: bbox range of volume, (N_v, 3, 2) of xyz_min/max of each volume
-        eps: error threshold for parallel comparison, by default 1e-7
 
     Return:
         near: near intersection zvals. (N_rays, N_v)
@@ -66,7 +80,10 @@ def ray_aabb_intersection_cuda(rays_o, rays_d, aabb_range, eps=1e-7):
         pts: (N_rays, N_v, 2, 3), each ray has near/far two points with each volume.
         mask: (N_rays, N_v), show whether each ray has intersection with the volume, BoolTensor
     """
-    return AABBOps.apply(rays_o, rays_d, aabb_range, eps)
+    return AABBOps.apply(rays_o, rays_d, aabb_range)
+
+
+# ------------------------------------------------------------------------------------------------ #
 
 
 class SparseVolumeSampleOps(torch.autograd.Function):
@@ -76,8 +93,14 @@ class SparseVolumeSampleOps(torch.autograd.Function):
     def forward(ctx, rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb):
         rays_o = rays_o.contiguous()  # make it contiguous
         rays_d = rays_d.contiguous()  # make it contiguous
-        zvals, mask = _volume_func.sparse_volume_sampling(
-            rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb
+        n_rays = rays_o.shape[0]
+        aabb_range = torch.permute(aabb_range, (1, 0)).contiguous()  # (2, 3)
+
+        zvals = torch.zeros((n_rays, n_pts), dtype=rays_o.dtype, device=rays_o.device)
+        mask = torch.zeros((n_rays, n_pts), dtype=torch.bool, device=rays_o.device)
+
+        _volume_func.sparse_volume_sampling(
+            rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_grid, bitfield, near_distance, perturb, zvals, mask
         )
 
         return zvals, mask
@@ -93,9 +116,12 @@ def sparse_volume_sampling(
         rays_o: ray origin, (N_rays, 3)
         rays_d: ray direction, assume normalized, (N_rays, 3)
         near: (N_rays, 1) near distance for each ray
-        near: (N_rays, 1) far distance for each ray
+        far: (N_rays, 1) far distance for each ray
         n_pts: max num of sampling pts on each ray,
         dt: const dt for searching
+        aabb_range: (3, 2) bounding box range
+        n_grid: resolution
+        bitfield: bitfield in (n_grid, n_grid, n_grid) bool tensor
         near_distance: near distance for sampling. By default 0.0.
         perturb: whether to perturb the first zval, use in training only. by default False
 
@@ -110,6 +136,9 @@ def sparse_volume_sampling(
     )
 
 
+# ------------------------------------------------------------------------------------------------ #
+
+
 class ReduceMaxOps(torch.autograd.Function):
     """Python wrapper of the CUDA function"""
 
@@ -117,7 +146,9 @@ class ReduceMaxOps(torch.autograd.Function):
     def forward(ctx, full_tensor, idx, n_group):
         full_tensor = full_tensor.contiguous()  # make it contiguous
         idx = idx.contiguous()  # make it contiguous
-        uni_tensor = _volume_func.tensor_reduce_max(full_tensor, idx, n_group)
+
+        uni_tensor = torch.zeros((n_group, ), dtype=full_tensor.dtype, device=full_tensor.device)
+        _volume_func.tensor_reduce_max(full_tensor, idx, n_group, uni_tensor)
 
         return uni_tensor
 

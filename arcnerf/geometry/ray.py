@@ -287,7 +287,7 @@ def aabb_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, aabb_range
     assert aabb_range.shape[1] == 3 and aabb_range.shape[2] == 2, 'AABB range must be (N, 3, 2)'
 
     if CUDA_BACKEND_AVAILABLE and rays_o.is_cuda:
-        near, far, pts, mask = ray_aabb_intersection_cuda(rays_o, rays_d, aabb_range, eps)
+        near, far, pts, mask = ray_aabb_intersection_cuda(rays_o, rays_d, aabb_range)
     else:
         near = torch.zeros((n_rays * n_volume, ), dtype=dtype, device=device)  # (N_rays*N_v,)
         far = torch.ones((n_rays * n_volume, ), dtype=dtype, device=device) * 10000.0  # (N_rays*N_v,)

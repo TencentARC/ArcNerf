@@ -928,7 +928,7 @@ class Volume(nn.Module):
         Returns:
             pts_in_occ_voxel: (B, ) whether each pts is in occupied voxels
         """
-        if CUDA_BACKEND_AVAILABLE and pts.is_cuda:
+        if CUDA_BACKEND_AVAILABLE and pts.is_cuda and self.bitfield.is_cuda:
             return check_pts_in_occ_voxel_cuda(pts, self.bitfield, self.get_range(), self.n_grid)
 
         voxel_idx, pts_in_occ_voxel = self.get_voxel_idx_from_xyz(pts)  # (B, 3), (B, )

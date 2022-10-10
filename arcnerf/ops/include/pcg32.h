@@ -23,30 +23,25 @@
  *
  *     http://www.pcg-random.org
  *
- * Note: This code was modified to work with CUDA by the tiny-cuda-nn authors.
+ * Note: This code was modified by the JNeRF authors.
  */
 
 #pragma once
 
-#define PCG32_DEFAULT_STATE  0x853c49e6748fea9bULL
+#define HOST_DEVICE __host__ __device__
+#define PCG32_DEFAULT_STATE 0x853c49e6748fea9bULL
 #define PCG32_DEFAULT_STREAM 0xda3e39cb94b95bdbULL
-#define PCG32_MULT           0x5851f42d4c957f2dULL
+#define PCG32_MULT 0x5851f42d4c957f2dULL
 
-#include <stdint.h>
 #include <cmath>
 #include <cassert>
-
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <cuda_fp16.h>
-
-/// PCG32 Pseudorandom number generator
-struct pcg32 {
+struct pcg32
+{
 	/// Initialize the pseudorandom number generator with default seed
-	__host__ __device__ pcg32() : state(PCG32_DEFAULT_STATE), inc(PCG32_DEFAULT_STREAM) {}
+	HOST_DEVICE pcg32() : state(PCG32_DEFAULT_STATE), inc(PCG32_DEFAULT_STREAM) {}
 
 	/// Initialize the pseudorandom number generator with the \ref seed() function
-	__host__ __device__ pcg32(uint64_t initstate, uint64_t initseq = 1u) { seed(initstate, initseq); }
+	HOST_DEVICE pcg32(uint64_t initstate, uint64_t initseq = 1u) { seed(initstate, initseq); }
 
 	/**
 	 * \brief Seed the pseudorandom number generator
@@ -54,7 +49,7 @@ struct pcg32 {
 	 * Specified in two parts: a state initializer and a sequence selection
 	 * constant (a.k.a. stream id)
 	 */
-	__host__ __device__ void seed(uint64_t initstate, uint64_t initseq = 1) {
+	HOST_DEVICE void seed(uint64_t initstate, uint64_t initseq = 1) {
 		state = 0U;
 		inc = (initseq << 1u) | 1u;
 		next_uint();
@@ -63,7 +58,7 @@ struct pcg32 {
 	}
 
 	/// Generate a uniformly distributed unsigned 32-bit random number
-	__host__ __device__ uint32_t next_uint() {
+	HOST_DEVICE uint32_t next_uint() {
 		uint64_t oldstate = state;
 		state = oldstate * PCG32_MULT + inc;
 		uint32_t xorshifted = (uint32_t) (((oldstate >> 18u) ^ oldstate) >> 27u);
@@ -72,7 +67,7 @@ struct pcg32 {
 	}
 
 	/// Generate a uniformly distributed number, r, where 0 <= r < bound
-	__host__ __device__ uint32_t next_uint(uint32_t bound) {
+	HOST_DEVICE uint32_t next_uint(uint32_t bound) {
 		// To avoid bias, we need to make the range of the RNG a multiple of
 		// bound, which we do by dropping output less than a threshold.
 		// A naive scheme to calculate the threshold would be to do
@@ -104,7 +99,7 @@ struct pcg32 {
 	}
 
 	/// Generate a single precision floating point value on the interval [0, 1)
-	__host__ __device__ float next_float() {
+	HOST_DEVICE float next_float() {
 		/* Trick from MTGP: generate an uniformly distributed
 			single precision number in [1,2) and subtract 1. */
 		union {
@@ -122,7 +117,7 @@ struct pcg32 {
 	 * only the first 32 mantissa bits will be filled (however, the resolution is still
 	 * finer than in \ref next_float(), which only uses 23 mantissa bits)
 	 */
-	__host__ __device__ double next_double() {
+	HOST_DEVICE double next_double() {
 		/* Trick from MTGP: generate an uniformly distributed
 			double precision number in [1,2) and subtract 1. */
 		union {
@@ -146,7 +141,7 @@ struct pcg32 {
 	 * previously drawn random numbers, even if small advancements.
 	 * are made inbetween.
 	 */
-	__host__ __device__ void advance(int64_t delta_ = (1ll<<32)) {
+	HOST_DEVICE void advance(int64_t delta_ = (1ll<<32)) {
 		uint64_t
 			cur_mult = PCG32_MULT,
 			cur_plus = inc,
@@ -170,7 +165,7 @@ struct pcg32 {
 	}
 
 	/// Compute the distance between two PCG32 pseudorandom number generators
-	__host__ __device__ int64_t operator-(const pcg32 &other) const {
+	HOST_DEVICE int64_t operator-(const pcg32 &other) const {
 		assert(inc == other.inc);
 
 		uint64_t
@@ -195,10 +190,10 @@ struct pcg32 {
 	}
 
 	/// Equality operator
-	__host__ __device__ bool operator==(const pcg32 &other) const { return state == other.state && inc == other.inc; }
+	HOST_DEVICE bool operator==(const pcg32 &other) const { return state == other.state && inc == other.inc; }
 
 	/// Inequality operator
-	__host__ __device__ bool operator!=(const pcg32 &other) const { return state != other.state || inc != other.inc; }
+	HOST_DEVICE bool operator!=(const pcg32 &other) const { return state != other.state || inc != other.inc; }
 
 	uint64_t state;  // RNG state.  All values are possible.
 	uint64_t inc;    // Controls which RNG sequence (stream) is selected. Must *always* be odd.

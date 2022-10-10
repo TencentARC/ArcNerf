@@ -4,121 +4,124 @@
 //
 // Some volume func
 
+#include "common.h"
 
-#include "helper_math.h"
-#include "utils.h"
+#define HOST_DEVICE __host__ __device__
 
-
-// Used to index into the PRNG stream. Must be larger than the number of
-// samples consumed by any given training ray.
-inline constexpr __device__ __host__ uint32_t N_MAX_RANDOM_SAMPLES_PER_RAY() { return 8; }
-
-inline constexpr __device__ __host__ uint32_t NERF_STEPS() { return 1024; }
-inline constexpr __device__ __host__ float SQRT3() { return 1.73205080757f; }
-inline constexpr __device__ __host__ float STEPSIZE() { return (SQRT3() / NERF_STEPS()); }
-inline constexpr __device__ __host__ float MIN_CONE_STEPSIZE() { return STEPSIZE(); }
-inline constexpr __device__ __host__ float DT() { return MIN_CONE_STEPSIZE(); }
 
 // aabb intersection.
-inline __device__ float2 ray_aabb_intersect(
-    const float3 rays_o,
-    const float3 rays_d,
-    const float3 xyz_min,
-    const float3 xyz_max
-){
-    // handles invalid
-    float eps = 1e-7;
-    if (fabs(rays_d.x) < eps && (rays_o.x < xyz_min.x || rays_o.x > xyz_max.x))
-        return make_float2(-1.0f);
-    if (fabs(rays_d.y) < eps && (rays_o.y < xyz_min.y || rays_o.y > xyz_max.y))
-        return make_float2(-1.0f);
-    if (fabs(rays_d.z) < eps && (rays_o.z < xyz_min.z || rays_o.z > xyz_max.z))
-        return make_float2(-1.0f);
+HOST_DEVICE Vector2f aabb_ray_intersect(
+    const Vector3f pos,
+    const Vector3f dir,
+    const Vector3f xyz_min,
+    const Vector3f xyz_max)
+{
+    // x dim
+    float tmin = (xyz_min.x() - pos.x()) / dir.x();
+    float tmax = (xyz_max.x() - pos.x()) / dir.x();
 
-    const float3 inv_d = 1.0f / rays_d;
-    const float3 t_min = (xyz_min - rays_o) * inv_d;
-    const float3 t_max = (xyz_max - rays_o) * inv_d;
+    if (tmin > tmax) { host_device_swap(tmin, tmax); }
 
-    float t1 = fmaxf3(fminf(t_min, t_max));
-    float t2 = fminf3(fmaxf(t_min, t_max));
+    // y dim
+    float tymin = (xyz_min.y() - pos.y()) / dir.y();
+    float tymax = (xyz_max.y() - pos.y()) / dir.y();
+    if (tymin > tymax) { host_device_swap(tymin, tymax); }
 
-    if (t1 > t2) return make_float2(-1.0f); // no intersection
-    t1 = fmaxf(0.0f, t1);
-    t2 = fmaxf(0.0f, t2);
-
-    return make_float2(t1, t2);
-}
-
-
-// get voxel index from xyz, return -1 for invalid pts
-inline __device__ float3 cal_voxel_idx_from_xyz(
-    const float3 xyz,
-    const float3 xyz_min,
-    const float3 xyz_max,
-    const float n_grid
-) {
-    float3 voxel_size = (xyz_max - xyz_min) / n_grid;
-    float3 voxel_idx = (xyz - xyz_min) / voxel_size;
-    if (fminf3(voxel_idx) < 0 || fmaxf3(voxel_idx) > n_grid) {
-        return make_float3(-1.0f, -1.0f, -1.0f);
+    if (tmin > tymax || tymin > tmax)
+    {
+        return {-1.0f, -1.0f};
     }
 
-    return voxel_idx;
+    if (tymin > tmin) { tmin = tymin; }
+    if (tymax < tmax) { tmax = tymax; }
+
+    // z dim
+    float tzmin = (xyz_min.z() - pos.z()) / dir.z();
+    float tzmax = (xyz_max.z() - pos.z()) / dir.z();
+    if (tzmin > tzmax) { host_device_swap(tzmin, tzmax); }
+
+    if (tmin > tzmax || tzmin > tmax)
+    {
+        return {-1.0f, -1.0f};
+    }
+
+    if (tzmin > tmin) { tmin = tzmin; }
+    if (tzmax < tmax) { tmax = tzmax; }
+
+    return {tmin, tmax};
 }
 
-// check pts bounding in aabb
-inline __device__ bool check_pts_in_aabb(
-    const float3 xyz,
-    const float3 xyz_min,
-    const float3 xyz_max
+// convert 3d xyz index to 1d index. We don't use the morton code, which is not consistent with torch volume
+inline HOST_DEVICE float convert_xyz_index_to_flatten_index(Vector3f xyz_index, uint32_t n_grid) {
+    float x = xyz_index.x();
+    float y = xyz_index.y();
+    float z = xyz_index.z();
+
+    float n = (float)n_grid;
+    float flatten_index = x * (n * n) + y * n + z;
+
+    return flatten_index;
+}
+
+
+// check whether the pts is occupied
+inline HOST_DEVICE bool density_grid_occupied_at(
+    const Vector3f xyz,
+    const bool *bitfield,
+    const Vector3f xyz_min,
+    const Vector3f xyz_max,
+    const uint32_t n_grid
 ) {
-    if (xyz.x >= xyz_min.x && xyz.y >= xyz_min.y && xyz.z >= xyz_min.z &&\
-        xyz.x <= xyz_max.x && xyz.y <= xyz_max.y && xyz.z <= xyz_max.z)
-        return true;
+    Vector3f voxel_size = (xyz_max - xyz_min) / (float)n_grid;
+    Vector3f voxel_idx = (xyz - xyz_min).array() / voxel_size.array();
+    if (voxel_idx.minCoeff() < 0 || voxel_idx.maxCoeff() > (float)n_grid) {
+        return false;
+    }
+
+    uint32_t flatten_index = (uint32_t)convert_xyz_index_to_flatten_index(voxel_idx, n_grid);
+    if (bitfield[flatten_index]) { return true; }
 
     return false;
 }
 
-// get point from rays_o, rays_d and zvals
-inline __device__ float3 get_ray_points_by_zvals(
-    const float3 rays_o,
-    const float3 rays_d,
-    const float zval
+
+// check pts bounding in aabb
+inline HOST_DEVICE bool check_pts_in_aabb(const Vector3f xyz, const Vector3f xyz_min, const Vector3f xyz_max
 ) {
-    return rays_o + zval * rays_d;
+    return xyz.x() >= xyz_min.x() && xyz.y() >= xyz_min.y() && xyz.z() >= xyz_min.z() && \
+           xyz.x() <= xyz_max.x() && xyz.y() <= xyz_max.y() && xyz.z() <= xyz_max.z();
 }
 
 
 // update to next voxel find pos. TODO: Check correct for pts not in (0, 1)
-inline __device__ float distance_to_next_voxel(
-    const float3 pos,
-    const float3 rays_d,
-    const float3 xyz_min,
-    const float3 xyz_max,
+inline HOST_DEVICE float distance_to_next_voxel(
+    const Vector3f pos,
+    const Vector3f rays_d,
+    const Vector3f xyz_min,
+    const Vector3f xyz_max,
     const uint32_t n_grid
 ) {
-    float3 xyz_center = (xyz_min + xyz_max) / 2.0;
-    float3 xyz_half_len = (xyz_max - xyz_min) / 2.0;
-    const float3 inv_d = 1.0f / rays_d;
+    Vector3f xyz_center = (xyz_min + xyz_max) / 2.0;
+    Vector3f xyz_half_len = (xyz_max - xyz_min) / 2.0;
+    const Vector3f inv_d = rays_d.cwiseInverse();
 
-	float3 p = n_grid * pos;
-	float tx = (floorf(p.x + xyz_center.x + xyz_half_len.x * signf(rays_d.x)) - p.x) * inv_d.x;
-	float ty = (floorf(p.y + xyz_center.y + xyz_half_len.y * signf(rays_d.y)) - p.y) * inv_d.y;
-	float tz = (floorf(p.z + xyz_center.z + xyz_half_len.z * signf(rays_d.z)) - p.z) * inv_d.z;
-	float t = fmin(fmin(tx, ty), tz);
+	Vector3f p = (float)n_grid * pos;
+	Vector3f sign_d = signv3f(rays_d);
+    Vector3f t = (floorv3f(p + xyz_center + xyz_half_len.cwiseProduct(signv3f(rays_d))) - p).cwiseProduct(inv_d);
+	float t_min = t.minCoeff();
 
-	return fmaxf(t / n_grid, 0.0f);
+	return fmaxf(t_min / n_grid, 0.0f);
 }
 
 
 // update to next voxel
-inline __device__ float advance_to_next_voxel(
+inline HOST_DEVICE float advance_to_next_voxel(
     float t,
     const float dt,
-    const float3 pos,
-    const float3 rays_d,
-    const float3 xyz_min,
-    const float3 xyz_max,
+    const Vector3f pos,
+    const Vector3f rays_d,
+    const Vector3f xyz_min,
+    const Vector3f xyz_max,
     const uint32_t n_grid
 ) {
 	float t_target = t + distance_to_next_voxel(pos, rays_d, xyz_min, xyz_max, n_grid);

@@ -7,34 +7,31 @@
 
 #include <torch/extension.h>
 
-#include "helper.h"
+#include "common.h"
 #include "volume_func.h"
 #include "pcg32.h"
 
 
 // The real cuda kernel
-template <typename scalar_t>
 __global__ void check_pts_in_occ_voxel_cuda_kernel(
-    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> xyz,
-    const torch::PackedTensorAccessor32<bool, 3, torch::RestrictPtrTraits> bitfield,
-    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> range,
+    const uint32_t n_elements,
+    const Vector3f *__restrict__ xyz,
+    const bool *__restrict__ bitfield,
+    const Vector3f *__restrict__ aabb_range,
     const uint32_t n_grid,
-    torch::PackedTensorAccessor32<bool, 1, torch::RestrictPtrTraits> output) {
+    bool *__restrict__ output) {
 
-    const int n = blockIdx.x * blockDim.x + threadIdx.x;
-    if (n >= xyz.size(0)) return;
+    const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n_elements)
+        return;
 
-    const float3 _xyz =  make_float3(xyz[n][0], xyz[n][1], xyz[n][2]);
-    const float3 xyz_min = make_float3(range[0][0], range[1][0], range[2][0]);
-    const float3 xyz_max = make_float3(range[0][1], range[1][1], range[2][1]);
-    float3 voxel_idx = cal_voxel_idx_from_xyz(_xyz, xyz_min, xyz_max, (scalar_t) n_grid);
+    const Vector3f pos = xyz[i];
+    const Vector3f xyz_min = aabb_range[0];
+    const Vector3f xyz_max = aabb_range[1];
 
-    if (voxel_idx.x < 0) return;
+    bool occ = density_grid_occupied_at(pos, bitfield, xyz_min, xyz_max, n_grid);
 
-    const bool occ = bitfield[(uint8_t)voxel_idx.x][(uint8_t)voxel_idx.y][(uint8_t)voxel_idx.z];
-    if (occ) {
-        output[n] = true;
-    }
+    output[i] = occ;
 
     return;
 }
@@ -42,82 +39,85 @@ __global__ void check_pts_in_occ_voxel_cuda_kernel(
 /* CUDA instantiate func for hashgrid_encode forward
    @param: xyz, torch float tensor of (B, 3)
    @param: bitfield, (N_grid, N_grid, N_grid), bool tensor indicating each voxel's occupancy
-   @param: range, torch float tensor of (3, 2), range of xyz boundary
+   @param: range, torch float tensor of (2, 3), range of xyz boundary
    @param: n_grid, uint8_t resolution
    @return: output, torch bool tensor of (B,)
 */
-torch::Tensor check_pts_in_occ_voxel_cuda(
+void check_pts_in_occ_voxel_cuda(
     const torch::Tensor xyz,
     const torch::Tensor bitfield,
-    const torch::Tensor range,
-    const uint32_t n_grid) {
+    const torch::Tensor aabb_range,
+    const int n_grid,
+    torch::Tensor output) {
 
-    const uint32_t B = xyz.size(0);  // B
+    const uint32_t n_elements = xyz.size(0);  // B
 
-    const uint32_t threads = 512;
-    const uint32_t blocks = div_round_up(B, threads);
+    cudaStream_t stream=0;
 
-    // Init the output tensor
-    torch::Tensor output = torch::zeros({B,}, torch::kBool).to(xyz.device());  // (B,)
+    // input
+    Vector3f* xyz_p = (Vector3f*)xyz.data_ptr();
+    bool* bitfield_p = (bool*)bitfield.data_ptr();
+    Vector3f* aabb_range_p = (Vector3f*)aabb_range.data_ptr();
+    // output
+    bool* output_p = (bool*)output.data_ptr();
 
-    // instantiate the real executable kernel
-    AT_DISPATCH_FLOATING_TYPES(xyz.scalar_type(), "check_pts_in_occ_voxel_cuda",
-    ([&] {
-        check_pts_in_occ_voxel_cuda_kernel<scalar_t><<<blocks, threads>>>(
-            xyz.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
-            bitfield.packed_accessor32<bool, 3, torch::RestrictPtrTraits>(),
-            range.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
-            n_grid,
-            output.packed_accessor32<bool, 1, torch::RestrictPtrTraits>()
-        );
-    }));
+    linear_kernel(check_pts_in_occ_voxel_cuda_kernel, 0, stream,
+        n_elements, xyz_p, bitfield_p, aabb_range_p, (uint32_t)n_grid, output_p);
 
-    return output;
-
+    cudaDeviceSynchronize();
 }
 
 
+// ------------------------------------------------------------------------------------------------ //
+
 // The real cuda kernel
-template <typename scalar_t>
 __global__ void aabb_intersection_cuda_kernel(
-    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> rays_o,  //(N_rays, 3)
-    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> rays_d,  //(N_rays, 3)
-    const torch::PackedTensorAccessor32<scalar_t, 3, torch::RestrictPtrTraits> aabb_range,  //(N_v, 3, 2)
-    const float eps,
-    torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> near,  //(N_rays, N_v)
-    torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> far,  //(N_rays, N_v)
-    torch::PackedTensorAccessor32<scalar_t, 4, torch::RestrictPtrTraits> pts,  //(N_rays, N_v, 2, 3)
-    torch::PackedTensorAccessor32<bool, 2, torch::RestrictPtrTraits> mask) {  //(N_rays, N_v)
+    const uint32_t n_elements,
+    const uint32_t n_rays,
+    const uint32_t n_v,
+    const Vector3f *__restrict__ rays_o,  //(N_rays, 3)
+    const Vector3f *__restrict__ rays_d,  //(N_rays, 3)
+    const Vector3f *__restrict__ aabb_range,  //(N_v, 2, 3)
+    float *__restrict__ near,  //(N_rays, N_v)
+    float *__restrict__ far,  //(N_rays, N_v)
+    Vector3f *__restrict__ pts,  //(N_rays, N_v, 2, 3)
+    bool *__restrict__ mask) {  //(N_rays, N_v)
 
-    const uint32_t n = blockIdx.x * blockDim.x + threadIdx.x;  // ray id
-    const uint32_t v = blockIdx.y * blockDim.y + threadIdx.y;  // volume id
+    const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;  //
 
-    if (n < rays_o.size(0) && v < aabb_range.size(0)) {
-        const float3 _rays_o = make_float3(rays_o[n][0], rays_o[n][1], rays_o[n][2]);
-        const float3 _rays_d = make_float3(rays_d[n][0], rays_d[n][1], rays_d[n][2]);
-        const float3 xyz_min = make_float3(aabb_range[v][0][0], aabb_range[v][1][0], aabb_range[v][2][0]);
-        const float3 xyz_max = make_float3(aabb_range[v][0][1], aabb_range[v][1][1], aabb_range[v][2][1]);
-        const float2 t1t2 = ray_aabb_intersect(_rays_o, _rays_d, xyz_min, xyz_max);
-        if (t1t2.y > 0) {
-            near[n][v] = t1t2.x + eps;
-            far[n][v] = t1t2.y - eps;
-            mask[n][v] = true;
-        } else {
-            near[n][v] = 0.0;
-            far[n][v] = 0.0;
-            mask[n][v] = false;
-        }
+    if (i >= n_elements) return;
 
-        // get ray pts
-        const float3 pts_near = _rays_o + near[n][v] * _rays_d;
-        const float3 pts_far = _rays_o + far[n][v] * _rays_d;
-        pts[n][v][0][0] = pts_near.x;
-        pts[n][v][0][1] = pts_near.y;
-        pts[n][v][0][2] = pts_near.z;
-        pts[n][v][1][0] = pts_far.x;
-        pts[n][v][1][1] = pts_far.y;
-        pts[n][v][1][2] = pts_far.z;
+    const uint32_t rays_idx = (i / n_v);
+    const uint32_t vol_idx = (i % n_v);
+
+    const Vector3f _rays_o = rays_o[rays_idx];
+    const Vector3f _rays_d = rays_d[rays_idx];
+    const Vector3f xyz_min = aabb_range[vol_idx * 2];
+    const Vector3f xyz_max = aabb_range[vol_idx * 2 + 1];
+
+    Vector2f tminmax = aabb_ray_intersect(_rays_o, _rays_d, xyz_min, xyz_max);
+
+    // move output ptr
+    near += i;
+    far += i;
+    pts += i * 2;
+    mask += i;
+
+    if (tminmax.x() > 0) {
+        near[0] = tminmax.x();
+        far[0] = tminmax.y();
+        mask[0] = true;
+    } else {
+        near[0] = 0.0;
+        far[0] = 0.0;
+        mask[0] = false;
     }
+
+    // get ray pts
+    const Vector3f pts_near = _rays_o + near[0] * _rays_d;
+    const Vector3f pts_far = _rays_o + far[0] * _rays_d;
+    pts[0] = pts_near;
+    pts[1] = pts_far;
 
     return;
 }
@@ -125,117 +125,111 @@ __global__ void aabb_intersection_cuda_kernel(
 /* CUDA instantiate of aabb intersection func
    @param: rays_o, ray origin, (N_rays, 3)
    @param: rays_d, ray direction, assume normalized, (N_rays, 3)
-   @param: aabb_range, bbox range of volume, (N_v, 3, 2) of xyz_min/max of each volume
-   @param: eps, error threshold
+   @param: aabb_range, bbox range of volume, (N_v, 2, 3) of xyz_min/max of each volume
    @return: near, near intersection zvals. (N_rays, N_v)
    @return: far, far intersection zvals. (N_rays, N_v)
    @return: pts, intersection pts with the volume. (N_rays, N_v, 2, 3)
    @return: mask, (N_rays, N_v), show whether each ray has intersection with the volume, BoolTensor
 */
-std::vector<torch::Tensor> aabb_intersection_cuda(
+void aabb_intersection_cuda(
     const torch::Tensor rays_o,
     const torch::Tensor rays_d,
     const torch::Tensor aabb_range,
-    const float eps) {
+    torch::Tensor near,
+    torch::Tensor far,
+    torch::Tensor pts,
+    torch::Tensor mask) {
 
-    const uint32_t N_rays = rays_o.size(0);  // N_rays
-    const uint32_t N_v = aabb_range.size(0); // N_v
+    cudaStream_t stream=0;
 
-    const uint32_t threads_per_row = 512;
-    const uint32_t threads_per_col = 1;  // commonly use one volume to check
-    const dim3 threads(threads_per_row, threads_per_col);
-    const dim3 blocks(div_round_up(N_rays, threads_per_row), div_round_up(N_v, threads_per_col));
+    const uint32_t n_rays = rays_o.size(0);  // N_rays
+    const uint32_t n_v = aabb_range.size(0); // N_v
 
-    // Init the output tensor
-    auto dtype = rays_o.dtype();
-    auto device = rays_o.device();
-    torch::Tensor near = torch::zeros({N_rays, N_v}, dtype).to(device);  // (N_rays, N_v)
-    torch::Tensor far = torch::ones({N_rays, N_v}, dtype).to(device) * 10000.0f;  // (N_rays, N_v)
-    torch::Tensor pts = torch::zeros({N_rays, N_v, 2, 3}, dtype).to(device);  // (N_rays, N_v, 2, 3)
-    torch::Tensor mask = torch::ones({N_rays, N_v}, torch::kBool).to(device);  // (N_rays, N_v)
+    const uint32_t n_elements = n_rays * n_v;
 
-    // instantiate the real executable kernel
-    AT_DISPATCH_FLOATING_TYPES(rays_o.scalar_type(), "aabb_intersection_cuda",
-    ([&] {
-        aabb_intersection_cuda_kernel<scalar_t><<<blocks, threads>>>(
-            rays_o.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
-            rays_d.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
-            aabb_range.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
-            eps,
-            near.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
-            far.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
-            pts.packed_accessor32<scalar_t, 4, torch::RestrictPtrTraits>(),
-            mask.packed_accessor32<bool, 2, torch::RestrictPtrTraits>()
-        );
-    }));
+    // inputs
+    Vector3f* rays_o_p = (Vector3f*)rays_o.data_ptr();
+    Vector3f* rays_d_p = (Vector3f*)rays_d.data_ptr();
+    Vector3f* aabb_range_p = (Vector3f*)aabb_range.data_ptr();
 
-    return {near, far, pts, mask};
+    // outputs
+    float* near_p = (float*)near.data_ptr();
+    float* far_p = (float*)far.data_ptr();
+    Vector3f* pts_p = (Vector3f*)pts.data_ptr();
+    bool* mask_p = (bool*)mask.data_ptr();
+
+    linear_kernel(aabb_intersection_cuda_kernel, 0, stream, n_elements,
+        n_rays, n_v, rays_o_p, rays_d_p, aabb_range_p,
+        near_p, far_p, pts_p, mask_p);
+
+    cudaDeviceSynchronize();
+
 }
 
 
+// ------------------------------------------------------------------------------------------------ //
+
+
 // The real cuda kernel
-template <typename scalar_t>
 __global__ void sparse_volume_sampling_cuda_kernel(
-    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> rays_o,  //(N_rays, 3)
-    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> rays_d,  //(N_rays, 3)
-    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> near,  //(N_rays, 1)
-    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> far,  //(N_rays, 1)
-    const int N_pts,
+    const uint32_t n_rays,
+    const Vector3f *__restrict__ rays_o,  //(N_rays, 3)
+    const Vector3f *__restrict__ rays_d,  //(N_rays, 3)
+    const float *__restrict__ near,  //(N_rays, 1)
+    const float *__restrict__ far,  //(N_rays, 1)
+    const Vector3f *__restrict__ aabb_range,  // (2, 3)
+    const bool *__restrict__ bitfield,  //(n_grid, n_grid, n_grid)
+    const uint32_t n_grid,
+    const uint32_t n_pts,
     const float dt,
-    pcg32 rng,
     const float near_distance,
     const bool perturb,
-    const torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> aabb_range,
-    const float n_grid,
-    const torch::PackedTensorAccessor32<bool, 3, torch::RestrictPtrTraits> bitfield,
-    torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> zvals,  //(N_rays, N_pts)
-    torch::PackedTensorAccessor32<bool, 2, torch::RestrictPtrTraits> mask) {  //(N_rays, N_pts)
+    default_rng_t rng,
+    float *__restrict__ zvals,  //(N_rays, N_pts)
+    bool *__restrict__ mask) {  //(N_rays, N_pts)
 
-    const uint32_t n = blockIdx.x * blockDim.x + threadIdx.x;  // ray id
-    if (n >= rays_o.size(0)) return;
+    const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;  // ray id
+    if (i >= n_rays) return;
 
-    scalar_t startt = fmaxf(near[n][0], near_distance);
-    scalar_t far_end = far[n][0];
-    rng.advance(n * N_MAX_RANDOM_SAMPLES_PER_RAY());
+    rng.advance(i * 8);
 
-    const float3 xyz_min = make_float3(aabb_range[0][0], aabb_range[1][0], aabb_range[2][0]);
-    const float3 xyz_max = make_float3(aabb_range[0][1], aabb_range[1][1], aabb_range[2][1]);
-
+    Vector3f _rays_o = rays_o[i];
+    Vector3f _rays_d = rays_d[i];
+    float startt = fmaxf(near[i], near_distance);
+    float far_end = far[i];
     // perturb init zvals
-    startt += dt * rng.next_float();
-//     if (perturb) {
-//         startt += dt * rng.next_float();
-//     }
+    startt += dt * random_val(rng);
 
-    const float3 _rays_o = make_float3(rays_o[n][0], rays_o[n][1], rays_o[n][2]);
-    const float3 _rays_d = make_float3(rays_d[n][0], rays_d[n][1], rays_d[n][2]);
+    const Vector3f xyz_min = aabb_range[0];
+    const Vector3f xyz_max = aabb_range[1];
 
     uint32_t j = 0;
-    scalar_t t = startt;
-    float3 pos;
+    float t = startt;
+    Vector3f pos;
 
-    while (t <= far_end && j < N_pts && \\
-                check_pts_in_aabb(get_ray_points_by_zvals(_rays_o, _rays_d, t), xyz_min, xyz_max)) {
-        float3 voxel_idx = cal_voxel_idx_from_xyz(_rays_o + t * _rays_d, xyz_min, xyz_max, (float) n_grid);
-        if (voxel_idx.x >= 0 && bitfield[(uint8_t)voxel_idx.x][(uint8_t)voxel_idx.y][(uint8_t)voxel_idx.z]) {
+    // move zvals and mask
+    zvals += i * n_pts;
+    mask += i * n_pts;
+
+    while (t <= far_end && j < n_pts && check_pts_in_aabb(pos = _rays_o + _rays_d * t, xyz_min, xyz_max)) {
+        if (density_grid_occupied_at(pos, bitfield, xyz_min, xyz_max, n_grid)) {
             // update the pts and mask
-            zvals[n][j] = t;
-            mask[n][j] = true;
+            zvals[j] = t;
+            mask[j] = true;
             ++j;
             t += dt;
         } else {
-            pos = get_ray_points_by_zvals(_rays_o, _rays_d, t);
             t = advance_to_next_voxel(t, dt, pos, _rays_d, xyz_min, xyz_max, n_grid);
         }
     }
 
     // make the remaining zvals the same as last
     float last_zval;
-    if (j > 0 && j < N_pts) {
-        last_zval = zvals[n][j-1];
+    if (j > 0 && j < n_pts) {
+        last_zval = zvals[j-1];
     }
-    while (j > 0 && j < N_pts) {
-        zvals[n][j] = last_zval;
+    while (j > 0 && j < n_pts) {
+        zvals[j] = last_zval;
         ++j;
     }
 
@@ -248,76 +242,71 @@ __global__ void sparse_volume_sampling_cuda_kernel(
    @param: rays_d, ray direction, assume normalized, (N_rays, 3)
    @param: near, near intersection zvals. (N_rays, 1)
    @param: far, far intersection zvals. (N_rays, 1)
-   @param: N_pts, max num of sampling pts on each ray.
+   @param: n_pts, max num of sampling pts on each ray.
    @param: dt, fix step length
-   @param: aabb_range, bbox range of volume, (3, 2) of xyz_min/max of each volume
+   @param: aabb_range, bbox range of volume, (2, 3) of xyz_min/max of each volume
    @param: near_distance, near distance for sampling. By default 0.0.
    @param: perturb, whether to perturb the first zval, use in training only
    @return: zvals, (N_rays, N_pts), sampled points zvals on each rays.
    @return: mask, (N_rays, N_pts), show whether each ray has intersection with the volume, BoolTensor
 */
-std::vector<torch::Tensor> sparse_volume_sampling_cuda(
+void sparse_volume_sampling_cuda(
     const torch::Tensor rays_o,
     const torch::Tensor rays_d,
     const torch::Tensor near,
     const torch::Tensor far,
-    const int N_pts,
+    const int n_pts,
     const float dt,
     const torch::Tensor aabb_range,
     const int n_grid,
     const torch::Tensor bitfield,
     const float near_distance,
-    const bool perturb) {
+    const bool perturb,
+    torch::Tensor zvals,
+    torch::Tensor mask) {
 
-    const uint32_t N_rays = rays_o.size(0);  // N_rays
+    cudaStream_t stream=0;
 
-    const uint32_t threads = 512;
-    const uint32_t blocks(div_round_up(N_rays, threads));
+    const uint32_t n_rays = rays_o.size(0);  // N_rays
 
-    // Init the output tensor
-    auto dtype = rays_o.dtype();
-    auto device = rays_o.device();
+    // inputs
+    Vector3f* rays_o_p = (Vector3f*)rays_o.data_ptr();
+    Vector3f* rays_d_p = (Vector3f*)rays_d.data_ptr();
+    Vector3f* aabb_range_p = (Vector3f*)aabb_range.data_ptr();
+    float* near_p = (float*)near.data_ptr();
+    float* far_p = (float*)far.data_ptr();
+    bool* bitfield_p = (bool*)bitfield.data_ptr();
 
-    // random seed to perturb the first value
-    pcg32 rng = pcg32{(uint64_t)623};
+    // outputs
+    float* zvals_p = (float*)zvals.data_ptr();
+    bool* mask_p = (bool*)mask.data_ptr();
 
-    torch::Tensor zvals = torch::zeros({N_rays, N_pts}, dtype).to(device);  // (N_rays, N_pts)
-    torch::Tensor mask = torch::zeros({N_rays, N_pts}, torch::kBool).to(device);  // (N_rays, N_pts)
+    linear_kernel(sparse_volume_sampling_cuda_kernel, 0, stream, n_rays,
+        rays_o_p, rays_d_p, near_p, far_p, aabb_range_p, bitfield_p,
+        (uint32_t)n_grid, (uint32_t)n_pts, dt, near_distance, perturb,
+        rng, zvals_p, mask_p);
 
-    // instantiate the real executable kernel
-    AT_DISPATCH_FLOATING_TYPES(rays_o.scalar_type(), "sparse_volume_sampling_cuda",
-    ([&] {
-        sparse_volume_sampling_cuda_kernel<scalar_t><<<blocks, threads>>>(
-            rays_o.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
-            rays_d.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
-            near.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
-            far.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
-            N_pts, dt, rng, near_distance, perturb,
-            aabb_range.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
-            n_grid,
-            bitfield.packed_accessor32<bool, 3, torch::RestrictPtrTraits>(),
-            zvals.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
-            mask.packed_accessor32<bool, 2, torch::RestrictPtrTraits>()
-        );
-    }));
+    rng.advance();
+    cudaDeviceSynchronize();
 
-    return {zvals, mask};
 }
 
 
+// ------------------------------------------------------------------------------------------------ //
+
 // The real cuda kernel
-template <typename scalar_t>
 __global__ void tensor_reduce_max_cuda_kernel(
-    const torch::PackedTensorAccessor32<scalar_t, 1, torch::RestrictPtrTraits> full_tensor,  //(N, )
-    const torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> group_idx,  //(N, )
+    const uint32_t n_elements,
+    const float *__restrict__ full_tensor,
+    const uint64_t *__restrict__ group_idx,
     const uint32_t n_group,
-    const torch::PackedTensorAccessor32<scalar_t, 1, torch::RestrictPtrTraits> uni_tensor) {  //(N_uni, )
+    float *__restrict__ uni_tensor) {
 
-    const uint32_t n = blockIdx.x * blockDim.x + threadIdx.x;  // ray id
-    if (n >= full_tensor.size(0)) return;
+    const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;  // ray id
+    if (i >= n_elements) return;
 
-    int64_t real_idx = group_idx[n];
-    atomicMax((uint32_t *)&uni_tensor[real_idx], __float_as_uint(full_tensor[n]));
+    uint64_t real_idx = group_idx[i];
+    atomicMax((uint32_t *)&uni_tensor[real_idx], __float_as_uint(full_tensor[i]));
 }
 
 /* CUDA instantiate of tensor_reduce_max func
@@ -326,32 +315,24 @@ __global__ void tensor_reduce_max_cuda_kernel(
    @param: n_group: num of group (N_uni)
    @return: uni_tensor: (N_uni. ) maximum of each unique group
 */
-torch::Tensor tensor_reduce_max_cuda(
+void tensor_reduce_max_cuda(
     const torch::Tensor full_tensor,
     const torch::Tensor group_idx,
-    const uint32_t n_group) {
+    const int n_group,
+    torch::Tensor uni_tensor) {
 
-    const uint32_t N = full_tensor.size(0);  // N
+    cudaStream_t stream=0;
 
-    const uint32_t threads = 512;
-    const uint32_t blocks(div_round_up(N, threads));
+    const uint32_t n_elements = full_tensor.size(0);  // N
 
-    // Init the output tensor
-    auto dtype = full_tensor.dtype();
-    auto device = full_tensor.device();
+    // inputs
+    float* full_tensor_p = (float*)full_tensor.data_ptr();
+    uint64_t* group_idx_p = (uint64_t*)group_idx.data_ptr();
 
-    torch::Tensor uni_tensor = torch::zeros({n_group,}, dtype).to(device);  // (N_uni,)
+    // outputs
+    float* uni_tensor_p = (float*)uni_tensor.data_ptr();
 
-    // instantiate the real executable kernel
-    AT_DISPATCH_FLOATING_TYPES(full_tensor.scalar_type(), "tensor_reduce_max_cuda",
-    ([&] {
-        tensor_reduce_max_cuda_kernel<scalar_t><<<blocks, threads>>>(
-            full_tensor.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
-            group_idx.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>(),
-            n_group,
-            uni_tensor.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>()
-        );
-    }));
+    linear_kernel(tensor_reduce_max_cuda_kernel, 0, stream, n_elements,
+        full_tensor_p, group_idx_p, (uint32_t)n_group, uni_tensor_p);
 
-    return uni_tensor;
 }
