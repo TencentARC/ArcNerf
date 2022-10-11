@@ -69,6 +69,7 @@ dataset:
         scene_name: lego
         img_scale: 1.0
         scale_radius: 3.0
+        center_pixel: True
         precache: True
         device: gpu
         augmentation:
@@ -85,6 +86,7 @@ dataset:
         scene_name: lego
         img_scale: 0.5
         scale_radius: 3.0
+        center_pixel: True
         precache: False
         device: gpu
         augmentation:
@@ -98,6 +100,7 @@ dataset:
         scene_name: lego
         img_scale: 1.0
         scale_radius: 3.0
+        center_pixel: True
         precache: True
         device: gpu
         augmentation:
@@ -114,6 +117,7 @@ inference:
         u_start: 0.5
         v_range: [-0.6, -0.2]
         fps: 5
+        center_pixel: True
 
 model:
     type: MipNeRF

@@ -76,7 +76,7 @@ if __name__ == '__main__':
         exit()
 
     if files is not None and len(files) > 0:
-        write_progress_imgs(files, eval_dir, eval=True)
+        write_progress_imgs(files, eval_dir, model, eval=True)
         logger.add_log('Visual results add to {}'.format(eval_dir))
 
     logger.add_log('Evaluation Benchmark result. \n {}'.format(metric_info))
