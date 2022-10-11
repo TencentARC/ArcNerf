@@ -109,7 +109,7 @@ dataset:
         device: gpu
         augmentation:
             blend_bkg_color:
-                bkg_color: [0.0, 0.0, 0.0]
+                bkg_color: [1.0, 1.0, 1.0]
 
 #inference:
 #    to_gpu: True
@@ -148,7 +148,7 @@ model:
         ray_sample_fix_step: True
         near_distance: 0.2
         opa_thres: 0.01
-        bkg_color: [0.0, 0.0, 0.0]
+        bkg_color: [1.0, 1.0, 1.0]
         log_max_allowance: 18  # only used for dynamic batch_size, 1 << 18 = 4096*64
     rays:
         n_sample: 1024
@@ -156,9 +156,9 @@ model:
         perturb: True
         add_inf_z: False
         noise_std: 0.0
-        white_bkg: False  # for eval only
-    chunk_rays: 32768
-    chunk_pts: 131072
+        white_bkg: True  # for eval only
+    chunk_rays: 32768   # 4096 * 16
+    chunk_pts: 1048576  # 4096 * 256
     geometry:
         type: FusedMLPGeoNet
         W: 64
