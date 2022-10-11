@@ -147,14 +147,9 @@ class NeRF(Base3dDataset):
             for cam_idx in range(len(cam_json[m]['frames'])):
                 poses = np.array(cam_json[m]['frames'][cam_idx]['transform_matrix']).astype(np.float32)  # (4, 4)
                 # correct the poses in our system
-                # poses[:, 1:3] *= -1.0
-                # poses = poses[[0, 2, 1, 3], :]
-                # poses[1, :] *= -1
-
-                # debug only TODO: Remove for actual
-                poses = poses[[1, 2, 0, 3], :]
                 poses[:, 1:3] *= -1.0
-                poses[:3, 3] = poses[:3, 3] * 0.33 + np.array([0.5, 0.5, 0.5])
+                poses = poses[[0, 2, 1, 3], :]
+                poses[1, :] *= -1
 
                 cameras.append(
                     PerspectiveCamera(

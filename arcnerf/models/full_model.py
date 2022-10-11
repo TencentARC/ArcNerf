@@ -364,6 +364,8 @@ class FullModel(nn.Module):
         # prepare flatten inputs
         flat_inputs, batch_size, n_rays_per_batch = self.prepare_flatten_inputs(inputs, inference_only)
 
+        # TODO: There could be a bug that foreground model accumulate too many progress and CUDA memory out.
+        # TODO: Check the case of nerf++.
         get_progress_fg = True if (self.bkg_model is not None) else get_progress  # need the progress to blend
         fg_output = chunk_processing(
             self.fg_model.forward, self.fg_model.get_chunk_rays(), False, flat_inputs, inference_only, get_progress_fg,

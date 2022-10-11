@@ -58,7 +58,7 @@ progress:
     epoch_save_checkpoint: 10000
     local_progress: True
 
-    epoch_val: 500
+    epoch_val: 5000
     save_progress_val: True
     max_samples_val: 1
 
@@ -72,7 +72,7 @@ dataset:
         scene_name: lego
         img_scale: 1.0
         center_pixel: True
-        #scale_radius: 3.0
+        scale_radius: 3.0
         precache: True
         device: gpu
         scheduler:
@@ -84,18 +84,18 @@ dataset:
             dynamic_batch_size:
                 update_epoch: 16
 
-#    val:
-#        skip: 8
-#        type: NeRF
-#        scene_name: lego
-#        img_scale: 1.0
-#        center_pixel: True
-#        #scale_radius: 3.0
-#        precache: False
-#        device: gpu
-#        augmentation:
-#            blend_bkg_color:
-#                bkg_color: [1.0, 1.0, 1.0]
+    val:
+        skip: 8
+        type: NeRF
+        scene_name: lego
+        img_scale: 1.0
+        center_pixel: True
+        scale_radius: 3.0
+        precache: False
+        device: gpu
+        augmentation:
+            blend_bkg_color:
+                bkg_color: [1.0, 1.0, 1.0]
 
     eval:
         eval_batch_size: 1
@@ -104,44 +104,40 @@ dataset:
         scene_name: lego
         img_scale: 1.0
         center_pixel: True
-        #scale_radius: 3.0
+        scale_radius: 3.0
         precache: False
         device: gpu
         augmentation:
             blend_bkg_color:
                 bkg_color: [1.0, 1.0, 1.0]
 
-#inference:
-#    to_gpu: True
-#    render:
-#        type: [spiral]
-#        n_cam: [60]
-#        repeat: [1]
-#        radius: 3.0
-#        u_start: 0.5
-#        v_range: [-0.6, -0.2]
-#        fps: 5
-#
-#    volume:
-#        n_grid: 512
-#        #origin: [0.0, -0.11, 0.0]
-#        #xyz_len: [1.2, 1.2, 2.0]
-#        origin: [0.5, 0.5, 0.5]
-#        side: 1.0
-#        level: 50.0
-#        chunk_pts_factor: 32
-#        render_mesh:
-#            backend: pytorch3d
+inference:
+    to_gpu: True
+    render:
+        type: [spiral]
+        n_cam: [60]
+        repeat: [1]
+        radius: 3.0
+        u_start: 0.5
+        v_range: [-0.6, -0.2]
+        fps: 5
+
+    volume:
+        n_grid: 512
+        origin: [0.0, -0.11, 0.0]
+        xyz_len: [1.2, 1.2, 2.0]
+        level: 50.0
+        chunk_pts_factor: 32
+        render_mesh:
+            backend: pytorch3d
 
 model:
     type: NeRF
     obj_bound:
         volume:
             n_grid: 128
-            #origin: [0.0, -0.11, 0.0]
-            #xyz_len: [1.2, 1.2, 2.0]
-            origin: [ 0.5, 0.5, 0.5 ]
-            side: 1.0
+            origin: [0.0, -0.11, 0.0]
+            xyz_len: [1.2, 1.2, 2.0]
         epoch_optim: 16
         epoch_optim_warmup: 256
         ray_sample_acc: True
@@ -168,10 +164,8 @@ model:
             type: HashGridEmbedder
             input_dim: 3
             n_freqs: 0  # do not do geo init
-            #origin: [0.0, -0.11, 0.0]
-            #xyz_len: [1.2, 1.2, 2.0]
-            origin: [ 0.5, 0.5, 0.5 ]
-            side: 1.0
+            origin: [-1.0, -0.11, 1.0]
+            xyz_len: [1.2, 1.2, 2.0]
             n_levels: 16
             n_feat_per_entry: 2
             hashmap_size: 19
