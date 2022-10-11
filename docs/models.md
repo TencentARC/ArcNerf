@@ -252,6 +252,8 @@ the main object in a volume/sphere for accurate and concentrate sampling, or wit
   - depth_far: depth value for invalid rays. By default `10.0`.
   - normal: normal for invalid rays. float in `0~1`. By default `(0.0, 1.0, 0.0)`, up direction.
   - progress: For the progress(pts in rays), it will all be set with zeros values.
+  - log_max_allowance: Set this to allow dynamic adjustment of the batch size. It must use any bound structure
+    to create a coarse `mask_pts`. It will adjust num of rays to fit the valid num of pts around (`1 << log_max_allowance`)
 
 Following are real modeling methods:
 

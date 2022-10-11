@@ -94,6 +94,14 @@ class Base3dModel(BaseModel):
         geo_net = self.get_net()[0]
         geo_net.pretrain_siren()
 
+    def get_dynamicbs_factor(self):
+        """Get the dynamic factor from fg model"""
+        return 1
+
+    def reset_measurement(self):
+        """Reset the measurement for dynamic batchsize from fg model"""
+        return
+
     def ray_marching(
         self,
         sigma: torch.Tensor,

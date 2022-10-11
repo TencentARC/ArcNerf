@@ -214,9 +214,9 @@ class ArcNerfTrainer(BasicTrainer):
         """Process all concat data"""
         self.data['train'] = self.train_pipeline.process_train_data(self.logger, self.data['train'])
 
-    def get_train_batch(self):
+    def get_train_batch(self, epoch):
         """Get the train batch base on mode"""
-        data_batch = self.train_pipeline.get_train_batch(self.data['train'])
+        data_batch = self.train_pipeline.get_train_batch(self.data['train'], epoch, self.model)
 
         return data_batch
 
@@ -508,7 +508,7 @@ class ArcNerfTrainer(BasicTrainer):
 
         # each epoch just contains one step for nerf training
         t_start = time.time()
-        loss_all = self.train_step(epoch, 0, step_in_epoch, self.get_train_batch())
+        loss_all = self.train_step(epoch, 0, step_in_epoch, self.get_train_batch(epoch))
         epoch_time = time.time() - t_start
         if epoch % self.cfgs.progress.epoch_loss == 0:
             self.logger.add_log('Epoch time {:.3f} s/iter'.format(epoch_time))
@@ -550,6 +550,7 @@ class ArcNerfTrainer(BasicTrainer):
             if self.data['val'] is not None and self.cfgs.progress.epoch_val > 0:
                 if epoch > 0 and epoch % self.cfgs.progress.epoch_val == 0:
                     self.valid_epoch(epoch, step_in_epoch)
+                    self.model.reset_measurement()  # for dynamic batchsize reset
 
             if self.data['eval'] is not None and self.cfgs.progress.epoch_eval > 0:
                 if (epoch + 1) % self.cfgs.progress.epoch_eval == 0:

@@ -40,12 +40,21 @@ class FgModel(Base3dModel):
             params['bkg_color'] = [1.0, 1.0, 1.0]  # white
             params['depth_far'] = 10.0  # far distance
             params['normal'] = [0.0, 1.0, 0.0]  # for eikonal loss cal, up direction
+            # This is for foreground model only to use the dynamic batchsize
+            params['max_allowance'] = -1  # do not use update
         else:
             cfgs = self.cfgs.model.obj_bound
             # bkg color/depth/normal for invalid rays
             params['bkg_color'] = get_value_from_cfgs_field(cfgs, 'bkg_color', [1.0, 1.0, 1.0])  # white
             params['depth_far'] = get_value_from_cfgs_field(cfgs, 'depth_far', 10.0)  # far distance
             params['normal'] = get_value_from_cfgs_field(cfgs, 'normal', [0.0, 1.0, 0.0])  # for eikonal loss cal
+            # This is for foreground model only to use the dynamic batchsize
+            params['max_allowance'] = get_value_from_cfgs_field(self.cfgs.model.obj_bound, 'log_max_allowance', -1)
+            if params['max_allowance'] > 0:
+                params['max_allowance'] = 1 << params['max_allowance']
+
+        params['measured_batch_size'] = 0
+        params['measured_count'] = 0
 
         return params
 
@@ -87,6 +96,35 @@ class FgModel(Base3dModel):
     def set_optim_cfgs(self, key, value):
         """Set optim cfgs by optional key in the obj bound class"""
         return self.obj_bound.set_optim_cfgs(key, value)
+
+    def reset_measurement(self):
+        """Reset the measurement for dynamic batchsize"""
+        self.set_render_cfgs('measured_batch_size', 0)
+        self.set_render_cfgs('measured_count', 0)
+
+    def adjust_dynamicbs_factor(self, mask_pts):
+        """Adjust the measure batchsize by max_allowance pts"""
+        max_allowance = self.get_render_cfgs('max_allowance')
+        if max_allowance > 0 and mask_pts is not None:
+            n_valid_pts = float(mask_pts.sum())
+
+            self.set_render_cfgs('measured_count', self.get_render_cfgs('measured_count') + 1)
+            self.set_render_cfgs(
+                'measured_batch_size',
+                self.get_render_cfgs('measured_batch_size') + float(max_allowance) / (n_valid_pts + 1)
+            )
+
+    def get_dynamicbs_factor(self):
+        """Get the dynamic_factor for dynamic batchsize adjustment"""
+        if self.get_render_cfgs('measured_count') > 0:
+            dynamic_factor = (self.get_render_cfgs('measured_batch_size') / self.get_render_cfgs('measured_count'))
+        else:
+            dynamic_factor = 1
+
+        # reset for next round
+        self.reset_measurement()
+
+        return dynamic_factor
 
     @torch.no_grad()
     def get_near_far_from_rays(self, inputs):
@@ -144,6 +182,10 @@ class FgModel(Base3dModel):
             pass
         else:  # both not None, update real mask_rays
             mask_rays = torch.logical_and(mask_rays, torch.any(mask_pts, dim=1))  # update the mask_rays
+
+        # adjust dynamic batchsize factor
+        if not inference_only:
+            self.adjust_dynamicbs_factor(mask_pts)
 
         # handle the case of sparse rays
         if mask_rays is not None:

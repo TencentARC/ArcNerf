@@ -24,6 +24,9 @@ A `Pipeline` class is in the trainer dir to process all the data, and sample dat
   - color: If you use `random`, will use random bkg color for background rays. Otherwise, you can use (1, 1, 1) or other
   to set the rgb value.
 
+- dynamic_batchize:
+  - Use for fg model to dynamically adjust num of rays
+  - update_epoch: set up update num of rays every update epoch.
 
 ------------------------------------------------------------------------
 ## Common_Trainer

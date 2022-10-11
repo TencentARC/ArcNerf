@@ -70,6 +70,9 @@ class Pipeline(object):
         # ray sample preparation
         train_data = self.step_ray_sample(logger, train_data)
 
+        # dynamic batch_size
+        self.step_dynamic_bs(logger)
+
         # bkg color handling
         self.step_bkg_color(logger, train_data)
 
@@ -171,15 +174,30 @@ class Pipeline(object):
 
         return train_data
 
+    def step_dynamic_bs(self, logger):
+        """Adjust the dynamic batch size"""
+        if valid_key_in_cfgs(self.scheduler_cfg, 'dynamic_batch_size') \
+                and get_value_from_cfgs_field(self.scheduler_cfg.dynamic_batch_size, 'update_epoch', 0) > 0:
+            update_epoch = self.scheduler_cfg.dynamic_batch_size.update_epoch
+            self.set_info('dynamic_batch_size', update_epoch)
+            logger.add_log('Dynamically adjust training batch size every {} epoches...'.format(update_epoch))
+            assert not (self.get_info('sample_mode') == 'full' and not self.get_info('sample_cross_view')), \
+                'Not allow full image without cross view'
+        else:
+            self.set_info('dynamic_batch_size', 0)
+
     def step_bkg_color(self, logger, train_data):
         """bkg color handling. Just log information"""
         if self.scheduler_cfg is not None and valid_key_in_cfgs(self.scheduler_cfg, 'bkg_color') \
                 and 'mask' in train_data.keys():
             logger.add_log('Train with bkg color: {}'.format(self.scheduler_cfg.bkg_color.color))
 
-    def get_train_batch(self, train_data):
+    def get_train_batch(self, train_data, epoch, model):
         """Get the training batch from prepared inputs"""
         data_batch = {}
+
+        # update n_rays
+        self.fetch_step_update_dynamic_bs(epoch, model)
 
         # fetch data by ray sample
         data_batch = self.fetch_step_ray_sample(train_data, data_batch)
@@ -191,6 +209,21 @@ class Pipeline(object):
         data_batch = self.fetch_step_other_type(train_data, data_batch)
 
         return data_batch
+
+    def fetch_step_update_dynamic_bs(self, epoch, model):
+        """Update dynamic batch size"""
+        n_rays = self.get_info('n_rays')
+
+        if self.get_info('dynamic_batch_size') > 0:
+            update_epoch = self.get_info('dynamic_batch_size')
+            if epoch % update_epoch == 0 and epoch > 500:  # fix warmup
+                dynamic_factor = model.get_dynamicbs_factor()
+
+                def div_round_up(val, divisor):
+                    return (val + divisor - 1) // divisor
+
+                dynamic_n_rays = int(div_round_up(n_rays * dynamic_factor, 128) * 128)  # For CUDA usage
+                self.set_info('n_rays', dynamic_n_rays)
 
     def fetch_step_ray_sample(self, train_data, data_batch):
         """Fetch rays from full tensor by mode"""

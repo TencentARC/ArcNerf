@@ -451,3 +451,11 @@ class FullModel(nn.Module):
     def get_est_opacity(self, dt, pts: torch.Tensor):
         """Only the fg model can forward pts"""
         return self.fg_model.get_est_opacity(dt, pts)
+
+    def get_dynamicbs_factor(self):
+        """Get the dynamic factor from fg model"""
+        return self.fg_model.get_dynamicbs_factor()
+
+    def reset_measurement(self):
+        """Reset the measurement for dynamic batchsize from fg model"""
+        self.fg_model.reset_measurement()
