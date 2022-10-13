@@ -195,7 +195,7 @@ class FgModel(Base3dModel):
                 zvals_valid = zvals[mask_rays]
                 mask_pts_valid = mask_pts[mask_rays] if mask_pts is not None else None
 
-                # rare case, the batch send in are all from background
+                # rare case, the batch send in are all from background. Make a fake ray to get output keys.
                 empty_batch = False
                 if torch.sum(mask_rays) == 0:
                     empty_batch = True

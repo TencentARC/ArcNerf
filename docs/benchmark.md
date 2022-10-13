@@ -14,7 +14,7 @@ Expname are in the format of `{dataset}_{scene}_{model}_{other_settings}`.
 |  NeRF  |configs/expr/NeRF/lego/nerf_lego_nerf.yaml|32.86|https://github.com/yenchenlin/nerf-pytorch|32.3|32.54|  |
 |  NeuS  |configs/expr/NeRF/lego/nerf_lego_neus.yaml|30.81|https://github.com/Totoro97/NeuS| 31.12 |  NA |embed_pts=10 following official repo|
 | VolSDF |configs/expr/NeRF/lego/nerf_lego_volsdf.yaml|28.25| https://github.com/lioryariv/volsdf | 20.77 |NA| Official repo not converge well on lego scene  |
-|MipNeRF |configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml|32.95| https://github.com/google/mipnerf | TODO |35.74| TODO: Not match up yet|
+|MipNeRF |configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml|34.19| https://github.com/google/mipnerf | TODO |35.74| TODO: Not fully match up yet|
 
 * NeRF: We have another repo contains only the function for vanilla nerf. You can visit [simplenerf](https://github.com/TencentARC/simplenerf) for more detail.
 

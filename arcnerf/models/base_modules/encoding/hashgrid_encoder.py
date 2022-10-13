@@ -22,6 +22,8 @@ except ImportError:
 class HashGridEmbedder(nn.Module):
     """The multi-res hash-grid embedder introduced in instant-ngp
     ref: https://github.com/NVlabs/tiny-cuda-nn / https://github.com/ashawkey/torch-ngp
+
+    The torch-version is slow and cost memory. Just for learning purpose, not fully test. Use `tcnn` backbone.
     """
 
     def __init__(
@@ -106,7 +108,6 @@ class HashGridEmbedder(nn.Module):
                     'base_resolution': self.base_res,
                     'per_level_scale': float(self.per_level_scale),
                 },
-                dtype=dtype  # TODO: will fp16 fast without loss acc
             )
 
         self.out_dim = n_levels * n_feat_per_entry + include_input * input_dim  # L * F + 3
