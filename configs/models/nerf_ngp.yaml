@@ -2,22 +2,29 @@
 
 model:
     type: NeRF
-    obj_bound:
-        volume:
-            n_grid: 128
-            side: 2.0
-        epoch_optim: 16
-        epoch_optim_warmup: 256
+    obj_bound:                          # use object bound for fg model
+        volume:                         # volume bound or sphere bound
+            n_grid: 128                 # resolution of the volume
+            side: 2.0                   # size of volume
+        epoch_optim: 16                 # epoch pruning the volume
+        epoch_optim_warmup: 256         # warmup period for pruning
+        ray_sample_acc: True            # sampling in the pruning voxel instead of all
+        ray_sample_fix_step: True       # fix step sampling
+        near_distance: 0.2              # near distance
+        opa_thres: 0.01                 # threshold to filter voxel
+        bkg_color: [0.0, 0.0, 0.0]      # default bkg color for empty ray
+        depth_far: 10.0                 # default zvals for empty ray
+        log_max_allowance: 18           # only used for dynamic batch_size, 1 << 18 = 4096*64
     rays:
         n_sample: 1024                # n_sample for zvals sampling
         n_importance: 0               # do not use hierarchical sampling
         inverse_linear: False         # inverse_linear make zvals close to near
         perturb: True                 # perturb zvals interval
-        add_inf_z: True               # Add inf zval for ray marching
+        add_inf_z: False              # Add inf zval for ray marching
         noise_std: 1.0                # noise for sigma in training
         white_bkg: False              # cast the background as white
     chunk_rays: 32768                 # each chunk to process 1024*32(ray), enough for 32 GB
-    chunk_pts: 131072                 # each chunk to progress 4096*32(pts), for model forward
+    chunk_pts: 1048576                # each chunk to progress 4096*256(pts), for model forward
     geometry:
         type: FusedMLPGeoNet          # fused mlp
         W: 64                         # linear hidden neuron
@@ -33,14 +40,14 @@ model:
             n_feat_per_entry: 2       # num of feat in each entry
             hashmap_size: 19          # 2**hashmap_size for hashmap size in each bin
             base_res: 16              # base res on each xyz dim
-            max_res: 512              # last res
+            max_res: 2048             # last res
             backend: tcnn             # backend: support torch/cuda/tcnn
         W_feat: 16                    # extra feature output
         out_act_cfg:
             type: TruncExp            # follow official implementation
     radiance:
         type: FusedMLPRadianceNet     # fused mlp
-        mode: 'vf'                    # view_dir and feature only
+        mode: 'fv'                    # view_dir and feature only. The order affect fusemlp result
         W: 64                         # linear hidden dim
         D: 2                          # num of linear, not include final
         encoder:

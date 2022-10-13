@@ -102,8 +102,8 @@ class FusedMLPGeoNet(EncoderMLPGeoNet):
         if self.W_feat <= 0:  # (B, 1), None
             out_geo = out
         else:  # (B, 1), (B, W_feat)
-            out_geo = out[:, 0].unsqueeze(-1).clone()
-            out_feat = out.clone()
+            out_geo = out[:, 0].unsqueeze(-1)
+            out_feat = out
 
         if self.out_act is not None:
             out_geo = self.out_act(out_geo)

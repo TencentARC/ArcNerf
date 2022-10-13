@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import numpy as np
 import torch
 
 from .base_network import BaseGeoNet, BaseRadianceNet
@@ -59,6 +60,7 @@ class EncoderMLPRadainceNet(BaseRadianceNet):
         Args:
             mode: 'p':points(xyz) - 'v':view_dirs - 'n':normals - 'f'-geo_feat
                   Should be a str combining all used inputs. By default 'vf', use view_dir and geo_feat like nerf.
+                  The order sometimes matters, but not large.
         """
         super(EncoderMLPRadainceNet, self).__init__()
         self.mode = mode
@@ -101,6 +103,14 @@ class EncoderMLPRadainceNet(BaseRadianceNet):
             inputs.append(normals)
         if 'f' in self.mode:
             inputs.append(geo_feat)
+
+        # sort by pvnf order. Sometimes affect performance
+        d = {'p': 0, 'v': 1, 'n': 2, 'f': 3}
+        arr = []
+        for m in self.mode:
+            arr.append(d[m])
+        arr = np.argsort(arr).tolist()
+        inputs = [inputs[i] for i in arr]
 
         out = torch.cat(inputs, dim=-1)
         assert out.shape[-1] == self.init_input_dim, 'Shape not match'
