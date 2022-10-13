@@ -20,7 +20,7 @@ Expname are in the format of `{dataset}_{scene}_{model}_{other_settings}`.
 
 -----------------------------------------------------------------------
 
-#### Instant-NGP
+#### Instant-NGP on lego
 The highly optimized [instant-ngp](https://github.com/NVlabs/instant-ngp) model, official performance:
 - max_samples: 1024, color space: sRGB, max_res: 2048, lr=1e-2
 - The original eval uses black background, but original `NeRF` uses white bkg
@@ -34,17 +34,21 @@ The highly optimized [instant-ngp](https://github.com/NVlabs/instant-ngp) model,
 | 5w  |~5min| 36.36 | 35.78 | 36.02 | 35.12 |
 
 Our result:
+- On white background. Use customize volume in torch(Not many cuda code).
+- Original repo converge much faster. (But replica like `JNeRF`/`XRNeRF` also do not converage that fast)
 
-| Num steps | time | PSNR |
-|:---------:|:----:|:----:|
-| 100 | ~1s | 21.46 |
-| 500 | ~1s | 21.46 |
-| 2k  | ~1s | 21.46 |
-| 1w  | ~1s | 21.46 |
-| 5w  | ~1s | 21.46 |
+| Num steps | time | PSNR | comment   |
+|:---------:|:----:|:----:|:---------:|
+| 100 | ~4s  | 14.17 | Crop stage, not converge well|
+| 500 | ~18s | 17.07 | Crop stage, not converge  well|
+| 2k  | ~40s | 26.42 |  |
+| 1w  | ~3min| 31.90 |  |
+| 5w  | ~17min  | 34.53 | |
 
-* We have another repo contains only the function for instant-ngp, which runs much faster than this repo.
-You can visit [simplengp](https://github.com/TencentARC/simplengp) for more detail.
+* Many factor that could affect the result(Like using `black background` improve PSNR to `35.0`.)
+* We implement most of the operation in torch rather than Highly optimized CUDA kernels. It is more flexible for experiment but slower in speed.
+* We have another repo contains only the function for instant-ngp, which runs faster(`~12 min`) and better than this repo. It contains functions for ngp only.
+It uses more CUDA implementation from original repo. You can visit [simplengp](https://github.com/TencentARC/simplengp) for more detail and expr log.
 
 
 -----------------------------------------------------------------------
@@ -60,4 +64,7 @@ We only use non-ndc version. For ndc space, you need to refer to our [simplenerf
 
 -----------------------------------------------------------------------
 
-# Time and speed
+## Capture
+### qqtiger
+It is a more daily scene captured by us. It reflects the algorithm performance on common daily scenes.
+It contains a foreground object and background.
