@@ -12,6 +12,8 @@ Some tests do not use check but give visual results in `tests/xxx/results`
 
 We set default cfg file path at `__init__.py`. You can change it and tests will read the config from it.
 
+Many of the tests on `geometry` or `model` will save visible results in the result dir.
+
 ------------------------------------------------------------------------
 # tests_common
 Tests for common class. Directly obtained from `common_trainer` project.

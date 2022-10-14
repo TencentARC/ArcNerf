@@ -42,10 +42,10 @@ Our result:
 | 100 | ~4s  | 14.17 | Crop stage, not converge well|
 | 500 | ~18s | 17.07 | Crop stage, not converge  well|
 | 2k  | ~40s | 26.42 |  |
-| 1w  | ~3min| 31.90 |  |
-| 5w  | ~17min  | 34.53 | |
+| 1w  | ~3min| 31.99 |  |
+| 5w  | ~17min  | 34.65 | |
 
-* Many factor that could affect the result(Like using `black background` improve PSNR to `35.0`.)
+* Many factor that could affect the result(Like using `black background` improve PSNR to `~35.0`.)
 * We implement most of the operation in torch rather than Highly optimized CUDA kernels. It is more flexible for experiment but slower in speed.
 * We have another repo contains only the function for instant-ngp, which runs faster(`~12 min`) and better than this repo. It contains functions for ngp only.
 It uses more CUDA implementation from original repo. You can visit [simplengp](https://github.com/TencentARC/simplengp) for more detail and expr log.

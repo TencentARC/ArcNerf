@@ -70,6 +70,7 @@ dataset:
         img_scale: 1.0
         scale_radius: 3.0
         align_cam: True
+        device: gpu
         precache: True
 
     val:
@@ -78,6 +79,7 @@ dataset:
         img_scale: 0.25
         scale_radius: 3.0
         align_cam: True
+        device: gpu
         precache: False
 
     eval:
@@ -88,9 +90,11 @@ dataset:
         img_scale: 1.0
         scale_radius: 3.0
         align_cam: True
+        device: gpu
         precache: True
 
 inference:
+    to_gpu: True
     render:
         type: [swing]
         n_cam: [20]

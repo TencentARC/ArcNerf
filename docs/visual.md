@@ -78,3 +78,8 @@ helpful to plot points/lines in defined colors with legends. We use `matplotlib`
 ------------------------------------------------------------------------
 # Notebook:
 - We provide the python notebook in `notebooks/draw_3d_examples.ipynb` to use the render.
+
+
+------------------------------------------------------------------------
+# release repo
+We also have clean version on this visual helper at [ArcVis](https://github.com/TencentARC/ArcVis).

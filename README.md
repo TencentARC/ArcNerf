@@ -46,6 +46,14 @@ git clone --recursive xxx
 ### Self-Capture data and Colmap
 
 
+### Visual helper
+
+![ray_pc](assets/datasets/ray_pc.gif)
+![cam_pc](assets/datasets/cam_pc.gif)
+![pts_pc](assets/datasets/pts_pc.gif)
+
+
+
 ------------------------------------------------------------------------
 ## Models
 

@@ -71,6 +71,7 @@ dataset:
         scale_radius: 3.0
         pc_radius: 2.0
         skip: 10
+        device: gpu
         precache: True
 
     val:
@@ -80,6 +81,7 @@ dataset:
         scale_radius: 3.0
         pc_radius: 2.0
         skip: 10
+        device: gpu
         precache: False
 
     eval:
@@ -91,9 +93,11 @@ dataset:
         scale_radius: 3.0
         pc_radius: 2.0
         skip: 10
+        device: gpu
         precache: True
 
 inference:
+    to_gpu: True
     render:
         type: [circle]
         n_cam: [20]

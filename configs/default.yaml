@@ -102,6 +102,10 @@ dataset:
             precrop:                 # crop the image to keep center rays
                 ratio: 0.5           # num of ratio keep on each dim
                 max_epoch: 500       # max epoch for precropping
+#            bkg_color:               # bkg color for training batch, mask must exist
+#                color: random        # random background is better for main object optimization. Set [1.0, 1.0, 1.0] for white bkg
+#            dynamic_batch_size:      # only use when fg model with volume pruning
+#                update_epoch: 16     # freq to update
 
     val:
         type: Capture
@@ -114,6 +118,9 @@ dataset:
         center_pixel: False
         precache: False
         device: cpu
+#        augmentation:
+#            blend_bkg_color:                       # could be used in lego to force a bkg_color
+#                bkg_color: [ 1.0, 1.0, 1.0 ]
 
     eval:
         eval_batch_size: 1
@@ -165,7 +172,7 @@ inference:
         render_mesh:                # If True, will render the extracted mesh(in color and geo only)
             backend: pytorch3d      # Select the render backend type. (Open3d, pytorch3d)
 
-model:
+model:                              # for more detail on model, visit the `docs/models.md` and `configs/models` for detail
     type: NeRF
 #    obj_bound:                       # this helps to bound the obj in a smaller structure and save computation
 #        sphere:                      # sphere used for neus/volsdf and some sdf method
@@ -218,12 +225,13 @@ model:
 
 loss:
     ImgLoss:
-        keys: ['rgb_coarse', 'rgb_fine']
-        weight: 1.0
+        keys: ['rgb_coarse', 'rgb_fine']        # The key in training depends on the model setting
+        loss_type: MSE                          # Support `MSE`, `L1`, `Huber`
+        weight: 1.0                             # Weight for on loss
 
 metric:
-    PSNR:
+    PSNR:                                       # eval by default only one key `rgb`
 
 train_metric:
     PSNR:
-        key: 'rgb_fine'
+        key: 'rgb_fine'                         # `rgb` for one stage output, `rgb_fine` for two stage fine output

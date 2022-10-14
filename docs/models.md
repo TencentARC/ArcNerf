@@ -56,10 +56,10 @@ encoder:  # This is the encoder in NSVF
         n_freqs: 6
 ```
 You need to specify the `sub_encoder_types` and `sub_encoder#` for ordered encoders. You only need the input_dim
-for init input and it will calculate the input/output dims.
+for init input, and it will calculate the input/output dims.
 
 ## Tiny-cuda-nn
-Some encoders are implemented in [tiny-cuda-nn]() by Nvidia. You should clone the repo `--recursive`
+Some encoders are implemented in [tiny-cuda-nn](https://github.com/nvlabs/tiny-cuda-nn) by Nvidia. You should clone the repo `--recursive`
 and install them by `sh scripts/install_tinycudann.sh`.
 
 ------------------------------------------------------------------------
@@ -77,14 +77,21 @@ You should set `model.obj_bound` to set the bounding structure.
 It does not contain any structure, and the sampling is performing based on ray configs. Points are either in a near/far
 range, or bounding by a sphere with larger radius that can cover all cameras.
 
+![no_bound](../assets/models/no_bound.gif)
+
 ### VolumeBound
 It contains a dense volume with bitfield to record the density in every voxel. Optimization can be performed if you set.
 The points then will be sampled in remaining voxel. And rays computation can be largely reduced in coarse structure.
 - origin/n_grid/xyz_len/side: The information of the volume.
 
+![volume_bound](../assets/models/volume_bound.gif)
+![coarse_volume](../assets/models/coarse_volume.gif)
+
 ### SphereBound
 It contains a smaller sphere bounding the real object. In sdf modeling like `Neus`, it samples inside such a sphere.
 - origin/radius: The information of the sphere.
+-
+![sphere_bound](../assets/models/sphere_bound.gif)
 
 ------------------------------------------------------------------------
 ## BaseGeoNet/BaseRadianceNetwork
@@ -163,7 +170,7 @@ But it could be overwritten by hardcode near/far.
 
 For point sampling:
 - n_sample: Init sample point.
-- n_importance: Point sampled from hierarchical sampling
+- n_importance: Point sampled from hierarchical sampling. For pruning methods, we are still able to use resampling for more accurate boundary estimation.
 - perturb: perturb zvals during training.
 - inverse_linear: If True, more points are sampled closer to near zvals.
 
@@ -172,8 +179,9 @@ For ray marching(color blending):
     - If you add a separate background model, you should not use it, so that ray inside the sphere focus on the object.
 - noise_std: if >0.0, add to sigma when ray marching. good for training.
 - white_bkg: If True, will make the rays with mask = 0 as rgb = 1.0
-- rand_bkg_color: If True, will use the mask to blend a random background color to the input images. This helps to
-                    facilitate the training of some synthetic scenes. Only used in training and data with mask.
+- alpha: Some methods directly give alpha rather than use density.
+- bkg_color: If True, will use the mask to blend a background color to the input images. This helps to
+             facilitate the training of some synthetic scenes if used random bkg. Only used in training and data with mask.
 
 ------------------------------------------------------------------------
 # background
@@ -279,13 +287,18 @@ A simple tutorial is in `notebooks/surface_render.ipynb`.
 It is combination of GeoNet and RadianceNet, with up sample, resample pdf, ray marching, etc.
 
 Since it gets sdf value instead of sigma, we do not support sigma mode for blending.
-(Actuall we can do, but `rgb blending` has better result)
+(Actually we can do, but `rgb blending` has better result)
 
 - init_var: use to init the inv_s param. By default `inv_s = -np.log(init_var)/speed_factor`, init as `0.05`
 - speed_factor: use to init the inv_s, and get scale by `exp(inv_s * speed_factor``. By default `10`.
 - anneal_end: num of epoch for slope blending. In infer model, the factor is `1`, else `min(epoch/anneal_end, 1)`
 - n_iter: num of iter to run upsample algo.
 - radius_bound: This is the interest of radius that we bound.
+
+* A unit test in `tests.tests_arcnerf.tests_neus.py` show the upsample algorithm's benefit.
+*
+![neus](../assets/models/neus.png)
+![neus2](../assets/models/neus2.png)
 
 ### VolSDF
 [VolSDF](https://arxiv.org/abs/2106.12052) models sdf as well but used different sdf_to_density function and sampling method compared with NeuS.
@@ -300,6 +313,9 @@ Since it gets sdf value instead of sigma, we do not support sigma mode for blend
 
 The performance is worse than Neus as we test.
 
+* A unit test in `tests.tests_arcnerf.tests_volsdf.py` show the upsample algorithm's benefit.
+![volsdf](../assets/models/volsdf.png)
+
 ### Instant-ngp
 [Instant-ngp](https://arxiv.org/abs/2201.05989) is not a model. It uses `HashGridEmbedder` and `SHEmbedder` to
 accelerate the training progress. For volume-based acceleration, you should set `obj_bound` as a volume, use do
@@ -310,6 +326,8 @@ and density update. Only a single `N_grid**3` density bitfield is used for recor
 use the volume not normalized as a `[0, 1]` cuda but with customized position and length. The sampling is based
 on the customized volume.
 
+The converge is like:
+![ngp](../assets/models/ngp.gif)
 ------------------------------------------------------------------------
 ## bkg_model
 Here are the class of bkg_model, which concentrates on building the background.

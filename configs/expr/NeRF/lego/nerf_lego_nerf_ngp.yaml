@@ -121,6 +121,7 @@ inference:
         u_start: 0.5
         v_range: [-0.6, -0.2]
         fps: 5
+        center_pixel: True
 
     volume:
         n_grid: 512

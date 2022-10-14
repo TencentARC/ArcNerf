@@ -28,6 +28,7 @@ Will not touch intrinsic. If point cloud exists, rescale them by same factor to 
 - exchange_coord: Flexible to exchange/flip the coord to a standard system.
 - eval_max_sample: To keep the closest-to-center_pose samples in the split.
 Done after camera `scale_radius`. The radius is restricted within `scale_radius` range.
+- ndc_space/center_pixel: Affect the ray sampling function in `get_rays`.
 ## Augmentation:
 The augmentation is for all image process in all time.
 - n_rays: Sample `n_rays` instead of using all. But calling it every time may sample overlapping rays, not use in train.
@@ -86,7 +87,7 @@ Will write data to `cfgs.dir.data_dir/Capture/scene_name`
 - match_type: `sequential_matcher` is good for sequential ordered images.
               `exhaustive_matcher` is good for random ordered image.
 - dense_reconstruct: If true, run dense_reconstruct and get dense point cloud and mesh.
-### Mask generation
+### Mask/Segmentation estimation
 - TODO: We may add it in the future.
 ### Volume regression from mask
 If mask is provided, we use all masks in training set to get the 2d bbox, and simply regress a 3d volume for the object.
@@ -95,6 +96,8 @@ methods.
 - Run `python tools/get_3d_bbox_from_silhouette.py --configs configs/datasets/DATASET_NAME/SCENE_NAME.yaml`, you should
 prepare a yaml file for this dataset and scene. It will output the regressed volume information and visualization of
 volume and bbox.
+- TODO: It is still a developing function. We plan to make the estimation more closely bounding to the object, and set
+the pruning volume as model initialization.
 ### Dataset
 Use `Capture` class for this dataset. It is specified by scene_name.
 - scene_name: scene_name that is the folder name under `Capture`. Use it to be identifier.
@@ -112,6 +115,23 @@ which is close to object center, adjust cam/pc by this offset. This is optional 
 - We test and show that the method is robust to make the coordinate system such that object is centered at (0,0,0),
 cam is on surface with `scale_radius`. Only scale and translation is applied, do not affect the intrinsic.
 
+File Structure is:
+```
+Capture
+└───qqtiger
+│     └───images
+│     │    └─── *.jgp
+│     └───colmap_output.txt
+│     └───database.db
+│     └───poses_bounds.npy
+│     └───sparse
+│           └─── 0
+│               └─── cameras.bin
+│               └─── images.bin
+│               └─── points3D.bin
+│               └─── project.ini
+└───etc(other scenes)
+```
 
 ------------------------------------------------------------------------
 ## Standard benchmarks
@@ -169,11 +189,11 @@ LLFF
 │     │    └─── *.JPG
 │     └───mpis4
 │     └───sparse
-│     │    └─── 0
-│     │    │    └─── cameras.bin
-│     │    │    └─── images.bin
-│     │    │    └─── points3D.bin
-│     │    │    └─── project.ini
+│          └─── 0
+│               └─── cameras.bin
+│               └─── images.bin
+│               └─── points3D.bin
+│               └─── project.ini
 │     └───database.db
 │     └───poses_bounds.npy
 │     └───simplices.npy
@@ -279,9 +299,9 @@ MipNeRF360
 │     │    └─── *.JPG
 │     └───sparse
 │     │    └─── 0
-│     │    │    └─── cameras.bin
-│     │    │    └─── images.bin
-│     │    │    └─── points3D.bin
+│     │         └─── cameras.bin
+│     │         └─── images.bin
+│     │         └─── points3D.bin
 │     └───poses_bounds.npy
 └───counter
 └───bicycle
@@ -377,7 +397,7 @@ use same resolution(Or scale if image really too large), and use custom cam path
 - test_holdout: In order to split train/eval images, use this to holdout testset, by default 8.
 only those will be fully rendered can calculate metric.
 
-For some standard benchmark(`NeRF`/`NSVF`/`LLFF`), we follow the same split as they used for fair comparison.
+For some standard benchmark(`NeRF`/`NSVF`/`LLFF`), we follow the same split as official repos used for fair comparison.
 
 ------------------------------------------------------------------------
 ## Inference
@@ -395,6 +415,7 @@ Controls the params of render novel view(volume rendering), like the camera path
   - radius: radius of cam path, single value
   - u_start/u_range/v_ratio/v_range/normal/n_rot/reverse: for placing the cameras. Check `poses` for details.
   - fps: render video fps.
+  - center_pixel: Whether to generate the rays from `center_pixel` rather than corner.
 
 #### Surface_render
 If you set this, also render the view by finding the surface pts and render. Good for sdf models like Neus and volsdf.
@@ -407,6 +428,9 @@ If you set this, also render the view by finding the surface pts and render. Goo
 Controls the params of volume estimation and mesh extraction/rendering.
 
 We support extract the mesh from volume field and getting the colors of mesh/verts by normal direction.
+
+Remaining that this function is not always actually in `NeRF` like rendering methods, since they are not developed
+for mesh extraction. We plan to merge other mesh extraction methods.
 
 - origin/n_grid/side/xyz_len: params for volume position and size. Check `geometry/volume.py` for detail.
 - level/grad_dir: Determine the value flow. SDF is 0.0/ascent(inside smaller), density is +level/descent(inside larger).

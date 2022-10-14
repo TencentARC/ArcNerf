@@ -180,23 +180,6 @@ class TestDict(unittest.TestCase):
             save_path=file_path
         )
 
-        # some negative, early_stop
-        output = np_wrapper(ray_marching, sigma, None, zvals, False, 0.0, False, False, None, None, 0.01)
-
-        visual_list, _ = sample_ray_marching_output_by_index(output)
-        visual_list = visual_list[0]
-
-        file_path = osp.join(RESULT_DIR, 'ray_marching_early_stop.png')
-        draw_2d_components(
-            points=visual_list['points'],
-            lines=visual_list['lines'],
-            legends=visual_list['legends'],
-            xlabel='zvals',
-            ylabel='',
-            title='ray marching from synthesis input, early_step with 0.01 transmittance allowance',
-            save_path=file_path
-        )
-
     def tests_sample_pdf(self):
         sigma, zvals = self.create_systhesis_ray_input()
         output = np_wrapper(ray_marching, sigma, None, zvals)

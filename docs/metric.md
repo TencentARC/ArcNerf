@@ -1,5 +1,5 @@
 # img_metric
-Metric for evaluating image quality
+Metric for evaluating image quality. You should take care about the key on train/eval mode from model.
 
 ## PSNR
 PSNR between images, calculate from mean mse loss.

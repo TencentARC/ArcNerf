@@ -24,10 +24,22 @@ A `Pipeline` class is in the trainer dir to process all the data, and sample dat
   - color: If you use `random`, will use random bkg color for background rays. Otherwise, you can use (1, 1, 1) or other
   to set the rgb value.
 
-- dynamic_batchize:
+- dynamic_batchsize:
   - Use for fg model to dynamically adjust num of rays
   - update_epoch: set up update num of rays every update epoch.
 
+# get_progress and save visual 3D result
+If you open `get_progress` in `debug`, and set `--progress.save_progress(val) True`, the trainer will save 3d sample points
+with object bound in `expr_dir/progress/train(val)`.
+- But `get_progress` accumulate lots of points, which makes CUDA memory out in some cases, be careful to use.
+
+![pruning_pc](../assets/models/pruning_pc.gif)
+![pruning_pts](../assets/models/pruning_pts.gif)
+
+# Eval/Inference
+Refer to [datasets](datasets.md) for more details.
+
 ------------------------------------------------------------------------
 ## Common_Trainer
-The details of how to use the trainer please ref to `docs/common_trainer.md`.
+The details of how to use the trainer please ref to [common_trainer](common_trainer.md) and our project
+[common_trainer](https://github.com/TencentARC/common_trainer).

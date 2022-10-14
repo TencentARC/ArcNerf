@@ -69,6 +69,7 @@ dataset:
         scene_name: fern
         img_scale: 0.125
         ndc_space: False   # do not use ndc in arcnerf
+        device: gpu
         precache: True
 
     val:
@@ -76,6 +77,7 @@ dataset:
         scene_name: fern
         img_scale: 0.125
         ndc_space: False  # do not use ndc in arcnerf
+        device: gpu
         precache: False
 
     eval:
@@ -84,6 +86,7 @@ dataset:
         scene_name: fern
         img_scale: 0.125
         ndc_space: False  # do not use ndc in arcnerf
+        device: gpu
         precache: True
 
 model:

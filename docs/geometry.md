@@ -1,3 +1,6 @@
+# Geometry
+We implement the geometry class and operations in torch. Some CUDA Kernel is optional for acceleration.
+
 ------------------------------------------------------------------------
 # projection
 Function for cam projection from 3d points into image pixels
@@ -23,6 +26,10 @@ Functions for create/modify cam poses
 - average/center poses: get avg pose and recenter all poses
 - get cam on sphere by different mode
 
+![cam_spiral](../assets/geometry/cam_spiral.gif)
+![camera_circle](../assets/geometry/camera_circle.gif)
+
+
 ------------------------------------------------------------------------
 # sphere
 Many function about sphere is provided, including:
@@ -39,6 +46,9 @@ where `u` in `(0, 2pi)`, `v` in `(0, pi)`
 - y = cos(v)
 - z = sin(u) * sin(v)
 
+![sphere_line](../assets/geometry/sphere_line.png)
+![sphere_ray](../assets/geometry/sphere_ray.gif)
+
 ------------------------------------------------------------------------
 # ray
 Functions for ray point. ray is `(rays_o, rays_d)`, rays_d is always assumed to be normalized.
@@ -51,11 +61,16 @@ Functions for ray point. ray is `(rays_o, rays_d)`, rays_d is always assumed to 
 - surface_ray_intersection: find the ray-surface intersection. Support `sphere_tracing`/`root_finding`.
 - aabb_ray_intersection: find the ray-volume intersection.
 
+![rays](../assets/geometry/rays.gif)
+
 ------------------------------------------------------------------------
 # triangle
 Functions for triangle calculation.
 - get_tri_normal
 - get_tri_circumcircle
+
+![tri](../assets/geometry/tri.gif)
+![tri_norm](../assets/geometry/tri_norm.gif)
 
 ------------------------------------------------------------------------
 # mesh
@@ -67,6 +82,9 @@ Function for mesh extraction, color extraction, etc.
 - get_face_centers: get the triangle centers
 - simplify_mesh: simplify mesh
 - render_mesh: it will call open3d/pytorch3d backend to render the mesh by cam positions.
+
+
+![mesh](../assets/geometry/mesh.gif)
 
 ------------------------------------------------------------------------
 # volume
@@ -102,8 +120,15 @@ For ray in pts in volume, we provide a lot of function like
 - ray_volume_intersection: call the aabb intersection test and find the ray-volume intersection
   - ray_volume_intersection_in_occ_voxel: You can call to find the intersection in occupied voxels only
 - get_ray_pass_through: get the voxel_ids that the ray pass through
+
+
+![ray_pass](../assets/geometry/ray_pass.gif)
+![volume_bound_sample](../assets/geometry/volume_bound_sample.gif)
+
 ------------------------------------------------------------------------
 
 # point cloud
 Function of point cloud with pts and color.
 - save_point_cloud: export pc file as .ply file
+
+![pc](../assets/geometry/pc.gif)
