@@ -1,11 +1,13 @@
 # ArcNerf
 
+ArcNerf is a framework incorporating many state-of-the-art NeRF-based methods with useful functionality on novel view rendering
+and object extraction.
+
+The framework is highly modular, which allows you to modify any piece and develop your own algorithm easily.
+
+It is developed by [TencentARC Lab](https://arc.tencent.com/).
 
 ![nerf](assets/models/ngp.gif)
-
-------------------------------------------------------------------------
-
-
 
 ------------------------------------------------------------------------
 # Installation
@@ -13,7 +15,7 @@ Get the repo by `git clone https://github.com/TencentARC/ArcNerf --recursive`
 
 - Install libs by `pip install -r requirements.txt`.
 - Install the customized ops by `sh scripts/install_ops.sh`.
-- Install tiny-cuda-nn modules by `sh scripts/install_tinycudann.sh`.
+- Install tiny-cuda-nn modules by `sh scripts/install_tinycudann.sh`. (Only for `fusemlp`/`hashgrid encode`, etc)
 
 We test on env with:
 - GPU: NVIDIA-A100 with CUDA 11.1 (Lower version may harm the `tinycudann` module).
@@ -69,6 +71,9 @@ a complete, modular framework that is easy to change any of the components and c
 
 Toward the same goal, we are working on those fields could make this project helpful to the community:
 
+
+TODO: Add pipeline image
+
 - Highly modular design of pipeline:
   - Every field is seperated, and you can plug in any new developed module under the framework. Those fields
   can be easily controlled by the config files and modified without harming others.
@@ -89,46 +94,66 @@ Toward the same goal, we are working on those fields could make this project hel
 
 
 - Docs and Code:
-  - All the functions are with detailed docs on its usage, and the operation are comment with its tensor size,
-  which makes you easy to understand the change to components.
+  - All the functions are with detailed docs on its usage, and the operation are commented with its tensor size,
+  which makes you easy to understand the change of components.
   - We also provide many experiments [note](docs/expr.md) on our trails.
 
 
 - Tests and Visual helpers:
-  - We have developed an interactive visualizer to easily tests the correctness of our geometry function.
-  - We have written a lots of unittest on the geometry and modelling functions. Take a lot, and you will be easy to understand how
+  - We have developed an interactive visualizer to easily tests the correctness of our geometry function. It is compatible with torch/np arrays.
+  - We have written a lots of unittest on the geometry and modelling functions. Take a look, and you will be easy to understand how
   to use the visualizer for checking your own implementation.
 
 
-We are still working on many other helpful functions, please ref [todo](docs/todolist.md) for more details. Bring issues to us
-if you have any suggestions.
+We are still working on many other helpful functions for better rendering and extraction, please ref [todo](docs/todolist.md) for more details.
+
+Bring issues to us if you have any suggestion!
 
 
 ------------------------------------------------------------------------
 ## Datasets and Benchmarks
+All the datasets inherit the same data class for ray generation, img/mask preparation. What you need to do in a new class
+is to read image/camera poses under different mode split. The details are [here](docs/datasets.md).
 
 ### Self-Capture data and Colmap
-
+We support customized data by `Capture` dataset. You can record a clip of video around the object and run the pre-process
+script under `scripts/data_process.sh`. Notice that colmap results is highly correlated to your filming status. A clear, stable
+video with full angle towards the object could bring more accurate result.
 
 ### Visual helper
+We put all the dataset configs under [conf](configs/datasets), and you can check the result by running the unittest
+`tests/tests_arcnerf/tests_dataset/tests_any_dataset.py` and see the results.
+
+For any dataset that we have provided, you should check the configs like this to ensure the setting are correct.
 
 ![ray_pc](assets/datasets/ray_pc.gif)
 ![cam_pc](assets/datasets/cam_pc.gif)
 ![pts_pc](assets/datasets/pts_pc.gif)
 
 
+### Benchmark
+See [benchmark](docs/benchmark.md) for details, and [expr](docs/expr.md) for some trails we have conducted and some problems we have meet.
 
 ------------------------------------------------------------------------
 ## Models
+The models are highly modular. You only need to focus on
 
+TODO: Add module stucture image
 
 ### full_model
+Full model class is the main class for modeling.
 
+TODO: Not finish this!!!!
 
 ### Base_3d_model
 
 ------------------------------------------------------------------------
 ## Geometry
+
+We implement plentiful geometry function in torch under [geometry](arcnerf/geometry). The operation are batch-based, and their
+correctness are check under [unittests](tests/tests_arcnerf/tests_geometry).
+
+You can see the [doc](docs/geometry.md) for more details and know what is support.
 
 ------------------------------------------------------------------------
 ## Visualization
