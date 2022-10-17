@@ -6,9 +6,9 @@ from subprocess import check_output
 
 import numpy as np
 
+from common.utils.img_utils import get_n_img_in_dir, is_img_ext
 from .colmap_lib import read_model
 from .colmap_wrapper import run_colmap, run_colmap_dense
-from common.utils.img_utils import get_n_img_in_dir, is_img_ext
 
 
 def estimate_poses(scene_dir, logger, match_type, factors=None):

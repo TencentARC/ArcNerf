@@ -166,7 +166,7 @@ class VolSDF(SdfModel):
             cur_error = self.get_error_bound(beta0, sdf, zvals, d_star)  # (B, )
             beta[cur_error <= eps] = beta0
             beta_min, beta_max = beta0.repeat(zvals.shape[0]), beta  # (B, ) * 2
-            for j in range(self.get_ray_cfgs('beta_iter')):
+            for _ in range(self.get_ray_cfgs('beta_iter')):
                 beta_mid = (beta_min + beta_max) / 2.  # (B, )
                 cur_error = self.get_error_bound(beta_mid.unsqueeze(-1), sdf, zvals, d_star)
                 beta_max[cur_error <= eps] = beta_mid[cur_error <= eps]

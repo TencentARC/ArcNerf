@@ -90,7 +90,7 @@ class TestDict(unittest.TestCase):
         t_forward, t_backward, t_forward_only = 0.0, 0.0, 0.0
         for _ in range(self.n_run):
             # clear the grad
-            for k, v in input.items():
+            for _, v in input.items():
                 if isinstance(v, torch.Tensor):
                     if v.grad is not None:
                         v.grad.zero_()

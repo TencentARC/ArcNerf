@@ -91,7 +91,7 @@ def closest_point_to_rays(rays_o: torch.Tensor, rays_d: torch.Tensor, n_init_pai
     distance = torch.zeros(size=(n_rays, 1), dtype=rays_o.dtype, device=rays_o.device)
 
     optimizer = torch.optim.Adam([pts_optim], lr=lr)
-    for i in range(n_iter):
+    for _ in range(n_iter):
         pts_on_rays, zvals = closest_point_on_ray(rays_o, rays_d, pts_optim)  # (10, 1, 3), (10, 1)
         distance = torch.norm(pts_on_rays[:, 0, :] - pts_optim, dim=-1)  # (10, )
         mean_dist = distance.mean()

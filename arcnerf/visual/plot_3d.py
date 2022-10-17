@@ -9,9 +9,9 @@ import plotly.graph_objects as go
 import plotly.io as pio
 from PIL import Image
 
-from .camera_model import create_camera_model, get_cam_whf
 from arcnerf.geometry.sphere import get_sphere_surface
 from common.visual.draw_cv2 import get_colors
+from .camera_model import create_camera_model, get_cam_whf
 
 
 def transform_plt_space(pts, xyz_axis=0):

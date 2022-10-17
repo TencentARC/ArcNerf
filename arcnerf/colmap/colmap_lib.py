@@ -32,8 +32,9 @@
 
 import os
 import collections
-import numpy as np
 import struct
+
+import numpy as np
 
 CameraModel = collections.namedtuple('CameraModel', ['model_id', 'model_name', 'num_params'])
 Camera = collections.namedtuple('Camera', ['id', 'model', 'width', 'height', 'params'])

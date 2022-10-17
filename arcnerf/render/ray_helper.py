@@ -350,7 +350,7 @@ def get_zvals_from_sphere_radius(rays_o: torch.Tensor, rays_d: torch.Tensor, sph
         zvals: (N_rays, N), each ray samples n_pts points.
               If points do not intersect, will use 0 for it.
     """
-    _, zvals, _, mask = sphere_ray_intersection(rays_o, rays_d, sphere_radius)
+    _, zvals, _, _ = sphere_ray_intersection(rays_o, rays_d, sphere_radius)
 
     return zvals
 
@@ -522,7 +522,7 @@ def ray_marching(
     """
     dtype = zvals.dtype
     device = zvals.device
-    n_rays, n_pts = zvals.shape[:2]
+    n_rays = zvals.shape[0]
 
     assert sigma is not None or alpha is not None, 'Can not be None for both alpha and sigma..'
 

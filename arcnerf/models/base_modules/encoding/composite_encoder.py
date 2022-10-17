@@ -17,7 +17,7 @@ class CompositeEmbedder(nn.Module):
 
         self.encoders = []
         self.out_dim = 0
-        for enc_idx, enc_type in enumerate(sub_encoder_types):
+        for enc_idx, _ in enumerate(sub_encoder_types):
             enc_str = 'sub_encoder{}'.format(enc_idx + 1)
             assert enc_str in kwargs.keys(), 'You must have {} in cfgs...'.format(enc_str)
             enc_cfgs = obj_to_dict(kwargs[enc_str])

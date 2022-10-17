@@ -97,7 +97,7 @@ class RegMaskLoss(nn.Module):
                      if not do_mean, return (B, N_rays) loss
         """
         loss = 0.0
-        for idx, k in enumerate(self.keys):
+        for k in self.keys:
             loss += cal_nll_loss(output[k])  # (B, N_rays)
 
         if self.do_mean:
@@ -133,7 +133,7 @@ class RegWeightsLoss(nn.Module):
                      if not do_mean, return (B, N_rays, N_pts) loss
         """
         loss = 0.0
-        for idx, k in enumerate(self.keys):
+        for k in self.keys:
             assert k in output.keys(), 'You must turn debug.get_progress=True for this loss...'
             loss += cal_nll_loss(output[k])  # (B, N_rays)
 
