@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
-from . import BOUND_REGISTRY
-from .basic_bound import BasicBound
 from arcnerf.geometry.sphere import Sphere
 from common.utils.cfgs_utils import valid_key_in_cfgs
+from . import BOUND_REGISTRY
+from .basic_bound import BasicBound
 
 
 @BOUND_REGISTRY.register()

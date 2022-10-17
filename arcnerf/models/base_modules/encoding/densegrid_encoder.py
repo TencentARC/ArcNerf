@@ -3,8 +3,8 @@
 import torch
 import torch.nn as nn
 
-from . import ENCODER_REGISTRY
 from arcnerf.geometry.volume import Volume
+from . import ENCODER_REGISTRY
 
 
 @ENCODER_REGISTRY.register()

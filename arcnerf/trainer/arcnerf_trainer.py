@@ -6,7 +6,6 @@ import time
 
 import torch
 
-from .pipeline import Pipeline
 from arcnerf.datasets import get_dataset, get_model_feed_in, POTENTIAL_KEYS
 from arcnerf.datasets.transform.augmentation import get_transforms
 from arcnerf.eval.eval_func import run_eval
@@ -23,6 +22,7 @@ from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
 from common.utils.registry import METRIC_REGISTRY
 from common.utils.train_utils import master_only
 from common.visual.plot_2d import draw_2d_components
+from .pipeline import Pipeline
 
 
 class ArcNerfTrainer(BasicTrainer):

@@ -6,11 +6,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from .encoder_mlp_network import EncoderMLPGeoNet, EncoderMLPRadainceNet
 from arcnerf.models.base_modules import MODULE_REGISTRY
 from arcnerf.models.base_modules.activation import get_activation
 from arcnerf.models.base_modules.linear import DenseLayer, SirenLayer
 from common.utils.cfgs_utils import dict_to_obj
+from .encoder_mlp_network import EncoderMLPGeoNet, EncoderMLPRadainceNet
 
 
 @MODULE_REGISTRY.register()

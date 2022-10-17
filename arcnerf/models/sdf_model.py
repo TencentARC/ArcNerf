@@ -2,11 +2,10 @@
 
 import torch
 
-from .fg_model import FgModel
 from arcnerf.geometry.ray import surface_ray_intersection
 from arcnerf.geometry.transformation import normalize
-
 from common.utils.torch_utils import chunk_processing
+from .fg_model import FgModel
 
 
 class SdfModel(FgModel):

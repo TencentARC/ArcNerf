@@ -3,9 +3,9 @@
 import numpy as np
 import torch
 
-from .transformation import batch_dot_product
 from arcnerf.ops.volume_func import ray_aabb_intersection_cuda, CUDA_BACKEND_AVAILABLE
 from common.utils.torch_utils import set_tensor_to_zeros
+from .transformation import batch_dot_product
 
 
 def get_ray_points_by_zvals(rays_o: torch.Tensor, rays_d: torch.Tensor, zvals: torch.Tensor):

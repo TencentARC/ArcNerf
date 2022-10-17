@@ -4,9 +4,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from .ray import aabb_ray_intersection, get_ray_points_by_zvals
 from arcnerf.ops.volume_func import check_pts_in_occ_voxel_cuda, CUDA_BACKEND_AVAILABLE
 from common.utils.torch_utils import torch_to_np
+from .ray import aabb_ray_intersection, get_ray_points_by_zvals
 
 
 class Volume(nn.Module):

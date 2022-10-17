@@ -3,9 +3,9 @@
 import torch
 import torch.nn as nn
 
-from . import BOUND_REGISTRY
 from arcnerf.render.ray_helper import get_near_far_from_rays, get_zvals_from_near_far
 from common.utils.cfgs_utils import get_value_from_cfgs_field
+from . import BOUND_REGISTRY
 
 
 @BOUND_REGISTRY.register()

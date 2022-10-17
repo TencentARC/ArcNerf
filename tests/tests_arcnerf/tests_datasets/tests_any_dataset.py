@@ -9,7 +9,6 @@ import cv2
 import numpy as np
 import torch
 
-from . import setup_test_config
 from arcnerf.datasets import get_dataset
 from arcnerf.datasets.transform.augmentation import get_transforms
 from arcnerf.geometry.poses import average_poses, generate_cam_pose_on_sphere
@@ -26,6 +25,7 @@ from common.utils.torch_utils import np_wrapper, torch_to_np
 from common.utils.video_utils import write_video
 from common.visual import get_combine_colors
 from common.visual.draw_cv2 import draw_vert_on_img
+from . import setup_test_config
 
 MODE = 'train'
 RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results'))

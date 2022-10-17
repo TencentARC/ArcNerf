@@ -3,10 +3,10 @@
 import numpy as np
 import torch
 
+from common.utils.torch_utils import np_wrapper
 from .sphere import uv_to_sphere_point, get_sphere_line, get_spiral_line, get_regular_sphere_line, get_swing_line
 from .transformation import normalize, get_rotate_matrix_from_vec, rotate_points
 from .triangle import circumcircle_from_triangle
-from common.utils.torch_utils import np_wrapper
 
 
 def invert_poses(poses):

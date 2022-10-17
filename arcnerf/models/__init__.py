@@ -4,10 +4,10 @@ import importlib
 import os.path as osp
 from copy import deepcopy
 
-from .full_model import FullModel
 from common.utils.cfgs_utils import dict_to_obj, obj_to_dict, valid_key_in_cfgs
 from common.utils.file_utils import scan_dir
 from common.utils.registry import MODEL_REGISTRY
+from .full_model import FullModel
 
 __all__ = ['build_model']
 

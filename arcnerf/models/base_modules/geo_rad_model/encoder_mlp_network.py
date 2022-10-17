@@ -3,9 +3,9 @@
 import numpy as np
 import torch
 
-from .base_network import BaseGeoNet, BaseRadianceNet
 from arcnerf.geometry.transformation import normalize
 from arcnerf.models.base_modules import build_encoder, get_activation
+from .base_network import BaseGeoNet, BaseRadianceNet
 
 
 class EncoderMLPGeoNet(BaseGeoNet):

@@ -2,13 +2,13 @@
 
 import torch
 
-from .fg_model import FgModel
-from .base_modules.encoding.gaussian_encoder import Gaussian
-from .base_modules import build_geo_model, build_radiance_model
 from arcnerf.render.ray_helper import sample_pdf
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import MODEL_REGISTRY
 from common.utils.torch_utils import chunk_processing
+from .fg_model import FgModel
+from .base_modules.encoding.gaussian_encoder import Gaussian
+from .base_modules import build_geo_model, build_radiance_model
 
 
 @MODEL_REGISTRY.register()

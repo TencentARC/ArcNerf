@@ -2,12 +2,12 @@
 
 import torch
 
-from .base_3d_model import Base3dModel
-from .base_modules import build_geo_model, build_radiance_model
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.render.ray_helper import get_zvals_outside_sphere
 from common.utils.registry import MODEL_REGISTRY
 from common.utils.torch_utils import chunk_processing
+from .base_3d_model import Base3dModel
+from .base_modules import build_geo_model, build_radiance_model
 
 
 class BkgModel(Base3dModel):

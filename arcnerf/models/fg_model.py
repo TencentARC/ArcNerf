@@ -2,13 +2,13 @@
 
 import torch
 
-from .base_3d_model import Base3dModel
-from .base_modules.obj_bound import build_obj_bound
 from arcnerf.geometry.ray import surface_ray_intersection, get_ray_points_by_zvals
 from arcnerf.geometry.transformation import normalize
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import MODEL_REGISTRY
 from common.utils.torch_utils import chunk_processing
+from .base_3d_model import Base3dModel
+from .base_modules.obj_bound import build_obj_bound
 
 
 @MODEL_REGISTRY.register()

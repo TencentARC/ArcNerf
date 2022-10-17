@@ -1,9 +1,9 @@
 # ArcNerf
 
-ArcNerf is a framework incorporating many state-of-the-art NeRF-based methods with useful functionality on novel view rendering
+ArcNerf is a framework consist of many state-of-the-art NeRF-based methods with useful functionality on novel view rendering
 and object extraction.
 
-The framework is highly modular, which allows you to modify any piece and develop your own algorithm easily.
+The framework is highly modular, which allows you to modify any component in the pipeline and develop your own algorithm easily.
 
 It is developed by [TencentARC Lab](https://arc.tencent.com/).
 
@@ -27,6 +27,7 @@ Toward the same goal, we are working on those fields could make this project hel
 
 * Here is the framework overview. Notice that not all the designed feature have been implemented in this framework(eg. Traditional MVS Branch).
 We are working on extending it in the coming future.
+
 ![pipe](assets/Pipe1.png)
 
 
@@ -40,8 +41,8 @@ We are working on extending it in the coming future.
 
 
 - Unified dataset and benchmark:
-  - We separate the dataset based on official repo, and all methods are running under the same settings for fair comparison.
-  - We also make unittests for the datasets and you are easy to check whether the setting on the data is correct.
+  - We split the dataset following on official repo, and all methods are running under the same settings for fair comparison.
+  - We also make unittests for the datasets and you are easy to check whether the configs on the data is correct.
 
 ![data](assets/datasets/pts_pc.gif)
 
@@ -49,8 +50,8 @@ We are working on extending it in the coming future.
   - Mesh extraction on Density Model or SDF Model. (We are still working on incorporating better extraction functions to collect Assets for Modern Graphic Engine)
   - Colmap preparation on your own capture data.
   - surface rendering on the sdf model
-  - plentiful geometry function implemented in torch backend.
-  - For other functionality on the trainer and logging, please ref [doc](docs/common_trainer.md).
+  - plentiful geometry functions implemented in torch backend.
+  - For other functions on the trainer and logging, please ref [doc](docs/common_trainer.md).
 
 - Render
 ![render](assets/result/qqtiger_render.gif)
@@ -63,7 +64,7 @@ We are working on extending it in the coming future.
 - Docs and Code:
   - All the functions are with detailed docs on its usage, and the operation are commented with its tensor size,
   which makes you easy to understand the change of components.
-  - We also provide many experiments [note](docs/expr.md) on our trails.
+  - We also provide our experiments [note](docs/expr.md) on our trails.
 
 
 - Tests and Visual helpers:
@@ -85,7 +86,7 @@ Bring issues to us if you have any suggestion!
 Get the repo by `git clone https://github.com/TencentARC/ArcNerf --recursive`
 
 - Install libs by `pip install -r requirements.txt`.
-- Install the customized ops by `sh scripts/install_ops.sh`.
+- Install the customized ops by `sh scripts/install_ops.sh`. (Only for `volume sampling/pruning`, etc)
 - Install tiny-cuda-nn modules by `sh scripts/install_tinycudann.sh`. (Only for `fusemlp`/`hashgrid encode`, etc)
 
 We test on env with:
@@ -120,7 +121,7 @@ Train by `python train.py --configs configs/default.yaml --gpu_ids 0`.
 Eval by `python evaluate.py --configs configs/eval.yaml --gpu_ids 0`. You can set your target model by `--model_pt path/to/model`.
 
 ## Inference
-Inference make customized rendering video and extract mesh output.
+Inference makes customized rendering video and extract mesh output.
 Run by `python inference.py --configs configs/eval.yaml --gpu_ids 0`. You can set your target model by `--model_pt path/to/model`.
 
 ## Notebook
@@ -167,7 +168,7 @@ For more detail on the structure of model class, visit [model](docs/models.md) a
 ------------------------------------------------------------------------
 ## Geometry
 
-We implement plentiful geometry function in torch under [geometry](arcnerf/geometry). The operation are batch-based, and their
+We implement plentiful geometry functions in torch under [geometry](arcnerf/geometry). The operation are batch-based, and their
 correctness are check under [unittests](tests/tests_arcnerf/tests_geometry).
 
 You can see the [doc](docs/geometry.md) for more details and know what is support.

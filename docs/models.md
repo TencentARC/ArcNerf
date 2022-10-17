@@ -89,6 +89,7 @@ range, or bounding by a sphere with larger radius that can cover all cameras.
 It contains a dense volume with bitfield to record the density in every voxel. Optimization can be performed if you set.
 The points then will be sampled in remaining voxel. And rays computation can be largely reduced in coarse structure.
 - origin/n_grid/xyz_len/side: The information of the volume.
+- Pruning is allowed on unoccupied voxels. (See `fg_model` for details.)
 
 ![volume_bound](../assets/models/volume_bound.gif)
 ![coarse_volume](../assets/models/coarse_volume.gif)
@@ -96,7 +97,7 @@ The points then will be sampled in remaining voxel. And rays computation can be 
 ### SphereBound
 It contains a smaller sphere bounding the real object. In sdf modeling like `Neus`, it samples inside such a sphere.
 - origin/radius: The information of the sphere.
--
+
 ![sphere_bound](../assets/models/sphere_bound.gif)
 
 ------------------------------------------------------------------------
@@ -129,6 +130,8 @@ Specify the type as `FusedMLPGeoNet/FusedMLPRadianceNet`.
 
 ------------------------------------------------------------------------
 # chunk_size
+Rays/Points are processed in chunk and results are combined to get full output. If you set the chunk_size based on
+your GPU capacity.
 ## chunk_rays
 The model is hard to process `batch_size * n_rays_per_sample * n_pts_per_ray` in a single
 forward, set it to be `n_rays` to be process in a single forward.
@@ -139,12 +142,12 @@ rays from each sample. We flat samples in batch and get `(B*N_rays, ...)` togeth
 rays are processed in chunk and output return in `(B*N_rays, ...)` as well. Finally, we reshape them and
 get `(B, N_rays, ...)` as final results.
 
-The main `forward` function in `Base3dModel` is a wrapper for `(B, N_rays, ...)` input, call `_forward` by `chunk_rays`
+The main `forward` function in `FullModel` is a wrapper for `(B, N_rays, ...)` input, and it calls `fg/bkg_model`'s `forward` by `chunk_rays`
 size,  and the core `_forward` in child class (like `NeRF`) process `(N_rays_per_chunk, ...)` and get result for rays.
 
 ## chunk_pts
 In the core `_forward`, the model may forward the pts sampled on rays. We set `chunk_pts` for a single forward size for
-pts. By default we use `4096*192=786432`, it works good for 32GB memory GPU.
+pts. By default, we use `4096*192=786432`, it works good for 32GB memory GPU.
 
 ## gpu_online
 The chunk process function supports bringing tensor online for each chunk and bring back after processing.
@@ -206,12 +209,12 @@ The first three methods do not require a separate model, but the final one does.
 
 ------------------------------------------------------------------------
 # Models
-Below are the models we support.
+Main argument to the model:
 - inference_only: Use in eval/infer mode. If True, only keep 'rgb/depth/mask',
             will remove progress item like 'sigma/radiance' to save memory.
 - get_progress: Use in train/val mode. If True, keep 'sigma/radiance' for visual purpose.
 - cur_epoch/total_epoch: to adjust strategies during training
-
+Below are the models we support.
 ## FullModel
 Full Model is the class for all models. It contains fg_model and optional bkg_model.
 It combines values from both model and get final results. If you don't use bkg model, you need

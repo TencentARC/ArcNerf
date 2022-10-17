@@ -7,10 +7,10 @@ import os.path as osp
 import cv2
 import numpy as np
 
-from .base_3d_dataset import Base3dDataset
 from arcnerf.render.camera import PerspectiveCamera
 from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.registry import DATASET_REGISTRY
+from .base_3d_dataset import Base3dDataset
 
 
 @DATASET_REGISTRY.register()

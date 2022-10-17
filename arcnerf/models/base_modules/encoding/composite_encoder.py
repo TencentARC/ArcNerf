@@ -3,8 +3,8 @@
 import torch
 import torch.nn as nn
 
-from . import ENCODER_REGISTRY
 from common.utils.cfgs_utils import obj_to_dict
+from . import ENCODER_REGISTRY
 
 
 @ENCODER_REGISTRY.register()
