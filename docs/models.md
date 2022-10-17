@@ -1,3 +1,9 @@
+# Model
+Here is the overview of all Model components:
+
+![model](../assets/Model.png)
+
+
 # Base_modules
 Modules like embedder, implicit function, radiance field, etc.
 

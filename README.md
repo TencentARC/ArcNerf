@@ -10,6 +10,77 @@ It is developed by [TencentARC Lab](https://arc.tencent.com/).
 ![nerf](assets/models/ngp.gif)
 
 ------------------------------------------------------------------------
+# What is special in this project?
+
+In the recent few months, many frameworks working on common NeRF-based pipeline have been proposed:
+
+- [NeRFStudio](https://github.com/nerfstudio-project/nerfstudio)
+- [NeRF-Factory](https://github.com/kakaobrain/NeRF-Factory)
+- [Wisp](https://github.com/NVIDIAGameWorks/kaolin-wisp)
+- [JNeRF](https://github.com/Jittor/JNeRF)
+- [XRNeRF](https://github.com/openxrlab/xrnerf)
+
+All those amazing works are trying to bring those state-of-the-art NeRF-based methods together into
+a complete, modular framework that is easy to change any of the components and conduct experiment quickly.
+
+Toward the same goal, we are working on those fields could make this project helpful to the community:
+
+* Here is the framework overview. Notice that not all the designed feature have been implemented in this framework(eg. Traditional MVS Branch).
+We are working on extending it in the coming future.
+![pipe](assets/Pipe1.png)
+
+
+- Highly modular design of pipeline:
+  - Every field is seperated, and you can plug in any new developed module under the framework. Those fields
+  can be easily controlled by the config files and modified without harming others.
+  - We provide both sdf model, background model for modeling object and background as well, which are not commonly provided
+  in other repo.
+
+![pipe](assets/Pipe2.png)
+
+
+- Unified dataset and benchmark:
+  - We separate the dataset based on official repo, and all methods are running under the same settings for fair comparison.
+  - We also make unittests for the datasets and you are easy to check whether the setting on the data is correct.
+
+![data](assets/datasets/pts_pc.gif)
+
+- Many useful functionality are provided:
+  - Mesh extraction on Density Model or SDF Model. (We are still working on incorporating better extraction functions to collect Assets for Modern Graphic Engine)
+  - Colmap preparation on your own capture data.
+  - surface rendering on the sdf model
+  - plentiful geometry function implemented in torch backend.
+  - For other functionality on the trainer and logging, please ref [doc](docs/common_trainer.md).
+
+- Render
+![render](assets/result/qqtiger_render.gif)
+
+- Extraction
+![obj](assets/result/geo.gif)
+![tex](assets/result/with_tex.gif)
+
+
+- Docs and Code:
+  - All the functions are with detailed docs on its usage, and the operation are commented with its tensor size,
+  which makes you easy to understand the change of components.
+  - We also provide many experiments [note](docs/expr.md) on our trails.
+
+
+- Tests and Visual helpers:
+  - We have developed an interactive visualizer to easily tests the correctness of our geometry function. It is compatible with torch/np arrays.
+  - We have written a lots of unittest on the geometry and modelling functions. Take a look, and you will be easy to understand how
+  to use the visualizer for checking your own implementation.
+
+![cam](assets/geometry/cam_spiral.gif)
+![volume](assets/geometry/ray_pass.gif)
+![ray](assets/geometry/rays.gif)
+
+
+We are still working on many other helpful functions for better rendering and extraction, please ref [todo](docs/todolist.md) for more details.
+
+Bring issues to us if you have any suggestion!
+
+------------------------------------------------------------------------
 # Installation
 Get the repo by `git clone https://github.com/TencentARC/ArcNerf --recursive`
 
@@ -42,6 +113,8 @@ Train by `python train.py --configs configs/default.yaml --gpu_ids 0`.
 
 - `--gpu_ids -1` will use `cpu`, which is good for you to debug the code in local IDE like pycharm line by line without a GPU device.
 - for more details on the `config`, go to [default.yaml](configs/default.yaml) for more details.
+- add `--resume path/to/model` can resume training from checkpoints. Model will be saved periodically to forbid unpredictable error.
+- For more detail of the training pipeline, visit [common_trainer](docs/common_trainer.md) and [trainer](docs/trainer.md).
 
 ## Evaluate
 Eval by `python evaluate.py --configs configs/eval.yaml --gpu_ids 0`. You can set your target model by `--model_pt path/to/model`.
@@ -53,62 +126,6 @@ Run by `python inference.py --configs configs/eval.yaml --gpu_ids 0`. You can se
 ## Notebook
 Some notebooks are provided for you to understand what is happening for inference and how to use our visualizer.
 Go to [notebook](notebooks) for more details.
-
-
-------------------------------------------------------------------------
-# What is special in this project?
-
-In the recent few weeks, many frameworks working on common NeRF-based pipeline have been proposed:
-
-- [NeRFStudio](https://github.com/nerfstudio-project/nerfstudio)
-- [NeRF-Factory](https://github.com/kakaobrain/NeRF-Factory)
-- [Wisp](https://github.com/NVIDIAGameWorks/kaolin-wisp)
-- [JNeRF](https://github.com/Jittor/JNeRF)
-- [XRNeRF](https://github.com/openxrlab/xrnerf)
-
-All those amazing works are trying to bring those state-of-the-art NeRF-based methods together into
-a complete, modular framework that is easy to change any of the components and conduct experiment quickly.
-
-Toward the same goal, we are working on those fields could make this project helpful to the community:
-
-
-TODO: Add pipeline image
-
-- Highly modular design of pipeline:
-  - Every field is seperated, and you can plug in any new developed module under the framework. Those fields
-  can be easily controlled by the config files and modified without harming others.
-  - We provide both sdf model, background model for modeling object and background as well, which are not commonly provided
-  in other repo.
-
-
-- Unified dataset and benchmark:
-  - We separate the dataset based on official repo, and all methods are running under the same settings for fair comparison.
-  - We also make unittests for the datasets and you are easy to check whether the setting on the data is correct.
-
-
-- Many useful functionality are provided:
-  - Mesh extraction on Density Model or SDF Model. (We are still working on incorporating better extraction functions)
-  - Colmap preparation on your own capture data.
-  - surface rendering on the sdf model
-  - For other functionality on the trainer and logging, please ref [doc](docs/common_trainer.md).
-
-
-- Docs and Code:
-  - All the functions are with detailed docs on its usage, and the operation are commented with its tensor size,
-  which makes you easy to understand the change of components.
-  - We also provide many experiments [note](docs/expr.md) on our trails.
-
-
-- Tests and Visual helpers:
-  - We have developed an interactive visualizer to easily tests the correctness of our geometry function. It is compatible with torch/np arrays.
-  - We have written a lots of unittest on the geometry and modelling functions. Take a look, and you will be easy to understand how
-  to use the visualizer for checking your own implementation.
-
-
-We are still working on many other helpful functions for better rendering and extraction, please ref [todo](docs/todolist.md) for more details.
-
-Bring issues to us if you have any suggestion!
-
 
 ------------------------------------------------------------------------
 ## Datasets and Benchmarks
@@ -134,18 +151,18 @@ For any dataset that we have provided, you should check the configs like this to
 ### Benchmark
 See [benchmark](docs/benchmark.md) for details, and [expr](docs/expr.md) for some trails we have conducted and some problems we have meet.
 
+![rgb](assets/result/lego_rgb.gif)
+![mask](assets/result/lego_mask.gif)
+
+
 ------------------------------------------------------------------------
 ## Models
-The models are highly modular. You only need to focus on
+The models are highly modular and are in level-structure. You are free to modify components at each level by configs,
+or easily develop new algorithm and plug it in the desired place.
 
-TODO: Add module stucture image
+For more detail on the structure of model class, visit [model](docs/models.md) and understand each component of it.
 
-### full_model
-Full model class is the main class for modeling.
-
-TODO: Not finish this!!!!
-
-### Base_3d_model
+![model](assets/Model.png)
 
 ------------------------------------------------------------------------
 ## Geometry

@@ -3,7 +3,7 @@ We may develop more function on this pipeline based on priority and time:
 --------------------------------------------------------------------
 Data preparation:
 - Mask estimation
-- Volume generation
+- Volume generation/3d bbox estimation
 - Maybe more accurate camera estimation
 
 --------------------------------------------------------------------
@@ -35,3 +35,4 @@ Other functionality:
 - nvdiffras based rendering optimzation
 - real time train/inference online demo, any view point visual(opengl, cuda, etc)
 - online training gui(many have done)
+- 3d modification, text2obj generation
