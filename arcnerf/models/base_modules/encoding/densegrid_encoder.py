@@ -64,7 +64,7 @@ class DenseGridEmbedder(nn.Module):
         self.W_feat = W_feat
         self.feat_only = feat_only
 
-        self.out_dim = include_input * input_dim + W_feat + ((1 - feat_only) * W_feat)
+        self.out_dim = include_input * input_dim + W_feat + (1 - feat_only)
 
     def get_output_dim(self):
         """Get output dim"""

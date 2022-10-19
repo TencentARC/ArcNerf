@@ -101,7 +101,7 @@ class TestDict(unittest.TestCase):
         self.log_time('Gaussian Embedder(Freq=16): ', t_f, t_b, t_f_o, dim=mean_cov.shape)
 
     def tests_densegrid_encoder(self):
-        model = DenseGridEmbedder(3, grid=256, include_input=True, W_feat=0)
+        model = DenseGridEmbedder(3, n_grid=128, side=1.0, include_input=True, W_feat=0)
         model = self.to_cuda(model)
         pts = self.to_cuda(self.pts.clone().requires_grad_(True))
         # single pts per ray
@@ -113,7 +113,7 @@ class TestDict(unittest.TestCase):
         self.log_time('DenseGrid Embedder(Grid=256, W_feat=0): ', t_f, t_b, t_f_o, dim=pts.shape)
 
     def tests_densegrid_encoder_W256(self):
-        model = DenseGridEmbedder(3, grid=256, include_input=True, W_feat=256)
+        model = DenseGridEmbedder(3, n_grid=128, side=1.0, include_input=True, W_feat=256)
         model = self.to_cuda(model)
         pts = self.to_cuda(self.pts.clone().requires_grad_(True))
         # single pts per ray

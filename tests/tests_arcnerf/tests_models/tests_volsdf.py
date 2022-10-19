@@ -57,9 +57,12 @@ class TestVolsdfDict(TestModelDict):
         zvals = get_zvals_from_near_far(
             feed_in['near'].view(-1, 1), feed_in['far'].view(-1, 1), cfgs.model.rays.n_eval
         )  # (BN, 3)
-        zvals, zvals_surface = model.get_fg_model().upsample_zvals(
-            feed_in['rays_o'].view(-1, 3), feed_in['rays_d'].view(-1, 3), zvals, False,
-            model.get_fg_model().forward_pts
+        zvals, zvals_surface, _ = model.get_fg_model().upsample_zvals(
+            feed_in['rays_o'].view(-1, 3),
+            feed_in['rays_d'].view(-1, 3),
+            zvals,
+            model.get_fg_model().forward_pts,
+            inference_only=False
         )
         self.assertEqual(zvals.shape, (self.batch_size * self.n_rays, n_total))
         self.assertEqual(zvals_surface.shape, (self.batch_size * self.n_rays, 1))
@@ -169,8 +172,8 @@ class TestVolsdfDict(TestModelDict):
             zvals = zvals.cuda()
 
         # with n_importance
-        zvals_sample, zvals_surface = model.get_fg_model().upsample_zvals(
-            rays_o, rays_d, zvals, True, sdf_func
+        zvals_sample, zvals_surface, _ = model.get_fg_model().upsample_zvals(
+            rays_o, rays_d, zvals, sdf_func, inference_only=True
         )  # (1, n_importance+n_sample), (1, 1)
 
         res = get_2d_output(zvals, zvals_sample, zvals_surface, sdf)
@@ -190,8 +193,8 @@ class TestVolsdfDict(TestModelDict):
         n_importance = model.get_fg_model().get_ray_cfgs('n_importance')
         model.get_fg_model().set_ray_cfgs('n_importance', 0)
 
-        zvals_sample, zvals_surface = model.get_fg_model().upsample_zvals(
-            rays_o, rays_d, zvals, True, sdf_func
+        zvals_sample, zvals_surface, _ = model.get_fg_model().upsample_zvals(
+            rays_o, rays_d, zvals, sdf_func, inference_only=True
         )  # (1, n_sample), (1, 1)
         model.get_fg_model().set_ray_cfgs('n_importance', n_importance)
 

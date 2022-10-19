@@ -52,9 +52,9 @@ def rotate_points(points: torch.Tensor, rot: torch.Tensor, rotate_only=False):
     Returns:
         rotated points in (B, N, 3)
     """
-    proj_points = torch.einsum('bki,bji->bjk', rot[:, :3, :3], points)
+    proj_points = torch.einsum('bki,bji->bjk', rot[:, :3, :3], points)  # (B, N, 3)
     if not rotate_only:
-        proj_points += rot[:, :3, 3]
+        proj_points += rot[:, :3, 3].unsqueeze(1)
 
     return proj_points
 

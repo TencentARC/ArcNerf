@@ -180,7 +180,7 @@ model:
             type: TruncExp
     radiance:
         type: FusedMLPRadianceNet
-        mode: 'fv'   # This matter push up ~0.5 PSNR on eval
+        mode: 'fv'   # This order matter push up ~0.5 PSNR on eval
         W: 64
         D: 2
         encoder:
