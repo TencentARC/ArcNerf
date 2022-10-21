@@ -116,8 +116,7 @@ inference:
 
     volume:
         n_grid: 512
-        origin: [0.0, -0.11, 0.0]
-        xyz_len: [1.2, 1.2, 2.0]
+        side: 2.0
         level: 0.0
         grad_dir: ascent
         chunk_pts_factor: 1

@@ -37,10 +37,6 @@ geometry extraction, you need to optimize the texture map in other way.
 - resample more pts near surface can further improve the PSNR(`~0.3`), but time for each step will increase by `x2`. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngp_resample.yaml)
 But this still can not make the extraction color correct.
 
-|     model     | PSNR |
-|:-----:|:----:|
-| NeRF  | 32.78|
-|+center_pixel| 33.79 |
 
 ------------------------------------------------------------------------------------------------------------
 
@@ -67,3 +63,31 @@ Basic NeRF PSNR on Lego is `32.78`. [conf](../configs/expr/NeRF/lego/nerf_lego_n
 # volsdf (sdf model)
 
 - Running
+
+
+------------------------------------------------------------------------------------------------------------
+Summary:
+
+|          model            | PSNR  |  iter/s | eval s/img |
+|:-------------------------:|:-----:|:-------:|:----------:|
+| NeRF                      | 32.78 |
+|+center_pixel              | 33.79 |
+
+
+------------------------------------------------------------------------------------------------------------
+
+# Inference on result
+
+## Extraction
+We use a pre-defined volume, and use each voxel's center point to extract density/sdf, then apply marching cube
+to get the mesh.
+
+For the color on mesh, we use the triangle centroid as pts, with -face_norm as directly to get the color for face.
+
+- Advance algorithm for texture map/lighting are not supported. You many possibly need to do diffRendering to optimize
+the texture and other asset used for modern graphical engine. We will try to do it in the future.
+
+- Although we support customized volume for extraction(the volume has same side, or different lenght on xyz dimension).
+But we found that only xyz with same length could generate color correctly.
+
+TODO: Add nerf/neus geo/color mesh output images!!!

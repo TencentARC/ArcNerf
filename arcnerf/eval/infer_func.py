@@ -125,9 +125,11 @@ class Inferencer(object):
                 'level': get_value_from_cfgs_field(self.cfgs.volume, 'level', 50.0),
                 'grad_dir': get_value_from_cfgs_field(self.cfgs.volume, 'grad_dir', 'descent'),
                 'chunk_pts_factor': get_value_from_cfgs_field(self.cfgs.volume, 'chunk_pts_factor', 1),
-                'render_mesh': valid_key_in_cfgs(self.cfgs.volume, 'render_mesh'),
-                'render_backend': get_value_from_cfgs_field(self.cfgs.volume.render_mesh, 'backend'),
+                'render_mesh': valid_key_in_cfgs(self.cfgs.volume, 'render_mesh')
             }
+            if valid_key_in_cfgs(self.cfgs.volume, 'render_mesh'):
+                volume_cfgs['render_backend'] = get_value_from_cfgs_field(self.cfgs.volume.render_mesh, 'backend')
+
             if volume_cfgs['xyz_len'] is None:
                 volume_cfgs['side'] = get_value_from_cfgs_field(self.cfgs.volume, 'side', 1.5)  # make sure volume exist
             else:
@@ -517,7 +519,7 @@ class Inferencer(object):
                 mesh_out['simplify'] = self.get_mesh_components(verts_sim, faces_sim, model)
 
             # add c2w and intrinsic for mesh rendering
-            if 'render' in self.get_render_cfgs():
+            if self.get_render_cfgs() is not None and 'render' in self.get_render_cfgs():
                 mesh_out['render'] = {
                     'type': self.get_render_cfgs('type'),
                     'H': self.H,
