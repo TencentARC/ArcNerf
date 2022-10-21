@@ -59,8 +59,9 @@ class NeRF(FgModel):
 
         # get coarse pts sigma/rgb  (B, N_sample, ...)
         sigma, radiance = self.get_sigma_radiance_by_mask_pts(
-            self.coarse_geo_net, self.coarse_radiance_net, rays_o, rays_d, zvals, mask_pts
+            self.coarse_geo_net, self.coarse_radiance_net, rays_o, rays_d, zvals, mask_pts, inference_only
         )
+
         # ray marching for coarse network, keep the coarse weights for next stage
         output_coarse = self.ray_marching(sigma, radiance, zvals, inference_only=inference_only, bkg_color=bkg_color)
         coarse_weights = output_coarse['weights']
@@ -71,16 +72,11 @@ class NeRF(FgModel):
         # fine model
         if self.get_ray_cfgs('n_importance') > 0:
             # get upsampled zvals
-            zvals = self.upsample_zvals(zvals, coarse_weights, inference_only)  # TODO: Upsample new mask
+            zvals, mask_pts = self.upsample_zvals(zvals, coarse_weights, mask_pts, inference_only)
 
             # get upsampled pts sigma/rgb  (B, N_total, ...)
             sigma, radiance = self.get_sigma_radiance_by_mask_pts(
-                self.fine_geo_net,
-                self.fine_radiance_net,
-                rays_o,
-                rays_d,
-                zvals,
-                None  # TODO: Full mask
+                self.fine_geo_net, self.fine_radiance_net, rays_o, rays_d, zvals, mask_pts, inference_only
             )
 
             # ray marching for fine network
@@ -94,16 +90,18 @@ class NeRF(FgModel):
 
         return output
 
-    def upsample_zvals(self, zvals: torch.Tensor, weights: torch.Tensor, inference_only=True):
+    def upsample_zvals(self, zvals: torch.Tensor, weights: torch.Tensor, mask_pts=None, inference_only=True):
         """Upsample zvals if N_importance > 0
 
         Args:
             zvals: tensor (B, N_sample), coarse zvals for all rays
             weights: tensor (B, N_sample) (B, N_sample(-1))
+            mask_pts: tensor (B, N_sample) whether each pts is valid. None means all valid.
             inference_only: affect the sample_pdf deterministic. By default False(For train)
 
         Returns:
             zvals: tensor (B, N_sample + N_importance), up-sample zvals near the surface
+            mask_pts: new mask in (B, N_sample + N_importance)
         """
         weights_coarse = weights[:, 1:self.get_ray_cfgs('n_sample') - 1]  # (B, N_sample-2)
         zvals_mid = 0.5 * (zvals[..., 1:] + zvals[..., :-1])  # (B, N_sample-1)
@@ -113,7 +111,10 @@ class NeRF(FgModel):
         ).detach()
         zvals, _ = torch.sort(torch.cat([zvals, _zvals], -1), -1)  # (B, N_sample+N_importance=N_total)
 
-        return zvals
+        # update mask
+        mask_pts = self.merge_full_mask(mask_pts, _zvals)  # (B, N_total)
+
+        return zvals, mask_pts
 
     def surface_render(
         self,

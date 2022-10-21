@@ -34,23 +34,78 @@ class MipNeRF(FgModel):
         """make one more sample for interval modeling"""
         return self.get_ray_cfgs('n_sample') + 1
 
+    def get_sigma_radiance_by_mask_pts(
+        self, geo_net, radiance_net, rays_o, rays_d, intervals, mask_pts=None, inference_only=False
+    ):
+        """Process the pts/dir by mask_pts. Only process valid zvals to save computation
+
+        Args:
+            geo_net: geometry net
+            radiance_net: radiance net
+            rays_o: (B, 3) rays origin
+            rays_d: (B, 3) rays direction(normalized)
+            intervals: (B, N_pts, 6) intervals on each ray
+            mask_pts: (B, N_pts) whether each pts is valid. If None, process all the pts
+            inference_only: Whether its in the inference mode
+
+        Returns:
+            sigma: (B, N_pts) sigma on all pts. Duplicated pts share the same value
+            radiance: (B, N_pts, 3) rgb on all pts. Duplicated pts share the same value
+        """
+        n_rays = intervals.shape[0]
+        n_pts = intervals.shape[1]
+        dtype = intervals.dtype
+        device = intervals.device
+
+        # get points, expand rays_d to all pts
+        rays_d_repeat = torch.repeat_interleave(rays_d.unsqueeze(1), n_pts, dim=1)  # (B, N_pts, 3)
+
+        if mask_pts is None:
+            intervals = intervals.view(-1, 6)  # (B*N_pts, 6)
+            rays_d_repeat = rays_d_repeat.view(-1, 3)  # (B*N_pts, 3)
+        else:
+            intervals = intervals[mask_pts].view(-1, 6)  # (N_valid_pts, 6)
+            rays_d_repeat = rays_d_repeat[mask_pts].view(-1, 3)  # (N_valid_pts, 3)
+            # adjust dynamic batchsize factor when mask_pts is not None
+            if not inference_only:
+                self.adjust_dynamicbs_factor(mask_pts)
+
+        # get sigma and rgb, . shape in (N_valid_pts, ...)
+        _sigma, _radiance = chunk_processing(
+            self._forward_pts_dir, self.chunk_pts, False, geo_net, radiance_net, intervals, rays_d_repeat
+        )
+
+        # reshape to (B, N_sample, ...) by fill duplicating pts
+        if mask_pts is None:
+            sigma = _sigma.view(n_rays, -1)  # (B, N_sample)
+            radiance = _radiance.view(n_rays, -1, 3)  # (B, N_sample, 3)
+        else:
+            last_pts_idx = torch.cumsum(mask_pts.sum(dim=1), dim=0) - 1  # index on flatten sigma/radiance
+            last_sigma, last_radiance = _sigma[last_pts_idx], _radiance[last_pts_idx]  # (B,) (B, 3)
+            sigma = torch.ones((n_rays, n_pts), dtype=dtype, device=device) * last_sigma.unsqueeze(1)
+            radiance = torch.ones((n_rays, n_pts, 3), dtype=dtype, device=device) * last_radiance.unsqueeze(1)
+            sigma[mask_pts] = _sigma
+            radiance[mask_pts] = _radiance
+
+        return sigma, radiance
+
     def _forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         """zvals is in shape (n_sample+1)"""
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)
         rays_r = inputs['rays_r']  # (B, 1)
         zvals = inputs['zvals']  # (B, 1)
+        mask_pts = inputs['mask_pts']  # (B, n_pts)
+        bkg_color = inputs['bkg_color']  # (B, 3)
         n_rays = rays_o.shape[0]
         output = {}
 
         # get mean/cov representation of intervals
         intervals = self.gaussian(zvals, rays_o, rays_d, rays_r)  # (B, N_sample, 6)
-        intervals = intervals.view(-1, intervals.shape[-1])  # (B*N_sample, 6)
 
         # get sigma and rgb, expand rays_d to all pts. shape in (B*N_sample, ...)
-        rays_d_repeat = torch.repeat_interleave(rays_d, int(intervals.shape[0] / n_rays), dim=0)
-        sigma, radiance = chunk_processing(
-            self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, intervals, rays_d_repeat
+        sigma, radiance = self.get_sigma_radiance_by_mask_pts(
+            self.geo_net, self.radiance_net, rays_o, rays_d, intervals, mask_pts, inference_only
         )
 
         # reshape
@@ -59,7 +114,9 @@ class MipNeRF(FgModel):
 
         # ray marching for coarse network, keep the coarse weights for next stage, use mid pts for interval
         zvals_mid = 0.5 * (zvals[:, 1:] + zvals[:, :-1])
-        output_coarse = self.ray_marching(sigma, radiance, zvals_mid, inference_only=inference_only)
+        output_coarse = self.ray_marching(
+            sigma, radiance, zvals_mid, inference_only=inference_only, bkg_color=bkg_color
+        )
         coarse_weights = output_coarse['weights']
 
         # handle progress
@@ -72,21 +129,17 @@ class MipNeRF(FgModel):
 
             # get mean/cov representation of intervals
             intervals = self.gaussian(zvals, rays_o, rays_d, rays_r)  # (B, N_importance, 6)
-            intervals = intervals.view(-1, intervals.shape[-1])  # (B*N_importance, 6)
 
-            # get sigma and rgb, expand rays_d to all pts. shape in (B*N_importance, ...)
-            rays_d_repeat = torch.repeat_interleave(rays_d, int(intervals.shape[0] / n_rays), dim=0)
-            sigma, radiance = chunk_processing(
-                self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, intervals, rays_d_repeat
+            # get upsampled pts sigma/rgb  (B, N_importance, ...), new Mask must be None
+            sigma, radiance = self.get_sigma_radiance_by_mask_pts(
+                self.geo_net, self.radiance_net, rays_o, rays_d, intervals, None, inference_only
             )
-
-            # reshape
-            sigma = sigma.view(n_rays, -1)  # (B, N_importance)
-            radiance = radiance.view(n_rays, -1, 3)  # (B, N_importance, 3)
 
             # ray marching for fine network, keep the coarse weights for next stage, use mid pts for interval
             zvals_mid = 0.5 * (zvals[:, 1:] + zvals[:, :-1])
-            output_fine = self.ray_marching(sigma, radiance, zvals_mid, inference_only=inference_only)
+            output_fine = self.ray_marching(
+                sigma, radiance, zvals_mid, inference_only=inference_only, bkg_color=bkg_color
+            )
 
             # handle progress
             output['fine'] = self.output_get_progress(output_fine, get_progress)

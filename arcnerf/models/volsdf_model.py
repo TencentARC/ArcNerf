@@ -57,34 +57,29 @@ class VolSDF(SdfModel):
         """use N_eval instead of using N_sample """
         return self.get_ray_cfgs('n_eval')
 
-    def _forward(self, inputs, zvals, mask, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+    def _forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)
+        zvals = inputs['zvals']  # (B, 1)
+        mask_pts = inputs['mask_pts']  # (B, n_pts)
+        bkg_color = inputs['bkg_color']  # (B, 3)
         n_rays = rays_o.shape[0]
 
         # sample zvals near surface, (B, N_total(N_sample+N_importance)) for zvals,  (B, 1) for zvals_surface
-        zvals, zvals_surface = self.upsample_zvals(rays_o, rays_d, zvals, inference_only, self.forward_pts)
-
-        # get points
-        pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (B, N_total, 3)
-        pts = pts.view(-1, 3)  # (B*N_total, 3)
-
-        # get sdf, rgb and normal, expand rays_d to all pts. shape in (B*N_total, ...)
-        rays_d_repeat = torch.repeat_interleave(rays_d, int(pts.shape[0] / n_rays), dim=0)
-        sdf, radiance, normal_pts = chunk_processing(
-            self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, pts, rays_d_repeat
+        zvals, zvals_surface, mask_pts = self.upsample_zvals(
+            rays_o, rays_d, zvals, self.forward_pts, mask_pts, inference_only
         )
 
-        # reshape
-        sdf = sdf.view(n_rays, -1)  # (B, N_total)
-        radiance = radiance.view(n_rays, -1, 3)  # (B, N_total, 3)
-        normal_pts = normal_pts.view(n_rays, -1, 3)  # (B, N_total, 3)
+        # get pts sigma/rgb/normal  (B, N_sample, ...)
+        sdf, radiance, normal_pts = self.get_sdf_radiance_normal_by_mask_pts(
+            self.geo_net, self.radiance_net, rays_o, rays_d, zvals, mask_pts, inference_only
+        )
 
         # convert sdf to sigma
         sigma = sdf_to_sigma(sdf, self.forward_beta(), self.beta_min)  # (B, N_total)
 
         # ray marching, sdf will not be used for calculation but for recording
-        output = self.ray_marching(sigma, radiance, zvals, inference_only=inference_only)
+        output = self.ray_marching(sigma, radiance, zvals, inference_only=inference_only, bkg_color=bkg_color)
         normal_pts = normal_pts[:, :output['weights'].shape[1]]  # in case add_inf_z
 
         # add normal. For normal map, needs to normalize each pts
@@ -113,20 +108,30 @@ class VolSDF(SdfModel):
 
         return opacity
 
-    def upsample_zvals(self, rays_o: torch.Tensor, rays_d: torch.Tensor, zvals: torch.Tensor, inference_only, sdf_func):
+    def upsample_zvals(
+        self,
+        rays_o: torch.Tensor,
+        rays_d: torch.Tensor,
+        zvals: torch.Tensor,
+        sdf_func,
+        mask_pts=None,
+        inference_only=False
+    ):
         """Sample zvals near surface
 
         Args:
             rays_o: torch.tensor (B, 3), cam_loc/ray_start position
             rays_d: torch.tensor (B, 3), view dir(assume normed)
             zvals: tensor (B, N_eval), coarse zvals for all rays, uniformly distributed in (near, far)
-            inference_only: affect the sample_pdf deterministic. By default False(For train)
             sdf_func: generally the model.forward_pts() func to get sdf from pts.
                        You can call it outside for debug.
+            mask_pts: tensor (B, N_sample) whether each pts is valid. None means all valid.
+            inference_only: affect the sample_pdf deterministic. By default False(For train)
 
         Returns:
             zvals: tensor (B, N_sample + N_importance), sample zvals near the surface
             zvals_surface: (B, 1) zvals on surface
+            mask_pts: new mask in (B, N_sample + N_importance). This not work. Always return None.
         """
         dtype = zvals.dtype
         device = zvals.device
@@ -214,7 +219,7 @@ class VolSDF(SdfModel):
         idx = torch.randint(zvals_sample.shape[-1], (zvals_sample.shape[0], ), device=device)
         zvals_surface = torch.gather(zvals_sample, 1, idx.unsqueeze(-1))
 
-        return zvals_sample, zvals_surface
+        return zvals_sample, zvals_surface, None
 
     def get_error_bound(self, beta, sdf: torch.Tensor, zvals: torch.Tensor, d_star: torch.Tensor, max_per_ray=True):
         """Calculate the error bound from approximate integration.

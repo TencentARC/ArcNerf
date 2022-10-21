@@ -37,7 +37,7 @@ class HashGridEmbedder(nn.Module):
         origin=(0, 0, 0),
         side=None,
         xyz_len=None,
-        dtype=torch.float32,
+        dtype='torch.float16',
         include_input=True,
         backend=None,
         *args,
@@ -57,7 +57,7 @@ class HashGridEmbedder(nn.Module):
                 origin: origin point(centroid of cube), a tuple of 3
                 side: each side len, if None, use xyz_len. If exist, use side only. By default None.
                 xyz_len: len of xyz dim, if None use side
-                dtype: dtype of params. By default is torch.float32
+                dtype: dtype of params. By default is torch.float16
             include_input: if True, raw input is included in the embedding. Appear at beginning. By default is True
             backend: which backend to use. By default None, use pure torch version.
 
@@ -72,6 +72,8 @@ class HashGridEmbedder(nn.Module):
         self.input_dim = input_dim
         self.include_input = include_input
 
+        self.dtype = cast_torch_dtype(dtype)
+
         # eq.3 in paper, each level multiply this scale, at most will be max_res
         self.base_res = base_res
         self.max_res = max_res
@@ -85,7 +87,7 @@ class HashGridEmbedder(nn.Module):
         self.embeddings, self.n_total_embed, self.offsets, self.resolutions = self.init_embeddings(init_emb)
 
         # set volume with base res
-        self.volume = Volume(n_grid=self.base_res, origin=origin, side=side, xyz_len=xyz_len, dtype=dtype)
+        self.volume = Volume(n_grid=self.base_res, origin=origin, side=side, xyz_len=xyz_len, dtype=self.dtype)
 
         # register params
         self.register()
@@ -179,7 +181,7 @@ class HashGridEmbedder(nn.Module):
 
         if self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
             norm_xyz = (xyz - self.min_xyz) / (self.max_xyz - self.min_xyz)  # to (0~1)
-            hashgrid_embed = self.hashgrid_encode_tcnn(norm_xyz)
+            hashgrid_embed = self.hashgrid_encode_tcnn(norm_xyz).type(self.dtype)
         else:
             hashgrid_embed = self.hashgrid_encode_torch(xyz)
         out.append(hashgrid_embed)  # (B, T*F)
@@ -245,3 +247,17 @@ class HashGridEmbedder(nn.Module):
             hash_index ^= idx[..., i] * primes[i]
 
         return hash_index % hashmap_size
+
+
+def cast_torch_dtype(dtype):
+    """String dtype to torch.dtype"""
+    if dtype == 'torch.float16':
+        return torch.float16
+    elif dtype == 'torch.float32':
+        return torch.float32
+    elif dtype == 'torch.float64':
+        return torch.float64
+    elif dtype == 'torch.uint8':
+        return torch.uint8
+    elif dtype == 'torch.bool':
+        return torch.bool

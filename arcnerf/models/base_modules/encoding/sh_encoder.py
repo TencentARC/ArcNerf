@@ -24,12 +24,15 @@ class SHEmbedder(nn.Module):
     This can be only used for xyz direction, but not position
     """
 
-    def __init__(self, input_dim=3, n_freqs=4, include_input=True, backend=None, *args, **kwargs):
+    def __init__(
+        self, input_dim=3, n_freqs=4, include_input=True, backend=None, dtype='torch.float16', *args, **kwargs
+    ):
         """
         Args:
             input_dim: dimension of input to be embedded. Must be 3(direction)
             n_freqs: num of degree for embedding.
             include_input: if True, raw input is included in the embedding. Appear at beginning. By default is True.
+            dtype: dtype of params. By default is torch.float16
             backend: which backend to use. By default None, use pure torch version.
 
         Returns:
@@ -43,6 +46,8 @@ class SHEmbedder(nn.Module):
         self.input_dim = input_dim
         self.n_freqs = n_freqs
         self.include_input = include_input
+
+        self.dtype = cast_torch_dtype(dtype)
 
         # backend
         if backend is None:
@@ -110,7 +115,7 @@ class SHEmbedder(nn.Module):
         # norm all the dir (-1, 1) -> (0, 1) for spherical harmonic
         xyz_norm = (xyz + 1) / 2.0
         if self.backend == 'tcnn' and TCNN_BACKEND_AVAILABLE:
-            sh_embed = self.sh_encode_tcnn(xyz_norm)
+            sh_embed = self.sh_encode_tcnn(xyz_norm).to(self.dtype)
         else:
             sh_embed = self.sh_encode_torch(xyz_norm)
         out.append(sh_embed)  # (B, n_freqs**2)
@@ -178,3 +183,17 @@ class SHEmbedder(nn.Module):
         out.append(freq_factors[4][8] * (xx * (xx - 3.0 * yy) - yy * (3.0 * xx - yy)))
 
         return torch.cat(out, dim=-1)  # (B, 25)
+
+
+def cast_torch_dtype(dtype):
+    """String dtype to torch.dtype"""
+    if dtype == 'torch.float16':
+        return torch.float16
+    elif dtype == 'torch.float32':
+        return torch.float32
+    elif dtype == 'torch.float64':
+        return torch.float64
+    elif dtype == 'torch.uint8':
+        return torch.uint8
+    elif dtype == 'torch.bool':
+        return torch.bool

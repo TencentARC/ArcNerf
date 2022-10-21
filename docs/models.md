@@ -34,12 +34,14 @@ It only embeds xyz positions rather than direction. It uses multi-res volume gri
 embedding of grid_pts from hashmap, and get the embedding by interpolation.
 
 You can select the backend by setting `backend`=`torch`/`tcnn`.
+`tcnn` runs in float16, you have to set `dtype: torch.float32` to use traditional mlp(not fused mlp).
 ### SHEmbedder
 The spherical harmonic hashing embedding introduced in [Instant-ngp](https://arxiv.org/abs/2201.05989).
 
 It only embeds xyz direction rather than positions.
 
 You can select the backend by setting `backend`=`torch`/`tcnn`.
+`tcnn` runs in float16, you have to set `dtype: torch.float32` to use traditional mlp(not fused mlp).
 ### DenseGridEmbedder
 The dense grid embedder directly extracts density and feature from a dense volume. It only embeds xyz direction rather than positions.
 ### CompositeEmbedder

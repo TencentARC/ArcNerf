@@ -183,10 +183,6 @@ class FgModel(Base3dModel):
         else:  # both not None, update real mask_rays
             mask_rays = torch.logical_and(mask_rays, torch.any(mask_pts, dim=1))  # update the mask_rays
 
-        # adjust dynamic batchsize factor
-        if not inference_only:
-            self.adjust_dynamicbs_factor(mask_pts)
-
         # handle the case of sparse rays
         if mask_rays is not None:
             if torch.all(mask_rays):
@@ -248,7 +244,9 @@ class FgModel(Base3dModel):
             'You should implement the _forward function that process rays with coarse zvals in child class...'
         )
 
-    def get_sigma_radiance_by_mask_pts(self, geo_net, radiance_net, rays_o, rays_d, zvals, mask_pts=None):
+    def get_sigma_radiance_by_mask_pts(
+        self, geo_net, radiance_net, rays_o, rays_d, zvals, mask_pts=None, inference_only=False
+    ):
         """Process the pts/dir by mask_pts. Only process valid zvals to save computation
 
         Args:
@@ -258,6 +256,7 @@ class FgModel(Base3dModel):
             rays_d: (B, 3) rays direction(normalized)
             zvals: (B, N_pts) zvals on each ray
             mask_pts: (B, N_pts) whether each pts is valid. If None, process all the pts
+            inference_only: Whether its in the inference mode
 
         Returns:
             sigma: (B, N_pts) sigma on all pts. Duplicated pts share the same value
@@ -278,6 +277,9 @@ class FgModel(Base3dModel):
         else:
             pts = pts[mask_pts].view(-1, 3)  # (N_valid_pts, 3)
             rays_d_repeat = rays_d_repeat[mask_pts].view(-1, 3)  # (N_valid_pts, 3)
+            # adjust dynamic batchsize factor when mask_pts is not None
+            if not inference_only:
+                self.adjust_dynamicbs_factor(mask_pts)
 
         # get sigma and rgb, . shape in (N_valid_pts, ...)
         _sigma, _radiance = chunk_processing(
@@ -362,6 +364,25 @@ class FgModel(Base3dModel):
                     output[k] = v
 
         return output
+
+    @staticmethod
+    def merge_full_mask(mask_pts, zvals_new):
+        """Update the old mask of pts by an extra full mask indicated by zvals_news
+
+        Args:
+            mask_pts:  bool tensor in (B, N_old), can be None
+            zvals_new: tensor of upsampled zvals in (B, N_new). Suppose all zvals are identical
+
+        Returns:
+            mask_pts: (B, N_old+N_new) if mask_pts is not None, else None
+        """
+        if mask_pts is not None:
+            mask_new = torch.ones_like(zvals_new, dtype=torch.uint8, device=zvals_new.device)
+            mask_pts = torch.sort(
+                torch.cat([mask_pts.type(torch.uint8), mask_new], -1), -1, descending=True
+            )[0].type(torch.bool)  # (B, N_total)
+
+        return mask_pts
 
     def optimize(self, cur_epoch=0):
         """Optimize the obj bounding geometric structure. Support ['volume'] now."""

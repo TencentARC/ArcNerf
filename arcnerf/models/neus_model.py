@@ -60,37 +60,24 @@ class Neus(SdfModel):
 
         return min(1.0, cur_epoch / self.anneal_end)
 
-    def _forward(self, inputs, zvals, mask, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
+    def _forward(self, inputs, inference_only=False, get_progress=False, cur_epoch=0, total_epoch=300000):
         rays_o = inputs['rays_o']  # (B, 3)
         rays_d = inputs['rays_d']  # (B, 3)
-        n_rays = rays_o.shape[0]
+        zvals = inputs['zvals']  # (B, 1)
+        mask_pts = inputs['mask_pts']  # (B, n_pts)
+        bkg_color = inputs['bkg_color']  # (B, 3)
 
-        # up-sample zvals
-        zvals = self.upsample_zvals(rays_o, rays_d, zvals, inference_only)  # (B, N_total(N_sample+N_importance))
+        # up-sample zvals with mask_pts
+        zvals, mask_pts = self.upsample_zvals(rays_o, rays_d, zvals, mask_pts, inference_only)  # (B, N_total)
 
         # use mid pts in section for sdf
-        mid_zvals = 0.5 * (zvals[..., 1:] + zvals[..., :-1])
-        # append an extra zval to the end (follow the original implementation)
-        sample_dist = (zvals[:, -1] - zvals[:, 0]) / self.get_ray_cfgs('n_sample') * 0.5  # (B,)
-        final_mid_zvals = mid_zvals[:, -1] + sample_dist  # (B,)
-        mid_zvals = torch.cat([mid_zvals, final_mid_zvals.unsqueeze(-1)], dim=-1)  # (B, N_total)
-        final_zvals = zvals[:, -1] + sample_dist  # (B,)
-        zvals = torch.cat([zvals, final_zvals.unsqueeze(-1)], dim=-1)  # (B, N_total+1)
+        mid_zvals, zvals, mask_mid_pts = self.handle_mid_pts(zvals, mask_pts)  # (B, N), (B, N+1), (B, N)
 
-        mid_pts = get_ray_points_by_zvals(rays_o, rays_d, mid_zvals)  # (B, N_total, 3)
-        mid_pts = mid_pts.view(-1, 3)  # (B*N_total, 3)
-
-        # get sdf, rgb and normal, expand rays_d to all pts. shape in (B*N_total, ...)
-        rays_d_repeat = torch.repeat_interleave(rays_d, int(mid_pts.shape[0] / n_rays), dim=0)
-        sdf, radiance, normal_pts = chunk_processing(
-            self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, mid_pts, rays_d_repeat
+        # get pts sigma/rgb/normal  (B, N_sample, ...)
+        sdf, radiance, normal_pts = self.get_sdf_radiance_normal_by_mask_pts(
+            self.geo_net, self.radiance_net, rays_o, rays_d, mid_zvals, mask_mid_pts, inference_only
         )
-
-        # reshape
-        sdf = sdf.view(n_rays, -1)  # (B, N_total)
-        rays_d_repeat = rays_d_repeat.view(n_rays, -1, 3)  # (B, N_total, 3)
-        radiance = radiance.view(n_rays, -1, 3)  # (B, N_total, 3)
-        normal_pts = normal_pts.view(n_rays, -1, 3)  # (B, N_total, 3)
+        rays_d_repeat = torch.repeat_interleave(rays_d.unsqueeze(1), mid_zvals.shape[1], dim=1)  # (B, N_total, 3)
 
         # estimate sdf for section pts using mid pts sdf
         cos_anneal_ratio = 1.0 if inference_only else self.get_cos_anneal(cur_epoch)
@@ -101,7 +88,9 @@ class Neus(SdfModel):
         alpha = sdf_to_alpha(sdf, zvals, iter_slope, self.forward_scale())  # (B, N_total)
 
         # ray marching, sdf will not be used for calculation but for recording
-        output = self.ray_marching(sdf, radiance, mid_zvals, alpha=alpha, inference_only=inference_only)
+        output = self.ray_marching(
+            sdf, radiance, mid_zvals, alpha=alpha, inference_only=inference_only, bkg_color=bkg_color
+        )
 
         # add normal. For normal map, needs to normalize each pts
         output['normal'] = torch.sum(output['weights'].unsqueeze(-1) * normalize(normal_pts), -2)  # (B, 3)
@@ -114,21 +103,31 @@ class Neus(SdfModel):
 
         return output
 
-    def upsample_zvals(self, rays_o: torch.Tensor, rays_d: torch.Tensor, zvals: torch.Tensor, inference_only, s=32):
+    def upsample_zvals(
+        self,
+        rays_o: torch.Tensor,
+        rays_d: torch.Tensor,
+        zvals: torch.Tensor,
+        mask_pts=None,
+        inference_only=False,
+        s=32
+    ):
         """Upsample zvals if N_importance > 0
 
         Args:
             rays_o: torch.tensor (B, 3), cam_loc/ray_start position
             rays_d: torch.tensor (B, 3), view dir(assume normed)
             zvals: tensor (B, N_sample), coarse zvals for all rays
+            mask_pts: tensor (B, N_sample) whether each pts is valid. None means all valid.
             inference_only: affect the sample_pdf deterministic. By default False(For train)
             s: factor for up-sample. By default 32
 
         Returns:
             zvals: tensor (B, N_sample + N_importance), up-sample zvals near the surface
+            mask_pts: new mask in (B, N_sample + N_importance)
         """
         if self.get_ray_cfgs('n_importance') <= 0:
-            return zvals
+            return zvals, mask_pts
 
         dtype = zvals.dtype
         device = zvals.device
@@ -167,12 +166,43 @@ class Neus(SdfModel):
             zvals = torch.cat([zvals, zvals_on_surface], dim=-1)
             zvals, _ = torch.sort(zvals, dim=-1)
 
-        return zvals
+            mask_pts = self.merge_full_mask(mask_pts, zvals_on_surface)
+
+        return zvals, mask_pts
+
+    def handle_mid_pts(self, zvals, mask_pts):
+        """Handling the mid_pts from NeuS given mask_pts"""
+        dtype = zvals.dtype
+        device = zvals.device
+
+        if mask_pts is None:
+            sample_dist = (zvals[:, -1] - zvals[:, 0]) / self.get_ray_cfgs('n_sample') * 0.5  # (B,)
+            mid_zvals = 0.5 * (zvals[..., 1:] + zvals[..., :-1])  # (B, N-1)
+            # append an extra zval to the end (follow the original implementation)
+            final_mid_zvals = mid_zvals[:, -1] + sample_dist  # (B,)
+            final_zvals = zvals[:, -1] + sample_dist  # (B,)
+            mid_zvals = torch.cat([mid_zvals, final_mid_zvals.unsqueeze(-1)], dim=-1)  # (B, N)
+            zvals = torch.cat([zvals, final_zvals.unsqueeze(-1)], dim=-1)  # (B, N+1)
+        else:  # Need to adjust the last position
+            sample_dist = (zvals[:, -1] - zvals[:, 0]) / self.get_ray_cfgs('n_sample') * 0.5  # (B,)
+            zeros_mask = torch.zeros((mask_pts.shape[0], 1), dtype=torch.bool, device=device)
+            ones_mask = torch.ones((mask_pts.shape[0], 1), dtype=torch.bool, device=device)
+            final_zvals = zvals[:, -1] + sample_dist * 2.0  # (B,)
+            _zvals = torch.ones((zvals.shape[0], zvals.shape[1] + 1), dtype=dtype,
+                                device=device) * final_zvals.unsqueeze(1)  # (B, N+1)
+            _mask_pts = torch.cat([mask_pts, zeros_mask], dim=1)  # (B, N+1)
+            _zvals[_mask_pts] = zvals[mask_pts]  # (B, N+1)
+
+            # mid zvals, but the last one will be the same zvals
+            mid_zvals = 0.5 * (_zvals[..., 1:] + _zvals[..., :-1])  # (B, N)
+
+            zvals = _zvals  # (B, N+1)
+            mask_pts = torch.cat([ones_mask, mask_pts[:, :-1]], dim=1)  # (B, N+1) extent one valid pts
+
+        return mid_zvals, zvals, mask_pts
 
     def get_est_opacity(self, dt, pts):
-        """NeuS model convert sdf with slope to alpha(opacity)
-        TODO: I have not check whether it is correct
-        """
+        """NeuS model convert sdf with slope to alpha(opacity)"""
         n_pts = pts.shape[0]
         # Make fake sdf on ray to get pts opacity
         rays_d = -normalize(pts)  # assume points to (0,0,0), (B, 3)
