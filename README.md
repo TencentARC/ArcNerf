@@ -39,6 +39,15 @@ We are working on extending it in the coming future.
 
 ![pipe](assets/Pipe2.png)
 
+  - Based on this pipeline, we can easily extend original nerf/neus model for:
+    - NeRF with pruning volume, with freq embed
+    - NeRF with hashGrid embed
+    - NeRF with hashGrid embed + volume pruning -> NGP model
+    - NeuS with pruning volume, with freq embed
+    - NeuS with hashGrid embed
+    - NeuS with hashGrid embed + volume pruning -> NeuS-NGP model
+  - Plug-in the modules like volume pruning makes the speed faster and generate better result. See [expr](docs/expr.md) for more detail.
+
 
 - Unified dataset and benchmark:
   - We split the dataset following on official repo, and all methods are running under the same settings for fair comparison.

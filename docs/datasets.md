@@ -28,7 +28,7 @@ Will not touch intrinsic. If point cloud exists, rescale them by same factor to 
 - exchange_coord: Flexible to exchange/flip the coord to a standard system.
 - eval_max_sample: To keep the closest-to-center_pose samples in the split.
 Done after camera `scale_radius`. The radius is restricted within `scale_radius` range.
-- ndc_space/center_pixel: Affect the ray sampling function in `get_rays`.
+- ndc_space/center_pixel/normalize_rays_d: Affect the ray sampling function in `get_rays`.
 ## Augmentation:
 The augmentation is for all image process in all time.
 - n_rays: Sample `n_rays` instead of using all. But calling it every time may sample overlapping rays, not use in train.
@@ -47,6 +47,7 @@ The augmentation is for all image process in all time.
 You need to get_rays by setting `wh_order=False` to change the order.
     - ndc_space: makes the rays in ndc space. You need to specify the near distance as well.
     - center_pixel: If set True, use (0.5, 1.5,...) instead of (0, 1, 2) as the pixel location.
+    - normalize_rays_d: By default True to normalize the rays. but in some model we don't want it normalized.
 ## point cloud
 - pts: `(n_pts, 3)` in world coordinate, `xyz` order
 - color: `(n_pts, 3)`, `rgb` order, should be normed into `0~1` range.

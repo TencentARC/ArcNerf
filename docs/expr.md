@@ -10,7 +10,7 @@ But what worth notice is:
 
 Thanks to our pipeline, we can easily change any part in the pipeline and see each what `pruning`/`embedding` contribute to the result:
 
-Basic NeRF PSNR on Lego is `32.78`. [conf](../configs/expr/NeRF/lego/nerf_lego_nerf.yaml)
+Basic NeRF PSNR on Lego is `32.86`. [conf](../configs/expr/NeRF/lego/nerf_lego_nerf.yaml)
 
 ## In data preperation
 - directly add `center_pixel` for ray generation improves NeRF(`freq embed`) performance(`~1`).  [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_centerpixel.yaml)
@@ -19,13 +19,23 @@ Basic NeRF PSNR on Lego is `32.78`. [conf](../configs/expr/NeRF/lego/nerf_lego_n
 We can change `freqEncode` into `tcnn.HashGridEncoding/SHEncoding`.
 
 - Using `ngp` like encodings, you must use `center_pixel`. Otherwise not converge. (This has also been proven in `ngp` model.)
-Without using a shallow network, we can get PSNR `xx`. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngpembed_centerpixel.yaml)
-- Further, decrease the mlp size using a shallow MLP
+Without using a shallow network, we can get PSNR `27.82`. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngpembed_centerpixel_trunc.yaml).
+It happens that geometry on object is good but noisy in empty space is heavy.
 
+![nerf_ngpembed](../assets/expr/nerf_ngpembed.png)
+
+- Further, decrease the mlp size using a shallow MLP make the speed faster (`0.3 -> 0.05s/iter`). The object is converage well but empty space is even noisier.
+[conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngpembed_centerpixel_shallow_trunc.yaml).
+
+![nerf_ngpembed_shallow](../assets/expr/nerf_ngpembed_shallow.png)
 
 ## Volume Pruning
 Based on original NeRF implementation, we can keep `freq embed`, can add volume structure with pruning to improve modelling and performance.
+With such object structure, we can set the `n_sample` large(1024), and it will remain samples based on volume voxels.
 
+- With directly sample 1024 pts and volume structure, speed and results both increase (`0.04s` + `PSNR 33.33`). [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_volumeprune_moresample_noimportance.yaml).
+
+- If we use original 64 + 128 sampling method in NeRF, the result is lower to `27.57`, meaning that the coarse sampling is not accurate to produce `resample` points. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_volumeprune.yaml).
 
 ## ngp
 `instant-ngp` combines volume pruning with hash/sh encoding, for much faster converge.
@@ -68,10 +78,17 @@ Basic NeRF PSNR on Lego is `32.78`. [conf](../configs/expr/NeRF/lego/nerf_lego_n
 ------------------------------------------------------------------------------------------------------------
 Summary:
 
-|          model            | PSNR  |  iter/s | eval s/img |
-|:-------------------------:|:-----:|:-------:|:----------:|
-| NeRF                      | 32.78 |
-|+center_pixel              | 33.79 |
+|          model            | PSNR  |  iter/s | Num iter | eval s/img | conf file|
+|:-------------------------:|:-----:|:-------:|:--------:|:----------:|:--------:|
+| NeRF                      | 32.86 | 0.25s   |  30w     | 10s        | [conf](../configs/expr/NeRF/lego/nerf_lego_nerf.yaml) |
+|+center_pixel              | 33.80 | 0.25s   |  30w     | 10s        | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_centerpixel.yaml)
+|  +hash/sh encoder           | 27.82 | 0.32s   |  30w     | 10s        | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngpembed_centerpixel_trunc.yaml)
+|  +hash/sh encoder + shallow | 9.27 | 0.05s   |  30w     | 1.3s       | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngpembed_centerpixel_shallow_trunc.yaml)
+|+volume pruning(1024 pts)  | 33.33 | 0.04s   |  30w     | 0.84s      | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_volumeprune_moresample_noimportance.yaml)
+|+volume pruning(64 + 128 pts)  | 27.57 | 0.2s   |  30w     | 4.13s      | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_volumeprune.yaml)
+| ngp                       | 34.31 | 0.018s   |  5w      | 0.24s     | [conf](../configs/expr/NeRF/lego/nerf_lego_nerf_ngp.yaml)
+|    + new volume           | 34.65 | 0.017s   |  5w      | 0.24s     | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngp_newvolume.yaml)
+
 
 
 ------------------------------------------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-name: nerf_lego_nerf_ngp
+name: nerf_lego_neus_ngp_newvolume
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_ngp'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_neus_ngp_newvolume'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_ngp/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_neus_ngp_newvolume/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -47,7 +47,7 @@ optim:
 progress:
     start_epoch: -1
     epoch: 50000
-    save_time: 1800
+    save_time: 600
 
     epoch_loss: 100
     iter_loss: 1
@@ -122,21 +122,27 @@ inference:
         v_range: [-0.6, -0.2]
         fps: 5
         center_pixel: True
+        surface_render:
+            chunk_rays_factor: 1024
+            method: sphere_tracing
 
     volume:
         n_grid: 512
-        side: 2.0
-        level: 50.0
-        chunk_pts_factor: 32
+        origin: [0.0, -0.11, 0.0]
+        xyz_len: [1.2, 1.2, 2.0]
+        level: 0.0
+        grad_dir: ascent
+        chunk_pts_factor: 1
         render_mesh:
             backend: pytorch3d
 
 model:
-    type: NeRF
+    type: Neus
     obj_bound:
         volume:
             n_grid: 128
-            side: 2.0
+            origin: [0.0, -0.11, 0.0]
+            xyz_len: [1.2, 1.2, 2.0]
         epoch_optim: 16
         epoch_optim_warmup: 256
         ray_sample_acc: True
@@ -146,24 +152,31 @@ model:
         bkg_color: [1.0, 1.0, 1.0]  # If want black-background, set [0.0, 0.0, 0.0]
         log_max_allowance: 18  # only used for dynamic batch_size, 1 << 18 = 4096*64
     rays:
+        radius_bound: 1.5
         n_sample: 1024
+        n_iter: 4
         inverse_linear: False
         perturb: True
         add_inf_z: False
         noise_std: 0.0
         white_bkg: True  # for eval only, if want black-background, set [0.0, 0.0, 0.0]
+    params:
+        speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
+        init_var: 0.05                # init var, when it approaches 0, cdf more close
+        anneal_end: 50000             # for anneal param, only set during training. please
     chunk_rays: 32768   # 4096 * 16
     chunk_pts: 1048576  # 4096 * 256
     geometry:
-        type: FusedMLPGeoNet
         W: 64
         D: 1
+        use_bias: False
         skips: []
         encoder:
             type: HashGridEmbedder
             input_dim: 3
             n_freqs: 0  # do not do geo init
-            side: 2.0
+            origin: [0.0, -0.11, 0.0]
+            xyz_len: [1.2, 1.2, 2.0]
             n_levels: 16
             n_feat_per_entry: 2
             hashmap_size: 19
@@ -171,16 +184,26 @@ model:
             max_res: 2048
             include_input: False
             backend: tcnn
+            dtype: torch.float32
         W_feat: 16
-        geometric_init: False
-        out_act_cfg:
-            type: TruncExp
+        geometric_init: True          # use geometric init. need radius_init
+        radius_init: 0.5              # geometric init sphere radius
+        weight_norm: True
+        skip_reduce_output: True
+        norm_skip: True
+        act_cfg: # activation function for dense layer
+            type: softplus
+            beta: 100
     radiance:
-        type: FusedMLPRadianceNet
-        mode: 'fv'   # This order matter push up ~0.5 PSNR on eval
+        type: FusedMLPRadianceNet  # fuse mlp here, other nan error
+        mode: 'pvnf'
         W: 64
         D: 2
         encoder:
+            pts:
+                type: FreqEmbedder
+                input_dim: 3
+                n_freqs: 0            # xyz embed freq, not embedding performed
             view:
                 type: SHEmbedder
                 input_dim: 3
@@ -188,17 +211,23 @@ model:
                 include_input: False
                 backend: tcnn
         W_feat_in: 16
+        weight_norm: True
 
 loss:
     ImgLoss:
-        keys: ['rgb_coarse']
         loss_type: Huber
+        use_mask: True
         delta: 0.1
         weight: 5
+    MaskLoss:
+        loss_type: BCE
+        weight: 0.1
+    EikonalLoss:
+        key: normal_pts
+        weight: 0.1
 
 metric:
     PSNR:
 
 train_metric:
     PSNR:
-        key: 'rgb_coarse'

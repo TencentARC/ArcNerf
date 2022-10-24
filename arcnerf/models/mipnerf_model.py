@@ -27,7 +27,7 @@ class MipNeRF(FgModel):
         # set gaussian
         gaussian_fn = get_value_from_cfgs_field(self.cfgs.model.rays.gaussian, 'gaussian_fn', 'cone')
         self.gaussian = Gaussian(gaussian_fn)
-        # blur coarse weights
+        # blur weights
         self.blur_coarse_weights = get_value_from_cfgs_field(self.cfgs.model.rays, 'blur_coarse_weights', False)
 
     def get_n_coarse_sample(self):
@@ -97,7 +97,6 @@ class MipNeRF(FgModel):
         zvals = inputs['zvals']  # (B, 1)
         mask_pts = inputs['mask_pts']  # (B, n_pts)
         bkg_color = inputs['bkg_color']  # (B, 3)
-        n_rays = rays_o.shape[0]
         output = {}
 
         # get mean/cov representation of intervals
@@ -107,10 +106,6 @@ class MipNeRF(FgModel):
         sigma, radiance = self.get_sigma_radiance_by_mask_pts(
             self.geo_net, self.radiance_net, rays_o, rays_d, intervals, mask_pts, inference_only
         )
-
-        # reshape
-        sigma = sigma.view(n_rays, -1)  # (B, N_sample)
-        radiance = radiance.view(n_rays, -1, 3)  # (B, N_sample, 3)
 
         # ray marching for coarse network, keep the coarse weights for next stage, use mid pts for interval
         zvals_mid = 0.5 * (zvals[:, 1:] + zvals[:, :-1])
@@ -163,7 +158,7 @@ class MipNeRF(FgModel):
         if self.blur_coarse_weights:
             weights_pad = torch.cat([weights[..., :1], weights, weights[..., -1:]], dim=-1)  # (B, N_sample+2)
             weights_max = torch.max(weights_pad[..., :-1], weights_pad[..., 1:])  # (B, N_sample+1)
-            weights = 0.5 * (weights_max[..., :-1] + weights_max[..., 1:])  # (B, N_sample)
+            weights = 0.5 * (weights_max[..., :-1] + weights_max[..., 1:]) + 0.01  # (B, N_sample)
 
         weights_coarse = weights[:, 1:self.get_n_coarse_sample() - 2]  # (B, N_sample-2)
         zvals_mid = 0.5 * (zvals[..., 1:] + zvals[..., :-1])  # (B, N_sample-1)
@@ -173,6 +168,10 @@ class MipNeRF(FgModel):
         ).detach()
 
         return _zvals
+
+    def get_est_opacity(self, dt, pts):
+        """For mip-nerf model, seem volume pruning is hard to work for any single pts"""
+        raise NotImplementedError('Do not support opa calculation for mipnerf')
 
     def surface_render(
         self,

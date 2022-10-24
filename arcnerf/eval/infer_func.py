@@ -425,6 +425,7 @@ class Inferencer(object):
         volume_pts = volume.get_volume_pts()  # (n_grid^3, 3) pts in torch
         voxel_size = volume.get_voxel_size()  # (3,) tuple
         volume_len = volume.get_len()  # (3,) tuple
+        volume_origin = volume.get_origin()[None]  # (1, 3) tensor
 
         # move to gpu
         if self.device == 'gpu':
@@ -442,7 +443,7 @@ class Inferencer(object):
         # get mesh output
         if np.any(valid_sigma):
             volume_out['mesh'] = self.run_infer_volume_mesh(
-                model, sigma, level, n_grid, grad_dir, voxel_size, volume_len, max_faces
+                model, sigma, level, n_grid, grad_dir, voxel_size, volume_len, volume_origin, max_faces
             )
 
         # set back in case training
@@ -491,7 +492,9 @@ class Inferencer(object):
 
         return pc_out, sigma, valid_sigma
 
-    def run_infer_volume_mesh(self, model, sigma, level, n_grid, grad_dir, voxel_size, volume_len, max_faces=500000):
+    def run_infer_volume_mesh(
+        self, model, sigma, level, n_grid, grad_dir, voxel_size, volume_len, volume_origin, max_faces=500000
+    ):
         """Extract mesh from volume field.
            Return mesh in full/simplified result as a dict.
            Return None if not run.
@@ -500,13 +503,14 @@ class Inferencer(object):
         sigma = sigma.reshape((n_grid, n_grid, n_grid))  # (n, n, n)
 
         try:
-            # full mesh
+            # full mesh, which are normalized in the volume. Need origin to adjust pts position
             time0 = time.time()
             verts, faces, _ = extract_mesh(sigma.copy(), level, voxel_size, volume_len, grad_dir)
+
             self.logger.add_log('    Extract mesh time {:.2f}s'.format(time.time() - time0))
             self.logger.add_log('    Extract {} verts, {} faces'.format(verts.shape[0], faces.shape[0]))
 
-            mesh_out = {'full': self.get_mesh_components(verts, faces, model)}
+            mesh_out = {'full': self.get_mesh_components(verts, faces, volume_origin, model)}
 
             # simplify mesh if need
             time0 = time.time()
@@ -516,7 +520,7 @@ class Inferencer(object):
                 verts_sim, faces_sim = simplify_mesh(verts, faces, max_faces)
                 self.logger.add_log('    Simplify mesh time {:.2f}s'.format(time.time() - time0))
                 self.logger.add_log('    Simplify {} verts, {} faces'.format(verts_sim.shape[0], faces_sim.shape[0]))
-                mesh_out['simplify'] = self.get_mesh_components(verts_sim, faces_sim, model)
+                mesh_out['simplify'] = self.get_mesh_components(verts_sim, faces_sim, volume_origin, model)
 
             # add c2w and intrinsic for mesh rendering
             if self.get_render_cfgs() is not None and 'render' in self.get_render_cfgs():
@@ -537,8 +541,10 @@ class Inferencer(object):
 
         return mesh_out
 
-    def get_mesh_components(self, verts, faces, model):
-        """Get all the mesh components(colors, normals) using model"""
+    def get_mesh_components(self, verts, faces, volume_origin, model):
+        """Get all the mesh components(colors, normals) using model
+        Since verts are normalized in the volume, You have to add volume offset to get the actual position for model.
+        """
         vert_normals, face_normals = get_normals(verts, faces)
         face_centers = get_face_centers(verts, faces)
         n_verts, n_faces = verts.shape[0], faces.shape[0]
@@ -552,9 +558,10 @@ class Inferencer(object):
         if self.device == 'gpu':
             vert_pts = vert_pts.cuda()
             vert_view_dir = vert_view_dir.cuda()
+            volume_origin = volume_origin.cuda()
 
         time0 = time.time()
-        _, vert_colors = model.forward_pts_dir(vert_pts, vert_view_dir)
+        _, vert_colors = model.forward_pts_dir(vert_pts + volume_origin, vert_view_dir)
         vert_colors = torch_to_np(vert_colors)
         self.logger.add_log('    Get verts color for all {} verts takes {:.2f}s'.format(n_verts, time.time() - time0))
 
@@ -569,7 +576,7 @@ class Inferencer(object):
             face_view_dir = face_view_dir.cuda()
 
         time0 = time.time()
-        _, face_colors = model.forward_pts_dir(face_center_pts, face_view_dir)
+        _, face_colors = model.forward_pts_dir(face_center_pts + volume_origin, face_view_dir)
         face_colors = torch_to_np(face_colors)
         self.logger.add_log('    Get faces color for all {} faces takes {:.2f}s'.format(n_faces, time.time() - time0))
 

@@ -35,10 +35,10 @@ class Base3dDataset(BaseDataset):
         # set for eval
         self.eval_max_sample = get_value_from_cfgs_field(cfgs, 'eval_max_sample')
 
-        # whether in ndc space
+        # for ray generation
         self.ndc_space = get_value_from_cfgs_field(cfgs, 'ndc_space', False)
-        # center pixel
         self.center_pixel = get_value_from_cfgs_field(cfgs, 'center_pixel', False)
+        self.normalize_rays_d = get_value_from_cfgs_field(cfgs, 'normalize_rays_d', True)
 
         # device
         self.device = get_value_from_cfgs_field(cfgs, 'device', 'cpu')
@@ -227,7 +227,7 @@ class Base3dDataset(BaseDataset):
             rays_o = []
             rays_d = []
             for idx in range(len(self.cameras)):
-                ray = self.cameras[idx].get_rays(index=center_idx, to_np=True, center_pixel=self.center_pixel)
+                ray = self.cameras[idx].get_rays(index=center_idx, to_np=True, center_pixel=True)
                 rays_o.append(ray[0])
                 rays_d.append(ray[1])
             rays = (np.concatenate(rays_o, axis=0), np.concatenate(rays_d, axis=0))
@@ -270,7 +270,12 @@ class Base3dDataset(BaseDataset):
             self.ray_bundles = []
             for i in range(self.n_imgs):
                 self.ray_bundles.append(
-                    self.cameras[i].get_rays(wh_order=False, ndc=self.ndc_space, center_pixel=self.center_pixel)
+                    self.cameras[i].get_rays(
+                        wh_order=False,
+                        ndc=self.ndc_space,
+                        center_pixel=self.center_pixel,
+                        normalize_rays_d=self.normalize_rays_d
+                    )
                 )
 
     def __len__(self):
@@ -308,7 +313,12 @@ class Base3dDataset(BaseDataset):
         if self.precache:
             ray_bundle = self.ray_bundles[idx]
         else:  # We don't sample rays here
-            ray_bundle = self.cameras[idx].get_rays(wh_order=False, ndc=self.ndc_space, center_pixel=self.center_pixel)
+            ray_bundle = self.cameras[idx].get_rays(
+                wh_order=False,
+                ndc=self.ndc_space,
+                center_pixel=self.center_pixel,
+                normalize_rays_d=self.normalize_rays_d
+            )
 
         inputs = {
             'img': img,  # (hw, 3), in rgb order / (n_rays, 3) if sample rays

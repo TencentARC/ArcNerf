@@ -35,7 +35,7 @@ optim:
     lr_scheduler:
         type: ExponentialLR
         lr_gamma: 0.1
-        lr_steps: [500000]
+        lr_steps: [250000]
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -43,7 +43,7 @@ optim:
 
 progress:
     start_epoch: -1
-    epoch: 300000
+    epoch: 500000
     save_time: 1800
 
     epoch_loss: 100
@@ -129,12 +129,12 @@ model:
         n_importance: 128
         gaussian:
             gaussian_fn: cone        # ['cone', 'cylinder'] to get mean/cov
-        blur_coarse_weights: True
         inverse_linear: False
         perturb: True
         add_inf_z: True
         noise_std: 0.0
         white_bkg: True
+        blur_coarse_weights: True
     chunk_rays: 32768
     chunk_pts: 131072
     geometry:
@@ -147,6 +147,8 @@ model:
             n_freqs: 16
         W_feat: 256
         geometric_init: False
+        out_act_cfg:
+            type: softplus  # softplus on sigma
     radiance:
         mode: 'vf'
         W: 128

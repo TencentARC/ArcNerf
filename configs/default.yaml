@@ -91,6 +91,7 @@ dataset:
         # exchange_coord: [y, z, x]  # exchange and flip coord. Generally not use
         ndc_space: False             # change the rays into ndc_space. You must assure the near is 1.0 before that. You should set near/far as 1 if used ndc_space
         center_pixel: False          # whether to use pixel from (0.5, 1.5,...) instead of (0, 1, 2)
+        #normalize_rays_d: True       # whether the rays_d are normalized. By default True
         precache: True               # precache all the rays at once
         device: cpu                  # ['cpu', 'gpu'], gpu brings all tensor to GPU, takes memory but fast in data preparation
         augmentation:                # augmentation is for rays on a single image. Do not change in whole progress

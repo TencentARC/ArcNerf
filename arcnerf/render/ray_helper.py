@@ -20,7 +20,8 @@ def get_rays(
     to_np=False,
     ndc=False,
     ndc_near=1.0,
-    center_pixel=False
+    center_pixel=False,
+    normalize_rays_d=True
 ):
     """Get rays in world coord from camera.
     No batch processing allow. Rays are produced by setting z=1 and get location.
@@ -39,6 +40,7 @@ def get_rays(
         ndc: If True, change rays to ndc space, you can then change near far to 0,1. By default False
         ndc_near: near zvals. By default 1.0.
         center_pixel: If True, use the center pixel from (0.5, 0.5) instead of corner(0, 0)
+        normalize_rays_d: normalize the rays_d. By default True
 
     Returns:
         rays_o: origin (N_ray, 3) tensor. If no sampler is used, return (WH, 3) num of rays
@@ -93,7 +95,8 @@ def get_rays(
         rays_o, rays_d = get_ndc_rays(rays_o, rays_d, W, H, intrinsic, ndc_near)
     else:
         # normalize rays for non_ndc case
-        rays_d = normalize(rays_d)  # (WH/N_rays, 3)
+        if normalize_rays_d:
+            rays_d = normalize(rays_d)  # (WH/N_rays, 3)
 
     if to_np:
         rays_o = torch_to_np(rays_o)

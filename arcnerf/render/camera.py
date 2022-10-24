@@ -116,7 +116,16 @@ class PerspectiveCamera(object):
 
         return pose
 
-    def get_rays(self, wh_order=True, index: np.ndarray = None, n_rays=-1, to_np=False, ndc=False, center_pixel=False):
+    def get_rays(
+        self,
+        wh_order=True,
+        index: np.ndarray = None,
+        n_rays=-1,
+        to_np=False,
+        ndc=False,
+        center_pixel=False,
+        normalize_rays_d=True
+    ):
         """Get camera rays by intrinsic and c2w, in world coord"""
         return get_rays(
             self.W,
@@ -128,7 +137,8 @@ class PerspectiveCamera(object):
             n_rays,
             to_np,
             ndc,
-            center_pixel=center_pixel
+            center_pixel=center_pixel,
+            normalize_rays_d=normalize_rays_d
         )
 
     def proj_world_to_pixel(self, points: torch.Tensor):
