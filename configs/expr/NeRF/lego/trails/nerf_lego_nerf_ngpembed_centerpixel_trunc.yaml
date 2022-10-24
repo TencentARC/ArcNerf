@@ -1,0 +1,189 @@
+name: nerf_lego_nerf_ngpembed_centerpixel_trunc   # Use hashencode + sh encode without volume pruning
+
+resume: None
+
+debug:
+    debug_mode: False
+    print_all_grad: False
+    get_progress: False
+
+dir:
+    expr_dir: None
+    data_dir: '/group/30042/leoyluo/Immerse/data'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_ngpembed_centerpixel_trunc'
+
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_ngpembed_centerpixel_trunc/checkpoints/final.pt.tar'
+
+gpu_ids: -1
+
+dist:
+    local_rank: 0
+    rank: 0
+    world_size: 1
+    distributed_backend: nccl
+    random_seed: None
+    slurm: False
+
+batch_size: 2
+n_rays: 4096
+worker: 4
+
+optim:
+    lr: 5e-4
+    optim_type: adam
+    weight_decay: 0.0
+    lr_scheduler:
+        type: ExponentialLR
+        lr_gamma: 0.1
+        lr_steps: [500000]
+
+    clip_gradients: 0.0
+    clip_warmup: -1
+    clip_gradients_warmup: 0.0
+
+progress:
+    start_epoch: -1
+    epoch: 300000
+    save_time: 1800
+
+    epoch_loss: 100
+    iter_loss: 1
+    save_progress: True
+    epoch_save_progress: 50000
+    iter_save_progress: 1
+
+    epoch_val: 50000
+    save_progress_val: True
+    max_samples_val: 1
+
+    epoch_save_checkpoint: 100000
+    local_progress: False
+
+    init_eval: False
+    epoch_eval: 50000
+    max_samples_eval: 25
+
+dataset:
+    train:
+        type: NeRF
+        scene_name: lego
+        img_scale: 1.0
+        scale_radius: 3.0
+        center_pixel: True
+        precache: True
+        device: gpu
+        scheduler:
+            precrop:
+                ratio: 0.5
+                max_epoch: 500
+            bkg_color:
+                color: random
+
+    val:
+        skip: 8
+        type: NeRF
+        scene_name: lego
+        img_scale: 0.5
+        scale_radius: 3.0
+        center_pixel: True
+        precache: False
+        device: gpu
+        augmentation:
+            blend_bkg_color:
+                bkg_color: [1.0, 1.0, 1.0]
+
+    eval:
+        eval_batch_size: 1
+        skip: 8
+        type: NeRF
+        scene_name: lego
+        img_scale: 1.0
+        scale_radius: 3.0
+        center_pixel: True
+        precache: True
+        device: gpu
+        augmentation:
+            blend_bkg_color:
+                bkg_color: [1.0, 1.0, 1.0]
+
+inference:
+    to_gpu: True
+    render:
+        type: [spiral]
+        n_cam: [60]
+        repeat: [1]
+        radius: 3.0
+        u_start: 0.5
+        v_range: [-0.6, -0.2]
+        fps: 5
+        center_pixel: True
+
+    volume:
+        n_grid: 512
+        side: 2.0
+        level: 50.0
+        chunk_pts_factor: 1
+        render_mesh:
+            backend: pytorch3d
+
+model:
+    type: NeRF
+    rays:
+        # bounding_radius: 3.0
+        near: 1.5
+        far: 4.5
+        n_sample: 64
+        n_importance: 128
+        inverse_linear: False
+        perturb: True
+        add_inf_z: True
+        noise_std: 0.0
+        white_bkg: True
+    chunk_rays: 32768
+    chunk_pts: 1048576
+    geometry:
+        W: 256
+        D: 8
+        skips: [4]
+        encoder:
+            type: HashGridEmbedder
+            input_dim: 3
+            n_freqs: 0  # do not do geo init
+            side: 2.0
+            n_levels: 16
+            n_feat_per_entry: 2
+            hashmap_size: 19
+            base_res: 16
+            max_res: 2048
+            include_input: False
+            backend: tcnn
+            dtype: torch.float32  # for original mlp
+        W_feat: 256
+        geometric_init: False
+        out_act_cfg:
+            type: TruncExp
+    radiance:
+        mode: 'vf'
+        W: 128
+        D: 1
+        encoder:
+            view:
+                type: SHEmbedder
+                input_dim: 3
+                n_freqs: 4
+                include_input: False
+                backend: tcnn
+                dtype: torch.float32  # for original mlp
+        W_feat_in: 256
+
+loss:
+    ImgLoss:
+        keys: ['rgb_coarse', 'rgb_fine']
+        weight: 1.0
+
+metric:
+    PSNR:
+
+train_metric:
+    PSNR:
+        key: 'rgb_fine'

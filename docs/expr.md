@@ -41,38 +41,78 @@ With such object structure, we can set the `n_sample` large(1024), and it will r
 `instant-ngp` combines volume pruning with hash/sh encoding, for much faster converge.
 You can visit our project [simplengp](http://github.com/TencentARC/simplengp) for more experiment log.
 
-- Without the `fusemlp` but used original mlp with same size, the PSNR drop by `~0.4`. Not sure whether `bias` or other factors affect the result.
-- ngp model can extract correct geometry, but color is wrong compared to NeRF model(we use the face normal as directly). If you need to ngp model for
-geometry extraction, you need to optimize the texture map in other way.
-- resample more pts near surface can further improve the PSNR(`~0.3`), but time for each step will increase by `x2`. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngp_resample.yaml)
-But this still can not make the extraction color correct.
+- We get `PSNR=34.31` for 5w iteration, base on volume-pruning and hashencoding. Many factors affects the result, you can see [simplengp](http://github.com/TencentARC/simplengp) for more detail.
+The [conf](../configs/expr/NeRF/lego/nerf_lego_nerf_ngp.yaml).
 
+- Using a smaller but closely bounding volume can slightly improve the result to `34.65`. Meaning that we can try to find more accurate bbox for better pruning and rendering result. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngp_newvolume.yaml).
+
+- Without the `fusemlp` but used original mlp with same size, the PSNR drop by `~0.4`. Not sure whether `bias` or other factors affect the result.
+
+- resample more pts near surface can further improve the PSNR(`~0.3`), but time for each step will increase a lot.
 
 ------------------------------------------------------------------------------------------------------------
-
 
 
 # MipNerf (for novel view rendering)
 For mip-Nerf, it is hard to used for object extraction, but provide better rendering result.
 Here are the trails and experience on Lego scene.
 
-- `center_pixel` is necessary in `mipnerf` which is the same as official repo.
+- `center_pixel` is necessary in `mipnerf` which is the same as official repo. Otherwise not converge well.
+We get `PSNR=xx` by [conf](../configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml).
 
+- `blur_coarse_weight` before resample stage is importance. Without it, we get `xx`. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_noblurweights.yaml).
+
+- Remove `solfplus` on sigma make a loss around `xx`.  [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_nosoftplus.yaml).
 
 ------------------------------------------------------------------------------------------------------------
 
 
-
 # NeuS (sdf model)
 
-Basic NeRF PSNR on Lego is `32.78`. [conf](../configs/expr/NeRF/lego/nerf_lego_nerf.yaml)
+Basic NeuS PSNR on Lego is `30.71`. [conf](../configs/expr/NeRF/lego/nerf_lego_neus.yaml).
+
+Except for volume rendering, we have surface rendering on sdf model, which takes the color from surface point seaching by sphere tracing. Its speed will be much faster.
+
+## In data preperation
+- directly add `center_pixel` for ray generation improves NeuS(`freq embed`) performance(`~2`).  [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_centerpixel.yaml)
+
+## embedding level
+We can change `freqEncode` into `tcnn.HashGridEncoding/SHEncoding`.
+
+- Using `ngp` like encodings, you must use `center_pixel`. Otherwise not converge. (This has also been proven in `ngp` model.)
+
+- Unlike NeRF(density model), directly use hash encoding push up the result.
+
+- Full mlp gets `34.16` [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngpembed_centerpixel.yaml),
+and a shallow network get `32.75` [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngpembed_centerpixel_shallow.yaml).
+
+## Volume Pruning
+Based on original NeuS implementation, we can keep `freq embed`, can add volume structure with pruning to improve modelling and performance.
+With such object structure, we can set the `n_sample` large(1024), and it will remain samples based on volume voxels.
+
+- With directly sample 1024 pts and volume structure, speed increase. But PSNR gets down. (Only `28.92` now). [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_volumeprune_moresample_noimportance.yaml).
+Possibly because the sdf model is sensitive to the surface.
+
+- With 1024 coarse sample and 64 surface samples, PSNR increases to `29.80`. But time also increase. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_volumeprune_moresample.yaml).
+
+- If we use original 64 + 64 sampling method in NeuS, the result is lower to `22.96`, meaning that the coarse sampling is not accurate to produce `resample` points. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_volumeprune.yaml).
+
+## ngp
+`instant-ngp` combines volume pruning with hash/sh encoding, for much faster converge. It can also be applied to SDF model.
+
+- We get `PSNR=30.26` for 5w iteration, base on volume-pruning and hashencoding. It is worse than original NeuS.
+
+- Using a smaller but closely bounding volume can slightly improve the result to `30.95` (But actually worse than NeuS with center_pixel, maybe more iteration needed).
+Meaning that we can try to find more accurate bbox for better pruning and rendering result. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngp_newvolume.yaml).
+
+- resample more pts near surface can further improve the PSNR(`~0.25`), but time for each step will double.  [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngp_resample.yaml).
 
 ------------------------------------------------------------------------------------------------------------
 
 
 # volsdf (sdf model)
 
-- Running
+- Compared to NeuS model, it's performance do not get better(`~28`). We don't perform extra experiment on it.
 
 
 ------------------------------------------------------------------------------------------------------------
@@ -88,9 +128,23 @@ Summary:
 |+volume pruning(64 + 128 pts)  | 27.57 | 0.2s   |  30w     | 4.13s      | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_volumeprune.yaml)
 | ngp                       | 34.31 | 0.018s   |  5w      | 0.24s     | [conf](../configs/expr/NeRF/lego/nerf_lego_nerf_ngp.yaml)
 |    + new volume           | 34.65 | 0.017s   |  5w      | 0.24s     | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngp_newvolume.yaml)
-
-
-
+| | | | |
+| MipNeRF                   | 35.xx | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml)
+|   - blur coarse weight    |  33.xx | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_noblurweights.yaml)
+|   - softplus              |  34.xx | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_nosoftplus.yaml)
+| | | | |
+| NeuS                     | 30.71 | 0.18s    | 30w      |  28s     | [conf](../configs/expr/NeRF/lego/nerf_lego_neus.yaml)
+|+center_pixel             | 32.44 | 0.18s   |  30w      |  28s        | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_centerpixel.yaml)
+|  +hash/sh encoder           | 34.16 | 0.1s   |  30w     | 28s        | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngpembed_centerpixel.yaml)
+|  +hash/sh encoder + shallow | 32.75 | 0.025s   |  30w     | 4s       | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngpembed_centerpixel_shallow.yaml)
+|+volume pruning(1024 pts)  | 28.92 | 0.04s   |  30w     | 2.65s      | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_volumeprune_moresample_noimportance.yaml)
+|+volume pruning(1024 + 64 pts)  | 29.80 | 0.16s   |  30w     | 53s      | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_volumeprune_moresample.yaml)
+|+volume pruning(64 + 64 pts)  | 22.96 | 0.1s   |  30w     | 8s      | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_volumeprune.yaml)
+| ngp                       | 30.26 | 0.07s   |  5w      | 0.48s     | [conf](../configs/expr/NeRF/lego/nerf_lego_neus_ngp.yaml)
+|    + new volume           | 30.95 | 0.07s   |  5w      | 0.49s     | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngp_newvolume.yaml)
+|    + resample             | 31.19 | 0.14s   |  5w      | 3.54s     | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngp_resample.yaml)
+| | | | |
+| volsdf                   | 38.25 | 0.18s    | 30w      |  43s     | [conf](../configs/expr/NeRF/lego/nerf_lego_volsdf.yaml)
 ------------------------------------------------------------------------------------------------------------
 
 # Inference on result
@@ -107,4 +161,11 @@ the texture and other asset used for modern graphical engine. We will try to do 
 - Although we support customized volume for extraction(the volume has same side, or different lenght on xyz dimension).
 But we found that only xyz with same length could generate color correctly.
 
-TODO: Add nerf/neus geo/color mesh output images!!!
+
+Here is the mesh extracted from NeRF_NGP and NeuS_NGP.
+
+- NeRF_NGP
+![nerf](../assets/expr/nerf_ngp.gif)
+
+- NeuS_NGP
+![nerf](../assets/expr/neus_ngp.gif)
