@@ -82,9 +82,10 @@ We can change `freqEncode` into `tcnn.HashGridEncoding/SHEncoding`.
 - Using `ngp` like encodings, you must use `center_pixel`. Otherwise not converge. (This has also been proven in `ngp` model.)
 
 - Unlike NeRF(density model), directly use hash encoding push up the result.
+  - Full mlp gets `34.16` [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngpembed_centerpixel.yaml),
+  and a shallow network get `32.75` [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngpembed_centerpixel_shallow.yaml).
 
-- Full mlp gets `34.16` [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngpembed_centerpixel.yaml),
-and a shallow network get `32.75` [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngpembed_centerpixel_shallow.yaml).
+![neus](../assets/expr/neus_ngpembed.gif)
 
 ## Volume Pruning
 Based on original NeuS implementation, we can keep `freq embed`, can add volume structure with pruning to improve modelling and performance.
@@ -100,12 +101,16 @@ Possibly because the sdf model is sensitive to the surface.
 ## ngp
 `instant-ngp` combines volume pruning with hash/sh encoding, for much faster converge. It can also be applied to SDF model.
 
-- We get `PSNR=30.26` for 5w iteration, base on volume-pruning and hashencoding. It is worse than original NeuS.
+- We get `PSNR=30.26` for 5w iteration, base on volume-pruning and hashencoding. It is worse than original NeuS. [conf](../configs/expr/NeRF/lego/nerf_lego_neus_ngp.yaml)
+  - Running to `10w` iter gets fully converge at `30.87`. Better than NeuS. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngp_10w.yaml)
 
-- Using a smaller but closely bounding volume can slightly improve the result to `30.95` (But actually worse than NeuS with center_pixel, maybe more iteration needed).
-Meaning that we can try to find more accurate bbox for better pruning and rendering result. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngp_newvolume.yaml).
+- Further use a smaller but closely bounding volume can slightly improve the result to `31.48`. Meaning that we can try to find more accurate bbox for better pruning and rendering result. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngp_10w_newvolume.yaml).
 
-- resample more pts near surface can further improve the PSNR(`~0.25`), but time for each step will double.  [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngp_resample.yaml).
+- resample 32 more pts near surface can further improve the PSNR(`~1.2`), but time for each step will double.  [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngp_10w_newvolume_resample32.yaml).
+  - It performs similar to the NeuS with HashEncoder + shallow MLP. volume pruning is not that important.
+
+## Geometry metric
+TBD: We will add geometry metric in the future for measuring the geometry reconstruction result.
 
 ------------------------------------------------------------------------------------------------------------
 
@@ -116,7 +121,7 @@ Meaning that we can try to find more accurate bbox for better pruning and render
 
 
 ------------------------------------------------------------------------------------------------------------
-Summary:
+# Summary:
 
 |          model            | PSNR  |  iter/s | Num iter | eval s/img | conf file|
 |:-------------------------:|:-----:|:-------:|:--------:|:----------:|:--------:|
@@ -140,11 +145,13 @@ Summary:
 |+volume pruning(1024 pts)  | 28.92 | 0.04s   |  30w     | 2.65s      | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_volumeprune_moresample_noimportance.yaml)
 |+volume pruning(1024 + 64 pts)  | 29.80 | 0.16s   |  30w     | 53s      | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_volumeprune_moresample.yaml)
 |+volume pruning(64 + 64 pts)  | 22.96 | 0.1s   |  30w     | 8s      | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_volumeprune.yaml)
-| ngp                       | 30.26 | 0.07s   |  5w      | 0.48s     | [conf](../configs/expr/NeRF/lego/nerf_lego_neus_ngp.yaml)
-|    + new volume           | 30.95 | 0.07s   |  5w      | 0.49s     | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngp_newvolume.yaml)
-|    + resample             | 31.19 | 0.14s   |  5w      | 3.54s     | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngp_resample.yaml)
+| ngp                       | 30.26 | 0.06s   |  5w       | 0.48s     | [conf](../configs/expr/NeRF/lego/nerf_lego_neus_ngp.yaml)
+|    + 10w iter             | 30.87 | 0.06s   |  10w      | 0.48s     | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngp_10w.yaml)
+|    + new volume           | 31.45 | 0.06s   |  10w      | 0.49s     | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngp_10w_newvolume.yaml)
+|    + resample 32 pts      | 32.67 | 0.12s   |  10w      | 3.54s     | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_ngp_10w_newvolume_resample32.yaml)
 | | | | |
-| volsdf                   | 38.25 | 0.18s    | 30w      |  43s     | [conf](../configs/expr/NeRF/lego/nerf_lego_volsdf.yaml)
+| volsdf                   | 28.25 | 0.18s    | 30w      |  43s     | [conf](../configs/expr/NeRF/lego/nerf_lego_volsdf.yaml)
+
 ------------------------------------------------------------------------------------------------------------
 
 # Inference on result
