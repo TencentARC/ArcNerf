@@ -234,7 +234,7 @@ class TestDict(unittest.TestCase):
             plotly_html=True
         )
 
-    def tests_get_voxel_grid_pts_by_voxel_idx(self):
+    def tests_voxel_grid_pts_by_voxel_idx(self):
         volume = Volume(n_grid=4, side=self.side)  # (-0.75, 0.75)
         volume.set_up_voxel_bitfield()
         batch_size = 32
