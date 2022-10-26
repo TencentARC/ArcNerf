@@ -47,6 +47,7 @@ class TestModelDict(unittest.TestCase):
         return item
 
     def create_feed_in_to_cuda(self):
+        """Inputs for all tests"""
         rays_o = torch.rand(self.n_rays, 3) * 3.0
         rays_d = -normalize(rays_o + torch.rand(self.n_rays, 3) * 3.0)  # point to origin
         feed_in = {
@@ -103,6 +104,7 @@ class TestModelDict(unittest.TestCase):
                 'faces': volume.get_bound_faces()
             }
 
+        # get bounding radius
         radius = [self.bounding_radius]
         if model.get_obj_bound_type() == 'sphere':
             radius_obj = model.get_obj_bound_structure().get_radius(in_float=True)
@@ -130,6 +132,7 @@ class TestModelDict(unittest.TestCase):
         model.set_factor(100.0)
         model.optimize(16)  # warmup
 
+        # get bounding volume
         volume = model.get_obj_bound_structure()
         volume_dict = {
             'grid_pts': torch_to_np(volume.get_occupied_grid_pts().view(-1, 3)),
@@ -152,6 +155,7 @@ class TestModelDict(unittest.TestCase):
         model.set_factor(1.0)
         model.optimize(512)  # not warmup
 
+        # get bounding volume
         volume = model.get_obj_bound_structure()
         volume_dict = {
             'grid_pts': torch_to_np(volume.get_occupied_grid_pts().view(-1, 3)),
@@ -295,7 +299,8 @@ class FakeGeoNet(BaseGeoNet):
         self.factor = 50.0  # adjust the density value
 
     def forward(self, x: torch.Tensor):
-        dist = self.radius - torch.norm(x, dim=-1, keepdim=True)  # inside is positive
+        # sdf: inside is positive, outside negative
+        dist = self.radius - torch.norm(x, dim=-1, keepdim=True)
         dist = dist.clamp_min(0.0) * self.factor  # (B, 1)
 
         return dist, None

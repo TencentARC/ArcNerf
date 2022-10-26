@@ -18,6 +18,7 @@ class TestGeomDict(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        """default configs"""
         cls.cfgs = setup_test_config()
         cls.H, cls.W = 480, 640
         cls.focal = 1000.0
@@ -28,6 +29,7 @@ class TestGeomDict(unittest.TestCase):
 
     @classmethod
     def setup_params(cls):
+        """Parameter of cameras"""
         intrinsic = torch.eye(3, dtype=torch.float32)
         intrinsic[0, 0] = cls.focal
         intrinsic[1, 1] = cls.focal
@@ -43,6 +45,7 @@ class TestGeomDict(unittest.TestCase):
 
     @classmethod
     def set_pixels(cls):
+        """Set pixel and depth for test"""
         i, j = torch.meshgrid(torch.linspace(0, cls.W - 1, cls.W), torch.linspace(0, cls.H - 1, cls.H))  # i, j: (W, H)
         pixels = torch.repeat_interleave(
             torch.stack([i, j]).reshape(-1, 2).unsqueeze(0), cls.batch_size, dim=0

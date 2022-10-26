@@ -114,6 +114,7 @@ class TestDict(unittest.TestCase):
                 _ = model(input)
                 t_forward_only += get_end_time(t0)
 
+        # run avg
         t_forward = t_forward / float(self.n_run)
         t_backward = t_backward / float(self.n_run)
         t_forward_only = t_forward_only / float(self.n_run)
@@ -121,6 +122,7 @@ class TestDict(unittest.TestCase):
         return t_forward, t_backward, t_forward_only
 
     def log_time(self, model_name, t_f, t_b, t_f_o):
+        """Log time for forward, backward, and forward-only mode"""
         self.logger.add_log('_' * 60)
         self.logger.add_log('Model: {}'.format(model_name))
         self.logger.add_log('   Forward: {:.6f}s'.format(t_f))
@@ -129,6 +131,7 @@ class TestDict(unittest.TestCase):
         self.logger.add_log('_' * 60)
 
     def tests_nerf(self):
+        """NeRF model benchmark"""
         cfgs_name = 'nerf.yaml'
         model = self.build_test_model(cfgs_name)
         loss_func = self.build_loss_func(['rgb_fine'])
@@ -137,6 +140,7 @@ class TestDict(unittest.TestCase):
         self.log_time('NeRF ', t_forward, t_backward, t_forward_only)
 
     def tests_nerfpp(self):
+        """NeRF++ model benchmark"""
         cfgs_name = 'nerfpp.yaml'
         model = self.build_test_model(cfgs_name)
         loss_func = self.build_loss_func(['rgb_fine'])
@@ -145,6 +149,7 @@ class TestDict(unittest.TestCase):
         self.log_time('NeRF++ ', t_forward, t_backward, t_forward_only)
 
     def tests_neus(self):
+        """NeuS model benchmark"""
         cfgs_name = 'neus.yaml'
         model = self.build_test_model(cfgs_name)
         loss_func = self.build_loss_func(['rgb'])
@@ -153,6 +158,7 @@ class TestDict(unittest.TestCase):
         self.log_time('Neus ', t_forward, t_backward, t_forward_only)
 
     def tests_volsdf(self):
+        """volsdf model benchmark"""
         cfgs_name = 'volsdf.yaml'
         model = self.build_test_model(cfgs_name)
         loss_func = self.build_loss_func(['rgb'])
@@ -161,6 +167,7 @@ class TestDict(unittest.TestCase):
         self.log_time('Volsdf ', t_forward, t_backward, t_forward_only)
 
     def tests_mipnerf(self):
+        """mipnerf model benchmark"""
         cfgs_name = 'mipnerf.yaml'
         model = self.build_test_model(cfgs_name)
         loss_func = self.build_loss_func(['rgb_fine'])
@@ -169,6 +176,7 @@ class TestDict(unittest.TestCase):
         self.log_time('mipnerf ', t_forward, t_backward, t_forward_only)
 
     def tests_nerf_ngp(self):
+        """nerf_ngp model benchmark"""
         cfgs_name = 'nerf_ngp.yaml'
         model = self.build_test_model(cfgs_name)
         loss_func = self.build_loss_func(['rgb_coarse'])

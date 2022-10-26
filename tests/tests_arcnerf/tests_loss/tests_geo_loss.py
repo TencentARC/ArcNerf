@@ -23,15 +23,19 @@ class TestDict(unittest.TestCase):
     def tests_eikonalloss(self):
         data = {'mask': self.bn_tensor.clone()}
         output = {'normal': self.bnp_tensor.clone()}
+        # eikonal on normal
         loss = EikonalLoss(dict_to_obj({}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
+        # no mean
         loss = EikonalLoss(dict_to_obj({'do_mean': False}))
         res = loss(data, output)
         self.assertEqual(res.shape, (self.batch_size, self.n_rays))
+        # with mask
         mask_loss = EikonalLoss(dict_to_obj({'use_mask': True}))
         res = mask_loss(data, output)
         self.assertEqual(res.shape, ())
+        # mask with no mean
         mask_loss = EikonalLoss(dict_to_obj({'use_mask': True, 'do_mean': False}))
         res = mask_loss(data, output)
         self.assertEqual(res.shape, (self.batch_size, self.n_rays))
@@ -39,28 +43,35 @@ class TestDict(unittest.TestCase):
     def tests_eikonalPTloss(self):
         data = {'mask': self.bn_tensor.clone()}
         output = {'normal_pts': self.bnp3_tensor.clone()}
+        # eikonal on normal of pts
         loss = EikonalLoss(dict_to_obj({'key': 'normal_pts'}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
+        # no mean
         loss = EikonalLoss(dict_to_obj({'key': 'normal_pts', 'do_mean': False}))
         res = loss(data, output)
         self.assertEqual(res.shape, (self.batch_size, self.n_rays, self.n_pts))
+        # with mask
         mask_loss = EikonalLoss(dict_to_obj({'key': 'normal_pts', 'use_mask': True}))
         res = mask_loss(data, output)
         self.assertEqual(res.shape, ())
+        # mask with no mean
         mask_loss = EikonalLoss(dict_to_obj({'key': 'normal_pts', 'use_mask': True, 'do_mean': False}))
         res = mask_loss(data, output)
         self.assertEqual(res.shape, (self.batch_size, self.n_rays, self.n_pts))
 
     def tests_regmaskloss(self):
         output = {'mask': self.bn_tensor.clone()}
+        # reg mask
         loss = RegMaskLoss(dict_to_obj({'keys': ['mask']}))
         res = loss(None, output)
         self.assertEqual(res.shape, ())
+        # two stage
         output = {'mask_coarse': self.bn_tensor.clone(), 'mask_fine': self.bn_tensor.clone()}
         loss = RegMaskLoss(dict_to_obj({'keys': ['mask_coarse', 'mask_fine']}))
         res = loss(None, output)
         self.assertEqual(res.shape, ())
+        # no mean
         output = {'mask': self.bn_tensor.clone()}
         loss = RegMaskLoss(dict_to_obj({'keys': ['mask'], 'do_mean': False}))
         res = loss(None, output)
@@ -68,9 +79,11 @@ class TestDict(unittest.TestCase):
 
     def tests_regweightsloss(self):
         output = {'progress_weights': self.bnp_tensor.clone()}
+        # reg weights
         loss = RegWeightsLoss(dict_to_obj({'keys': ['weights']}))
         res = loss(None, output)
         self.assertEqual(res.shape, ())
+        # no mean
         loss = RegWeightsLoss(dict_to_obj({'keys': ['weights'], 'do_mean': False}))
         res = loss(None, output)
         self.assertEqual(res.shape, (self.batch_size, self.n_rays, self.n_pts))

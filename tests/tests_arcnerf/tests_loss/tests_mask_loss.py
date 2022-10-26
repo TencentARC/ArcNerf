@@ -20,15 +20,19 @@ class TestDict(unittest.TestCase):
     def tests_maskloss(self):
         data = {'mask': self.bn_tensor.clone()}
         output = {'mask': self.bn_tensor.clone()}
+        # mask loss
         loss = MaskLoss(dict_to_obj({}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
+        # no mean
         loss = MaskLoss(dict_to_obj({'do_mean': False}))
         res = loss(data, output)
         self.assertEqual(res.shape, (self.batch_size, self.n_rays))
+        # mask loss l1
         l1loss = MaskLoss(dict_to_obj({'loss_type': 'L1'}))
         res = l1loss(data, output)
         self.assertEqual(res.shape, ())
+        # mask loss bce
         bce_loss = MaskLoss(dict_to_obj({'loss_type': 'BCE'}))
         res = bce_loss(data, output)
         self.assertEqual(res.shape, ())
@@ -36,16 +40,20 @@ class TestDict(unittest.TestCase):
     def tests_maskcfloss(self):
         data = {'mask': self.bn_tensor.clone()}
         output = {'mask_coarse': self.bn_tensor.clone()}
+        # one stage
         loss = MaskLoss(dict_to_obj({'keys': ['mask_coarse']}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
+        # two stage
         output['mask_fine'] = self.bn_tensor.clone()
         loss = MaskLoss(dict_to_obj({'keys': ['mask_coarse', 'mask_fine']}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
+        # l1
         l1loss = MaskLoss(dict_to_obj({'keys': ['mask_coarse', 'mask_fine'], 'loss_type': 'L1'}))
         res = l1loss(data, output)
         self.assertEqual(res.shape, ())
+        # bce
         bce_loss = MaskLoss(dict_to_obj({'keys': ['mask_coarse', 'mask_fine'], 'loss_type': 'BCE'}))
         res = bce_loss(data, output)
         self.assertEqual(res.shape, ())

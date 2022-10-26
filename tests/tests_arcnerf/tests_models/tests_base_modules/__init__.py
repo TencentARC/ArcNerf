@@ -19,10 +19,12 @@ def log_base_model_info(logger, model, feed_in, n_pts):
     logger.add_log('Model Parameters: ')
     for n, _ in model.named_parameters():
         logger.add_log('   ' + n)
+    # run model using real input
     flops, params = profile(model, inputs=(feed_in, ), verbose=False)
     logger.add_log('Module Flops/Params: ')
     logger.add_log('   N_pts: {}'.format(n_pts))
     logger.add_log('')
+    # flops unit in G/M
     if flops > 1024**3:
         flops, unit = flops / (1024.0**3), 'G'
     else:
@@ -30,6 +32,7 @@ def log_base_model_info(logger, model, feed_in, n_pts):
     logger.add_log('   Flops: {:.2f}{}'.format(flops, unit))
     logger.add_log('   Params: {:.2f}M'.format(params / (1024.0**2)))
 
+    # forward on gpu if gpu available
     if torch.cuda.is_available():
         model = model.cuda()
         feed_in = feed_in.cuda()

@@ -24,6 +24,7 @@ class TestDict(unittest.TestCase):
     def tests_psnr(self):
         data = {'img': self.bn3_tensor.clone()}
         output = {'rgb': self.bn3_tensor.clone()}
+        # full image psnr
         psnr = PSNR(dict_to_obj({}))
         metric = psnr(data, output)
         self.assertEqual(metric.shape, ())
@@ -31,6 +32,7 @@ class TestDict(unittest.TestCase):
     def tests_psnrcoarse(self):
         data = {'img': self.bn3_tensor.clone()}
         output = {'rgb_coarse': self.bn3_tensor.clone()}
+        # full image psnr on coarse rgb
         psnr = PSNR(dict_to_obj({'key': 'rgb_coarse'}))
         metric = psnr(data, output)
         self.assertEqual(metric.shape, ())
@@ -38,6 +40,7 @@ class TestDict(unittest.TestCase):
     def tests_psnrfine(self):
         data = {'img': self.bn3_tensor.clone()}
         output = {'rgb_fine': self.bn3_tensor.clone()}
+        # full image psnr on fine rgb
         psnr = PSNR(dict_to_obj({'key': 'rgb_fine'}))
         metric = psnr(data, output)
         self.assertEqual(metric.shape, ())
@@ -45,6 +48,7 @@ class TestDict(unittest.TestCase):
     def tests_maskpsnr(self):
         data = {'img': self.bn3_tensor.clone(), 'mask': self.bn_tensor.clone()}
         output = {'rgb': self.bn3_tensor.clone()}
+        # full image masked area psnr
         psnr = MaskPSNR(dict_to_obj({}))
         metric = psnr(data, output)
         self.assertEqual(metric.shape, ())
@@ -52,6 +56,7 @@ class TestDict(unittest.TestCase):
     def tests_maskpsnrcoarse(self):
         data = {'img': self.bn3_tensor.clone(), 'mask': self.bn_tensor.clone()}
         output = {'rgb_coarse': self.bn3_tensor.clone()}
+        # full image masked area psnr on coarse rgb
         psnr = MaskPSNR(dict_to_obj({'key': 'rgb_coarse'}))
         metric = psnr(data, output)
         self.assertEqual(metric.shape, ())
@@ -59,6 +64,7 @@ class TestDict(unittest.TestCase):
     def tests_maskpsnrfine(self):
         data = {'img': self.bn3_tensor.clone(), 'mask': self.bn_tensor.clone()}
         output = {'rgb_fine': self.bn3_tensor.clone()}
+        # full image masked area psnr on fine rgb
         psnr = MaskPSNR(dict_to_obj({'key': 'rgb_fine'}))
         metric = psnr(data, output)
         self.assertEqual(metric.shape, ())
@@ -66,6 +72,7 @@ class TestDict(unittest.TestCase):
     def tests_ssim(self):
         data = {'img': self.bn3_tensor.clone(), 'H': self.b_tensor * self.H, 'W': self.b_tensor * self.W}
         output = {'rgb': self.bn3_tensor.clone()}
+        # full image SSIM
         ssim = SSIM(dict_to_obj({}))
         metric = ssim(data, output)
         self.assertEqual(metric.shape, ())
@@ -73,6 +80,7 @@ class TestDict(unittest.TestCase):
     def tests_ssimcoarse(self):
         data = {'img': self.bn3_tensor.clone(), 'H': self.b_tensor * self.H, 'W': self.b_tensor * self.W}
         output = {'rgb_coarse': self.bn3_tensor.clone()}
+        # full image SSIM on coarse rgb
         ssim = SSIM(dict_to_obj({'key': 'rgb_coarse'}))
         metric = ssim(data, output)
         self.assertEqual(metric.shape, ())
@@ -80,6 +88,7 @@ class TestDict(unittest.TestCase):
     def tests_ssimfine(self):
         data = {'img': self.bn3_tensor.clone(), 'H': self.b_tensor * self.H, 'W': self.b_tensor * self.W}
         output = {'rgb_fine': self.bn3_tensor.clone()}
+        # full image SSIM on fine rgb
         ssim = SSIM(dict_to_obj({'key': 'rgb_fine'}))
         metric = ssim(data, output)
         self.assertEqual(metric.shape, ())
@@ -92,6 +101,7 @@ class TestDict(unittest.TestCase):
             'mask': self.bn_tensor.clone()
         }
         output = {'rgb': self.bn3_tensor.clone()}
+        # full image SSIM on masked area
         ssim = MaskSSIM(dict_to_obj({}))
         metric = ssim(data, output)
         self.assertEqual(metric.shape, ())
@@ -104,6 +114,7 @@ class TestDict(unittest.TestCase):
             'mask': self.bn_tensor.clone()
         }
         output = {'rgb_coarse': self.bn3_tensor.clone()}
+        # full image SSIM on masked area on coarse rgb
         ssim = MaskSSIM(dict_to_obj({'key': 'rgb_coarse'}))
         metric = ssim(data, output)
         self.assertEqual(metric.shape, ())
@@ -116,6 +127,7 @@ class TestDict(unittest.TestCase):
             'mask': self.bn_tensor.clone()
         }
         output = {'rgb_fine': self.bn3_tensor.clone()}
+        # full image SSIM on masked area on fine rgb
         ssim = MaskSSIM(dict_to_obj({'key': 'rgb_fine'}))
         metric = ssim(data, output)
         self.assertEqual(metric.shape, ())

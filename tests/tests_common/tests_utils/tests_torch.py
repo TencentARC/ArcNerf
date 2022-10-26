@@ -12,6 +12,7 @@ from common.utils.torch_utils import chunk_processing
 class TestDict(unittest.TestCase):
 
     def setUp(self):
+        """Set up default values for testing"""
         self.batch_size = 5
         self.n_sample = 16
         self.chunk_size = 10
@@ -37,6 +38,8 @@ class TestDict(unittest.TestCase):
         }
 
     def tests_chunk_process(self):
+        """Test the chunk process function"""
+
         # list process
         def list_func(bn3, bn, bn3_np, bn_np, none, bool, float, str, other):
             return bn3, bn, bn3_np, bn_np, none, bool, float, str
@@ -69,6 +72,7 @@ class TestDict(unittest.TestCase):
         self.assertTrue(all([v == self.str for v in out['str']]))
 
     def tests_chunk_process_device(self):
+        """Tests chuck process function for GPU as well"""
 
         def list_func(bn3, bn, inputs):
             bn3_o = bn3 + 1.0

@@ -11,7 +11,7 @@ import torch
 from arcnerf.geometry.poses import (
     average_poses,
     center_poses,
-    generate_can_pose_from_tri_circumcircle,
+    generate_cam_pose_from_tri_circle,
     generate_cam_pose_on_sphere,
     look_at,
     invert_poses,
@@ -58,7 +58,7 @@ class TestDict(TestGeomDict):
             save_path=file_path
         )
 
-    def tests_generate_cam_pose_on_sphere(self):
+    def tests_gen_cam_pose_on_sphere(self):
         u_start = 0  # (0, 1)
         v_ratio = 0.5  # (-1, 1)
         u_range = (0, 0.5)
@@ -100,7 +100,7 @@ class TestDict(TestGeomDict):
                 save_path=file_path
             )
 
-    def tests_generate_cam_pose_on_sphere_with_normal(self):
+    def tests_gen_cam_pose_on_sphere_normal(self):
         u_start = 0  # (0, 1)
         v_ratio = 0.5  # (-1, 1)
         look_at_point = np.array([1.0, 1.0, 0.0])  # (3, )
@@ -256,7 +256,7 @@ class TestDict(TestGeomDict):
         c2w = generate_cam_pose_on_sphere(
             'random', self.radius, 3, origin=look_at_point, look_at_point=look_at_point
         )  # (3, 4, 4)
-        c2w_circle, origin, radius = generate_can_pose_from_tri_circumcircle(c2w[:, :3, 3], n_cam, close=False)
+        c2w_circle, origin, radius = generate_cam_pose_from_tri_circle(c2w[:, :3, 3], n_cam, close=False)
         c2w_all = np.concatenate([c2w, c2w_circle], axis=0)  # (3+n, 4, 4)
         cam_colors = get_combine_colors(['blue', 'black'], [3, n_cam])  # (3+n, 3)
         cam_loc = c2w_all[:, :3, 3]  # (3+n, 3)

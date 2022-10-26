@@ -635,7 +635,7 @@ class Volume(nn.Module):
             mask: (N_rays, 1), show whether each ray has intersection with the volume, BoolTensor
         """
         if in_occ_voxel:  # in occupied sample
-            near, far, pts, mask = self.ray_volume_intersection_in_occ_voxel(rays_o, rays_d, force)
+            near, far, pts, mask = self.ray_volume_intersect_in_occ_voxel(rays_o, rays_d, force)
         else:  # full volume
             aabb_range = self.get_range()[None].to(rays_o.device)  # (1, 3, 2)
             near, far, pts, mask = aabb_ray_intersection(rays_o, rays_d, aabb_range)
@@ -643,7 +643,7 @@ class Volume(nn.Module):
 
         return near, far, pts, mask
 
-    def ray_volume_intersection_in_occ_voxel(self, rays_o: torch.Tensor, rays_d: torch.Tensor, force=False):
+    def ray_volume_intersect_in_occ_voxel(self, rays_o: torch.Tensor, rays_d: torch.Tensor, force=False):
         """Ray volume intersection in occupied voxels only.
 
         If the n_rays * n_volume is large, hard to calculate on all the volumes

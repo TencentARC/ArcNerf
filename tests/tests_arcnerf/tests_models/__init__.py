@@ -95,6 +95,7 @@ class TestModelDict(unittest.TestCase):
         return model
 
     def create_feed_in_to_cuda(self):
+        # default input for all test
         rays_o = torch.rand(self.batch_size, self.n_rays, 3) * self.max_pos
         rays_d = -normalize(rays_o + torch.rand_like(rays_o) * self.max_pos)  # point to origin with noise
         rays_r = torch.rand(self.batch_size, self.n_rays, 1)
@@ -118,6 +119,7 @@ class TestModelDict(unittest.TestCase):
         return feed_in
 
     def create_pts_dir_to_cuda(self, num_pts=3):
+        # pts with dir point to (0, 0, 0)
         pts = torch.rand(self.n_rays, num_pts)
         view_dir = -normalize(pts[:, :3])  # point to origin
         pts = self.to_cuda(pts)
@@ -147,6 +149,7 @@ class TestModelDict(unittest.TestCase):
             self.n_rays,
         ))
 
+        # test normal, or other fields
         if extra_keys is not None:
             for idx, key in enumerate(extra_keys):
                 if extra_bn3 is None:
@@ -165,6 +168,7 @@ class TestModelDict(unittest.TestCase):
         """Test that all keys are not started with progress_"""
         output = model(feed_in, inference_only=True)
         self.assertEqual(output['rgb'].shape, (self.batch_size, self.n_rays, 3))
+        # inference only do not have two stage output
         self.assertTrue('rgb_coarse' not in output.keys())
         self.assertTrue('rgb_fine' not in output.keys())
         self.assertTrue(all([not k.startswith('progress_') for k in output.keys()]))
@@ -178,12 +182,14 @@ class TestModelDict(unittest.TestCase):
 
     def _test_forward_progress(self, model, feed_in, progress_shape):
         output = model(feed_in, get_progress=True)
+        # check the progress item
         for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights']:
             self.assertEqual(output['progress_{}'.format(key)].shape, progress_shape)
         if model.sigma_reverse():
             self.assertTrue(output['progress_sigma_reverse'][0])
 
     def _test_get_est_opacity(self, model, pts):
+        """Test the est opacity function"""
         dt = 0.001
         opacity = model.get_est_opacity(dt, pts)
         self.assertEqual(opacity.shape, (pts.shape[0], ))

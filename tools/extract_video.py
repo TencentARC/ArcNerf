@@ -14,10 +14,12 @@ if __name__ == '__main__':
     cfgs = parse_configs()
     logger = Logger()
 
+    # get video from path
     video_path = cfgs.data.video_path
     logger.add_log('Start to extract images from video. Video path: {}'.format(video_path))
     assert osp.exists(video_path), 'No video file for processing...'
 
+    # output image dir
     scene_name = cfgs.data.scene_name
     scene_dir = osp.join(cfgs.dir.data_dir, 'Capture', scene_name)
     if osp.isdir(scene_dir):
@@ -29,12 +31,14 @@ if __name__ == '__main__':
     os.mkdir(scene_dir)
     os.mkdir(scene_img_dir)
 
+    # get meta data
     num_frame, width, height, _ = get_video_metadata(video_path)
     logger.add_log('    Original video information: num_frame-{}, shape-{}/{}(w/h)'.format(num_frame, width, height))
     logger.add_log(
         '    Video Downsample: {}, Image Downsample {}'.format(cfgs.data.video_downsample, cfgs.data.image_downsample)
     )
 
+    # extract frames and write to output dir
     extract_video(
         video_path,
         scene_img_dir,

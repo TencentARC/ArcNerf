@@ -158,7 +158,7 @@ class TestDict(unittest.TestCase):
             plotly_html=True
         )
 
-    def tests_get_collect_grid_pts_by_voxel_idx(self):
+    def tests_cal_grid_pts_by_voxel_idx(self):
         volume = Volume(n_grid=512, side=self.side)
         batch_size = 4096
         pts = torch.rand((batch_size, 3))
@@ -328,7 +328,7 @@ class TestDict(unittest.TestCase):
         )
 
         # on dense voxels
-        near, far, _, mask = np_wrapper(volume.ray_volume_intersection_in_occ_voxel, rays_o, rays_d)
+        near, far, _, mask = np_wrapper(volume.ray_volume_intersect_in_occ_voxel, rays_o, rays_d)
         mask = mask[:, 0]
         n_no_hit = np.sum(~mask)
         near, far = near[mask].reshape(-1, 1), far[mask].reshape(-1, 1)
@@ -352,9 +352,9 @@ class TestDict(unittest.TestCase):
         )
 
         # on dense voxels bounding volume
-        _, _, _, mask_dense = np_wrapper(volume.ray_volume_intersection_in_occ_voxel, rays_o, rays_d, False)
+        _, _, _, mask_dense = np_wrapper(volume.ray_volume_intersect_in_occ_voxel, rays_o, rays_d, False)
         n_no_hit_dense = np.sum(~mask_dense)
-        near, far, _, mask = np_wrapper(volume.ray_volume_intersection_in_occ_voxel, rays_o, rays_d, True)
+        near, far, _, mask = np_wrapper(volume.ray_volume_intersect_in_occ_voxel, rays_o, rays_d, True)
         mask = mask[:, 0]
         n_no_hit = np.sum(~mask)
         near, far = near[mask].reshape(-1, 1), far[mask].reshape(-1, 1)
@@ -396,7 +396,7 @@ class TestDict(unittest.TestCase):
         rays_d = -normalize(rays_o)
         rays_o[:, :2] += 0.1
         # sample in range
-        near, far, _, _ = np_wrapper(volume.ray_volume_intersection_in_occ_voxel, rays_o, rays_d)
+        near, far, _, _ = np_wrapper(volume.ray_volume_intersect_in_occ_voxel, rays_o, rays_d)
         n_pts = 64
         zvals = np_wrapper(get_zvals_from_near_far, near, far, n_pts)
         pts = np_wrapper(get_ray_points_by_zvals, rays_o, rays_d, zvals)

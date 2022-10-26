@@ -1,5 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+# run `python tests/test_utils/tests_cfgs.py --configs ./configs/default.yaml --sda.sdse sdas \
+#                                            --debug.debug_mode True --a.b.c.d '['111', 123]'` for checking
 
 import unittest
 

@@ -15,6 +15,7 @@ class TestDict(unittest.TestCase):
         cls.batch_size = 10
 
     def tests_dense_layer(self):
+        """Test dense/siren layers for different in/out size"""
         input_dims = range(1, 10)
         out_dims = range(1, 10)
         for i_dim in input_dims:

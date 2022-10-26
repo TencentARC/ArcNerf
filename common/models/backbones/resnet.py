@@ -12,7 +12,15 @@ from common.models.components import ConvBNRelu
 
 
 def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
-    """3x3 convolution with padding"""
+    """3x3 convolution with padding
+
+    Args:
+        in_planes: input channel size
+        out_planes: output channel size
+        stride: stride for conv, by default 1
+        groups: group num for conv, by default 1
+        dilation: dialtion for conv, by default 1
+    """
     return nn.Conv2d(
         in_planes,
         out_planes,
@@ -26,7 +34,13 @@ def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, d
 
 
 def conv1x1(in_planes: int, out_planes: int, stride: int = 1) -> nn.Conv2d:
-    """1x1 convolution"""
+    """1x1 convolution
+
+    Args:
+        in_planes: input channel size
+        out_planes: output channel size
+        stride: stride for conv, by default 1
+    """
     return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
 
 
@@ -44,6 +58,18 @@ class BasicBlock(nn.Module):
         dilation: int = 1,
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
+        """Init function for basic block
+
+        Args:
+            inplanes: input channel size
+            planes: output channel size
+            stride: stride for conv, by default 1
+            downsample: downsample or not
+            groups: group num for conv, by default 1
+            base_width: actually not use here
+            dilation: dialtion for conv, by default 1
+            norm_layer: batchnorm or groupnorm
+        """
         super(BasicBlock, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -61,6 +87,7 @@ class BasicBlock(nn.Module):
         self.stride = stride
 
     def forward(self, x: Tensor) -> Tensor:
+        """For x in (B, C, W, H)"""
         identity = x
 
         out = self.conv1(x)
@@ -70,9 +97,11 @@ class BasicBlock(nn.Module):
         out = self.conv2(out)
         out = self.bn2(out)
 
+        # downsample
         if self.downsample is not None:
             identity = self.downsample(x)
 
+        # straight cut
         out += identity
         out = self.relu(out)
 
@@ -99,6 +128,18 @@ class Bottleneck(nn.Module):
         dilation: int = 1,
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
+        """Init function for bottleneck module in resnet
+
+        Args:
+            inplanes: input channel size
+            planes: output channel size
+            stride: stride for conv, by default 1
+            downsample: downsample or not
+            groups: group num for conv, by default 1
+            base_width: used for group conv
+            dilation: dialtion for conv, by default 1
+            norm_layer: batchnorm or groupnorm
+        """
         super(Bottleneck, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -115,6 +156,7 @@ class Bottleneck(nn.Module):
         self.stride = stride
 
     def forward(self, x: Tensor) -> Tensor:
+        """For x in (B, C, W, H)"""
         identity = x
 
         out = self.conv1(x)
@@ -128,9 +170,11 @@ class Bottleneck(nn.Module):
         out = self.conv3(out)
         out = self.bn3(out)
 
+        # downsaple
         if self.downsample is not None:
             identity = self.downsample(x)
 
+        # straight cut
         out += identity
         out = self.relu(out)
 
@@ -149,6 +193,17 @@ class ResNet(nn.Module):
         replace_stride_with_dilation: Optional[List[bool]] = None,
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
+        """Init function for resnet
+        'resnet18': {'block': BasicBlock, 'layers': [2, 2, 2, 2], 'exp': 1},
+        Args:
+            block: BasicBlock or Bottleneck for each block
+            layers: list of layers for each block
+            zero_init_residual: zero init last BN
+            groups: group for conv layer
+            width_per_group: group conv channel
+            replace_stride_with_dilation:
+            norm_layer: batchNorm or groupNorm
+        """
         super(ResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -167,15 +222,20 @@ class ResNet(nn.Module):
             )
         self.groups = groups
         self.base_width = width_per_group
+
+        # init block
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+
+        # make other blocks
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
 
+        # init weights
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
@@ -201,6 +261,7 @@ class ResNet(nn.Module):
         stride: int = 1,
         dilate: bool = False
     ) -> nn.Sequential:
+        """Make layers in group"""
         norm_layer = self._norm_layer
         downsample = None
         previous_dilation = self.dilation
@@ -214,12 +275,15 @@ class ResNet(nn.Module):
             )
 
         layers = []
+        # init block
         layers.append(
             block(
                 self.inplanes, planes, stride, downsample, self.groups, self.base_width, previous_dilation, norm_layer
             )
         )
         self.inplanes = planes * block.expansion
+
+        # blocks
         for _ in range(1, blocks):
             layers.append(
                 block(
@@ -235,12 +299,13 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def _forward_impl(self, x: Tensor) -> Tensor:
-        # See note [TorchScript super()]
+        # init layer
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
 
+        # blocks
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
@@ -256,11 +321,13 @@ def _resnet(
     arch: str, block: Type[Union[BasicBlock, Bottleneck]], layers: List[int], pretrained: bool, path: str,
     progress: bool, **kwargs: Any
 ) -> ResNet:
+    """Get result by config setting"""
     model = ResNet(block, layers, **kwargs)
+
+    # load the pretrained weights from url or load address
     if pretrained:
         if path is None:
             state_dict = load_state_dict_from_url(model_urls[arch], progress=progress)
-
         else:
             state_dict = torch.load(path, map_location='cpu')
 
@@ -271,6 +338,7 @@ def _resnet(
 
 # Detail selection of resnet model
 resnet_spec = {
+    # basic block for shallow model
     'resnet18': {
         'block': BasicBlock,
         'layers': [2, 2, 2, 2],
@@ -281,6 +349,7 @@ resnet_spec = {
         'layers': [3, 4, 6, 3],
         'exp': 1
     },
+    # bottleneck for larger model
     'resnet50': {
         'block': Bottleneck,
         'layers': [3, 4, 6, 3],
@@ -298,6 +367,7 @@ resnet_spec = {
     }
 }
 
+# pytorch offical pretrained weights
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
     'resnet34': 'https://download.pytorch.org/models/resnet34-333f7ec4.pth',
@@ -308,8 +378,13 @@ model_urls = {
 
 
 def get_resnet(level, pretrained, output_channel=None, path=None, **kwargs):
+    """Core get function for resnet backbone"""
+
+    # select the main size, only few arch allowed
     assert level in ['18', '34', '50', '101', '152'], 'No level {} in resnet arch...'.format(level)
     arch = 'resnet{}'.format(level)
+
+    # make the backbone model
     model = _resnet(
         arch, resnet_spec[arch]['block'], resnet_spec[arch]['layers'], pretrained=pretrained, path=path, progress=False
     )

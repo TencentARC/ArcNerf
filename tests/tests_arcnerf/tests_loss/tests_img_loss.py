@@ -21,15 +21,19 @@ class TestDict(unittest.TestCase):
     def tests_imgloss(self):
         data = {'img': self.bn3_tensor.clone()}
         output = {'rgb': self.bn3_tensor.clone()}
+        # l2 loss
         loss = ImgLoss(dict_to_obj({}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
+        # no mean
         loss = ImgLoss(dict_to_obj({'do_mean': False}))
         res = loss(data, output)
         self.assertEqual(res.shape, (self.batch_size, self.n_rays, 3))
+        # l1
         l1loss = ImgLoss(dict_to_obj({'loss_type': 'L1'}))
         res = l1loss(data, output)
         self.assertEqual(res.shape, ())
+        # huber
         huberloss = ImgLoss(dict_to_obj({'loss_type': 'Huber', 'delta': 0.1}))
         res = huberloss(data, output)
         self.assertEqual(res.shape, ())
@@ -37,13 +41,16 @@ class TestDict(unittest.TestCase):
     def tests_imgcfloss(self):
         data = {'img': self.bn3_tensor.clone()}
         output = {'rgb_coarse': self.bn3_tensor.clone()}
+        # one stage
         loss = ImgLoss(dict_to_obj({'keys': ['rgb_coarse']}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
+        # two stage
         output['rgb_fine'] = self.bn3_tensor.clone()
         loss = ImgLoss(dict_to_obj({'keys': ['rgb_coarse', 'rgb_fine']}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
+        # l1 loss
         l1loss = ImgLoss(dict_to_obj({'keys': ['rgb_coarse', 'rgb_fine'], 'loss_type': 'L1'}))
         res = l1loss(data, output)
         self.assertEqual(res.shape, ())
@@ -51,9 +58,11 @@ class TestDict(unittest.TestCase):
     def tests_imgmaskloss(self):
         data = {'img': self.bn3_tensor.clone(), 'mask': self.bn_tensor.clone()}
         output = {'rgb': self.bn3_tensor.clone()}
+        # masked loss
         loss = ImgLoss(dict_to_obj({'use_mask': True}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
+        # masked l1 loss
         l1loss = ImgLoss(dict_to_obj({'use_mask': True, 'loss_type': 'L1'}))
         res = l1loss(data, output)
         self.assertEqual(res.shape, ())
@@ -61,13 +70,16 @@ class TestDict(unittest.TestCase):
     def tests_imgcfmaskloss(self):
         data = {'img': self.bn3_tensor.clone(), 'mask': self.bn_tensor.clone()}
         output = {'rgb_coarse': self.bn3_tensor.clone()}
+        # one stage masked loss
         loss = ImgLoss(dict_to_obj({'keys': ['rgb_coarse'], 'use_mask': True}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
+        # two stage masked loss
         output['rgb_fine'] = self.bn3_tensor.clone()
         loss = ImgLoss(dict_to_obj({'keys': ['rgb_coarse', 'rgb_fine'], 'use_mask': True}))
         res = loss(data, output)
         self.assertEqual(res.shape, ())
+        # two stage masked L1 loss
         l1loss = ImgLoss(dict_to_obj({'keys': ['rgb_coarse', 'rgb_fine'], 'use_mask': True, 'loss_type': 'L1'}))
         res = l1loss(data, output)
         self.assertEqual(res.shape, ())

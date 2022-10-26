@@ -19,7 +19,17 @@ def get_learning_rate_scheduler(
     **kwargs
 ):
     """Setup learning rate scheduler.
-       Now support [MultiStepLR, ExponentialLR, PolyLR, CosineAnnealingLR, WarmUpCosineLR].
+
+    Args:
+        optimizer: optimizer on train parameters
+        last_epoch: last_epoch for lr scheduler, by default -1
+        total_epoch: total epoch for training. Only PolyLR requires.
+        type: [MultiStepLR, ExponentialLR, PolyLR, CosineAnnealingLR, WarmUpCosineLR].
+        lr_gamma: Use as a decay factor in ExponentialLR and PolyLR. By default 0.1
+        lr_steps: Steps for decay. Different method has different usage
+        tmax: Use in CosineAnnealingLR to set period.
+        eta_min: Use in CosineAnnealingLR to set minimum.
+        min_factor: Use in WarmupCosine to adjust learning rate
     """
     if lr_steps is None:
         lr_steps = []

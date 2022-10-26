@@ -118,7 +118,7 @@ For ray in pts in volume, we provide a lot of function like
 - get_grid_pts_idx_by_voxel_idx/get_grid_pts_by_voxel_idx: get grid pts index and position by voxel idx
 - cal_weights_to_grid_pts / interpolate: interpolate pts by grid_pts using trilinear interpolation
 - ray_volume_intersection: call the aabb intersection test and find the ray-volume intersection
-  - ray_volume_intersection_in_occ_voxel: You can call to find the intersection in occupied voxels only
+  - ray_volume_intersect_in_occ_voxel: You can call to find the intersection in occupied voxels only
 - get_ray_pass_through: get the voxel_ids that the ray pass through
 
 

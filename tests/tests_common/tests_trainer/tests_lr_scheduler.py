@@ -20,9 +20,11 @@ class TestDict(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        """Set up a dummy config"""
         cls.cfgs = setup_test_config()
 
     def tests_lr_scheduler(self):
+        """Test lr scheduler and get visual results"""
         lr_scheduler_type = ['MultiStepLR', 'ExponentialLR', 'PolyLR', 'CosineAnnealingLR', 'WarmUpCosineLR']
         model = AlexNet(num_classes=1)
         lr = self.cfgs.optim.lr
@@ -48,6 +50,7 @@ class TestDict(unittest.TestCase):
             lines.append([x, y])
             legends.append(lr_type)
 
+        # write down visual 2d plot into result folder
         file_name = osp.join(RESULT_DIR, 'lr_scheduler.png')
         draw_2d_components(
             lines=lines, legends=legends, xlabel='step', ylabel='lr', title='lr scheduler', save_path=file_name

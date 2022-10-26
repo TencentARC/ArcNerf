@@ -42,7 +42,8 @@ class SampleRays(object):
         self.n_rays = n_rays
 
     def __call__(self, inputs):
-        select_idx = torch.randperm(inputs['img'].shape[0])
+        # get sample idx
+        select_idx = torch.randperm(inputs['img'].shape[0])[:self.n_rays]
 
         inputs['img'] = inputs['img'][select_idx, :]
         inputs['rays_o'] = inputs['rays_o'][select_idx, :]
@@ -61,6 +62,7 @@ class ShuffleRays(object):
         return
 
     def __call__(self, inputs):
+        # get full selection idx
         select_idx = torch.randperm(inputs['img'].shape[0])
 
         inputs['img'] = inputs['img'][select_idx, :]

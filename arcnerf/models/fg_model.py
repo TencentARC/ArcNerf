@@ -220,7 +220,7 @@ class FgModel(Base3dModel):
                     mask_rays[0] = False  # force to synthetic ray to use all default value
 
                 # update invalid rays by default values
-                output = self.update_default_values_for_invalid_rays(output_valid, mask_rays, bkg_color)
+                output = self.update_values_for_invalid_rays(output_valid, mask_rays, bkg_color)
 
         return output
 
@@ -300,7 +300,7 @@ class FgModel(Base3dModel):
 
         return sigma, radiance
 
-    def update_default_values_for_invalid_rays(self, output_valid, mask, rand_bkg_color=None):
+    def update_values_for_invalid_rays(self, output_valid, mask, rand_bkg_color=None):
         """Update the default values for invalid rays
 
         Args:

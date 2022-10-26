@@ -25,6 +25,7 @@ def pixel_to_cam(pixels: torch.Tensor, z: torch.Tensor, intrinsic: torch.Tensor)
     i = pixels[:, :, 0]
     j = pixels[:, :, 1]
 
+    # revert pixel loc to cam position
     x_cam = (i - (s * (j - cy) / fy) - cx) / fx * z  # (B, N)
     y_cam = (j - cy) / fy * z  # (B, N)
 
@@ -59,8 +60,8 @@ def pixel_to_world(pixels: torch.Tensor, z: torch.Tensor, intrinsic: torch.Tenso
     Returns:
          xyz_world: torch.tensor(B, N, 3), pixel lift to world coord position
     """
-    xyz_cam = pixel_to_cam(pixels, z, intrinsic)
-    xyz_world = cam_to_world(xyz_cam, c2w)
+    xyz_cam = pixel_to_cam(pixels, z, intrinsic)  # (B, N, 3)
+    xyz_world = cam_to_world(xyz_cam, c2w)  # (B, N, 3)
 
     return xyz_world
 
@@ -90,8 +91,8 @@ def cam_to_pixel(points: torch.Tensor, intrinsic: torch.Tensor):
     Returns:
         pixels: index in x(horizontal)/y(vertical), torch.tensor (B, N, 2)
     """
-    pixels = torch.einsum('bki,bji->bjk', intrinsic, points)
-    pixels = torch.div(pixels[:, :, :2], pixels[:, :, 2].unsqueeze(dim=-1) + 1e-8)
+    pixels = torch.einsum('bki,bji->bjk', intrinsic, points)  # (B, N, 3)
+    pixels = torch.div(pixels[:, :, :2], pixels[:, :, 2].unsqueeze(dim=-1) + 1e-8)  # (B, N, 2)
 
     return pixels[:, :, :2]
 
@@ -108,12 +109,12 @@ def world_to_pixel(points: torch.Tensor, intrinsic: torch.Tensor, w2c: torch.Ten
     Returns:
         pixels: index in x(horizontal)/y(vertical), torch.tensor (B, N, 2)
     """
-    xyz_cam = world_to_cam(points, w2c)
+    xyz_cam = world_to_cam(points, w2c)  # (B, N, 3)
 
     if distort:
-        xyz_cam = apply_distortion(xyz_cam, distort[0], distort[1])
+        xyz_cam = apply_distortion(xyz_cam, distort[0], distort[1])  # (B, N, 3)
 
-    pixels = cam_to_pixel(xyz_cam, intrinsic)
+    pixels = cam_to_pixel(xyz_cam, intrinsic)  # (B, N, 2)
 
     return pixels
 

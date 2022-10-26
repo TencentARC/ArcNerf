@@ -13,6 +13,7 @@ class DataPrefetcher(object):
         self.preload()
 
     def preload(self):
+        """preload the first batch of data and put img to cuda"""
         try:
             self.batch = next(self.loader)
         except StopIteration:
@@ -25,6 +26,7 @@ class DataPrefetcher(object):
                     self.batch[k] = self.batch[k].cuda(non_blocking=True)
 
     def next(self):
+        """Get the next batch"""
         torch.cuda.current_stream().wait_stream(self.stream)
         batch = self.batch
         self.preload()

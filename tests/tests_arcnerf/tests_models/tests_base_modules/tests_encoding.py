@@ -26,6 +26,7 @@ class TestDict(unittest.TestCase):
 
     def check_output_and_grad(self, out_torch, out_custom, out_custom_forward_only, grad_torch, grad_custom, atol=1e-8):
         """Check the output and grad"""
+        # check output
         if out_torch is not None:
             if isinstance(out_torch, list):
                 for out, _out, _out_forward in zip(out_torch, out_custom, out_custom_forward_only):
@@ -37,6 +38,7 @@ class TestDict(unittest.TestCase):
                     self.assertTrue(torch.allclose(out_torch, out_custom, atol=atol))
                     self.assertTrue(torch.allclose(out_torch, out_custom_forward_only, atol=atol))
 
+        # check grad
         if grad_torch is not None:
             if isinstance(grad_torch, list):
                 for grad, _grad in zip(grad_torch, grad_custom):
@@ -47,10 +49,12 @@ class TestDict(unittest.TestCase):
                     self.assertTrue(torch.allclose(grad_torch, grad_custom, atol=atol))
 
     def tests_freq_embedder(self):
+        # settings
         input_dims = range(1, 10)
         n_freqs = [0, 5, 10]
         periodic_fns = (torch.sin, torch.cos)
         include_inputs = [True, False]
+        # run test
         for input_dim in input_dims:
             for freq in n_freqs:
                 for include in include_inputs:
@@ -63,6 +67,7 @@ class TestDict(unittest.TestCase):
                     self.assertEqual(out.shape, (self.batch_size, out_dim))
 
     def test_gaussian_embedder(self):
+        # settings
         n_interval = 20
         n_freqs = [0, 5, 10]
         include_inputs = [True, False]
@@ -74,6 +79,7 @@ class TestDict(unittest.TestCase):
         rays_o = torch.rand((self.batch_size, 3))
         rays_d = torch.rand((self.batch_size, 3))
         rays_r = torch.rand((self.batch_size, 1))
+        # run test
         for gaussian_fn in gaussian_fns:
             for freq in n_freqs:
                 for include in include_inputs:
@@ -99,6 +105,7 @@ class TestDict(unittest.TestCase):
     def tests_sh_embedder(self):
         # test freq factors, at most 5
         include_inputs = [True, False]
+        # run test
         for degree in range(1, 6):
             for include in include_inputs:
                 model = SHEmbedder(n_freqs=degree, include_input=include)
