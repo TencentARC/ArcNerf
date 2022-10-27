@@ -61,6 +61,8 @@ class LLFF(Base3dDataset):
         """Get image list."""
         img_dir = osp.join(self.data_spec_dir, 'images')
         img_list = sorted(glob.glob(img_dir + '/*.JPG'))
+        if len(img_list) == 0:
+            img_list = sorted(glob.glob(img_dir + '/*.jpg'))  # some with .jgp
 
         n_imgs = len(img_list)
         assert n_imgs > 0, 'No image exists in {}'.format(img_dir)
