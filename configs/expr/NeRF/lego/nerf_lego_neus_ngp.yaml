@@ -47,7 +47,7 @@ optim:
 progress:
     start_epoch: -1
     epoch: 50000
-    save_time: 600
+    save_time: 1800
 
     epoch_loss: 100
     iter_loss: 1
