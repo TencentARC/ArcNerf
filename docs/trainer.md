@@ -27,6 +27,7 @@ A `Pipeline` class is in the trainer dir to process all the data, and sample dat
 - dynamic_batchsize:
   - Use for fg model to dynamically adjust num of rays
   - update_epoch: set up update num of rays every update epoch.
+  - max_batch_size: By default set to 32768. Use it to forbid extreme large batch size
 
 # get_progress and save visual 3D result
 If you open `get_progress` in `debug`, and set `--progress.save_progress(val) True`, the trainer will save 3d sample points

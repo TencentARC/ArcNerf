@@ -175,12 +175,21 @@ class Pipeline(object):
         return train_data
 
     def step_dynamic_bs(self, logger):
-        """Adjust the dynamic batch size"""
+        """Adjust the dynamic batch size.
+        Max_batch_size is set to forbid huge size of rays for extreme sparse view
+        """
+
         if valid_key_in_cfgs(self.scheduler_cfg, 'dynamic_batch_size') \
                 and get_value_from_cfgs_field(self.scheduler_cfg.dynamic_batch_size, 'update_epoch', 0) > 0:
             update_epoch = self.scheduler_cfg.dynamic_batch_size.update_epoch
+            max_batch_size = get_value_from_cfgs_field(self.scheduler_cfg.dynamic_batch_size, 'max_batch_size', 32768)
             self.set_info('dynamic_batch_size', update_epoch)
-            logger.add_log('Dynamically adjust training batch size every {} epoches...'.format(update_epoch))
+            self.set_info('dynamic_max_batch_size', max_batch_size)
+            logger.add_log(
+                'Dynamically adjust training batch size every {} epoches...max bs allow {}'.format(
+                    update_epoch, max_batch_size
+                )
+            )
             assert not (self.get_info('sample_mode') == 'full' and not self.get_info('sample_cross_view')), \
                 'Not allow full image without cross view'
         else:
@@ -222,7 +231,10 @@ class Pipeline(object):
                 def div_round_up(val, divisor):
                     return (val + divisor - 1) // divisor
 
-                dynamic_n_rays = int(div_round_up(n_rays * dynamic_factor, 128) * 128)  # For CUDA usage
+                # in case too many rays together
+                dynamic_n_rays = min(
+                    int(div_round_up(n_rays * dynamic_factor, 128) * 128), self.get_info('dynamic_max_batch_size')
+                )
                 self.set_info('n_rays', dynamic_n_rays)
 
     def fetch_step_ray_sample(self, train_data, data_batch):

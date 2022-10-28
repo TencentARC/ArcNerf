@@ -107,6 +107,7 @@ dataset:
 #                color: random        # random background is better for main object optimization. Set [1.0, 1.0, 1.0] for white bkg
 #            dynamic_batch_size:      # only use when fg model with volume pruning
 #                update_epoch: 16     # freq to update
+#                max_batch_size: 32768  # max batch size by default, restrict extreme sparse case
 
     val:
         type: Capture

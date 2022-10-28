@@ -52,6 +52,21 @@ It uses more CUDA implementation from original repo. You can visit [simplengp](h
 * In our framework, we can easily plugin the `HashEncoder` or `SparseVolumeSample` for other models(eg. `NeuS`).
 
 -----------------------------------------------------------------------
+### Full Benchmark on NeRF synthetic dataset
+
+All image with white-bkg, same as the eval in vanilla NeRF.
+
+|          |   chair    |   drums    |   ficus    |   hotdog   |   lego     | materials  |    mic     |   ship     |   avg  |
+|:--------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|:------:|
+|nerf     |   35.00    |   26.02    |   33.51    |   37.40    |   36.39    |   29.78    |   36.22    |   31.10    |  |
+|neus     |   33.76    |   25.60    |   32.59    |   36.34    |   35.38    |   28.73    |   30.50    |   26.41    |  |
+|mipnerf  |   33.76    |   25.60    |   32.59    |   36.34    |   35.38    |   28.73    |   35.80    |   29.95    |  |
+|nerf_ngp |   34.14    |   25.33    |   30.20    |   36.11    |   34.24    |   28.30    |   34.90    |   28.19    | 31.426 |
+|neus_ngp |   31.64    |   22.81    |   26.05    |   32.09    |   30.51    |   25.29    |   27.54    |   24.19    | 27.515 |
+
+
+
+-----------------------------------------------------------------------
 
 ## LLFF
 ### Fern  (378*504, 3 eval images)
@@ -60,6 +75,30 @@ We only use non-ndc version. For ndc space, you need to refer to our [simplenerf
 | Method |        cfg         | PSNR |    Official repo   |    Official PSNR     | paper PSNR  |
 |:------:|:------------------:|:----:|:------------------:|:--------------------:|:-----------:|
 |NeRF(non-ndc)|configs/expr/LLFF/fern/llff_fern_nerf.yaml|26.17|https://github.com/yenchenlin/nerf-pytorch|26.29(non-ndc)|NA|
+
+
+## Benchmark on LLFF Forward-face dataset
+All run for 20w iter and in non ndc-space.
+
+|          |    fern    |   flower   |  fortress  |   horns    |   leaves   |  orchids   |    room    |   trex     |   avg  |
+|:--------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|:------:|
+|nerf      |   25.17    |   27.40    |   31.16    |   27.45    |   20.92    |   20.36    |   32.70    |   26.80    | 26.495 |
+|mipnerf   |   26.77    |   28.50    |   32.99    |   29.90    |   22.57    |   21.12    |   32.54    |   28.86    | 27.906 |
+
+
+
+
+-----------------------------------------------------------------------
+
+## DTU
+
+
+
+
+
+-----------------------------------------------------------------------
+
+## TanksAndTemplates
 
 
 -----------------------------------------------------------------------

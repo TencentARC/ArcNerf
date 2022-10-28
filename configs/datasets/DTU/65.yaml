@@ -9,6 +9,9 @@ dataset:
         scale_radius: 3.0
         align_cam: True     #  dtu 65 need to adjust
         precache: False
+        augmentation:
+            blend_bkg_color:
+                bkg_color: [1.0, 1.0, 1.0]   # directly use mask for foreground modeling
 
 model:
     rays:

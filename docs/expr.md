@@ -58,9 +58,9 @@ For mip-Nerf, it is hard to used for object extraction, but provide better rende
 Here are the trails and experience on Lego scene.
 
 - `center_pixel` is necessary in `mipnerf` which is the same as official repo. Otherwise not converge well.
-We get `PSNR=xx` by [conf](../configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml).
+We get `PSNR=35.36` by [conf](../configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml).
 
-- `blur_coarse_weight` before resample stage is importance. Without it, we get `xx`. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_noblurweights.yaml).
+- `blur_coarse_weight` before resample stage is importance. Without it, we get `31.43`. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_noblurweights.yaml).
 
 - Remove `solfplus` on sigma make a loss around `xx`.  [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_nosoftplus.yaml).
 
@@ -123,6 +123,8 @@ TBD: We will add geometry metric in the future for measuring the geometry recons
 ------------------------------------------------------------------------------------------------------------
 # Summary:
 
+On the trails are run on one A100 GPU.
+
 |          model            | PSNR  |  iter/s | Num iter | eval s/img | conf file|
 |:-------------------------:|:-----:|:-------:|:--------:|:----------:|:--------:|
 | NeRF                      | 32.86 | 0.25s   |  30w     | 10s        | [conf](../configs/expr/NeRF/lego/nerf_lego_nerf.yaml) |
@@ -134,9 +136,9 @@ TBD: We will add geometry metric in the future for measuring the geometry recons
 | ngp                       | 34.31 | 0.018s   |  5w      | 0.24s     | [conf](../configs/expr/NeRF/lego/nerf_lego_nerf_ngp.yaml)
 |    + new volume           | 34.65 | 0.017s   |  5w      | 0.24s     | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngp_newvolume.yaml)
 | | | | |
-| MipNeRF                   | 35.xx | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml)
-|   - blur coarse weight    |  33.xx | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_noblurweights.yaml)
-|   - softplus              |  34.xx | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_nosoftplus.yaml)
+| MipNeRF                   |  35.36 | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml)
+|   - blur coarse weight    |  31.43 | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_noblurweights.yaml)
+|   - softplus              |  35.xx | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_nosoftplus.yaml)
 | | | | |
 | NeuS                     | 30.71 | 0.18s    | 30w      |  28s     | [conf](../configs/expr/NeRF/lego/nerf_lego_neus.yaml)
 |+center_pixel             | 32.44 | 0.18s   |  30w      |  28s        | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_centerpixel.yaml)
