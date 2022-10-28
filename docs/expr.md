@@ -62,7 +62,7 @@ We get `PSNR=35.36` by [conf](../configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml).
 
 - `blur_coarse_weight` before resample stage is importance. Without it, we get `31.43`. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_noblurweights.yaml).
 
-- Remove `solfplus` on sigma make a loss around `xx`.  [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_nosoftplus.yaml).
+- Remove `solfplus` on sigma make a loss around `35.27`, not a significant loss.  [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_nosoftplus.yaml).
 
 ------------------------------------------------------------------------------------------------------------
 
@@ -138,7 +138,7 @@ On the trails are run on one A100 GPU.
 | | | | |
 | MipNeRF                   |  35.36 | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml)
 |   - blur coarse weight    |  31.43 | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_noblurweights.yaml)
-|   - softplus              |  35.xx | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_nosoftplus.yaml)
+|   - softplus              |  35.27 | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_nosoftplus.yaml)
 | | | | |
 | NeuS                     | 30.71 | 0.18s    | 30w      |  28s     | [conf](../configs/expr/NeRF/lego/nerf_lego_neus.yaml)
 |+center_pixel             | 32.44 | 0.18s   |  30w      |  28s        | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_centerpixel.yaml)
