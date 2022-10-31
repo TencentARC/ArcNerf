@@ -3,6 +3,7 @@
 import numpy as np
 
 from arcnerf.geometry.poses import center_poses
+from arcnerf.geometry.projection import world_to_cam
 from arcnerf.geometry.transformation import rotate_points
 from common.utils.cfgs_utils import valid_key_in_cfgs
 from common.utils.torch_utils import np_wrapper
@@ -137,7 +138,8 @@ class Base3dPCDataset(Base3dDataset):
         """
         bounds = []
         for idx in range(len(self.cameras)):
-            pts_reproj = np_wrapper(self.cameras[idx].proj_world_to_cam, self.point_cloud['pts'])
+            cam_cpu = self.cameras[idx].get_pose(w2c=True).cpu()
+            pts_reproj = np_wrapper(world_to_cam, self.point_cloud['pts'][None, ...], cam_cpu[None, ...])[0]
             near, far = pts_reproj[:, -1].min(), pts_reproj[:, -1].max()
             if extend_factor > 0:
                 near_far_dist = far - near

@@ -1,0 +1,166 @@
+name: capture_qqtiger_mipnerf
+
+resume: None
+
+debug:
+    debug_mode: False
+    print_all_grad: False
+    get_progress: False
+
+dir:
+    expr_dir: None
+    data_dir: '/group/30042/leoyluo/Immerse/data'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_mipnerf'
+
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_mipnerf/checkpoints/final.pt.tar'
+
+gpu_ids: -1
+
+dist:
+    local_rank: 0
+    rank: 0
+    world_size: 1
+    distributed_backend: nccl
+    random_seed: None
+    slurm: False
+
+batch_size: 2
+n_rays: 4096
+worker: 4
+
+optim:
+    lr: 5e-4
+    optim_type: adam
+    weight_decay: 0.0
+    lr_scheduler:
+        type: ExponentialLR
+        lr_gamma: 0.1
+        lr_steps: [250000]
+
+    clip_gradients: 0.0
+    clip_warmup: -1
+    clip_gradients_warmup: 0.0
+
+progress:
+    start_epoch: -1
+    epoch: 500000
+    save_time: 1800
+
+    epoch_loss: 100
+    iter_loss: 1
+    save_progress: True
+    epoch_save_progress: 50000
+    iter_save_progress: 1
+
+    epoch_val: 50000
+    save_progress_val: True
+    max_samples_val: 1
+
+    epoch_save_checkpoint: 100000
+    local_progress: False
+
+    init_eval: False
+    epoch_eval: 100000
+    max_samples_eval: 3
+
+dataset:
+    train:
+        type: Capture
+        scene_name: qqtiger
+        img_scale: 0.25
+        scale_radius: 3.0
+        pc_radius: 2.0
+        center_pixel: True
+        skip: 10
+        device: gpu
+        precache: True
+
+    val:
+        type: Capture
+        scene_name: qqtiger
+        img_scale: 0.125
+        scale_radius: 3.0
+        pc_radius: 2.0
+        center_pixel: True
+        skip: 10
+        device: gpu
+        precache: False
+
+    eval:
+        eval_batch_size: 1
+        eval_max_sample: 3
+        type: Capture
+        scene_name: qqtiger
+        img_scale: 0.25
+        scale_radius: 3.0
+        pc_radius: 2.0
+        center_pixel: True
+        skip: 10
+        device: gpu
+        precache: True
+
+inference:
+    to_gpu: True
+    render:
+        type: [circle]
+        n_cam: [20]
+        repeat: [3]
+        radius: 2.0
+        u_start: 0.75
+        v_ratio: -0.2
+        fps: 5
+        center_pixel: True
+
+model:
+    type: MipNeRF
+    rays:
+        # bounding_radius: 3.0
+        near: 1.0
+        far: 8.0
+        n_sample: 128
+        n_importance: 128
+        gaussian:
+            gaussian_fn: cone        # ['cone', 'cylinder'] to get mean/cov
+        inverse_linear: False
+        perturb: True
+        add_inf_z: True
+        noise_std: 0.0
+        white_bkg: True
+        blur_coarse_weights: True
+    chunk_rays: 32768
+    chunk_pts: 131072
+    geometry:
+        W: 256
+        D: 8
+        skips: [4]
+        encoder:
+            type: GaussianEmbedder    # Use gaussian embedder
+            input_dim: 3
+            n_freqs: 16
+        W_feat: 256
+        geometric_init: False
+        out_act_cfg:
+            type: softplus  # softplus on sigma
+    radiance:
+        mode: 'vf'
+        W: 128
+        D: 1
+        encoder:
+            view:
+                type: FreqEmbedder
+                input_dim: 3
+                n_freqs: 4
+        W_feat_in: 256
+
+loss:
+    ImgLoss:
+        keys: ['rgb_coarse', 'rgb_fine']
+        internal_weights: [0.1, 1.0]
+        weight: 1.0
+
+metric:
+    PSNR:
+
+train_metric:
+    PSNR:
+        key: 'rgb_fine'
