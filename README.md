@@ -20,6 +20,8 @@ In the recent few months, many frameworks working on common NeRF-based pipeline 
 - [JNeRF](https://github.com/Jittor/JNeRF)
 - [XRNeRF](https://github.com/openxrlab/xrnerf)
 
+(And a very nice start-up company [Luma.ai](https://captures.lumalabs.ai/) is working on NeRF based real-time rendering on 3d scene.)
+
 All those amazing works are trying to bring those state-of-the-art NeRF-based methods together into
 a complete, modular framework that is easy to change any of the components and conduct experiment quickly.
 
@@ -47,7 +49,7 @@ We are working on extending it in the coming future.
     - NeuS with hashGrid embed
     - NeuS with hashGrid embed + volume pruning -> NeuS-NGP model
   - Plug-in the modules like volume pruning makes the speed faster and generate better result. See [expr](docs/expr.md) for more detail.
-
+  - foreground_model and background_model are separate well. They each bound the modeling in in-out area by sphere, volume and other geometry structure. It is suitable for common daily captured video.
 
 - Unified dataset and benchmark:
   - We split the dataset following on official repo, and all methods are running under the same settings for fair comparison.

@@ -136,9 +136,9 @@ On the trails are run on one A100 GPU.
 | ngp                       | 34.31 | 0.018s   |  5w      | 0.24s     | [conf](../configs/expr/NeRF/lego/nerf_lego_nerf_ngp.yaml)
 |    + new volume           | 34.65 | 0.017s   |  5w      | 0.24s     | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngp_newvolume.yaml)
 | | | | |
-| MipNeRF                   |  35.36 | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml)
-|   - blur coarse weight    |  31.43 | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_noblurweights.yaml)
-|   - softplus              |  35.27 | 0.26s    | 50w      |           | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_nosoftplus.yaml)
+| MipNeRF                   |  35.36 | 0.26s    | 50w      | 11.34s    | [conf](../configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml)
+|   - blur coarse weight    |  31.43 | 0.26s    | 50w      | 11.34s    | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_noblurweights.yaml)
+|   - softplus              |  35.27 | 0.26s    | 50w      | 11.34s    | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_nosoftplus.yaml)
 | | | | |
 | NeuS                     | 30.71 | 0.18s    | 30w      |  28s     | [conf](../configs/expr/NeRF/lego/nerf_lego_neus.yaml)
 |+center_pixel             | 32.44 | 0.18s   |  30w      |  28s        | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_neus_centerpixel.yaml)
@@ -156,6 +156,16 @@ On the trails are run on one A100 GPU.
 
 ------------------------------------------------------------------------------------------------------------
 
+# Real scene with foreground and background
+
+What is special in the project is that you are free to separate fg_model and bkg_model. Full_model will auto merge the result.
+
+To get better fg_model for extraction, a sdf model is better. And you can still use `nerf++` or `instant-ngp` like multi-sphere/volume strcture for modeling unlimited background area.
+
+TODO: Add real scene modeling samples and result.
+
+------------------------------------------------------------------------------------------------------------
+
 # Inference on result
 
 ## Extraction
@@ -164,11 +174,11 @@ to get the mesh.
 
 For the color on mesh, we use the triangle centroid as pts, with -face_norm as directly to get the color for face.
 
-- Advance algorithm for texture map/lighting are not supported. You many possibly need to do diffRendering to optimize
+- Advanced algorithm for texture map/lighting are not supported. You many possibly need to do diffRender to optimize
 the texture and other asset used for modern graphical engine. We will try to do it in the future.
 
-- Although we support customized volume for extraction(the volume has same side, or different lenght on xyz dimension).
-But we found that only xyz with same length could generate color correctly.
+- We support customized volume for extraction(the volume has same side, or different lenght on xyz dimension). Accurate volume for object
+leads to better result. We don't provide auto or interactive bbox selection, we may provide it in the future.
 
 
 Here is the mesh extracted from NeRF_NGP and NeuS_NGP.
