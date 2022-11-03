@@ -90,6 +90,7 @@ Will write data to `cfgs.dir.data_dir/Capture/scene_name`
 - dense_reconstruct: If true, run dense_reconstruct and get dense point cloud and mesh.
 ### Mask/Segmentation estimation
 - TODO: We may add it in the future.
+- But for now you can use external tools to extract the mask, and put it under `mask/xxx.png` in the data_dir.
 ### Volume regression from mask
 If mask is provided, we use all masks in training set to get the 2d bbox, and simply regress a 3d volume for the object.
 This help to get the close approximation of the bounding volume, which could be helpful in modelling for some explicit
@@ -121,7 +122,9 @@ File Structure is:
 Capture
 └───qqtiger
 │     └───images
-│     │    └─── *.jgp
+│     │    └─── *.png
+│     └───images
+│           └─── *.png
 │     └───colmap_output.txt
 │     └───database.db
 │     └───poses_bounds.npy

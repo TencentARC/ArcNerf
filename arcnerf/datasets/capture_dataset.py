@@ -25,6 +25,9 @@ class Capture(Base3dPCDataset):
 
         # get image, read image list first, then read skip images in case too many images.
         img_list, self.n_imgs = self.get_image_list()
+        mask_list, n_mask = self.get_mask_list()
+        if mask_list is not None:
+            assert self.n_imgs == n_mask, 'Num of image not match num of mask {}-vs-{}'.format(self.n_imgs, n_mask)
         self.H, self.W = self.read_image_list(img_list[:1])[0].shape[:2]
 
         # get cameras
@@ -53,12 +56,14 @@ class Capture(Base3dPCDataset):
 
         # to make fair comparison, remove test file from train
         holdout_index = self.get_holdout_index()
-        img_list, _ = self.get_holdout_samples_with_list(holdout_index, img_list)
+        img_list, mask_list = self.get_holdout_samples_with_list(holdout_index, img_list, mask_list)
 
         # skip image and keep less samples
-        img_list, _ = self.skip_samples_with_list(img_list)
+        img_list, mask_list = self.skip_samples_with_list(img_list, mask_list)
         # read the real image after skip
         self.images = self.read_image_list(img_list)
+        # read mask, it is optional
+        self.masks = self.read_mask_list(mask_list) if mask_list is not None else []
         # keep close-to-mean samples if set
         self.keep_eval_samples()
 
@@ -84,6 +89,17 @@ class Capture(Base3dPCDataset):
         assert n_imgs > 0, 'No image exists in {}'.format(img_dir)
 
         return img_list, n_imgs
+
+    def get_mask_list(self):
+        """Get mask list. Return None if mask list is empty"""
+        mask_dir = osp.join(self.data_spec_dir, 'mask')
+        mask_list = sorted(glob.glob(mask_dir + '/*.png'))
+
+        n_imgs = len(mask_list)
+        if n_imgs == 0:
+            return None, None
+
+        return mask_list, n_imgs
 
     def read_cameras(self):
         """Read camera from pose file"""
