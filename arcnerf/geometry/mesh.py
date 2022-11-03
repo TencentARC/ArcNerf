@@ -205,7 +205,7 @@ def render_mesh_images(
                  for open3d, it only support geo mode without colors
         single_image_mode: If True, render each image at once to save GPU memory.
                            Only in 'pytorch3d'. By default False.
-        device: torch.device('cpu') or torch.device('cuda'). Only in 'pytorch3d'.
+        device: torch.device('cpu') or torch.device('cuda'). Only in 'pytorch3d'. can be string('cpu','cuda').
         sil_mode: whether to render in sil mode. Only in 'pytorch3d'. By default False.
         sil_hard: If in sil mode, render the silhouette in {0, 1} rather than (0-1).
                   By default True, Only in 'pytorch3d'.

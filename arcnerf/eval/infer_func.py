@@ -437,7 +437,7 @@ class Inferencer(object):
 
         # get point cloud output
         volume_out['pc'], sigma, valid_sigma = self.run_infer_volume_point_cloud(
-            model, volume_pts, n_grid, level, grad_dir, max_pts
+            model, volume_pts, volume_origin, n_grid, level, grad_dir, max_pts
         )
 
         # get mesh output
@@ -454,7 +454,7 @@ class Inferencer(object):
 
         return volume_out
 
-    def run_infer_volume_point_cloud(self, model, volume_pts, n_grid, level, grad_dir, max_pts=200000):
+    def run_infer_volume_point_cloud(self, model, volume_pts, volume_origin, n_grid, level, grad_dir, max_pts=200000):
         """Extract point cloud from volume field.
            Return point_cloud in full/simplified result as a dict.
            Return None if not run.
@@ -481,13 +481,15 @@ class Inferencer(object):
             valid_rgb = rgb[valid_sigma]  # (n_valid, 3)
             n_pts = valid_pts.shape[0]
             self.logger.add_log('    Getting {} valid pts'.format(n_pts))
-            pc_out['full'] = {'pts': valid_pts.copy(), 'color': valid_rgb.copy()}
+            # full pc is normalized to center
+            pc_out['full'] = {'pts': valid_pts.copy() - torch_to_np(volume_origin), 'color': valid_rgb.copy()}
             # sample for plot
             if n_pts > max_pts:
                 self.logger.add_log('    Sample to {} pts'.format(max_pts))
                 choice = np.random.choice(range(n_pts), max_pts, replace=False)
                 valid_pts = valid_pts[choice]
                 valid_rgb = valid_rgb[choice]
+            # sampled points are in original space
             pc_out['sample'] = {'pts': valid_pts.copy(), 'color': valid_rgb.copy()}
 
         return pc_out, sigma, valid_sigma
@@ -523,16 +525,17 @@ class Inferencer(object):
                 mesh_out['simplify'] = self.get_mesh_components(verts_sim, faces_sim, volume_origin, model)
 
             # add c2w and intrinsic for mesh rendering
-            if self.get_render_cfgs() is not None and 'render' in self.get_render_cfgs():
+            if self.get_volume_data() is not None and 'render' in self.get_volume_data():
+                render_mesh_cfgs = self.get_volume_data()['render']
                 mesh_out['render'] = {
-                    'type': self.get_render_cfgs('type'),
+                    'type': render_mesh_cfgs['type'],
                     'H': self.H,
                     'W': self.W,
-                    'fps': self.get_render_cfgs('fps'),
-                    'repeat': self.get_render_cfgs('repeat'),
-                    'c2w': self.get_render_data()['c2w'],
-                    'intrinsic': self.get_render_data()['intrinsic'],
-                    'backend': self.get_render_data()['backend'],
+                    'fps': render_mesh_cfgs['fps'],
+                    'repeat': render_mesh_cfgs['repeat'],
+                    'c2w': render_mesh_cfgs['c2w'],
+                    'intrinsic': render_mesh_cfgs['intrinsic'],
+                    'backend': render_mesh_cfgs['backend'],
                     'device': next(model.parameters()).device  # to allow gpu usage for rendering
                 }
 
@@ -581,13 +584,14 @@ class Inferencer(object):
         self.logger.add_log('    Get faces color for all {} faces takes {:.2f}s'.format(n_faces, time.time() - time0))
 
         res = {
-            'verts': verts,
+            'verts': verts + torch_to_np(volume_origin),  # return the mesh with offset
             'faces': faces,
             'vert_normals': vert_normals,
             'face_normals': face_normals,
             'face_centers': face_centers,
             'vert_colors': vert_colors,
             'face_colors': face_colors,
+            'volume_origin': torch_to_np(volume_origin),
         }
 
         return res
@@ -678,14 +682,16 @@ class Inferencer(object):
         """Write the full/simplified mesh extraction output"""
         # save full mesh as .ply file, save verts/faces only
         mesh_file = osp.join(geo_folder, 'mesh_extract.ply')
+        # For the .ply save as obj, it is normalized in the volume
+        verts_full_adjust = mesh['full']['verts'] - mesh['full']['volume_origin']
         save_meshes(
-            mesh_file, mesh['full']['verts'], mesh['full']['faces'], mesh['full']['vert_colors'],
+            mesh_file, verts_full_adjust, mesh['full']['faces'], mesh['full']['vert_colors'],
             mesh['full']['face_colors'], mesh['full']['vert_normals'], mesh['full']['face_normals']
         )
         mesh_geo_file = osp.join(geo_folder, 'mesh_extract_geo.ply')
-        save_meshes(mesh_geo_file, mesh['full']['verts'], mesh['full']['faces'], geo_only=True)
+        save_meshes(mesh_geo_file, verts_full_adjust, mesh['full']['faces'], geo_only=True)
 
-        # draw simplified in plotly
+        # draw simplified in plotly. Verts follows the correct space, no normalization
         verts_sim, faces_sim = mesh['simplify']['verts'], mesh['simplify']['faces']
         face_colors_sim = mesh['simplify']['face_colors']
         verts_by_faces, _ = get_verts_by_faces(verts_sim, faces_sim, None)
@@ -718,7 +724,7 @@ class Inferencer(object):
                 render['intrinsic'],
                 render['backend'],
                 single_image_mode=True,
-                device=self.device
+                device='cuda' if self.device == 'gpu' else 'cpu'
             )  # (n_cam, h, w, 3)
 
             file_path = osp.join(render_folder, 'color_mesh_render_{}.mp4'.format(path_type))
@@ -739,7 +745,7 @@ class Inferencer(object):
                 render['intrinsic'],
                 render['backend'],
                 single_image_mode=True,
-                device=self.device
+                device='cuda' if self.device == 'gpu' else 'cpu'
             )  # (n_cam, h, w, 3)
 
             file_path = osp.join(render_folder, 'geo_mesh_render_{}.mp4'.format(path_type))
