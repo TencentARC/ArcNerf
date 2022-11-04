@@ -89,6 +89,7 @@ dataset:
         pc_radius: 2.0               # only keep point cloud in a fix radius ball, scale after cam norm
         align_cam: False             # whether to use avg pose to adjust cam rotation. Only for cam that are not horizontally distributed.
         # exchange_coord: [y, z, x]  # exchange and flip coord. Generally not use
+        # cam_t_offset: [1.0, 0.0, 0.0]  # this adjusts the final c2w translation by -cam_t_offset, to move the coord system by manually
         ndc_space: False             # change the rays into ndc_space. You must assure the near is 1.0 before that. You should set near/far as 1 if used ndc_space
         center_pixel: False          # whether to use pixel from (0.5, 1.5,...) instead of (0, 1, 2)
         #normalize_rays_d: True       # whether the rays_d are normalized. By default True

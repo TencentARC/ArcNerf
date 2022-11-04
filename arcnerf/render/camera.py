@@ -100,6 +100,10 @@ class PerspectiveCamera(object):
         """reset_pose the intrinsic (3, 3)"""
         self.intrinsic = intrinsic.copy()
 
+    def adjust_translation(self, offset):
+        """Adjust translation in c2w"""
+        self.c2w[:3, 3] += offset
+
     def apply_transform(self, rot):
         """Rotate a pose by rot (4, 4)"""
         self.c2w = np.matmul(rot, self.c2w)

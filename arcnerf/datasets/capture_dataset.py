@@ -53,6 +53,8 @@ class Capture(Base3dPCDataset):
         self.norm_cam_pose()
         # align if required
         self.align_cam_horizontal()
+        # adjust translation if necessary to put obj in the center
+        self.adjust_cam_translation()
 
         # to make fair comparison, remove test file from train
         holdout_index = self.get_holdout_index()

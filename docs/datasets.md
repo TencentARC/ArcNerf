@@ -25,6 +25,7 @@ Will not touch intrinsic. If point cloud exists, rescale them by same factor to 
 - device: If set to gpu, it will put data directly to gpu(which fasten the speed of ray generation, but takes gpu).
 - pc_radius(base_3d_pc_dataset): Remove point cloud that are outside such absolute radius(all scaled by extra `1.05`).
 - align_cam: Sometimes it can be used to align cam in a horizontal way.
+- cam_t_offset: a list of 3 that adjust the c2w translation manually. This moves the object to center, good for neus geometric init.
 - exchange_coord: Flexible to exchange/flip the coord to a standard system.
 - eval_max_sample: To keep the closest-to-center_pose samples in the split.
 Done after camera `scale_radius`. The radius is restricted within `scale_radius` range.

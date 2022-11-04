@@ -196,6 +196,15 @@ class Base3dDataset(BaseDataset):
 
         return extrinsic
 
+    def adjust_cam_translation(self):
+        """Adjust c2w translation by some offset. This could make the obj in the coord center"""
+        assert len(self.cameras) > 0, 'Not camera in dataset, do not use this func'
+
+        if valid_key_in_cfgs(self.cfgs, 'cam_t_offset') and len(self.cfgs.cam_t_offset) == 3:
+            offset = np.array(self.cfgs.cam_t_offset)  # (3,)
+            for camera in self.cameras:
+                camera.adjust_translation(-offset)  # always negative direction
+
     def norm_cam_pose(self):
         """Normalize camera pose by scale_radius, place camera near a sphere surface. It affects extrinsic"""
         max_cam_norm_t = None
