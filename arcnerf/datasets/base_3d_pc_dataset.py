@@ -96,6 +96,18 @@ class Base3dPCDataset(Base3dDataset):
             if 'vis' in self.point_cloud:
                 self.point_cloud['vis'] = self.point_cloud['vis'][:, pts_valid]
 
+    def adjust_cam_translation(self):
+        """Adjust c2w translation by some offset. This could make the obj in the coord center"""
+        assert len(self.cameras) > 0, 'Not camera in dataset, do not use this func'
+
+        if valid_key_in_cfgs(self.cfgs, 'cam_t_offset') and len(self.cfgs.cam_t_offset) == 3:
+            offset = np.array(self.cfgs.cam_t_offset)  # (3,)
+            for camera in self.cameras:
+                camera.adjust_translation(-offset)  # always negative direction
+
+            # adjust point cloud as well
+            self.point_cloud['pts'] -= offset[None]
+
     def center_cam_poses_by_pc_mean(self):
         """Recenter camera pose by recenter the point_cloud center as (0,0,0)
         You should filter noisy point cloud that not belong to the main object

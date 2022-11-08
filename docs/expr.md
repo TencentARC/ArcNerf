@@ -41,14 +41,14 @@ With such object structure, we can set the `n_sample` large(1024), and it will r
 `instant-ngp` combines volume pruning with hash/sh encoding, for much faster converge.
 You can visit our project [simplengp](http://github.com/TencentARC/simplengp) for more experiment log.
 
-- We get `PSNR=34.31` for 5w iteration, base on volume-pruning and hashencoding. Many factors affects the result, you can see [simplengp](http://github.com/TencentARC/simplengp) for more detail.
+- We get `PSNR=35.21` for 5w iteration, base on volume-pruning and hashencoding. Many factors affect the result, you can see [simplengp](http://github.com/TencentARC/simplengp) for more detail.
 The [conf](../configs/expr/NeRF/lego/nerf_lego_nerf_ngp.yaml).
 
-- Using a smaller but closely bounding volume can slightly improve the result to `34.65`. Meaning that we can try to find more accurate bbox for better pruning and rendering result. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngp_newvolume.yaml).
+- Using a smaller but closely bounding volume get the same result `35.21`. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngp_newvolume.yaml).
 
 - Without the `fusemlp` but used original mlp with same size, the PSNR drop by `~0.4`. Not sure whether `bias` or other factors affect the result.
 
-- resample more pts near surface can further improve the PSNR(`~0.3`), but time for each step will increase a lot.
+- resample more pts near surface can further improve the PSNR(`~0.3`), but time for each step will increase by a lot.
 
 ------------------------------------------------------------------------------------------------------------
 
@@ -133,8 +133,8 @@ On the trails are run on one A100 GPU.
 |  +hash/sh encoder + shallow | 9.27 | 0.05s   |  30w     | 1.3s       | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngpembed_centerpixel_shallow_trunc.yaml)
 |+volume pruning(1024 pts)  | 33.33 | 0.04s   |  30w     | 0.84s      | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_volumeprune_moresample_noimportance.yaml)
 |+volume pruning(64 + 128 pts)  | 27.57 | 0.2s   |  30w     | 4.13s      | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_volumeprune.yaml)
-| ngp                       | 34.31 | 0.018s   |  5w      | 0.24s     | [conf](../configs/expr/NeRF/lego/nerf_lego_nerf_ngp.yaml)
-|    + new volume           | 34.65 | 0.017s   |  5w      | 0.24s     | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngp_newvolume.yaml)
+| ngp                       | 35.21 | 0.018s   |  5w      | 0.24s     | [conf](../configs/expr/NeRF/lego/nerf_lego_nerf_ngp.yaml)
+|    + new volume           | 35.21 | 0.017s   |  5w      | 0.24s     | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngp_newvolume.yaml)
 | | | | |
 | MipNeRF                   |  35.36 | 0.26s    | 50w      | 11.34s    | [conf](../configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml)
 |   - blur coarse weight    |  31.43 | 0.26s    | 50w      | 11.34s    | [conf](../configs/expr/NeRF/lego/trails/nerf_lego_mipnerf_noblurweights.yaml)

@@ -50,10 +50,12 @@ We are working on extending it in the coming future.
     - NeuS with hashGrid embed + volume pruning -> NeuS-NGP model
   - Plug-in the modules like volume pruning makes the speed faster and generate better result. See [expr](docs/expr.md) for more detail.
   - foreground_model and background_model are separate well. They each bound the modeling in in-out area by sphere, volume and other geometry structure. It is suitable for common daily captured video.
+    which provide high quality object mesh and background rendering at the same time
 
-- Unified dataset and benchmark:
-  - We split the dataset following on official repo, and all methods are running under the same settings for fair comparison.
-  - We also make unittests for the datasets and you are easy to check whether the configs on the data is correct.
+
+  - Unified dataset and benchmark:
+    - We split the dataset following on official repo, and all methods are running under the same settings for fair comparison.
+    - We also make unittests for the datasets and you are easy to check whether the configs on the data is correct.
 
 ![data](assets/datasets/pts_pc.gif)
 
@@ -75,6 +77,8 @@ We are working on extending it in the coming future.
 - Docs and Code:
   - All the functions are with detailed docs on its usage, and the operation are commented with its tensor size,
   which makes you easy to understand the change of components.
+  - We have implemented helpful geometry function on mesh/rays/sphere/volume/cam_pose in torch(some in CUDA extension).
+  It could be useful for you in other 3D-related projects as well.
   - We also provide our experiments [note](docs/expr.md) on our trails.
 
 

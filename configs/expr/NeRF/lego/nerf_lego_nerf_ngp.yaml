@@ -31,7 +31,7 @@ worker: 4
 optim:
     ema:
         decay: 0.95
-    lr: 1e-2
+    lr: 1e-1
     optim_type: adam
     weight_decay: 1e-6
     eps: 1e-15
@@ -194,7 +194,7 @@ loss:
         keys: ['rgb_coarse']
         loss_type: Huber
         delta: 0.1
-        weight: 5
+        weight: 3000
 
 metric:
     PSNR:

@@ -125,7 +125,7 @@ model:
         perturb: True
         add_inf_z: True
         noise_std: 0.0
-        white_bkg: True
+        white_bkg: False
         blur_coarse_weights: True
     chunk_rays: 32768
     chunk_pts: 131072

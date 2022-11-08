@@ -39,15 +39,16 @@ Our result:
 
 | Num steps | time | PSNR | comment   |
 |:---------:|:----:|:----:|:---------:|
-| 100 | ~4s  | 14.17 | Crop stage, not converge well|
-| 500 | ~18s | 17.07 | Crop stage, not converge  well|
-| 2k  | ~40s | 26.42 |  |
-| 1w  | ~3min| 31.99 |  |
-| 5w  | ~17min  | 34.65 | |
+| 100 | ~4s  | 16.11 | Crop stage, not converge well|
+| 500 | ~18s | 17.95 | Crop stage, not converge  well|
+| 2k  | ~40s | 30.01 |  |
+| 1w  | ~3min| 33.14 |  |
+| 5w  | ~17min  | 35.21 | |
 
-* Many factor that could affect the result(Like using `black background` improve PSNR to `~35.0`.)
+* We found that large lr and loss weight leads to sharp sigma distribution and final PSNR, so we use `lr=1e-1 & loss_weight=3000`.
+* Many factor that could affect the result(Like using `black background` improve PSNR to `~35.6`.)
 * We implement most of the operation in torch rather than Highly optimized CUDA kernels. It is more flexible for experiment but slower in speed.
-* We have another repo contains only the function for instant-ngp, which runs faster(`~15 min`) and better than this repo. It contains functions for ngp only.
+* We have another repo contains only the function for instant-ngp. It contains functions for ngp only and gets better result.
 It uses more CUDA implementation from original repo. You can visit [simplengp](https://github.com/TencentARC/simplengp) for more detail and expr log.
 * In our framework, we can easily plugin the `HashEncoder` or `SparseVolumeSample` for other models(eg. `NeuS`).
 
@@ -61,7 +62,7 @@ All image with white-bkg, same as the eval in vanilla NeRF.
 |nerf     |   33.30    |   25.11    |   30.47    |   36.73    |   32.86    |   29.87    |   33.24    |   28.70    | | 31.285 |
 |neus     |   31.36    |   24.26    |   25.86    |   36.66    |   30.72    |   29.09    |   30.50    |   26.41    | | 29.358 |
 |mipnerf  |   34.41    |   25.45    |   32.95    |   37.45    |   35.36    |   30.70    |   34.84    |   29.83    | | 32.624 |
-|nerf_ngp |   34.14    |   25.33    |   30.20    |   36.11    |   34.24    |   28.30    |   34.90    |   28.19    | | 31.426 |
+|nerf_ngp |   34.88    |   25.50    |   30.55    |   36.92    |   35.21    |   29.12    |   34.80    |   28.39    | | 31.921 |
 |neus_ngp |   31.64    |   22.81    |   26.05    |   32.09    |   30.51    |   25.29    |   27.54    |   24.19    | | 27.515 |
 
 * The volume in nerf/neus_ngp is simply volume with `side=2.0`. More accurate 3d volume bbox generally leads to better performance.
@@ -94,11 +95,11 @@ and eval on the pure object image with white bkg. Testhold out is 8 (`1/8` image
 
 |         |   24  |   37  |   40  |   55  |   63  |   65  |   69  |   83  |   97  |  105  |  106  |  110  |  114  |  118  |  122  |     |  avg |
 |:-------:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:---:|:----:|
-|nerf     | 27.26 | 26.05 | 27.68 | 24.21 | 27.14 | 25.82 | 22.16 | 28.13 | 25.30 | 28.28 | 23.12 | 26.79 | 27.73 | 26.88 | 28.52 |     |      |
-|neus     | 27.12 | 26.23 | 27.98 | 27.52 | 29.85 | 26.03 | 23.75 | 26.78 | 25.79 | 28.48 | 23.38 | 26.48 | 27.70 | 24.74 | 30.72 |     |      |
-|mipnerf  | 27.08 | **24.73** | 25.78 | 28.18 | 28.78 | **20.81** | 23.11 | 28.30 | 26.17 | 28.93 | 23.70 | 27.23 | 27.25 | 27.29 | 31.49 |
-|nerf_ngp | 27.16 | 26.48 | 28.96 | 28.93 | 30.78 | 27.10 | 24.01 | 30.41 | 26.21 | 30.15 | 24.55 | 28.32 | 28.69 | 27.77 | 32.54 |     |
-|neus_ngp | 26.61 | 24.91 | 27.31 | 28.43 | 28.89 | 25.57 | 23.04 | 26.51 | 24.84 | 27.92 | 22.48 | 25.20 | 27.56 | 24.28 | 30.56 |     |
+|nerf     | 27.26 | 26.05 | 27.68 | 24.21 | 27.14 | 25.82 | 22.16 | 28.13 | 25.30 | 28.28 | 23.12 | 26.79 | 27.73 | 26.88 | 28.52 |     | 26.338 |
+|neus     | 27.12 | 26.23 | 27.98 | 27.52 | 29.85 | 26.03 | 23.75 | 26.78 | 25.79 | 28.48 | 23.38 | 26.48 | 27.70 | 24.74 | 30.72 |     | 26.837 |
+|mipnerf  | 27.08 | 26.23 | 25.78 | 28.18 | 28.78 | 26.09 | 23.11 | 28.30 | 26.17 | 28.93 | 23.70 | 27.23 | 27.25 | 27.29 | 31.49 |     | 27.041 |
+|nerf_ngp | 27.16 | 26.48 | 28.96 | 28.93 | 30.78 | 27.10 | 24.01 | 30.41 | 26.21 | 30.15 | 24.55 | 28.32 | 28.69 | 27.77 | 32.54 |     | 28.137 |
+|neus_ngp | 26.61 | 24.91 | 27.31 | 28.43 | 28.89 | 25.57 | 23.04 | 26.51 | 24.84 | 27.92 | 22.48 | 25.20 | 27.56 | 24.28 | 30.56 |     | 26.274 |
 
 * mipnerf sometimes converge fast as 10w iter in DTU. Maybe the image num is smaller.
 * The volume in neus/nerf_ngp are set to `side=1.5` without tuning for each case specifically, only `scan=24` we use `side=2.0`.
@@ -107,6 +108,12 @@ The result could be better for more accurate volume selection.
 -----------------------------------------------------------------------
 
 ## TanksAndTemplates
+
+
+
+-----------------------------------------------------------------------
+
+## MipNeRF360
 
 
 -----------------------------------------------------------------------
