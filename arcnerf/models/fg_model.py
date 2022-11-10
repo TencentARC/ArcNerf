@@ -164,10 +164,14 @@ class FgModel(Base3dModel):
         bkg_color = inputs['bkg_color']
 
         # find the near/far/zvals and mask of rays and pts
-        near, far, mask_rays = self.get_near_far_from_rays(inputs)
-        zvals, mask_pts = self.get_zvals_from_near_far(
-            near, far, self.get_n_coarse_sample(), inference_only, rays_o, rays_d
-        )
+        with torch.no_grad():
+            near, far, mask_rays = self.get_near_far_from_rays(inputs)
+            zvals, mask_pts = self.get_zvals_from_near_far(
+                near, far, self.get_n_coarse_sample(), inference_only, rays_o, rays_d
+            )
+
+            # if the scene is so sparse, it incurs a large tensor with sparse input
+            zvals, mask_pts = self.reduce_empty_mask(zvals, mask_pts)
 
         # put them to the input keys
         inputs['zvals'] = zvals
@@ -243,6 +247,19 @@ class FgModel(Base3dModel):
         raise NotImplementedError(
             'You should implement the _forward function that process rays with coarse zvals in child class...'
         )
+
+    @torch.no_grad()
+    def reduce_empty_mask(self, zvals, mask_pts):
+        """The mask_pts are T, T, T, T, F, F, F. If the scene is sparse, it wastes a lots of memory"""
+        if mask_pts is None:
+            return zvals, mask_pts
+
+        # keep the largest sample
+        max_num_pts = int(mask_pts.sum(dim=1).max())
+        zvals = zvals[:, :max_num_pts]
+        mask_pts = mask_pts[:, :max_num_pts]
+
+        return zvals, mask_pts
 
     def get_sigma_radiance_by_mask_pts(
         self, geo_net, radiance_net, rays_o, rays_d, zvals, mask_pts=None, inference_only=False
