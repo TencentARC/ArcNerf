@@ -9,6 +9,10 @@
 #define HOST_DEVICE __host__ __device__
 
 
+////////////////////////////////////////////////////////////////////////////////
+// volume function
+////////////////////////////////////////////////////////////////////////////////
+
 // aabb intersection.
 HOST_DEVICE Vector2f aabb_ray_intersect(
     const Vector3f pos,
@@ -92,7 +96,7 @@ inline HOST_DEVICE bool check_pts_in_aabb(const Vector3f xyz, const Vector3f xyz
 }
 
 
-// update to next voxel find pos. TODO: Check correct for pts not in (0, 1)
+// update to next voxel find pos.
 inline HOST_DEVICE float distance_to_next_voxel(
     const Vector3f pos,
     const Vector3f rays_d,
@@ -127,4 +131,64 @@ inline HOST_DEVICE float advance_to_next_voxel(
 
 	do { t += dt; } while (t < t_target);
 	return t;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// volume function with bitfield.
+////////////////////////////////////////////////////////////////////////////////
+
+// morton3D coord transfer
+inline HOST_DEVICE uint32_t expand_bits(uint32_t v)
+{
+	v = (v * 0x00010001u) & 0xFF0000FFu;
+	v = (v * 0x00000101u) & 0x0F00F00Fu;
+	v = (v * 0x00000011u) & 0xC30C30C3u;
+	v = (v * 0x00000005u) & 0x49249249u;
+	return v;
+}
+
+inline HOST_DEVICE uint32_t morton3D(uint32_t x, uint32_t y, uint32_t z)
+{
+	uint32_t xx = expand_bits(x);
+	uint32_t yy = expand_bits(y);
+	uint32_t zz = expand_bits(z);
+	return xx | (yy << 1) | (zz << 2);
+}
+
+inline HOST_DEVICE uint32_t morton3D_invert(uint32_t x)
+{
+	x = x & 0x49249249;
+	x = (x | (x >> 2)) & 0xc30c30c3;
+	x = (x | (x >> 4)) & 0x0f00f00f;
+	x = (x | (x >> 8)) & 0xff0000ff;
+	x = (x | (x >> 16)) & 0x0000ffff;
+	return x;
+}
+
+inline HOST_DEVICE uint32_t cascaded_grid_idx_at_bit(Vector3f pos, const Vector3f xyz_min, const Vector3f xyz_max, const uint32_t n_grid)
+{
+    Vector3f voxel_size = (xyz_max - xyz_min) / (float)n_grid;
+    Vector3f voxel_idx = (pos - xyz_min).array() / voxel_size.array();
+    Vector3i i = voxel_idx.cast<int>();
+
+    uint32_t idx = morton3D(
+        clamp(i.x(), 0, (int)n_grid - 1),
+        clamp(i.y(), 0, (int)n_grid - 1),
+        clamp(i.z(), 0, (int)n_grid - 1));
+
+    return idx;
+}
+
+// check whether the pts is occupied
+inline HOST_DEVICE bool density_grid_occupied_at_bit(
+    const Vector3f pos,
+    const uint8_t *bitfield,
+    const Vector3f xyz_min,
+    const Vector3f xyz_max,
+    const uint32_t n_grid
+) {
+    uint32_t idx = cascaded_grid_idx_at_bit(pos, xyz_min, xyz_max, n_grid);
+
+    return bitfield[idx / 8] & (1 << (idx % 8));
 }

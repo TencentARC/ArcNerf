@@ -165,6 +165,8 @@ void sparse_volume_sampling_cuda(
    @param: N_pts, max num of sampling pts on each ray.
    @param: dt, fix step length
    @param: aabb_range, bbox range of volume, (2, 3) of xyz_min/max of whole volume
+   @param: n_grid, num of grid
+   @param: bitfield, in (n_grid, n_grid, n_grid) bool tensor
    @param: near_distance, near distance for sampling. By default 0.0.
    @return: zvals, (N_rays, N_pts), sampled points zvals on each rays.
    @return: mask, (N_rays, N_pts), show whether each ray has intersection with the volume, BoolTensor

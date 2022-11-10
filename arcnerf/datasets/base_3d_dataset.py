@@ -215,11 +215,13 @@ class Base3dDataset(BaseDataset):
                 cam_norm_t.append(camera.get_cam_pose_norm())
             max_cam_norm_t = max(cam_norm_t)
 
+            # roughly bounding in the sphere
+            scale = self.cfgs.scale_radius / (max_cam_norm_t * 1.05)
             for camera in self.cameras:
-                camera.rescale_pose(scale=self.cfgs.scale_radius / (max_cam_norm_t * 1.05))
+                camera.rescale_pose(scale=scale)
 
             if len(self.bounds) > 0:
-                self.bounds = [bound / max_cam_norm_t for bound in self.bounds]
+                self.bounds = [bound * scale for bound in self.bounds]
 
         return max_cam_norm_t
 

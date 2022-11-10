@@ -487,12 +487,19 @@ class ArcNerfTrainer(BasicTrainer):
 
         # optimize the model for its bounding structure
         self.model.optimize(epoch)
-        if self.model.get_fg_model().get_obj_bound_type() == 'volume' and \
-                epoch % self.cfgs.progress.epoch_loss == 0:
-            volume = self.model.get_fg_model().get_obj_bound_structure()
-            if volume.get_voxel_bitfield() is not None:
-                occ_ratio = volume.get_n_occupied_voxel() / volume.get_n_voxel()
-                self.logger.add_log('Remaining voxel ratio is {:.2f}%'.format(occ_ratio * 100.0))
+        # show the occ ratio
+        if epoch % self.cfgs.progress.epoch_loss == 0:
+            if self.model.get_fg_model().get_obj_bound_type() == 'volume':
+                volume = self.model.get_fg_model().get_obj_bound_structure()
+                if volume.get_voxel_bitfield() is not None:
+                    occ_ratio = volume.get_n_occupied_voxel() / volume.get_n_voxel()
+                    self.logger.add_log('Remaining voxel ratio is {:.2f}%'.format(occ_ratio * 100.0))
+            elif self.model.get_fg_model().get_obj_bound_type() == 'bitfield':
+                bitfield = self.model.get_fg_model().get_obj_bound_structure()
+                if bitfield is not None:
+                    bit_bound = self.model.get_fg_model().get_obj_bound()
+                    occ_ratio = bit_bound.get_bitfield_count()[1]
+                    self.logger.add_log('Remaining voxel ratio is {:.2f}%'.format(occ_ratio * 100.0))
 
         # remake train dataset train crop
         crop_shuffle = self.train_pipeline.check_crop_shuffle(epoch)

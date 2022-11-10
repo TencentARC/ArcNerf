@@ -96,6 +96,10 @@ The points then will be sampled in remaining voxel. And rays computation can be 
 ![volume_bound](../assets/models/volume_bound.gif)
 ![coarse_volume](../assets/models/coarse_volume.gif)
 
+### BitfieldBound
+This is another version of volumeBound which do not use Volume class but use bitfield as voxel representation introduced in
+`instant-ngp`. It has the same functionality but contains fewer tools for visualizaiton.
+
 ### SphereBound
 It contains a smaller sphere bounding the real object. In sdf modeling like `Neus`, it samples inside such a sphere.
 - origin/radius: The information of the sphere.

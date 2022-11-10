@@ -123,7 +123,6 @@ def sparse_volume_sampling(rays_o, rays_d, near, far, n_pts, dt, aabb_range, n_g
         bitfield: bitfield in (n_grid, n_grid, n_grid) bool tensor
         near_distance: near distance for sampling. By default 0.0.
 
-
     Return:
         zvals: (N_rays, N_pts), sampled points zvals on each rays. At mose n_pts for each ray,
                 but generally it only samples <100, pts in 128*3 sparse volume.

@@ -25,7 +25,7 @@ class VolumeBound(BasicBound):
         # set up the volume
         volume_cfgs = cfgs.volume
         if get_value_from_cfgs_field(volume_cfgs, 'n_grid') is None:
-            cfgs.n_grid = 128
+            volume_cfgs.n_grid = 128
         self.volume = Volume(**volume_cfgs.__dict__)
 
         # set bitfield for pruning

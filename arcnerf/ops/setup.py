@@ -24,6 +24,10 @@ setup(
             name='_volume_func',
             sources=['./src/volume_func/volume_func.cpp', './src/volume_func/volume_func_kernel.cu'],
         ),
+        CUDAExtension(  # bitfield related func
+            name='_bitfield_func',
+            sources=['./src/bitfield_func/bitfield_func.cpp', './src/bitfield_func/bitfield_func_kernel.cu'],
+        ),
     ],
 
     cmdclass={
