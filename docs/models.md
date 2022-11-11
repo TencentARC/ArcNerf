@@ -351,3 +351,4 @@ The model is also able to model foreground together if you set the parameters we
 ### NeRFPP(nerf++)
 The [nerf++](http://arxiv.org/abs/2010.07492) model use same structure of one stage NeRF model to model the background in Multi-Sphere Image(MSI),
 and change input to `(x/r, y/r, z/r, 1/r)` for different radius.
+- n_importance: Like original NeRF, we also allow you to do resampling in the bkg, which improve bkg sample quality.

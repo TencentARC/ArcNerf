@@ -199,6 +199,10 @@ class FullModel(nn.Module):
         """blend fg + bkg for sigma/radiance and re-run ray marching together.
         You must make sure that the sigma can be merged together. Otherwise do not use it(Like sdf method).
         All inputs flatten in (B, x) dim
+
+        NOTICE: We don't suggest blend sigma since it does not have advantage over rgb mode. And sometime
+        the representation of inner/outer sigma are not the same (eg. sdf + density).
+        Not full functionality is provided for sigma mode.
         """
         if any([key.endswith('_coarse') or key.endswith('_fine') for key in fg_output.keys()]):
             return self.blend_two_stage_bkg_sigma(fg_output, bkg_output, inference_only, get_progress)
@@ -231,13 +235,26 @@ class FullModel(nn.Module):
         """
         assert 'progress_trans_shift_coarse' in fg_output, 'You must get_progress for fg_model'
 
-        bkg_lamba_coarse = fg_output['progress_trans_shift_coarse'][:, -1]  # (B,) prob that light pass foreground
-        fg_output['rgb_coarse'] = fg_output['rgb_coarse'] + bkg_lamba_coarse[:, None] * bkg_output['rgb']
-        fg_output['depth_coarse'] = fg_output['depth_coarse'] + bkg_lamba_coarse * bkg_output['depth']
-        if 'rgb_fine' in fg_output:
-            bkg_lamba_fine = fg_output['progress_trans_shift_fine'][:, -1]  # (B,) prob that light pass foreground
-            fg_output['rgb_fine'] = fg_output['rgb_fine'] + bkg_lamba_fine[:, None] * bkg_output['rgb']
-            fg_output['depth_fine'] = fg_output['depth_fine'] + bkg_lamba_fine * bkg_output['depth']
+        if any([key.endswith('_coarse') or key.endswith('_fine') for key in bkg_output.keys()]):  # bkg is two stage
+            bkg_lamba_coarse = fg_output['progress_trans_shift_coarse'][:, -1]  # (B,) prob that light pass foreground
+            fg_output['rgb_coarse'] = fg_output['rgb_coarse'] + bkg_lamba_coarse[:, None] * bkg_output['rgb_coarse']
+            fg_output['depth_coarse'] = fg_output['depth_coarse'] + bkg_lamba_coarse * bkg_output['depth_coarse']
+            if 'rgb_fine' in fg_output:
+                bkg_lamba_fine = fg_output['progress_trans_shift_fine'][:, -1]
+                if 'rgb_fine' in bkg_output:  # merge with fine bkg
+                    fg_output['rgb_fine'] = fg_output['rgb_fine'] + bkg_lamba_fine[:, None] * bkg_output['rgb_fine']
+                    fg_output['depth_fine'] = fg_output['depth_fine'] + bkg_lamba_fine * bkg_output['depth_fine']
+                else:  # merge with coarse bkg
+                    fg_output['rgb_fine'] = fg_output['rgb_fine'] + bkg_lamba_fine[:, None] * bkg_output['rgb_coarse']
+                    fg_output['depth_fine'] = fg_output['depth_fine'] + bkg_lamba_fine * bkg_output['depth_coarse']
+        else:  # bkg one stage
+            bkg_lamba_coarse = fg_output['progress_trans_shift_coarse'][:, -1]  # (B,) prob that light pass foreground
+            fg_output['rgb_coarse'] = fg_output['rgb_coarse'] + bkg_lamba_coarse[:, None] * bkg_output['rgb']
+            fg_output['depth_coarse'] = fg_output['depth_coarse'] + bkg_lamba_coarse * bkg_output['depth']
+            if 'rgb_fine' in fg_output:
+                bkg_lamba_fine = fg_output['progress_trans_shift_fine'][:, -1]  # (B,) prob that light pass foreground
+                fg_output['rgb_fine'] = fg_output['rgb_fine'] + bkg_lamba_fine[:, None] * bkg_output['rgb']
+                fg_output['depth_fine'] = fg_output['depth_fine'] + bkg_lamba_fine * bkg_output['depth']
 
         # keep one set of progress
         fg_output = self.clean_two_stage_progress(fg_output)
@@ -253,8 +270,16 @@ class FullModel(nn.Module):
 
         assert 'progress_trans_shift' in fg_output, 'You must get_progress for fg_model'
         bkg_lamba = fg_output['progress_trans_shift'][:, -1]  # (B,) prob that light passed through foreground
-        fg_output['rgb'] = fg_output['rgb'] + bkg_lamba[:, None] * bkg_output['rgb']
-        fg_output['depth'] = fg_output['depth'] + bkg_lamba * bkg_output['depth']
+        if any([key.endswith('_coarse') or key.endswith('_fine') for key in bkg_output.keys()]):  # bkg is two stage
+            if 'rgb_fine' in bkg_output:  # merge with fine bkg
+                fg_output['rgb'] = fg_output['rgb'] + bkg_lamba[:, None] * bkg_output['rgb_fine']
+                fg_output['depth'] = fg_output['depth'] + bkg_lamba * bkg_output['depth_fine']
+            else:  # merge with coarse bkg
+                fg_output['rgb'] = fg_output['rgb'] + bkg_lamba[:, None] * bkg_output['rgb_coarse']
+                fg_output['depth'] = fg_output['depth'] + bkg_lamba * bkg_output['depth_coarse']
+        else:  # bkg is one stage
+            fg_output['rgb'] = fg_output['rgb'] + bkg_lamba[:, None] * bkg_output['rgb']
+            fg_output['depth'] = fg_output['depth'] + bkg_lamba * bkg_output['depth']
 
         return fg_output
 
@@ -276,7 +301,7 @@ class FullModel(nn.Module):
 
         return final_output
 
-    def prepare_flatten_inputs(self, inputs, inference_only=False):
+    def prepare_flatten_inputs(self, inputs):
         """Prepare the inputs by flatten them from (B, N, ...) to (BN, ...)
 
         Args:
@@ -288,7 +313,6 @@ class FullModel(nn.Module):
                 inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
                 inputs['bounds']: torch.tensor (B, N, 2). zvals near/far bound, optional
                 inputs['bkg_color']: torch.tensor (B, N, 3), random/fix bkg color, optional
-            inference_only: this device whether to use the random bkg_color
 
         Returns:
             flatten_inputs:
@@ -362,29 +386,37 @@ class FullModel(nn.Module):
             If get_progress is True, output will contain keys like 'progress_xx' for xx in ['sigma', 'zvals', etc].
         """
         # prepare flatten inputs
-        flat_inputs, batch_size, n_rays_per_batch = self.prepare_flatten_inputs(inputs, inference_only)
+        flat_inputs, batch_size, n_rays_per_batch = self.prepare_flatten_inputs(inputs)
 
-        # TODO: There could be a bug that foreground model accumulate too many progress and CUDA memory out.
-        # TODO: Check the case of nerf++.
-        get_progress_fg = True if (self.bkg_model is not None) else get_progress  # need the progress to blend
-        fg_output = chunk_processing(
-            self.fg_model.forward, self.fg_model.get_chunk_rays(), False, flat_inputs, inference_only, get_progress_fg,
-            cur_epoch, total_epoch
+        # chunk process fg+bkg function and merge result
+        chunk_rays = self.fg_model.get_chunk_rays()
+        if self.bkg_model is not None:
+            chunk_rays = min(self.fg_model.get_chunk_rays(), self.bkg_model.get_chunk_rays())
+
+        output = chunk_processing(
+            self.process_fg_bkg_model, chunk_rays, False, self.fg_model, self.bkg_model, flat_inputs, inference_only,
+            get_progress, cur_epoch, total_epoch
         )
 
+        # reshape values from (B*N, ...) to (B, N, ...)
+        output = self.reshape_output(output, batch_size, n_rays_per_batch)
+
+        return output
+
+    def process_fg_bkg_model(
+        self, fg_model, bkg_model, flat_inputs, inference_only, get_progress, cur_epoch, total_epoch
+    ):
+        """In case accumulate too many progress output during chunk_process, directly merge the output"""
+        get_progress_fg = True if (bkg_model is not None) else get_progress  # need the progress to blend
+        fg_output = fg_model.forward(flat_inputs, inference_only, get_progress_fg, cur_epoch, total_epoch)
+
         bkg_output = None
-        if self.bkg_model is not None:
-            bkg_output = chunk_processing(
-                self.bkg_model.forward, self.bkg_model.get_chunk_rays(), False, flat_inputs, inference_only, True,
-                cur_epoch, total_epoch
-            )  # bkg model always keep progress item for blending. Will not be saved after merge
+        if bkg_model is not None:  # bkg model always keep progress item for blending. Will not be saved after merge
+            bkg_output = bkg_model.forward(flat_inputs, inference_only, True, cur_epoch, total_epoch)
 
         # merge output and detach progress item
         output = self.blend_output(fg_output, bkg_output, inference_only, get_progress)
         output = self.detach_progress(output)
-
-        # reshape values from (B*N, ...) to (B, N, ...)
-        output = self.reshape_output(output, batch_size, n_rays_per_batch)
 
         return output
 
