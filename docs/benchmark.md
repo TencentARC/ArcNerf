@@ -46,7 +46,7 @@ Our result:
 | 5w  | ~17min  | 35.21 | |
 
 * We found that large lr and loss weight leads to sharp sigma distribution and final PSNR, so we use `lr=1e-1 & loss_weight=3000`.
-* Many factor that could affect the result(Like using `black background` improve PSNR to `~35.6`.)
+* Many factor that could affect the result(Like using `black background` improve PSNR to `~35.78`.)
 * We implement most of the operation in torch rather than Highly optimized CUDA kernels. It is more flexible for experiment but slower in speed.
 * We have another repo contains only the function for instant-ngp. It contains functions for ngp only and gets better result.
 It uses more CUDA implementation from original repo. You can visit [simplengp](https://github.com/TencentARC/simplengp) for more detail and expr log.

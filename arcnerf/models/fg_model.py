@@ -255,7 +255,7 @@ class FgModel(Base3dModel):
             return zvals, mask_pts
 
         # keep the largest sample
-        max_num_pts = int(mask_pts.sum(dim=1).max())
+        max_num_pts = max(1, int(mask_pts.sum(dim=1).max()))
         zvals = zvals[:, :max_num_pts]
         mask_pts = mask_pts[:, :max_num_pts]
 
