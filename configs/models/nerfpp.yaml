@@ -6,8 +6,8 @@ model:
         bounding_radius: 3.0          # bounding ray sampling region
         near: 1.5                     # hardcode near zvals
         # far: 4.0                    # should not set far if background model here
-        n_sample: 64                  # n_sample for zvals sampling
-        n_importance: 128             # n_importance for zvals for hierarchical sampling
+        n_sample: 32                  # n_sample for zvals sampling
+        n_importance: 64              # n_importance for zvals for hierarchical sampling
         inverse_linear: False         # inverse_linear make zvals close to near
         perturb: True                 # perturb zvals interval
         add_inf_z: False              # rgb mode must be False, sigma mode suggest True
@@ -41,6 +41,7 @@ model:
         rays:
             bounding_radius: 3.0          # bounding for outside range
             n_sample: 32                  # n_sample for zvals sampling
+            n_importance: 64              # n_importance for resampling
             perturb: True                 # perturb zvals interval
             add_inf_z: True               # rgb mode, should use True, sigma mode should use False
             noise_std: 1.0                # noise for sigma in training

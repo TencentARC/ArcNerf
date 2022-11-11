@@ -402,7 +402,7 @@ class FgModel(Base3dModel):
         return mask_pts
 
     def optimize(self, cur_epoch=0):
-        """Optimize the obj bounding geometric structure. Support ['volume'] now."""
+        """Optimize the obj bounding geometric structure. Support ['bitfield', 'volume'] now."""
         self.obj_bound.optimize(cur_epoch, self.get_n_coarse_sample(), self.get_est_opacity)
 
     def get_est_opacity(self, dt, pts):

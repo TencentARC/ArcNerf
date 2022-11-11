@@ -14,7 +14,7 @@ Expname are in the format of `{dataset}_{scene}_{model}_{other_settings}`.
 |  NeRF  |configs/expr/NeRF/lego/nerf_lego_nerf.yaml|32.86|https://github.com/yenchenlin/nerf-pytorch|32.3|32.54|  |
 |  NeuS  |configs/expr/NeRF/lego/nerf_lego_neus.yaml|30.81|https://github.com/Totoro97/NeuS| 31.12 |  NA |embed_pts=10 following official repo|
 | VolSDF |configs/expr/NeRF/lego/nerf_lego_volsdf.yaml|28.25| https://github.com/lioryariv/volsdf | 20.77 |NA| Official repo not converge well on lego scene  |
-|MipNeRF |configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml|34.19| https://github.com/google/mipnerf | NA |35.74| TODO: Not fully match up yet|
+|MipNeRF |configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml|35.36| https://github.com/google/mipnerf | NA |35.74| TODO: Not fully match up yet|
 
 * NeRF: We have another repo contains only the function for vanilla nerf. You can visit [simplenerf](https://github.com/TencentARC/simplenerf) for more detail.
 
@@ -43,7 +43,7 @@ Our result:
 | 500 | ~18s | 17.95 | Crop stage, not converge  well|
 | 2k  | ~40s | 30.01 |  |
 | 1w  | ~3min| 33.14 |  |
-| 5w  | ~17min  | 35.21 | |
+| 5w  | ~17min  | 35.38 | |
 
 * We found that large lr and loss weight leads to sharp sigma distribution and final PSNR, so we use `lr=1e-1 & loss_weight=3000`.
 * Many factor that could affect the result(Like using `black background` improve PSNR to `~35.78`.)
@@ -62,7 +62,7 @@ All image with white-bkg, same as the eval in vanilla NeRF.
 |nerf     |   33.30    |   25.11    |   30.47    |   36.73    |   32.86    |   29.87    |   33.24    |   28.70    | | 31.285 |
 |neus     |   31.36    |   24.26    |   25.86    |   36.66    |   30.72    |   29.09    |   30.50    |   26.41    | | 29.358 |
 |mipnerf  |   34.41    |   25.45    |   32.95    |   37.45    |   35.36    |   30.70    |   34.84    |   29.83    | | 32.624 |
-|nerf_ngp |   34.88    |   25.50    |   30.55    |   36.92    |   35.21    |   29.12    |   34.80    |   28.39    | | 31.921 |
+|nerf_ngp |   34.88    |   25.50    |   30.55    |   36.92    |   35.38    |   29.12    |   34.80    |   28.39    | | 31.942 |
 |neus_ngp |   31.64    |   22.81    |   26.05    |   32.09    |   30.51    |   25.29    |   27.54    |   24.19    | | 27.515 |
 
 * The volume in nerf/neus_ngp is simply volume with `side=2.0`. More accurate 3d volume bbox generally leads to better performance.

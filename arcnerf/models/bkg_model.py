@@ -51,6 +51,10 @@ class BkgModel(Base3dModel):
 
         return zvals, radius
 
+    def optimize(self, cur_epoch=0):
+        """Optimize the bkg structure. Support ['multivol'] now."""
+        return
+
 
 @MODEL_REGISTRY.register()
 class NeRFPP(BkgModel):
