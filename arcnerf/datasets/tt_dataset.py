@@ -16,6 +16,7 @@ class TanksAndTemples(Base3dDataset):
     """TanksAndTemples Dataset. Use colmap to process but do not save pointcloud.
     The poses are not that accurate which needs your optimization.
     Ref: https://www.tanksandtemples.org/
+    TODO: Have to use the preprocessed version in nerf++. Original version do not provide intrinsic.
     """
 
     def __init__(self, cfgs, data_dir, mode, transforms):

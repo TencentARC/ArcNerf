@@ -130,7 +130,7 @@ Multiple DenseLayer/SirenLayer. For details, ref to the implementation.
 
 #### TCNN FusedMLP Model
 Same structure with `Linear Network Model`. But multi-layer mlp is replaced by the fusedmlp
-from [tiny-cuda-nn](https://github.com/NVlabs/tiny-cuda-nn). It is must faster than original linear network,
+from [tiny-cuda-nn](https://github.com/NVlabs/tiny-cuda-nn). It is much faster than original linear network,
 but loses flexibility(Only fix neuron size, hard to init the params, hard to modify source code, etc.)
 Specify the type as `FusedMLPGeoNet/FusedMLPRadianceNet`.
 
@@ -352,3 +352,10 @@ The model is also able to model foreground together if you set the parameters we
 The [nerf++](http://arxiv.org/abs/2010.07492) model use same structure of one stage NeRF model to model the background in Multi-Sphere Image(MSI),
 and change input to `(x/r, y/r, z/r, 1/r)` for different radius.
 - n_importance: Like original NeRF, we also allow you to do resampling in the bkg, which improve bkg sample quality.
+
+### Multivol
+The Multivol model is the same from [Instant-ngp](https://arxiv.org/abs/2201.05989) but remove the inner volume to model the background in Multi-Volume structure.
+It uses dense sampling with pruning bitfield, which samples in important area for rendering. It will be good to used hashEncoding introduced in
+`instant-ngp` since the sampled points are in volume range.
+- basic_volume: Compared to `instant-ngp` which uses a fix volume structure, we are free to set the basic_volume and expand by pow of 2 in each
+cascade.
