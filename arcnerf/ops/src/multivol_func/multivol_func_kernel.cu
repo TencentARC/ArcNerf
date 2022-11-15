@@ -78,7 +78,7 @@ __global__ void sparse_sampling_in_multivol_bitfield_cuda_kernel(
                 ++j;
                 t += dt;
             } else {  // advance by min vol size, pos is normed now
-                t = advance_to_next_voxel(t, dt, pos, _rays_d, minvol_xyz_min, minvol_xyz_max, n_grid);
+                t = advance_to_next_voxel_multivol(t, cone_angle, min_step, max_step, pos, _rays_d, minvol_xyz_min, minvol_xyz_max, n_grid);
             }
 
         }

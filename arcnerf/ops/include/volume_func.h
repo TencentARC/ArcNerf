@@ -223,7 +223,7 @@ inline __device__ int mip_from_pos(
 }
 
 
-inline HOST_DEVICE bool cascaded_grid_idx_at_multivol(
+inline HOST_DEVICE uint32_t cascaded_grid_idx_at_multivol(
    Vector3f pos,
    const uint32_t mip,  // should > 0
    const Vector3f xyz_min,  // should be the inner one
@@ -256,7 +256,7 @@ inline HOST_DEVICE uint32_t grid_mip_offset(uint32_t mip, const uint32_t n_grid)
 
 
 inline HOST_DEVICE bool density_grid_occupied_at_multivol(
-    Vector3f pos,
+    Vector3f &pos,
     const uint8_t *bitfield,
     const uint32_t mip,
     const Vector3f xyz_min,  // should be the inner one
@@ -265,10 +265,29 @@ inline HOST_DEVICE bool density_grid_occupied_at_multivol(
 ) {
     uint32_t idx = cascaded_grid_idx_at_multivol(pos, mip, xyz_min, xyz_max, n_grid);
     return bitfield[idx / 8 + grid_mip_offset(mip-1, n_grid) / 8] & (1 << (idx % 8));  // ignore the first level
-
 }
 
 
 inline HOST_DEVICE float calc_dt(float t, float cone_angle, float min_step, float max_step) {
     return clamp(t * cone_angle, min_step, max_step);
+}
+
+
+// update to next voxel
+inline HOST_DEVICE float advance_to_next_voxel_multivol(
+    float t,
+    const float cone_angle,
+    const float min_step,
+    const float max_step,
+    const Vector3f pos,
+    const Vector3f rays_d,
+    const Vector3f xyz_min,
+    const Vector3f xyz_max,
+    const uint32_t n_grid
+) {
+    // Is the distance function works for different res?
+	float t_target = t + distance_to_next_voxel(pos, rays_d, xyz_min, xyz_max, n_grid);
+
+	do { t += calc_dt(t, cone_angle, min_step, max_step); } while (t < t_target);
+	return t;
 }

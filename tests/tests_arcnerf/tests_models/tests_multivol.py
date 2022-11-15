@@ -5,6 +5,7 @@ import os
 import os.path as osp
 
 import numpy as np
+import torch
 
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.geometry.volume import Volume
@@ -71,10 +72,14 @@ class TestNerfPPDict(TestModelDict):
     def plot_bkg_sample_visual(model, feed_in):
         """Plot the visual for outside sampling"""
         # visual plot the sampling in bkg volume
-        n_rays = 16
+        n_rays = 512
         rays_o = feed_in['rays_o'][0, :n_rays]
         rays_d = feed_in['rays_d'][0, :n_rays]
         bkg_model = model.get_bkg_model()
+        # add pruning
+        bkg_model.density_bitfield = torch.randint(
+            low=0, high=255, size=bkg_model.density_bitfield.shape
+        ).type(torch.uint8).to(rays_o.device)
 
         # sample pts
         near, far = bkg_model.get_near_far_from_rays(rays_o, rays_d)
@@ -87,18 +92,19 @@ class TestNerfPPDict(TestModelDict):
         basic_volume = bkg_model.basic_volume
         origin = basic_volume.get_origin()  # (3, )
         n_cascade = bkg_model.n_cascade
-        max_len = [[x * 2**(c - 1) for x in basic_volume.get_len()] for c in range(1, n_cascade)]
+        max_len = [[x * 2**c for x in basic_volume.get_len()] for c in range(1, n_cascade)]
         volumes = [Volume(origin=origin, xyz_len=max_len) for max_len in max_len]
+
         vol_dict = {
             'grid_pts': torch_to_np(basic_volume.get_corner()),  # (8, 3)
             'lines': basic_volume.get_bound_lines(),  # (2*6, 3)
-            'faces': basic_volume.get_bound_faces()  # (3(n+1)n^2, 4, 3)
+            # 'faces': basic_volume.get_bound_faces()  # (3(n+1)n^2, 4, 3)
         }
         for v in volumes:
             vol_dict = {
                 'grid_pts': np.concatenate([vol_dict['grid_pts'], torch_to_np(v.get_corner())], axis=0),
-                'lines': vol_dict['lines'] + v.get_bound_lines(),
-                'faces': vol_dict['faces'] + v.get_bound_faces(),
+                'lines': np.concatenate([vol_dict['lines'], v.get_bound_lines()], axis=0),
+                # 'faces': np.concatenate([vol_dict['faces'], v.get_bound_faces()], axis=0)
             }
 
         file_path = osp.join(RESULT_DIR, 'multivol_outside_sample.png')
