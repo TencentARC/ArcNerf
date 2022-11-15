@@ -4,7 +4,10 @@
 import os
 import os.path as osp
 
+import numpy as np
+
 from arcnerf.geometry.ray import get_ray_points_by_zvals
+from arcnerf.geometry.volume import Volume
 from arcnerf.visual.plot_3d import draw_3d_components
 from tests.tests_arcnerf.tests_models import TestModelDict
 from common.utils.cfgs_utils import get_value_from_cfgs_field
@@ -17,21 +20,13 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 class TestNerfPPDict(TestModelDict):
 
     def tests_model(self):
-        cfgs, logger = self.get_cfgs_logger('nerfpp.yaml', 'nerfpp.txt')
+        cfgs, logger = self.get_cfgs_logger('nerf_multivol.yaml', 'nerf_multivol.txt')
         model = self.build_model_to_cuda(cfgs, logger)
 
         feed_in = self.create_feed_in_to_cuda()
         self.log_model_info(logger, model, feed_in, cfgs)
 
         # without obj_bound structure
-        self.run_model_tests(model, feed_in, cfgs)
-
-        # add volume and test
-        model = self.add_volume_structure_to_fg_model(model)
-        self.run_model_tests(model, feed_in, cfgs)
-
-        # add sphere and test
-        model = self.add_sphere_structure_to_fg_model(model)
         self.run_model_tests(model, feed_in, cfgs)
 
     def run_model_tests(self, model, feed_in, cfgs):
@@ -75,23 +70,45 @@ class TestNerfPPDict(TestModelDict):
     @staticmethod
     def plot_bkg_sample_visual(model, feed_in):
         """Plot the visual for outside sampling"""
-        # visual plot the sampling in bkg
-        rays_o = feed_in['rays_o'][0, :1, :]  # keep 1 rays
-        rays_d = feed_in['rays_d'][0, :1, :]
-        zvals, radius = model.get_bkg_model().get_zvals_outside_sphere(
-            rays_o, rays_d, inference_only=True
-        )  # (1, n_pts, 1)
-        file_path = osp.join(RESULT_DIR, 'nerfpp_outside_sample.png')
-        # keep some sphere for visual only
-        max_sample = 16
-        radius = radius[0, :, 0].tolist()[:max_sample]
-        pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)[0][:max_sample]
+        # visual plot the sampling in bkg volume
+        n_rays = 16
+        rays_o = feed_in['rays_o'][0, :n_rays]
+        rays_d = feed_in['rays_d'][0, :n_rays]
+        bkg_model = model.get_bkg_model()
+
+        # sample pts
+        near, far = bkg_model.get_near_far_from_rays(rays_o, rays_d)
+        n_pts = 1024
+        zvals, mask_pts = bkg_model.get_zvals_from_near_far(near, far, n_pts, rays_o, rays_d)
+        pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (N_rays, N_pts, 3)
+        valid_pts = pts[mask_pts]
+
+        # draw multi-res volume
+        basic_volume = bkg_model.basic_volume
+        origin = basic_volume.get_origin()  # (3, )
+        n_cascade = bkg_model.n_cascade
+        max_len = [[x * 2**(c - 1) for x in basic_volume.get_len()] for c in range(1, n_cascade)]
+        volumes = [Volume(origin=origin, xyz_len=max_len) for max_len in max_len]
+        vol_dict = {
+            'grid_pts': torch_to_np(basic_volume.get_corner()),  # (8, 3)
+            'lines': basic_volume.get_bound_lines(),  # (2*6, 3)
+            'faces': basic_volume.get_bound_faces()  # (3(n+1)n^2, 4, 3)
+        }
+        for v in volumes:
+            vol_dict = {
+                'grid_pts': np.concatenate([vol_dict['grid_pts'], torch_to_np(v.get_corner())], axis=0),
+                'lines': vol_dict['lines'] + v.get_bound_lines(),
+                'faces': vol_dict['faces'] + v.get_bound_faces(),
+            }
+
+        file_path = osp.join(RESULT_DIR, 'multivol_outside_sample.png')
         draw_3d_components(
-            points=torch_to_np(pts),
-            rays=[torch_to_np(rays_o[:max_sample]), torch_to_np(rays_d[:max_sample])],
-            ray_linewidth=5,
-            sphere_radius=radius,
+            points=torch_to_np(valid_pts),
+            point_size=10,
+            rays=[torch_to_np(rays_o), torch_to_np(rays_d)],
+            volume=vol_dict,
+            title='Sampling in multi-res vol, the inner vol should be skipped',
             save_path=file_path,
             plotly=True,
-            plotly_html=True
+            plotly_html=True,
         )

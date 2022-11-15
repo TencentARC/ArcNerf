@@ -51,6 +51,30 @@ class BkgModel(Base3dModel):
 
         return zvals, radius
 
+    def read_optim_cfgs(self):
+        """Read optim params under model.obj_bound. Prams controls optimization"""
+        optim_cfgs = self.cfgs.model.optim
+        params = {
+            'near_distance': get_value_from_cfgs_field(optim_cfgs, 'near_distance', 0.0),
+            'epoch_optim': get_value_from_cfgs_field(optim_cfgs, 'epoch_optim', 16),  # You must optimize the volume
+            'epoch_optim_warmup': get_value_from_cfgs_field(optim_cfgs, 'epoch_optim_warmup', 256),
+            'ema_optim_decay': get_value_from_cfgs_field(optim_cfgs, 'ema_optim_decay', 0.95),
+            'opa_thres': get_value_from_cfgs_field(optim_cfgs, 'opa_thres', 0.01)
+        }
+
+        return params
+
+    def get_optim_cfgs(self, key=None):
+        """Get optim cfgs by optional key"""
+        if key is None:
+            return self.optim_cfgs
+
+        return self.optim_cfgs[key]
+
+    def set_optim_cfgs(self, key, value):
+        """Set optim cfgs by key"""
+        self.optim_cfgs[key] = value
+
     def optimize(self, cur_epoch=0):
         """Optimize the bkg structure. Support ['multivol'] now."""
         return

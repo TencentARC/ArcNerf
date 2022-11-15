@@ -15,7 +15,7 @@ class SphereBound(BasicBound):
         assert valid_key_in_cfgs(cfgs, 'sphere'), 'You must have sphere in the cfgs'
 
         self.cfgs = cfgs
-        self.read_optim_cfgs()
+        self.optim_cfgs = self.read_optim_cfgs()
 
         # set up the sphere
         sphere_cfgs = cfgs.sphere

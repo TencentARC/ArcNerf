@@ -192,3 +192,83 @@ inline HOST_DEVICE bool density_grid_occupied_at_bit(
 
     return bitfield[idx / 8] & (1 << (idx % 8));
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// specially for multi-res vol excluding the inner vol
+////////////////////////////////////////////////////////////////////////////////
+
+// mip level in multi-res vol
+inline __device__ int mip_from_pos(
+    const Vector3f &pos,
+    const Vector3f xyz_min,  // should be the inner one
+    const Vector3f xyz_max,
+    const uint32_t n_cascades
+) {
+    int exponent;
+    int exponent_x;
+    int exponent_y;
+    int exponent_z;
+    // The volume sides are not equal, need to check
+    Vector3f xyz_center = (xyz_min + xyz_max) / 2.0;
+    Vector3f xyz_half_len = (xyz_max - xyz_min) / 2.0;
+    Vector3f absval_xyz = (pos - xyz_center).cwiseAbs().cwiseProduct(xyz_half_len.cwiseInverse());  // Norm by side
+
+    frexpf(absval_xyz.x(), &exponent_x);
+    frexpf(absval_xyz.y(), &exponent_y);
+    frexpf(absval_xyz.z(), &exponent_z);
+    // Get the max one
+    exponent = max(max(exponent_x, exponent_y), exponent_z);
+
+    return min(n_cascades - 1, max(0, exponent));
+}
+
+
+inline HOST_DEVICE bool cascaded_grid_idx_at_multivol(
+   Vector3f pos,
+   const uint32_t mip,  // should > 0
+   const Vector3f xyz_min,  // should be the inner one
+   const Vector3f xyz_max,
+   const uint32_t n_grid
+) {
+    // Norm into the inner volume
+    Vector3f xyz_center = (xyz_min + xyz_max) / 2.0;
+    float mip_scale = scalbnf(1.0f, -mip);
+    pos -= xyz_center;
+    pos *= mip_scale;
+    pos += xyz_center;
+
+    Vector3f voxel_size = (xyz_max - xyz_min) / (float)n_grid;
+    Vector3f voxel_idx = (pos - xyz_min).array() / voxel_size.array();
+    Vector3i i = voxel_idx.cast<int>();
+
+    uint32_t idx = morton3D(
+        clamp(i.x(), 0, (int)n_grid - 1),
+        clamp(i.y(), 0, (int)n_grid - 1),
+        clamp(i.z(), 0, (int)n_grid - 1));
+
+    return idx;
+}
+
+
+inline HOST_DEVICE uint32_t grid_mip_offset(uint32_t mip, const uint32_t n_grid) {
+	return (n_grid * n_grid * n_grid) * mip;
+}
+
+
+inline HOST_DEVICE bool density_grid_occupied_at_multivol(
+    Vector3f pos,
+    const uint8_t *bitfield,
+    const uint32_t mip,
+    const Vector3f xyz_min,  // should be the inner one
+    const Vector3f xyz_max,
+    const uint32_t n_grid
+) {
+    uint32_t idx = cascaded_grid_idx_at_multivol(pos, mip, xyz_min, xyz_max, n_grid);
+    return bitfield[idx / 8 + grid_mip_offset(mip-1, n_grid) / 8] & (1 << (idx % 8));  // ignore the first level
+
+}
+
+
+inline HOST_DEVICE float calc_dt(float t, float cone_angle, float min_step, float max_step) {
+    return clamp(t * cone_angle, min_step, max_step);
+}

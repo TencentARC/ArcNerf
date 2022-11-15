@@ -13,7 +13,14 @@ class Volume(nn.Module):
     """A volume with customized operation"""
 
     def __init__(
-        self, n_grid=None, origin=(0, 0, 0), side=None, xyz_len=None, dtype=torch.float32, requires_grad=False
+        self,
+        n_grid=None,
+        origin=(0, 0, 0),
+        side=None,
+        xyz_len=None,
+        dtype=torch.float32,
+        requires_grad=False,
+        **kwargs
     ):
         """
         Args:

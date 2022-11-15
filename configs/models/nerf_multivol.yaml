@@ -72,9 +72,9 @@ model:
             opa_thres: 0.01                 # threshold to filter voxel
             ema_optim_decay: 0.95           # decay the density
         rays:
-            bounding_radius: 3.0          # bounding for outside range
             n_sample: 512                 # n_sample for zvals sampling
             n_importance: 0               # no resample
+            cone_angle: 0.00390625        # bkg use stepping sampling
             perturb: True                 # perturb zvals interval
             add_inf_z: True               # rgb mode, should use True, sigma mode should use False
             noise_std: 1.0                # noise for sigma in training

@@ -20,7 +20,7 @@ class VolumeBound(BasicBound):
         assert valid_key_in_cfgs(cfgs, 'volume'), 'You must have volume in the cfgs'
 
         self.cfgs = cfgs
-        self.read_optim_cfgs()
+        self.optim_cfgs = self.read_optim_cfgs()
 
         # set up the volume
         volume_cfgs = cfgs.volume
@@ -81,10 +81,9 @@ class VolumeBound(BasicBound):
         rays_o/rays_d is for coarse sampling in the volume
 
         Returns:
-            near, far: torch.tensor (B, 1) each
+            zvals: torch.tensor (B, 1) of zvals
             mask_pts: torch.tensor (B, n_pts), each pts validity on each ray.
                     This helps the following network reduces duplicated computation.
-
         """
         if self.get_optim_cfgs('epoch_optim') is not None and self.get_optim_cfgs('ray_sample_acc'):
             return self.get_zvals_from_sparse_volume(

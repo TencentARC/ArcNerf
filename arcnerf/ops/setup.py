@@ -28,6 +28,10 @@ setup(
             name='_bitfield_func',
             sources=['./src/bitfield_func/bitfield_func.cpp', './src/bitfield_func/bitfield_func_kernel.cu'],
         ),
+        CUDAExtension(  # multivol bitfield related func
+            name='_multivol_func',
+            sources=['./src/multivol_func/multivol_func.cpp', './src/multivol_func/multivol_func_kernel.cu'],
+        ),
     ],
 
     cmdclass={

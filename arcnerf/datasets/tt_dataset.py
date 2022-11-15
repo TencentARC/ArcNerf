@@ -94,10 +94,12 @@ class TanksAndTemples(Base3dDataset):
         return cameras
 
     def get_est_intrinsic(self):
-        """Get intrinsic (3, 3) from hwf"""
+        """Get intrinsic (3, 3) from hwf
+        TanksAndTemplates do not provide exact focal, the num is estimated and affects the result.
+        """
         intrinsic = np.eye(3)
-        intrinsic[0, 0] = 0.7 * self.W  # approximate focal
-        intrinsic[1, 1] = 0.7 * self.W
+        intrinsic[0, 0] = 0.59365 * self.W  # approximate focal
+        intrinsic[1, 1] = 0.59365 * self.W
         intrinsic[0, 2] = self.W / 2.0
         intrinsic[1, 2] = self.H / 2.0
 

@@ -24,7 +24,7 @@ class BitfieldBound(BasicBound):
         assert CUDA_BACKEND_AVAILABLE, 'bitfield require CUDA functionality'
 
         self.cfgs = cfgs
-        self.read_optim_cfgs()
+        self.optim_cfgs = self.read_optim_cfgs()
 
         # set up the volume
         bitfield_cfgs = cfgs.bitfield
@@ -93,10 +93,9 @@ class BitfieldBound(BasicBound):
         """Sample in the density bitfield.
 
         Returns:
-            near, far: torch.tensor (B, 1) each
+            zvals: torch.tensor (B, 1) of zvals
             mask_pts: torch.tensor (B, n_pts), each pts validity on each ray.
                     This helps the following network reduces duplicated computation.
-
         """
         const_dt = self.volume.get_diag_len() / n_pts
         zvals, mask_pts = sparse_volume_sampling_bit(

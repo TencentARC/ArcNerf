@@ -255,7 +255,9 @@ def sphere_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, radius: 
     return near, far, pts, mask
 
 
-def aabb_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, aabb_range: torch.Tensor, eps=1e-7):
+def aabb_ray_intersection(
+    rays_o: torch.Tensor, rays_d: torch.Tensor, aabb_range: torch.Tensor, eps=1e-7, force_torch=False
+):
     """Get intersection of ray with volume outside surface and the near/far zvals.
     This will be 6 cases: (1)outside no intersection -> near/far: 0, mask = 0
                           (2)outside 1 intersection  -> near = far, mask = 1
@@ -271,6 +273,7 @@ def aabb_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, aabb_range
         rays_d: ray direction, assume normalized, (N_rays, 3)
         aabb_range: bbox range of volume, (N_v, 3, 2) of xyz_min/max of each volume
         eps: error threshold for parallel comparison, by default 1e-7
+        force_torch: Whether to use the torch version. The torch version seems to be correct for all case.
 
     Returns:
         near: near intersection zvals. (N_rays, N_v)
@@ -286,7 +289,7 @@ def aabb_ray_intersection(rays_o: torch.Tensor, rays_d: torch.Tensor, aabb_range
     n_volume = aabb_range.shape[0]
     assert aabb_range.shape[1] == 3 and aabb_range.shape[2] == 2, 'AABB range must be (N, 3, 2)'
 
-    if CUDA_BACKEND_AVAILABLE and rays_o.is_cuda:
+    if not force_torch and CUDA_BACKEND_AVAILABLE and rays_o.is_cuda:
         near, far, pts, mask = ray_aabb_intersection_cuda(rays_o, rays_d, aabb_range)
     else:
         near = torch.zeros((n_rays * n_volume, ), dtype=dtype, device=device)  # (N_rays*N_v,)
