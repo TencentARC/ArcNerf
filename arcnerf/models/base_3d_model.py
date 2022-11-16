@@ -356,3 +356,26 @@ class Base3dModel(BaseModel):
         }
 
         return output
+
+    def get_est_opacity(self, dt, pts):
+        """Get the estimated opacity at certain pts. This method is only for fg_model.
+        In density model, when density is high, opacity = 1 - exp(-sigma*dt), when sigma is large, opacity is large.
+        You have to rewrite this function in sdf-like models
+
+        For opacity calculation:
+            - in instant-ngp, the opacity is used as `density * dt`,
+            - you can also used `1.0 - torch.exp(-torch.relu(density) * dt)` as its real definition.
+
+        Args:
+            dt: the dt used for calculated
+            pts: the pts in the field. (B, 3) xyz position. Need geometric model to process
+
+        Returns:
+            opacity: (B,) opacity. In density model, opacity = 1 - exp(-sigma*dt)
+                                   For sdf model,  opacity = 1 - exp(-sdf_to_sigma(sdf)*dt)
+            When opacity is large(Than some thresold), pts can be considered as in the object.
+        """
+        density = self.forward_pts(pts)  # (B,)
+        opacity = density * dt  # (B,)
+
+        return opacity

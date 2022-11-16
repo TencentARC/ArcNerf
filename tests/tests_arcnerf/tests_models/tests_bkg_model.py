@@ -16,14 +16,23 @@ class TestBkgDict(TestModelDict):
         self.log_model_info(logger, model, feed_in, cfgs)
 
         # test forward
-        self._test_forward(model, feed_in)
+        self._test_forward(model, feed_in, '_coarse')
+
+        if cfgs.model.rays.n_importance > 0:
+            self._test_forward(model, feed_in, '_fine')
 
         # test inference only
         self._test_forward_inference_only(model, feed_in)
 
         # test_get_progress
         n_sample = cfgs.model.rays.n_sample
-        progress_shape = (self.batch_size, self.n_rays, n_sample if cfgs.model.rays.add_inf_z else n_sample - 1)
+        n_importance = cfgs.model.rays.n_importance
+        n_total = n_sample + n_importance
+        add_inf_z = cfgs.model.rays.add_inf_z
+        if n_importance > 0:
+            progress_shape = (self.batch_size, self.n_rays, n_total if add_inf_z else n_total - 1)
+        else:
+            progress_shape = (self.batch_size, self.n_rays, n_sample if add_inf_z else n_sample - 1)
         self._test_forward_progress(model, feed_in, progress_shape)
 
         # direct pts/view

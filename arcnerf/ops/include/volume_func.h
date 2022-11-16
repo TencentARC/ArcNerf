@@ -209,8 +209,8 @@ inline __device__ int mip_from_pos(
     int exponent_y;
     int exponent_z;
     // The volume sides are not equal, need to check
-    Vector3f xyz_center = (xyz_min + xyz_max) / 2.0;
-    Vector3f xyz_half_len = (xyz_max - xyz_min) / 2.0;
+    Vector3f xyz_center = (xyz_min + xyz_max) / 2.0f;
+    Vector3f xyz_half_len = (xyz_max - xyz_min) / 2.0f;
     Vector3f absval_xyz = (pos - xyz_center).cwiseAbs().cwiseProduct(xyz_half_len.cwiseInverse());  // Norm by side
 
     frexpf(absval_xyz.x(), &exponent_x);

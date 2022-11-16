@@ -84,3 +84,53 @@ def sparse_sampling_in_multivol_bitfield(
         rays_o, rays_d, near, far, n_pts, cone_angle, min_step, max_step, min_aabb_range, aabb_range, n_grid, n_cascade,
         bitfield, near_distance
     )
+
+
+# -------------------------------------------------- ------------------------------------ #
+
+
+class GenerateGridSamples(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, density_grid, n_elements, aabb_range, density_grid_ema_step, n_cascade, n_grid, thresh):
+        device = density_grid.device
+        positions_uniform = torch.empty((n_elements, 3), dtype=density_grid.dtype, device=device)
+        indices_uniform = torch.empty((n_elements, ), dtype=torch.int32, device=device)
+        aabb_range = torch.permute(aabb_range, (1, 0)).contiguous()  # (2, 3)
+
+        _multivol_func.generate_grid_samples_multivol(
+            density_grid, density_grid_ema_step, n_elements, aabb_range, n_cascade, n_grid, thresh, positions_uniform,
+            indices_uniform
+        )
+
+        return positions_uniform, indices_uniform
+
+
+@torch.no_grad()
+def generate_grid_samples_multivol(
+    density_grid, n_elements, aabb_range, density_grid_ema_step, n_cascade, thresh, n_grid
+):
+    """Generate grid samples in each voxel for multivol excluding the inner one"""
+    return GenerateGridSamples.apply(
+        density_grid, n_elements, aabb_range, density_grid_ema_step, n_cascade, thresh, n_grid
+    )
+
+
+# -------------------------------------------------- ------------------------------------ #
+
+
+class UpdateBitfield(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, density_grid, density_grid_mean, density_grid_bitfield, thres, n_grid, n_cascade):
+        _multivol_func.update_bitfield_multivol(
+            density_grid, density_grid_mean, density_grid_bitfield, thres, n_grid, n_cascade
+        )
+
+        return density_grid_bitfield
+
+
+@torch.no_grad()
+def update_bitfield_multivol(density_grid, density_grid_mean, density_grid_bitfield, thres, n_grid, n_cascade):
+    """Update density bitfield by density value"""
+    return UpdateBitfield.apply(density_grid, density_grid_mean, density_grid_bitfield, thres, n_grid, n_cascade)

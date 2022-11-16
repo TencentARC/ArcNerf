@@ -161,5 +161,143 @@ void sparse_sampling_in_multivol_bitfield_cuda(
 
 }
 
+// -------------------------------------------------- ------------------------------------ //
+
+
+__global__ void generate_grid_samples_multivol_cuda_kernel(
+    const uint32_t n_elements,
+    const Vector3f *__restrict__ aabb_range,
+    default_rng_t rng,
+    const uint32_t step,
+    const float *__restrict__ grid_in,
+    Vector3f *__restrict__ out,
+    uint32_t *__restrict__ indices,
+    uint32_t n_cascades,
+    uint32_t n_grid,
+    const float thresh)
+{
+    const uint32_t i = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (i >= n_elements)
+        return;
+
+    // 1 random number to select the level, 3 to select the position.
+    rng.advance(i * 4);
+   uint32_t level = 0;
+    while (level == 0) {  // ignore the inner one
+        level = (uint32_t)(random_val(rng) * n_cascades) % n_cascades;
+    }
+
+    uint32_t n_grid_per_level = n_grid * n_grid * n_grid;
+
+    // Select grid cell that has density
+    uint32_t idx;
+    for (uint32_t j = 0; j < 10; ++j)
+    {
+        idx = ((i + step * n_elements) * 56924617 + j * 19349663 + 96925573) % n_grid_per_level;
+        idx += (level - 1) * n_grid_per_level;  // The first level do not exist
+        if (grid_in[idx] > thresh)
+        {
+            break;
+        }
+    }
+
+    // Random position within that cellq
+    uint32_t pos_idx = idx % n_grid_per_level;
+    uint32_t x = morton3D_invert(pos_idx >> 0);
+    uint32_t y = morton3D_invert(pos_idx >> 1);
+    uint32_t z = morton3D_invert(pos_idx >> 2);
+
+    // add noise inside voxel, and scale up
+    Vector3f xyz_center = (aabb_range[0] + aabb_range[1]) / 2.0f;
+    Vector3f xyz_len = aabb_range[1] - aabb_range[0];
+    Eigen::Vector3f pos = (Eigen::Vector3f{(float)x, (float)y, (float)z} + random_val_3d(rng)) / n_grid;  // (0, 1)
+    pos = pos - Eigen::Vector3f::Constant(0.5f);  // (-0.5, 0.5)
+    pos = pos.cwiseProduct(xyz_len) * scalbnf(1.0f, level) + xyz_center;
+
+    out[i] = pos;
+    indices[i] = idx;
+};
+
+void generate_grid_samples_multivol_cuda(
+        const torch::Tensor density_grid,
+        const int density_grid_ema_step,
+        const int n_elements,
+        const torch::Tensor aabb_range,
+        const int n_cascade,
+        const int n_grid,
+        const float thresh,
+        torch::Tensor density_grid_positions_uniform,
+        torch::Tensor density_grid_indices_uniform) {
+
+    cudaStream_t stream = 0;
+
+    // input value
+    float* density_grid_p = (float*)density_grid.data_ptr();
+    Vector3f* aabb_range_p = (Vector3f*)aabb_range.data_ptr();
+
+    // output value
+    uint32_t* density_grid_indices_p = (uint32_t*)density_grid_indices_uniform.data_ptr();
+    Vector3f* density_grid_positions_uniform_p = (Vector3f*)density_grid_positions_uniform.data_ptr();
+
+    linear_kernel(generate_grid_samples_multivol_cuda_kernel, 0, stream,
+        n_elements, aabb_range_p, rng, (uint32_t)density_grid_ema_step, density_grid_p,
+        density_grid_positions_uniform_p, density_grid_indices_p,
+        (uint32_t)n_cascade, (uint32_t)n_grid, thresh);
+
+    rng.advance();
+    cudaDeviceSynchronize();
+}
+
+
 
 // -------------------------------------------------- ------------------------------------ //
+
+
+__global__ void grid_to_bitfield(
+    const uint32_t n_elements,
+    const float *__restrict__ grid,
+    uint8_t *__restrict__ grid_bitfield,
+    const float mean_density,
+    const float opa_thres)
+{
+    const uint32_t i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i >= n_elements)
+        return;
+
+    uint8_t bits = 0;
+
+    float thresh = opa_thres < mean_density ? opa_thres : mean_density;
+
+    #pragma unroll
+    for (uint8_t j = 0; j < 8; ++j)
+    {
+        bits |= grid[i * 8 + j] > thresh ? ((uint8_t)1 << j) : 0;
+    }
+
+    grid_bitfield[i] = bits;
+}
+
+void update_bitfield_multivol_cuda(
+    const torch::Tensor density_grid,
+    const float density_grid_mean,
+    torch::Tensor density_grid_bitfield,
+    const float thres,
+    const int n_grid,
+    const int n_cascade) {
+
+    cudaStream_t stream=0;
+    // input
+    float* density_grid_p = (float*)density_grid.data_ptr();
+    // output
+    uint8_t* density_grid_bitfield_p = (uint8_t*)density_grid_bitfield.data_ptr();
+
+    const uint32_t u_n_grid = (uint32_t)n_grid;
+    const uint32_t n_elements = u_n_grid * u_n_grid * u_n_grid;
+    const uint32_t u_n_cascades = (uint32_t)n_cascade;
+
+    linear_kernel(grid_to_bitfield, 0, stream, n_elements / 8 * (u_n_cascades-1),
+        density_grid_p, density_grid_bitfield_p, density_grid_mean, thres);
+
+    cudaDeviceSynchronize();
+}

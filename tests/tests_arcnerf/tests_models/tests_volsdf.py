@@ -30,7 +30,7 @@ class TestVolsdfDict(TestModelDict):
         self.log_model_info(logger, model, feed_in, cfgs)
 
         # without obj_bound structure
-        self.run_model_tests(model, feed_in, cfgs)
+        self.run_model_tests(model, feed_in, cfgs, check_progress=True)
 
         # add volume and test
         model = self.add_volume_structure_to_fg_model(model)
@@ -40,7 +40,7 @@ class TestVolsdfDict(TestModelDict):
         model = self.add_sphere_structure_to_fg_model(model)
         self.run_model_tests(model, feed_in, cfgs)
 
-    def run_model_tests(self, model, feed_in, cfgs):
+    def run_model_tests(self, model, feed_in, cfgs, check_progress=False):
         # test forward
         self._test_forward(model, feed_in, extra_keys=['normal'], extra_bn3=[True])
 
@@ -67,9 +67,11 @@ class TestVolsdfDict(TestModelDict):
         self.assertEqual(zvals.shape, (self.batch_size * self.n_rays, n_total))
         self.assertEqual(zvals_surface.shape, (self.batch_size * self.n_rays, 1))
 
-        # get progress
-        progress_shape = (self.batch_size, self.n_rays, n_total - 1)
-        self._test_forward_progress(model, feed_in, progress_shape)
+        # check only when not using fg bounding structure
+        if check_progress:
+            # get progress
+            progress_shape = (self.batch_size, self.n_rays, n_total - 1)
+            self._test_forward_progress(model, feed_in, progress_shape)
 
         # direct inference
         pts, view_dir = self.create_pts_dir_to_cuda()

@@ -167,7 +167,7 @@ class BitfieldBound(BasicBound):
         scale = self.volume.get_range()[:, 1] - self.volume.get_range()[:, 0]  # (3,)
         pos_sample = pos_sample * scale[None] + self.volume.get_range()[:, 0][None]
 
-        # get the opacity by call the funcition
+        # get the opacity by call the function
         dt = self.volume.get_diag_len() / float(n_pts)  # only consider n coarse sample pts
         opacity = get_est_opacity(dt, pos_sample)  # (N,)
 

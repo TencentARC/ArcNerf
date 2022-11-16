@@ -29,7 +29,7 @@ class TestNerfDict(TestModelDict):
             model = self.add_sphere_structure_to_fg_model(model)
             self.run_model_tests(model, feed_in, cfgs)
 
-    def run_model_tests(self, model, feed_in, cfgs):
+    def run_model_tests(self, model, feed_in, cfgs, check_progress=False):
         # test forward
         self._test_forward(model, feed_in, '_coarse')
 
@@ -39,16 +39,18 @@ class TestNerfDict(TestModelDict):
         # inference only
         self._test_forward_inference_only(model, feed_in)
 
-        # get progress
-        n_sample = cfgs.model.rays.n_sample
-        n_importance = cfgs.model.rays.n_importance
-        n_total = n_sample + n_importance
-        add_inf_z = cfgs.model.rays.add_inf_z
-        if n_importance > 0:
-            progress_shape = (self.batch_size, self.n_rays, n_total if add_inf_z else n_total - 1)
-        else:
-            progress_shape = (self.batch_size, self.n_rays, n_sample if add_inf_z else n_sample - 1)
-        self._test_forward_progress(model, feed_in, progress_shape)
+        # check only when not using fg bounding structure
+        if check_progress:
+            # get progress
+            n_sample = cfgs.model.rays.n_sample
+            n_importance = cfgs.model.rays.n_importance
+            n_total = n_sample + n_importance
+            add_inf_z = cfgs.model.rays.add_inf_z
+            if n_importance > 0:
+                progress_shape = (self.batch_size, self.n_rays, n_total if add_inf_z else n_total - 1)
+            else:
+                progress_shape = (self.batch_size, self.n_rays, n_sample if add_inf_z else n_sample - 1)
+            self._test_forward_progress(model, feed_in, progress_shape)
 
         # direct pts/view
         pts, view_dir = self.create_pts_dir_to_cuda()

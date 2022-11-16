@@ -455,8 +455,8 @@ def sample_cdf(bins: torch.Tensor, cdf: torch.Tensor, n_sample, det=False, eps=1
 
     # inverse cdf, get index
     inds = torch.searchsorted(cdf.detach(), u, right=True)  # (B, n_sample)
-    below = torch.clamp_min(inds - 1, 0)
-    above = torch.clamp_max(inds, n_pts - 1)
+    below = torch.clamp(inds - 1, 0, n_pts - 1)
+    above = torch.clamp(inds, 0, n_pts - 1)
     inds_g = torch.stack([below, above], -1).view(-1, 2 * n_sample)  # (B, n_sample*2)
 
     cdf_g = torch.gather(cdf, 1, inds_g).view(-1, n_sample, 2)

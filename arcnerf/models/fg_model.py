@@ -254,8 +254,8 @@ class FgModel(Base3dModel):
         if mask_pts is None:
             return zvals, mask_pts
 
-        # keep the largest sample
-        max_num_pts = max(1, int(mask_pts.sum(dim=1).max()))
+        # keep the largest sample, at least 2 for resampling
+        max_num_pts = max(2, int(mask_pts.sum(dim=1).max()))
         zvals = zvals[:, :max_num_pts]
         mask_pts = mask_pts[:, :max_num_pts]
 
@@ -373,7 +373,11 @@ class FgModel(Base3dModel):
                         out_tensor = -torch.ones(new_shape, dtype=dtype, device=device)  # make it outside
                         out_tensor[mask] = v
                         output[k] = out_tensor
-                    else:  # for all `sigma`/`zvals`/`alpha`/`trans_shift`/`weights`/`radiance`, they are all zeros
+                    elif 'trans_shift' in k:
+                        out_tensor = torch.ones(new_shape, dtype=dtype, device=device)  # trans_shift should be 1
+                        out_tensor[mask] = v
+                        output[k] = out_tensor
+                    else:  # for all `sigma`/`zvals`/`alpha`/`weights`/`radiance`, they are all zeros,
                         out_tensor = torch.zeros(new_shape, dtype=dtype, device=device)
                         out_tensor[mask] = v
                         output[k] = out_tensor
@@ -404,29 +408,6 @@ class FgModel(Base3dModel):
     def optimize(self, cur_epoch=0):
         """Optimize the obj bounding geometric structure. Support ['bitfield', 'volume'] now."""
         self.obj_bound.optimize(cur_epoch, self.get_n_coarse_sample(), self.get_est_opacity)
-
-    def get_est_opacity(self, dt, pts):
-        """Get the estimated opacity at certain pts. This method is only for fg_model.
-        In density model, when density is high, opacity = 1 - exp(-sigma*dt), when sigma is large, opacity is large.
-        You have to rewrite this function in sdf-like models
-
-        For opacity calculation:
-            - in instant-ngp, the opacity is used as `density * dt`,
-            - you can also used `1.0 - torch.exp(-torch.relu(density) * dt)` as its real definition.
-
-        Args:
-            dt: the dt used for calculated
-            pts: the pts in the field. (B, 3) xyz position. Need geometric model to process
-
-        Returns:
-            opacity: (B,) opacity. In density model, opacity = 1 - exp(-sigma*dt)
-                                   For sdf model,  opacity = 1 - exp(-sdf_to_sigma(sdf)*dt)
-            When opacity is large(Than some thresold), pts can be considered as in the object.
-        """
-        density = self.forward_pts(pts)  # (B,)
-        opacity = density * dt  # (B,)
-
-        return opacity
 
     def surface_render(
         self, inputs, method='sphere_tracing', n_step=128, n_iter=100, threshold=0.01, level=50.0, grad_dir='descent'

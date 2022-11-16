@@ -125,6 +125,79 @@ void sparse_sampling_in_multivol_bitfield(
 // -------------------------------------------------- ------------------------------------ //
 
 
+void generate_grid_samples_multivol_cuda(
+    const torch::Tensor density_grid,
+    const int density_grid_ema_step,
+    const int n_elements,
+    const torch::Tensor aabb_range,
+    const int n_cascade,
+    const int n_grid,
+    const float thresh,
+    torch::Tensor density_grid_positions_uniform,
+    torch::Tensor density_grid_indices_uniform);
+
+void generate_grid_samples_multivol(
+    const torch::Tensor density_grid,
+    const int density_grid_ema_step,
+    const int n_elements,
+    const torch::Tensor aabb_range,
+    const int n_cascade,
+    const int n_grid,
+    const float thresh,
+    torch::Tensor density_grid_positions_uniform,
+    torch::Tensor density_grid_indices_uniform) {
+
+    // checking
+    CHECK_INPUT(density_grid)
+    CHECK_IS_FLOATING(density_grid)
+    CHECK_INPUT(aabb_range)
+    CHECK_IS_FLOATING(aabb_range)
+    CHECK_INPUT(density_grid_positions_uniform)
+    CHECK_IS_FLOATING(density_grid_positions_uniform)
+    CHECK_INPUT(density_grid_indices_uniform)
+    CHECK_IS_INT(density_grid_indices_uniform)
+
+    return generate_grid_samples_multivol_cuda(
+        density_grid, density_grid_ema_step, n_elements, aabb_range, n_cascade, n_grid, thresh,
+        density_grid_positions_uniform, density_grid_indices_uniform);
+}
+
+
+// -------------------------------------------------- ------------------------------------ //
+
+
+void update_bitfield_multivol_cuda(
+    const torch::Tensor density_grid,
+    const float density_grid_mean,
+    torch::Tensor density_grid_bitfield,
+    const float thres,
+    const int n_grid,
+    const int n_cascade);
+
+void update_bitfield_multivol(
+    const torch::Tensor density_grid,
+    const float density_grid_mean,
+    torch::Tensor density_grid_bitfield,
+    const float thres,
+    const int n_grid,
+    const int n_cascade) {
+
+    // checking
+    CHECK_INPUT(density_grid)
+    CHECK_IS_FLOATING(density_grid)
+    CHECK_INPUT(density_grid_bitfield)
+
+    return update_bitfield_multivol_cuda(density_grid, density_grid_mean, density_grid_bitfield, thres, n_grid, n_cascade);
+}
+
+
+
+// -------------------------------------------------- ------------------------------------ //
+
+
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+    m.def("generate_grid_samples_multivol", &generate_grid_samples_multivol, "generate_grid_samples_multivol (CUDA)");
+    m.def("update_bitfield_multivol", &update_bitfield_multivol, "update_bitfield_multivol (CUDA)");
     m.def("sparse_sampling_in_multivol_bitfield", &sparse_sampling_in_multivol_bitfield, "sparse_sampling_in_multivol_bitfield (CUDA)");
 }

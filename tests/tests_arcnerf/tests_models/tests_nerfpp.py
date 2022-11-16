@@ -7,7 +7,6 @@ import os.path as osp
 from arcnerf.geometry.ray import get_ray_points_by_zvals
 from arcnerf.visual.plot_3d import draw_3d_components
 from tests.tests_arcnerf.tests_models import TestModelDict
-from common.utils.cfgs_utils import get_value_from_cfgs_field
 from common.utils.torch_utils import torch_to_np
 
 RESULT_DIR = osp.abspath(osp.join(__file__, '..', 'results', 'bkg_model'))
@@ -46,21 +45,6 @@ class TestNerfPPDict(TestModelDict):
 
         # inference only
         self._test_forward_inference_only(model, feed_in)
-
-        # get progress
-        n_sample = cfgs.model.rays.n_sample
-        n_importance = cfgs.model.rays.n_importance
-        n_total = n_sample + n_importance
-        remove_last = 0
-        if cfgs.model.background.bkg_blend == 'rgb':
-            if get_value_from_cfgs_field(cfgs.model.rays, 'add_inf_z', False) is False:
-                remove_last = 1
-
-        if n_importance > 0:
-            progress_shape = (self.batch_size, self.n_rays, n_total - remove_last)
-        else:
-            progress_shape = (self.batch_size, self.n_rays, n_sample - remove_last)
-        self._test_forward_progress(model, feed_in, progress_shape)
 
         # direct pts/view
         pts, view_dir = self.create_pts_dir_to_cuda()
