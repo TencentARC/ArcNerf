@@ -317,21 +317,36 @@ Ref: https://jonbarron.info/mipnerf360/
 
 ### Tanks and Temples
 Captured outdoor 360 scene. A large object is at the center. Colmap processed poses and point_cloud is available
-for 3d reconstruction. We only download the `training` group with images.
+for 3d reconstruction. The official [link](https://www.tanksandtemples.org/) do not give correct intrinsic, so we use
+the one from [nerf++](https://github.com/Kai-46/nerfplusplus). It splits train/val/test already and contains 4 scenes.
 - scene_name: scene_name that is the folder name under `TanksAndTemples`. Use it to be identifier.
-- test_holdout: is used for separating the train/test images like `LLFF`.
 - ply: We do not load the `.ply` file for this moment.
 
 ```
 TanksAndTemples
-└───Truck
-│     └───images
-│     │    └─── *.jgp
-│     └───Truck.ply
-│     └───Truck_COLMAP_SfM.log
-└───Barn
-└───Church
-└───etc(other scenes)
+└───tat_training_Truck
+│     └───train
+│     │    └─── rgb
+│     │    │     └─── *.png
+│     │    └─── pose
+│     │    │     └─── *.txt
+│     │    └─── intrinsics
+│     │    │     └─── *.txt
+│     └───test
+│     │    └─── rgb
+│     │    │     └─── *.png
+│     │    └─── pose
+│     │    │     └─── *.txt
+│     │    └─── intrinsics
+│     │    │     └─── *.txt
+│     └───pointcloud_norm.ply
+│     └───camera_path
+└───tat_intermediate_Train
+│     └───train
+│     └───validation  (Only Truck does not have validation, it just a subset of test)
+│     └───test
+└───tat_intermediate_Playground
+└───tat_intermediate_M60
 ```
 
 Ref: https://www.tanksandtemples.org/

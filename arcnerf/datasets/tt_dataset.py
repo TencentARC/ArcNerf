@@ -13,42 +13,39 @@ from .base_3d_dataset import Base3dDataset
 
 @DATASET_REGISTRY.register()
 class TanksAndTemples(Base3dDataset):
-    """TanksAndTemples Dataset. Use colmap to process but do not save pointcloud.
-    The poses are not that accurate which needs your optimization.
-    Ref: https://www.tanksandtemples.org/
-    TODO: Have to use the preprocessed version in nerf++. Original version do not provide intrinsic.
+    """TanksAndTemples Dataset. We used the version processed by nerf++ (https://github.com/Kai-46/nerfplusplus)
+    which contains 4 scenes (Truck, M60, Train, Playground)
+    The official link is https://www.tanksandtemples.org/, but it does not contains intrinsic and need further optim.
     """
 
     def __init__(self, cfgs, data_dir, mode, transforms):
         super(TanksAndTemples, self).__init__(cfgs, data_dir, mode, transforms)
 
         # real capture dataset with scene_name
-        self.data_spec_dir = osp.join(self.data_dir, 'TanksAndTemples', self.cfgs.scene_name)
+        scene_dir = 'tat_{}_{}'.format(self.convert_scene(self.cfgs.scene_name), self.cfgs.scene_name)
+        self.data_spec_dir = osp.join(self.data_dir, 'TanksAndTemples', scene_dir)
         self.identifier = self.cfgs.scene_name
 
         # get image
         img_list, self.n_imgs = self.get_image_list(mode)
+        self.images = self.read_image_list(img_list)
         self.H, self.W = self.read_image_list(img_list[:1])[0].shape[:2]
 
-        # get cameras
-        self.cam_file = osp.join(self.data_spec_dir, 'Truck_COLMAP_SfM.log')
-        assert osp.exists(self.cam_file), 'Camera file {} not exist...Please run colmap first...'.format(self.cam_file)
-        self.cameras = self.read_cameras()
-
+        # load all camera together in all split for consistent camera normalization
+        self.cameras, cam_split_idx = self.read_cameras_by_mode(mode)  # get the index for final selection
         for cam in self.cameras:
             cam.set_device(self.device)
 
+        # handle the camera in all split to make consistent
         # norm camera_pose to restrict pc range
         self.norm_cam_pose()
 
-        # to make fair comparison, remove test file from train
-        holdout_index = self.get_holdout_index()
-        img_list, _ = self.get_holdout_samples_with_list(holdout_index, img_list)
+        # keep only the camera in certain split
+        self.cameras = [self.cameras[idx] for idx in cam_split_idx]
+        assert self.n_imgs == len(self.cameras), 'Camera num not match the image number'
 
         # skip image and keep less samples
-        img_list, _ = self.skip_samples_with_list(img_list)
-        # read the real image after skip
-        self.images = self.read_image_list(img_list)
+        self.skip_samples()
         # keep close-to-mean samples if set
         self.keep_eval_samples()
 
@@ -62,46 +59,88 @@ class TanksAndTemples(Base3dDataset):
         if self.precache:
             self.precache_ray()
 
+    @staticmethod
+    def convert_scene(scene_name):
+        """Convert scene name to kind"""
+        if scene_name == 'Truck':
+            return 'training'
+        else:
+            return 'intermediate'
+
+    @staticmethod
+    def convert_mode(mode):
+        """Convert mode train/val/eval to dataset name"""
+        if mode == 'train':
+            return 'train'
+        elif mode == 'val' or mode == 'eval':  # bot read test
+            return 'test'
+        else:
+            raise NotImplementedError('Not such mode {}...'.format(mode))
+
     def get_image_list(self, mode=None):
         """Get image list."""
-        img_dir = osp.join(self.data_spec_dir, 'images')
-        img_list = sorted(glob.glob(img_dir + '/*.jpg'))
+        img_dir = osp.join(self.data_spec_dir, self.convert_mode(mode), 'rgb')
+        img_list = sorted(glob.glob(img_dir + '/*.png'))
 
         n_imgs = len(img_list)
         assert n_imgs > 0, 'No image exists in {}'.format(img_dir)
 
         return img_list, n_imgs
 
-    def read_cameras(self):
-        """Read camera from pose file"""
-        with open(self.cam_file, 'r') as f:
-            lines = f.readlines()
-        n_cam = int(len(lines) / 5.0)
-        assert n_cam == self.n_imgs, 'Num of images not match num of cam...Check it...'
+    def read_cameras_by_mode(self, mode):
+        """Read in all the camera file and keep the index of split"""
+        # read cam on all split
+        all_mode = ['train', 'eval']
+        idx = [[-1]]
+        pose_files = []
+        intrinsics_files = []
+        for i, m in enumerate(all_mode):
+            last_idx = idx[i][-1] + 1
+            # pose
+            pose_dir = osp.join(self.data_spec_dir, self.convert_mode(m), 'pose')
+            pose_file = sorted(glob.glob(pose_dir + '/*.txt'))
+            pose_files.append(pose_file)
 
-        c2ws = []
-        for idx in range(n_cam):
-            c2w_lines = lines[idx * 5 + 1:(idx + 1) * 5]
-            c2w_lines = [line.strip().split() for line in c2w_lines]
-            c2w = np.array(c2w_lines, dtype=np.float32)
-            c2ws.append(c2w)
+            # intrinsic
+            intrinsics_dir = osp.join(self.data_spec_dir, self.convert_mode(m), 'intrinsics')
+            intrinsics_file = sorted(glob.glob(intrinsics_dir + '/*.txt'))
+            intrinsics_files.append(intrinsics_file)
+            idx.append(list(range(last_idx, last_idx + len(pose_file))))
 
-        intrinsic = self.get_est_intrinsic()
+        # train for first, other for last
+        split_idx = idx[1] if mode == 'train' else idx[2]
 
+        # concat all the cameras
         cameras = []
-        for idx in range(self.n_imgs):
-            cameras.append(PerspectiveCamera(intrinsic=intrinsic, c2w=c2ws[idx], W=self.W, H=self.H))
+        for i, m in enumerate(all_mode):
+            for pose_txt, intrinsic_txt in zip(pose_files[i], intrinsics_files[i]):
+                assert pose_txt.split('/')[-1] == intrinsic_txt.split('/')[-1]
+                cameras.append(self.read_cameras_from_txt(pose_txt, intrinsic_txt))
 
-        return cameras
+        return cameras, split_idx
 
-    def get_est_intrinsic(self):
-        """Get intrinsic (3, 3) from hwf
-        TanksAndTemplates do not provide exact focal, the num is estimated and affects the result.
-        """
-        intrinsic = np.eye(3)
-        intrinsic[0, 0] = 0.59365 * self.W  # approximate focal
-        intrinsic[1, 1] = 0.59365 * self.W
-        intrinsic[0, 2] = self.W / 2.0
-        intrinsic[1, 2] = self.H / 2.0
+    def read_cameras_from_txt(self, pose_txt, intrinsic_txt):
+        """Read camera from txt files """
+        with open(pose_txt, 'r') as f:
+            pose_lines = f.readline()
+        with open(intrinsic_txt, 'r') as f:
+            intrinsics_lines = f.readline()
+
+        c2w = self.read_c2w(pose_lines)
+        intrinsic = self.read_intrinsic(intrinsics_lines)
+
+        return PerspectiveCamera(intrinsic=intrinsic, c2w=c2w, W=self.W, H=self.H)
+
+    @staticmethod
+    def read_c2w(lines):
+        """Read c2w from pose file"""
+        c2w = np.array([float(x) for x in lines.split(' ')]).reshape(4, 4)
+
+        return c2w
+
+    @staticmethod
+    def read_intrinsic(lines):
+        """Get intrinsic (3, 3) from line"""
+        intrinsic = np.array([float(x) for x in lines.split(' ')]).reshape(4, 4)[:3, :3]
 
         return intrinsic

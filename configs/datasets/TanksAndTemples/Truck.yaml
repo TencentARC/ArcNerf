@@ -6,7 +6,7 @@ dataset:
         type: TanksAndTemples
         scene_name: Truck
         skip: 8
-        img_scale: 0.5
+        img_scale: 1.0
         scale_radius: 3.0
         precache: False
 
