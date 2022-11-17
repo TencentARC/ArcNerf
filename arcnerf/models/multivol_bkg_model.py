@@ -114,26 +114,26 @@ class MultiVol(BkgModel):
         near, far = self.get_near_far_from_rays(rays_o, rays_d)
         zvals, mask_pts = self.get_zvals_from_near_far(near, far, self.get_ray_cfgs('n_sample'), rays_o, rays_d)
 
-        # keep the largest sample. Actually some duplicate pts, but calc all.
+        # keep the largest sample
         max_num_pts = max(1, int(mask_pts.sum(dim=1).max()))
         zvals = zvals[:, :max_num_pts]  # (n_rays, max_pts)
+        mask_pts = mask_pts[:, :max_num_pts]  # (n_rays, max_pts)
 
-        # get points, expand rays_d to all pts
-        pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (B, N, 3)
-        rays_d_repeat = torch.repeat_interleave(rays_d.unsqueeze(1), pts.shape[1], dim=1)  # (B, N, 3)
-
-        # flatten
-        pts = pts.view(-1, 3)  # (BN, 3)
-        rays_d_repeat = rays_d_repeat.view(-1, 3)  # (BN, 3)
-
-        # get sigma and rgb, . shape in (N_valid_pts, ...)
-        sigma, radiance = chunk_processing(
-            self._forward_pts_dir, self.chunk_pts, False, self.geo_net, self.radiance_net, pts, rays_d_repeat
-        )
-
-        # reshape to (B, N_sample, ...)
-        sigma = sigma.view(n_rays, -1)  # (B, N_sample)
-        radiance = radiance.view(n_rays, -1, 3)  # (B, N_sample, 3)
+        # get sigma and radiance, without processing duplications
+        valid_rays_idx = torch.any(mask_pts, dim=1)  # (n_rays)
+        if not torch.all(valid_rays_idx):  # consider the ray is empty
+            _sigma, _radiance = self.get_sigma_radiance_by_mask_pts(
+                self.geo_net, self.radiance_net, rays_o[valid_rays_idx], rays_d[valid_rays_idx], zvals[valid_rays_idx],
+                mask_pts[valid_rays_idx]
+            )
+            sigma = torch.zeros((n_rays, *_sigma.shape[1:]), dtype=_sigma.dtype, device=_sigma.device)
+            radiance = torch.zeros((n_rays, *_radiance.shape[1:]), dtype=_radiance.dtype, device=_radiance.device)
+            sigma[valid_rays_idx] = _sigma
+            radiance[valid_rays_idx] = _radiance
+        else:
+            sigma, radiance = self.get_sigma_radiance_by_mask_pts(
+                self.geo_net, self.radiance_net, rays_o, rays_d, zvals, mask_pts
+            )  # (n_rays, max_pts), (n_rays, max_pts, 3)
 
         output = self.ray_marching(sigma, radiance, zvals, inference_only=inference_only)
 
@@ -149,6 +149,51 @@ class MultiVol(BkgModel):
                                        device=self.density_grid.device) * density_grid_mean
 
         return density_grid_mean
+
+    def get_sigma_radiance_by_mask_pts(self, geo_net, radiance_net, rays_o, rays_d, zvals, mask_pts):
+        """Process the pts/dir by mask_pts. Only process valid zvals to save computation
+        It is the same in the fg_model but mask_pts is always there
+
+        NOTICE: all the rays must contains some pts
+
+        Args:
+            geo_net: geometry net
+            radiance_net: radiance net
+            rays_o: (B, 3) rays origin
+            rays_d: (B, 3) rays direction(normalized)
+            zvals: (B, N_pts) zvals on each ray
+            mask_pts: (B, N_pts) whether each pts is valid. all rows should contain some True value.
+
+        Returns:
+            sigma: (B, N_pts) sigma on all pts. Duplicated pts share the same value
+            radiance: (B, N_pts, 3) rgb on all pts. Duplicated pts share the same value
+        """
+        n_rays = zvals.shape[0]
+        n_pts = zvals.shape[1]
+        dtype = zvals.dtype
+        device = zvals.device
+
+        # get points, expand rays_d to all pts
+        pts = get_ray_points_by_zvals(rays_o, rays_d, zvals)  # (B, N_pts, 3)
+        rays_d_repeat = torch.repeat_interleave(rays_d.unsqueeze(1), n_pts, dim=1)  # (B, N_pts, 3)
+
+        pts = pts[mask_pts].view(-1, 3)  # (N_valid_pts, 3)
+        rays_d_repeat = rays_d_repeat[mask_pts].view(-1, 3)  # (N_valid_pts, 3)
+
+        # get sigma and rgb, . shape in (N_valid_pts, ...)
+        _sigma, _radiance = chunk_processing(
+            self._forward_pts_dir, self.chunk_pts, False, geo_net, radiance_net, pts, rays_d_repeat
+        )
+
+        # reshape to (B, N_sample, ...) by fill duplicating pts
+        last_pts_idx = torch.cumsum(mask_pts.sum(dim=1), dim=0) - 1  # index on flatten sigma/radiance
+        last_sigma, last_radiance = _sigma[last_pts_idx], _radiance[last_pts_idx]  # (B,) (B, 3)
+        sigma = torch.ones((n_rays, n_pts), dtype=dtype, device=device) * last_sigma.unsqueeze(1)
+        radiance = torch.ones((n_rays, n_pts, 3), dtype=dtype, device=device) * last_radiance.unsqueeze(1)
+        sigma[mask_pts] = _sigma
+        radiance[mask_pts] = _radiance
+
+        return sigma, radiance
 
     @torch.no_grad()
     def optimize(self, cur_epoch=0):
