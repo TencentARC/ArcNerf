@@ -10,6 +10,7 @@ from arcnerf.datasets import get_dataset, get_model_feed_in, POTENTIAL_KEYS
 from arcnerf.datasets.transform.augmentation import get_transforms
 from arcnerf.eval.eval_func import run_eval
 from arcnerf.eval.infer_func import Inferencer
+from arcnerf.geometry.point_cloud import save_point_cloud
 from arcnerf.loss import build_loss
 from arcnerf.metric import build_metric
 from arcnerf.models import build_model
@@ -20,6 +21,7 @@ from common.loss.loss_dict import LossDictCounter
 from common.trainer.basic_trainer import BasicTrainer
 from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field
 from common.utils.registry import METRIC_REGISTRY
+from common.utils.torch_utils import torch_to_np
 from common.utils.train_utils import master_only
 from common.visual.plot_2d import draw_2d_components
 from .pipeline import Pipeline
@@ -500,6 +502,18 @@ class ArcNerfTrainer(BasicTrainer):
                     bit_bound = self.model.get_fg_model().get_obj_bound()
                     occ_ratio = bit_bound.get_bitfield_count()[1]
                     self.logger.add_log('Remaining voxel ratio is {:.2f}%'.format(occ_ratio * 100.0))
+
+        # write debug pc
+        if self.cfgs.progress.save_progress and self.cfgs.progress.local_progress:
+            if epoch % self.cfgs.progress.epoch_save_progress == 0:
+                if self.model.get_fg_model().get_obj_bound_type() == 'volume':
+                    volume = self.model.get_fg_model().get_obj_bound_structure()
+                    if volume.get_voxel_bitfield() is not None:
+                        occ_pc = torch_to_np(volume.get_occupied_voxel_pts())  # (n_occ, 3)
+                        progress_dir = os.path.join(self.cfgs.dir.expr_spec_dir, 'progress', 'train', 'occ_pc')
+                        os.makedirs(progress_dir, exist_ok=True)
+                        occ_file = os.path.join(progress_dir, 'occ_pc_epoch_{:06d}.ply'.format(epoch))
+                        save_point_cloud(occ_file, occ_pc)
 
         # remake train dataset train crop
         crop_shuffle = self.train_pipeline.check_crop_shuffle(epoch)
