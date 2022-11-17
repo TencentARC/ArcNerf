@@ -71,7 +71,6 @@ dataset:
         scale_radius: 3.0
         pc_radius: 1.0
         skip: 8
-        center_by_view_dirs: True
         precache: True
 
     val:
@@ -81,7 +80,6 @@ dataset:
         scale_radius: 3.0
         pc_radius: 1.0
         skip: 8
-        center_by_view_dirs: True
         precache: False
 
     eval:
@@ -93,7 +91,6 @@ dataset:
         scale_radius: 3.0
         pc_radius: 1.0
         skip: 8
-        center_by_view_dirs: True
         precache: True
 
 inference:

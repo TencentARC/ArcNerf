@@ -39,11 +39,13 @@ class MipNeRF360(Base3dDataset):
             cam.set_device(self.device)
 
         # roughly center the cameras by common view point
-        self.center_cam_poses_by_view_dirs()
+        self.center_cam_poses_by_view_dirs()  # just for checking. Not use in eval
         # norm camera_pose to restrict pc range
         self.norm_cam_pose()
         # align if required
         self.align_cam_horizontal()
+        # align to ngp coord
+        self.adjust_cam_translation()
 
         # to make fair comparison, remove test file from train
         holdout_index = self.get_holdout_index()

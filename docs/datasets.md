@@ -109,10 +109,12 @@ Since we need to rescale the point_cloud and cam so that object(pc) is centered 
 as (0,0,0), noise not on object will make the center incorrect. We do the following:
 - Use all camera and ray from center image plane to get a closely approximate common view point,
 which is close to object center, adjust cam/pc by this offset. This is optional by setting `center_by_view_dirs=True`.
+- `center_by_view_dirs` do not gives out deterministic results all the time, which leads to inconsistency between train/eval. Only for checking.
 - Norm cam and point by `scale_radius` to make them within a sphere with known range.
 - Filter point cloud by `pc_radius` and remove point outside.
 - Recenter cam and point by setting the filtered point cloud center as (0,0,0).
 - Re-norm cam and point again to make cam on the surface of sphere with `scale_radius` and obj is centered.
+- cam_t_offset: use to shift all the cam positions by -offset.
 - test_holdout: is used for separating the train/test images.
 
 - We test and show that the method is robust to make the coordinate system such that object is centered at (0,0,0),

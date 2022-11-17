@@ -7,8 +7,8 @@ dataset:
         scene_name: garden
         skip: 8
         img_scale: 0.25
-        center_by_view_dirs: True
-        center_pose: True
+        # center_by_view_dirs: True  # just for checking
+        cam_t_offset: [0.0, 1.8, 0.0]
         scale_radius: 3.0
         precache: False
 
@@ -26,4 +26,4 @@ inference:
 
     volume:
         n_grid: 4       # just for visual purpose
-        side: 1.5
+        side: 2.0

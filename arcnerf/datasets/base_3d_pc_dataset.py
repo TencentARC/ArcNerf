@@ -124,6 +124,8 @@ class Base3dPCDataset(Base3dDataset):
     def center_cam_poses_by_view_dirs(self):
         """Recenter camera pose by setting the common view point center at (0,0,0)
         The common view point is the closest point to all rays.
+        TODO: This func do not gives up deterministic output. So should not use it.
+        TODO: You could only use to find the offset and handle it manually(use cam_t_offset).
         """
         view_point_mean = super().center_cam_poses_by_view_dirs()
         if view_point_mean is not None:
