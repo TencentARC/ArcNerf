@@ -144,7 +144,7 @@ class MultiVol(BkgModel):
 
     def get_density_grid_mean(self):
         """Get the mean density of each level"""
-        density_grid_mean = float(self.density_grid.clamp_min(0.0).mean().item()) * (self.n_cascade - 1)
+        density_grid_mean = float(self.density_grid.clamp_min(0.0).mean().item())
         density_grid_mean = torch.ones((1, ), dtype=self.density_grid.dtype,
                                        device=self.density_grid.device) * density_grid_mean
 
@@ -198,7 +198,7 @@ class MultiVol(BkgModel):
 
         # ema update density grid
         self.density_grid = ema_grid_samples_nerf(
-            self.density_grid_tmp, self.density_grid, self.n_elements, self.get_optim_cfgs('ema_optim_decay')
+            self.density_grid_tmp, self.density_grid, self.total_n_elements, self.get_optim_cfgs('ema_optim_decay')
         )
 
         # update density mean and bitfield

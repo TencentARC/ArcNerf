@@ -67,8 +67,15 @@ __global__ void sparse_sampling_in_multivol_bitfield_cuda_kernel(
         float dt = calc_dt(t, cone_angle, min_step, max_step);
         uint32_t mip = mip_from_pos(pos, minvol_xyz_min, minvol_xyz_max, n_cascade);
 
-        if (mip == 0) {  // since it hits the inner volume, revert back
-            j = 0;  // The sampling should not cover bkg -> fg -> bkg sequence
+        if (mip == 0) {  // since it hits the inner volume, revert back, The sampling should not cover bkg -> fg -> bkg sequence
+            // reset all the previous values, and j becomes 0
+            while (j > 0) {
+                zvals[j] = 0.0;
+                mask[j] = false;
+                j--;
+            }
+            zvals[j] = 0.0;
+            mask[j] = false;
             t = advance_to_next_voxel(t, dt, pos, _rays_d, minvol_xyz_min, minvol_xyz_max, n_grid);
         } else {
             if (density_grid_occupied_at_multivol(pos, bitfield, mip, minvol_xyz_min, minvol_xyz_max, n_grid)) {
