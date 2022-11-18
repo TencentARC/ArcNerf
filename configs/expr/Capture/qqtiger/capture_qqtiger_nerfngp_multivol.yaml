@@ -1,0 +1,258 @@
+name: capture_qqtiger_nerfngp_multivol
+
+resume: None
+
+debug:
+    debug_mode: False
+    print_all_grad: False
+    get_progress: False
+
+dir:
+    expr_dir: None
+    data_dir: '/group/30042/leoyluo/Immerse/data'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_nerfngp_multivol'
+
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_nerfngp_multivol/checkpoints/final.pt.tar'
+
+gpu_ids: -1
+
+dist:
+    local_rank: 0
+    rank: 0
+    world_size: 1
+    distributed_backend: nccl
+    random_seed: None
+    slurm: False
+
+batch_size: 2
+n_rays: 1024
+worker: 4
+
+optim:
+    ema:
+        decay: 0.95
+    lr: 1e-1
+    optim_type: adam
+    weight_decay: 1e-6
+    eps: 1e-15
+    lr_scheduler:
+        type: MultiStepLR
+        lr_gamma: 0.33
+        lr_steps: [20000, 30000, 40000, 50000]
+    clip_gradients: 0.0
+    clip_warmup: -1
+    clip_gradients_warmup: 0.0
+
+progress:
+    start_epoch: -1
+    epoch: 50000
+    save_time: 1800
+
+    epoch_loss: 100
+    iter_loss: 1
+    save_progress: True
+    epoch_save_progress: 5000
+    iter_save_progress: 1
+
+    epoch_save_checkpoint: 10000
+    local_progress: False
+
+    epoch_val: 5000
+    save_progress_val: False
+    max_samples_val: 1
+
+    init_eval: False
+    epoch_eval: 10000
+    max_samples_eval: 25
+
+dataset:
+    train:
+        type: Capture
+        scene_name: qqtiger
+        test_holdout: 24
+        img_scale: 0.25
+        scale_radius: 3.0
+        pc_radius: 2.0
+        center_pixel: True
+        skip: 3
+        device: gpu
+        precache: True
+
+    val:
+        type: Capture
+        scene_name: qqtiger
+        test_holdout: 24
+        img_scale: 0.125
+        scale_radius: 3.0
+        pc_radius: 2.0
+        center_pixel: True
+        device: gpu
+        precache: False
+
+    eval:
+        eval_batch_size: 1
+        type: Capture
+        scene_name: qqtiger
+        test_holdout: 24
+        img_scale: 0.25
+        scale_radius: 3.0
+        pc_radius: 2.0
+        center_pixel: True
+        device: gpu
+        precache: True
+
+#inference:
+#    to_gpu: True
+#    render:
+#        type: [circle]
+#        n_cam: [20]
+#        repeat: [3]
+#        radius: 2.0
+#        u_start: 0.75
+#        v_ratio: -0.2
+#        fps: 5
+#
+#    volume:
+#        n_grid: 512
+#        side: 1.5
+#        level: 50.0
+#        chunk_pts_factor: 16
+#        render_mesh:
+#            backend: pytorch3d
+
+model:
+    type: NeRF
+    obj_bound:
+        volume:
+            n_grid: 128
+            side: 1.5
+        epoch_optim: 16
+        epoch_optim_warmup: 256
+        ray_sample_acc: True
+        ray_sample_fix_step: True
+        near_distance: 0.2
+        opa_thres: 0.01
+        bkg_color: [0.0, 0.0, 0.0]
+        depth_far: 2.0
+        log_max_allowance: 18
+    rays:
+        n_sample: 1024
+        n_importance: 0
+        perturb: True
+        add_inf_z: False
+        noise_std: 0.0
+        white_bkg: False
+    chunk_rays: 32768
+    chunk_pts: 1048576
+    geometry:
+        #type: FusedMLPGeoNet   # Some unknown bug is in the MLP backward, use torch version.
+        use_bias: False
+        W: 64
+        D: 1
+        skips: [ ]
+        encoder:
+            type: HashGridEmbedder
+            input_dim: 3
+            include_input: False
+            side: 1.5
+            n_freqs: 0
+            n_levels: 16
+            n_feat_per_entry: 2
+            hashmap_size: 19
+            base_res: 16
+            max_res: 2048
+            backend: tcnn
+            dtype: torch.float32  # cast type for torch mlp
+        W_feat: 16
+        out_act_cfg:
+            type: TruncExp
+    radiance:
+        #type: FusedMLPRadianceNet
+        use_bias: False
+        mode: 'fv'
+        W: 64
+        D: 2
+        encoder:
+            view:
+                type: SHEmbedder
+                include_input: False
+                input_dim: 3
+                n_freqs: 4
+                backend: tcnn
+                dtype: torch.float32  # cast type
+        W_feat_in: 16
+    background:
+        type: MultiVol                    # background model type with multivol
+        bkg_blend: 'rgb'
+        basic_volume:
+            n_grid: 128
+            side: 1.5
+            n_cascade: 5
+        optim:
+            epoch_optim: 16
+            epoch_optim_warmup: 256
+            near_distance: 0.2
+            opa_thres: 0.01
+            ema_optim_decay: 0.95
+        rays:
+            n_sample: 1024
+            n_importance: 0
+            cone_angle: 0.00390625
+            perturb: True
+            add_inf_z: True
+            noise_std: 0.0
+            white_bkg: False
+        chunk_rays: 32768
+        chunk_pts: 1048576
+        geometry:
+            #type: FusedMLPGeoNet
+            use_bias: False
+            W: 64
+            D: 1
+            skips: [ ]
+            encoder: # encoder
+                type: HashGridEmbedder
+                input_dim: 3
+                include_input: False
+                side: 24.0                # bounding volume for the outside. Should be 2**(n_cas-1)*side
+                n_freqs: 0
+                n_levels: 16
+                n_feat_per_entry: 2
+                hashmap_size: 19
+                base_res: 16
+                max_res: 2048
+                backend: tcnn
+                dtype: torch.float32  # cast type
+            W_feat: 16
+            out_act_cfg:
+                type: TruncExp
+        radiance:
+            #type: FusedMLPRadianceNet
+            use_bias: False
+            mode: 'fv'
+            W: 64
+            D: 2
+            encoder:
+                view:
+                    type: SHEmbedder
+                    include_input: False
+                    input_dim: 3
+                    n_freqs: 4
+                    backend: tcnn
+                    dtype: torch.float32  # cast type
+            W_feat_in: 16
+
+
+loss:
+    ImgLoss:
+        keys: ['rgb_coarse']
+        loss_type: Huber
+        delta: 0.1
+        weight: 3000
+
+metric:
+    PSNR:
+
+train_metric:
+    PSNR:
+        key: 'rgb_coarse'

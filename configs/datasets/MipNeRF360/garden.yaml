@@ -8,7 +8,7 @@ dataset:
         skip: 8
         img_scale: 0.25
         # center_by_view_dirs: True  # just for checking
-        cam_t_offset: [0.0, 1.8, 0.0]
+        cam_t_offset: [0.0, 1.4, 0.0]  # to put the table in the center
         scale_radius: 3.0
         precache: False
 

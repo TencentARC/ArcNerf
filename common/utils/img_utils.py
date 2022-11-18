@@ -152,3 +152,19 @@ def get_bbox_from_mask(mask, expand=1.05):
     ])
 
     return bounding_box
+
+
+def get_img_blur(img):
+    """Get the image blur by laplacian deviation. Higher the value, more clear the image
+
+    Args:
+        img: rgb image in range (0,1) in shape (H, W, 3)
+
+    Return:
+        blur: a value indicating the blur by laplacian
+    """
+    img_unorm = img_to_uint8(img)  # bgr
+    gray_img = cv2.cvtColor(img_unorm, cv2.COLOR_BGR2GRAY)
+    blur = float(cv2.Laplacian(gray_img, cv2.CV_16S).var())
+
+    return blur

@@ -7,7 +7,7 @@ from arcnerf.geometry.poses import center_poses, average_poses
 from arcnerf.geometry.ray import closest_point_to_rays
 from common.datasets.base_dataset import BaseDataset
 from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field, pop_none_item
-from common.utils.img_utils import img_scale, read_img
+from common.utils.img_utils import img_scale, read_img, get_img_blur
 from common.utils.torch_utils import np_wrapper
 
 
@@ -276,6 +276,20 @@ class Base3dDataset(BaseDataset):
             flip = get_value_from_cfgs_field(self.cfgs, 'exchange_coord')[2]
             for idx in range(len(self.cameras)):
                 self.cameras[idx].exchange_coord(src, dst, flip)
+
+    def remove_blur_images(self, imgs):
+        """Remove image with blur > blur_thres"""
+        if get_value_from_cfgs_field(self.cfgs, 'blur_thres', None) is not None:
+            clear_idx = []
+            for idx, img in enumerate(imgs):
+                if isinstance(img, str):
+                    img = read_img(img, norm_by_255=True)
+                assert isinstance(img, np.ndarray), 'Must be np array'
+                blur = get_img_blur(img.copy())
+                if blur >= self.cfgs.blur_thres:
+                    clear_idx.append(idx)
+
+            return clear_idx
 
     def precache_ray(self):
         """Precache all the rays for all images first"""

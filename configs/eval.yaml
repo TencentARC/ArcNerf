@@ -18,7 +18,7 @@ dist:
     world_size: 1
 
 progress:
-    max_samples_eval: 3      # Max num of sample to write into image in eval
+    max_samples_eval: 25      # Max num of sample to write into image in eval
 
 dataset:
     eval:

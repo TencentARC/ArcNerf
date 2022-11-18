@@ -76,7 +76,7 @@ progress:
 
     init_eval: False                # Whether to eval the model at first epoch
     epoch_eval: 100000              # Num of epoch eval model on test set. -1 means no evaluation
-    max_samples_eval: 3             # Max num of sample to write into image in eval
+    max_samples_eval: 25            # Max num of sample to write into image in eval
 
 dataset:
     train:

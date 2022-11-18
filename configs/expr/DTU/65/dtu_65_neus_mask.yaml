@@ -61,7 +61,7 @@ progress:
 
     init_eval: False
     epoch_eval: 100000
-    max_samples_eval: 3
+    max_samples_eval: 25
 
 dataset:
     train:
@@ -84,7 +84,6 @@ dataset:
 
     eval:
         eval_batch_size: 1
-        eval_max_sample: 3
         type: DTU
         scan_id: 65
         img_scale: 1.0

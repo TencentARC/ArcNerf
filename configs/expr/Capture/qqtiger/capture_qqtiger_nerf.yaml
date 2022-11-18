@@ -61,22 +61,24 @@ progress:
 
     init_eval: False
     epoch_eval: 100000
-    max_samples_eval: 3
+    max_samples_eval: 25
 
 dataset:
     train:
         type: Capture
         scene_name: qqtiger
+        test_holdout: 24
         img_scale: 0.25
         scale_radius: 3.0
         pc_radius: 2.0
-        skip: 10
+        skip: 3
         device: gpu
         precache: True
 
     val:
         type: Capture
         scene_name: qqtiger
+        test_holdout: 24
         img_scale: 0.125
         scale_radius: 3.0
         pc_radius: 2.0
@@ -86,9 +88,9 @@ dataset:
 
     eval:
         eval_batch_size: 1
-        eval_max_sample: 3
         type: Capture
         scene_name: qqtiger
+        test_holdout: 24
         img_scale: 0.25
         scale_radius: 3.0
         pc_radius: 2.0
