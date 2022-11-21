@@ -1,4 +1,4 @@
-name: capture_qqtiger_nerfpp_sigma
+name: capture_qqtiger_nerf_nerfpp
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_nerfpp_sigma'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_nerf_nerfpp'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_nerfpp_sigma/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_nerf_nerfpp/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -82,7 +82,6 @@ dataset:
         img_scale: 0.125
         scale_radius: 3.0
         pc_radius: 2.0
-        skip: 10
         device: gpu
         precache: False
 
@@ -94,28 +93,27 @@ dataset:
         img_scale: 0.25
         scale_radius: 3.0
         pc_radius: 2.0
-        skip: 10
         device: gpu
         precache: True
 
-inference:
-    to_gpu: True
-    render:
-        type: [circle]
-        n_cam: [20]
-        repeat: [3]
-        radius: 2.0
-        u_start: 0.75
-        v_ratio: -0.2
-        fps: 5
-
-    volume:
-        n_grid: 512
-        side: 1.5
-        level: 50.0
-        chunk_pts_factor: 32
-        render_mesh:
-            backend: pytorch3d
+#inference:
+#    to_gpu: True
+#    render:
+#        type: [circle]
+#        n_cam: [20]
+#        repeat: [3]
+#        radius: 2.0
+#        u_start: 0.75
+#        v_ratio: -0.2
+#        fps: 5
+#
+#    volume:
+#        n_grid: 512
+#        side: 1.5
+#        level: 50.0
+#        chunk_pts_factor: 32
+#        render_mesh:
+#            backend: pytorch3d
 
 model:
     type: NeRF
@@ -127,7 +125,7 @@ model:
         n_importance: 128
         inverse_linear: False
         perturb: True
-        add_inf_z: True    # should use inf for overall sigma blending, but you can choose not
+        add_inf_z: False    # should not use inf for foreground rgb ray_marching
         noise_std: 0.0
         white_bkg: False
     chunk_rays: 32768
@@ -154,12 +152,12 @@ model:
         W_feat_in: 256
     background:
         type: NeRFPP
-        bkg_blend: 'sigma'
+        bkg_blend: 'rgb'
         rays:
             bounding_radius: 3.0
             n_sample: 32
             perturb: True
-            add_inf_z: False    # should not use inf for background sigma
+            add_inf_z: True         # must set to be True
             noise_std: 0.0
             white_bkg: False
         chunk_rays: 32768
@@ -187,7 +185,7 @@ model:
 
 loss:
     ImgLoss:
-        keys: ['rgb_coarse', 'rgb_fine']
+        keys: [ 'rgb_coarse', 'rgb_fine' ]
         weight: 1.0
 
 metric:

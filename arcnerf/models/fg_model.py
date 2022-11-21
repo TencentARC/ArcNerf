@@ -45,7 +45,7 @@ class FgModel(Base3dModel):
         else:
             cfgs = self.cfgs.model.obj_bound
             # bkg color/depth/normal for invalid rays
-            params['bkg_color'] = get_value_from_cfgs_field(cfgs, 'bkg_color', [1.0, 1.0, 1.0])  # white
+            params['bkg_color'] = get_value_from_cfgs_field(cfgs, 'bkg_color', [0.0, 0.0, 0.0])  # black to allow merge
             params['depth_far'] = get_value_from_cfgs_field(cfgs, 'depth_far', 10.0)  # far distance
             params['normal'] = get_value_from_cfgs_field(cfgs, 'normal', [0.0, 1.0, 0.0])  # for eikonal loss cal
             # This is for foreground model only to use the dynamic batchsize
@@ -373,8 +373,8 @@ class FgModel(Base3dModel):
                         out_tensor = -torch.ones(new_shape, dtype=dtype, device=device)  # make it outside
                         out_tensor[mask] = v
                         output[k] = out_tensor
-                    elif 'trans_shift' in k:
-                        out_tensor = torch.ones(new_shape, dtype=dtype, device=device)  # trans_shift should be 1
+                    elif 'trans_shift' in k:  # trans_shift should be 1, allow full bkg_color blend
+                        out_tensor = torch.ones(new_shape, dtype=dtype, device=device)
                         out_tensor[mask] = v
                         output[k] = out_tensor
                     else:  # for all `sigma`/`zvals`/`alpha`/`weights`/`radiance`, they are all zeros,

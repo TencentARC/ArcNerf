@@ -84,7 +84,6 @@ dataset:
         scale_radius: 3.0
         pc_radius: 2.0
         center_pixel: True
-        skip: 10
         device: gpu
         precache: False
 
@@ -97,7 +96,6 @@ dataset:
         scale_radius: 3.0
         pc_radius: 2.0
         center_pixel: True
-        skip: 10
         device: gpu
         precache: True
 

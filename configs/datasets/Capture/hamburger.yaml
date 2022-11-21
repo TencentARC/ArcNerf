@@ -31,11 +31,12 @@ model:
 
 inference:
     render:
-        type: [circle]
+        type: [swing]
         n_cam: [20]
         radius: 3.0
-        u_start: 0.75
-        v_ratio: -0.2
+        u_range: [0.7, 1.0]
+        v_range: [-0.1, -0.1]
+        n_rot: 1
 
     volume:
         n_grid: 4       # just for visual purpose
