@@ -99,25 +99,25 @@ dataset:
         device: gpu
         precache: True
 
-#inference:
-#    to_gpu: True
-#    render:
-#        type: [spiral]
-#        n_cam: [60]
-#        repeat: [1]
-#        radius: 3.0
-#        u_start: 0.0
-#        v_range: [-0.3, -0.1]
-#        fps: 5
-#        center_pixel: True
-#
-#    volume:
-#        n_grid: 512
-#        side: 2.0
-#        level: 50.0
-#        chunk_pts_factor: 16
-#        render_mesh:
-#            backend: pytorch3d
+inference:
+    to_gpu: True
+    render:
+        type: [spiral]
+        n_cam: [60]
+        repeat: [1]
+        radius: 3.0
+        u_start: 0.0
+        v_range: [-0.3, -0.1]
+        fps: 5
+        center_pixel: True
+
+    volume:
+        n_grid: 512
+        side: 2.0
+        level: 50.0
+        chunk_pts_factor: 16
+        render_mesh:
+            backend: pytorch3d
 
 model:
     type: NeRF

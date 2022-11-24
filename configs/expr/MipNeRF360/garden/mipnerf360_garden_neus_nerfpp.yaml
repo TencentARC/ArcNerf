@@ -94,28 +94,28 @@ dataset:
         device: gpu
         precache: True
 
-#inference:
-#    to_gpu: True
-#    render:
-#        type: [spiral]
-#        n_cam: [60]
-#        repeat: [1]
-#        radius: 3.0
-#        u_start: 0.0
-#        v_range: [-0.3, -0.1]
-#        fps: 5
-#        surface_render:
-#            chunk_rays_factor: 1024
-#            method: sphere_tracing
-#
-#    volume:
-#        n_grid: 512
-#        side: 2.0
-#        level: 0.0
-#        grad_dir: ascent
-#        chunk_pts_factor: 1
-#        render_mesh:
-#            backend: pytorch3d
+inference:
+    to_gpu: True
+    render:
+        type: [spiral]
+        n_cam: [60]
+        repeat: [1]
+        radius: 3.0
+        u_start: 0.0
+        v_range: [-0.3, -0.1]
+        fps: 5
+        surface_render:
+            chunk_rays_factor: 1024
+            method: sphere_tracing
+
+    volume:
+        n_grid: 512
+        side: 2.0
+        level: 0.0
+        grad_dir: ascent
+        chunk_pts_factor: 1
+        render_mesh:
+            backend: pytorch3d
 
 model:
     type: Neus
