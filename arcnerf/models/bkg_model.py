@@ -11,7 +11,6 @@ class BkgModel(Base3dModel):
     """Class for bkg model. Child class of Base3dModel.
     It can also be used as foreground model if you want.
 
-    Do not use two-stage model when it's used as a bkg_model.
     """
 
     def __init__(self, cfgs):

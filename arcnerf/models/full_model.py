@@ -442,7 +442,7 @@ class FullModel(nn.Module):
 
         # reshape values from (B*N, ...) to (B, N, ...)
         output = self.reshape_output(output, batch_size, n_rays_per_batch)
-        print('Output keys ', output.keys())
+
         return output
 
     def process_fg_bkg_model(

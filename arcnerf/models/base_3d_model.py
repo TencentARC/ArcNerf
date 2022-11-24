@@ -94,6 +94,14 @@ class Base3dModel(BaseModel):
         geo_net = self.get_net()[0]
         geo_net.pretrain_siren()
 
+    def get_obj_bound_type(self):
+        """Only in fg_model"""
+        return None
+
+    def get_obj_bound_structure(self):
+        """Only in fg_model"""
+        return None
+
     def get_dynamicbs_factor(self):
         """Get the dynamic factor from fg model"""
         return 1

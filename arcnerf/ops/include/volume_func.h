@@ -225,7 +225,7 @@ inline __device__ int mip_from_pos(
 
 inline HOST_DEVICE uint32_t cascaded_grid_idx_at_multivol(
    Vector3f pos,
-   const uint32_t mip,  // should > 0
+   const uint32_t mip,
    const Vector3f xyz_min,  // should be the inner one
    const Vector3f xyz_max,
    const uint32_t n_grid
@@ -261,10 +261,15 @@ inline HOST_DEVICE bool density_grid_occupied_at_multivol(
     const uint32_t mip,
     const Vector3f xyz_min,  // should be the inner one
     const Vector3f xyz_max,
-    const uint32_t n_grid
+    const uint32_t n_grid,
+    const bool inclusive
 ) {
     uint32_t idx = cascaded_grid_idx_at_multivol(pos, mip, xyz_min, xyz_max, n_grid);
-    return bitfield[idx / 8 + grid_mip_offset(mip-1, n_grid) / 8] & (1 << (idx % 8));  // ignore the first level
+
+    if (inclusive)
+        return bitfield[idx / 8 + grid_mip_offset(mip, n_grid) / 8] & (1 << (idx % 8));
+    else
+        return bitfield[idx / 8 + grid_mip_offset(mip-1, n_grid) / 8] & (1 << (idx % 8));  // ignore the first level
 }
 
 

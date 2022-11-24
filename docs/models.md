@@ -359,3 +359,5 @@ It uses dense sampling with pruning bitfield, which samples in important area fo
 `instant-ngp` since the sampled points are in volume range.
 - basic_volume: Compared to `instant-ngp` which uses a fix volume structure, we are free to set the basic_volume and expand by pow of 2 in each
 cascade.
+  - inclusive: The bkg_model can also be a full-scene model by setting `inclusive` as True, which samples pts in the inner
+  volume as well. In this mode, it will be different to do extraction, by rendering is fine.

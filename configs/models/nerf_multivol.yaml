@@ -65,6 +65,7 @@ model:
             origin: [0.0, 0.0, 0.0]         # origin of volume
             side: 1.0                       # side length of the volume
             n_cascade: 5                    # num of cascade, it should exclude the inner one. max volume side is (2**(n-1)*side)
+            inclusive: False                # bkg model exclude the inner volume
         optim:
             epoch_optim: 16                 # epoch pruning the volume
             epoch_optim_warmup: 256         # warmup period for pruning

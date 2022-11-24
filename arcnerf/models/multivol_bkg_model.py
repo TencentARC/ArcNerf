@@ -18,8 +18,8 @@ from .base_modules import build_geo_model, build_radiance_model
 
 @MODEL_REGISTRY.register()
 class MultiVol(BkgModel):
-    """ Multi-Volume model with several resolution. It is the one used in instant-ngp,
-        but inner volume is removed
+    """ Multi-Volume model with several resolution. It is the one used in instant-ngp, but inner volume is removed
+        But actually it can be served as a FG_Model as well by include the inner volume
     """
 
     def __init__(self, cfgs):
@@ -41,6 +41,7 @@ class MultiVol(BkgModel):
         assert self.n_cascade > 1, 'You should have at least 2 cascades...'
         self.n_grid = vol_cfgs.n_grid
         self.basic_volume = Volume(**vol_cfgs.__dict__)
+        self.inclusive = get_value_from_cfgs_field(vol_cfgs, 'inclusive', False)  # True to include
 
         # min vol & max vol range
         origin = self.basic_volume.get_origin()  # (3, )
@@ -54,7 +55,10 @@ class MultiVol(BkgModel):
 
         # set bitfield for pruning
         self.n_elements = self.n_grid**3
-        self.total_n_elements = self.n_elements * (self.n_cascade - 1)
+        if self.inclusive:
+            self.total_n_elements = self.n_elements * self.n_cascade
+        else:
+            self.total_n_elements = self.n_elements * (self.n_cascade - 1)
         # density bitfield
         density_bitfield = (torch.ones((self.total_n_elements // 8, ), dtype=torch.uint8) * 255).type(torch.uint8)
         self.register_buffer('density_bitfield', density_bitfield)
@@ -101,7 +105,8 @@ class MultiVol(BkgModel):
             self.n_grid,
             self.n_cascade,
             self.density_bitfield,
-            near_distance=self.get_optim_cfgs('near_distance')
+            near_distance=self.get_optim_cfgs('near_distance'),
+            inclusive=self.inclusive
         )
 
         return zvals, mask
@@ -222,11 +227,11 @@ class MultiVol(BkgModel):
         # get sample. The inner level will be ignored
         pos_uniform, idx_uniform = generate_grid_samples_multivol(
             self.density_grid, n_uniform, self.basic_volume.get_range(), self.ema_step, self.n_cascade, self.n_grid,
-            -0.01
+            -0.01, self.inclusive
         )
         pos_nonuniform, idx_nonuniform = generate_grid_samples_multivol(
             self.density_grid, n_nonuniform, self.basic_volume.get_range(), self.ema_step, self.n_cascade, self.n_grid,
-            self.get_optim_cfgs('opa_thres')
+            self.get_optim_cfgs('opa_thres'), self.inclusive
         )
 
         # merge
@@ -250,7 +255,7 @@ class MultiVol(BkgModel):
         density_grid_mean = self.get_density_grid_mean()
         self.density_bitfield = update_bitfield_multivol(
             self.density_grid, density_grid_mean, self.density_bitfield, self.get_optim_cfgs('opa_thres'), self.n_grid,
-            self.n_cascade
+            self.n_cascade, self.inclusive
         )
 
         self.ema_step = self.ema_step + 1

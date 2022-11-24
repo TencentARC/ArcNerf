@@ -80,9 +80,9 @@ class GenerateGridSamples(torch.autograd.Function):
 
 
 @torch.no_grad()
-def generate_grid_samples(density_grid, n_elements, density_grid_ema_step, thresh, n_grid):
+def generate_grid_samples(density_grid, n_elements, density_grid_ema_step, n_grid, thresh):
     """Generate grid samples in each voxel. The function generates inputs in [0, 1) range"""
-    return GenerateGridSamples.apply(density_grid, n_elements, density_grid_ema_step, thresh, n_grid)
+    return GenerateGridSamples.apply(density_grid, n_elements, density_grid_ema_step, n_grid, thresh)
 
 
 # -------------------------------------------------- ------------------------------------ #

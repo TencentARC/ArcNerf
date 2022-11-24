@@ -26,6 +26,7 @@ void sparse_sampling_in_multivol_bitfield_cuda(
     const int n_cascade,
     const torch::Tensor bitfield,
     const float near_distance,
+    const bool inclusive,
     torch::Tensor zvals,
     torch::Tensor mask);
 
@@ -45,6 +46,7 @@ void sparse_sampling_in_multivol_bitfield_cuda(
    @param: n_cascade, cascade level
    @param: bitfield, (n_grid**3 / 8) uint8 bit
    @param: near_distance, near distance for sampling. By default 0.0.
+   @param: inclusive, whether to include in the inner volume. By default False
    @return: zvals, (N_rays, N_pts), sampled points zvals on each rays.
    @return: mask, (N_rays, N_pts), show whether each ray has intersection with the volume, BoolTensor
 */
@@ -63,6 +65,7 @@ void sparse_sampling_in_multivol_bitfield(
     const int n_cascade,
     const torch::Tensor bitfield,
     const float near_distance,
+    const bool inclusive,
     torch::Tensor zvals,
     torch::Tensor mask){
     // checking
@@ -101,9 +104,11 @@ void sparse_sampling_in_multivol_bitfield(
         throw std::runtime_error{"xyz range should be in (2, 3)."};
     }
 
-    if (bitfield.size(0) != (n_grid * n_grid * n_grid / 8) * (n_cascade - 1)) {
-        throw std::runtime_error{"bitfield should be in (n_grid**3/8,)."};
+    int n_level = inclusive ? n_cascade : n_cascade-1;
+    if (bitfield.size(0) != (n_grid * n_grid * n_grid / 8) * n_level) {
+        throw std::runtime_error{"bitfield should be in (n_grid**3/8*n_level,)."};
     }
+
 
     if (zvals.size(0) != rays_o.size(0) || zvals.size(1) != n_pts) {
         throw std::runtime_error{"zval should be in (n_rays, n_pts)."};
@@ -116,7 +121,7 @@ void sparse_sampling_in_multivol_bitfield(
     // call actual cuda function
     return sparse_sampling_in_multivol_bitfield_cuda(
         rays_o, rays_d, near, far, n_pts, cone_angle, min_step, max_step,
-        min_aabb_range, aabb_range, n_grid, n_cascade, bitfield, near_distance,
+        min_aabb_range, aabb_range, n_grid, n_cascade, bitfield, near_distance, inclusive,
         zvals, mask
     );
 }
@@ -133,6 +138,7 @@ void generate_grid_samples_multivol_cuda(
     const int n_cascade,
     const int n_grid,
     const float thresh,
+    const bool inclusive,
     torch::Tensor density_grid_positions_uniform,
     torch::Tensor density_grid_indices_uniform);
 
@@ -144,6 +150,7 @@ void generate_grid_samples_multivol(
     const int n_cascade,
     const int n_grid,
     const float thresh,
+    const bool inclusive,
     torch::Tensor density_grid_positions_uniform,
     torch::Tensor density_grid_indices_uniform) {
 
@@ -158,7 +165,7 @@ void generate_grid_samples_multivol(
     CHECK_IS_INT(density_grid_indices_uniform)
 
     return generate_grid_samples_multivol_cuda(
-        density_grid, density_grid_ema_step, n_elements, aabb_range, n_cascade, n_grid, thresh,
+        density_grid, density_grid_ema_step, n_elements, aabb_range, n_cascade, n_grid, thresh, inclusive,
         density_grid_positions_uniform, density_grid_indices_uniform);
 }
 
@@ -172,7 +179,8 @@ void update_bitfield_multivol_cuda(
     torch::Tensor density_grid_bitfield,
     const float thres,
     const int n_grid,
-    const int n_cascade);
+    const int n_cascade,
+    const bool inclusive);
 
 void update_bitfield_multivol(
     const torch::Tensor density_grid,
@@ -180,14 +188,16 @@ void update_bitfield_multivol(
     torch::Tensor density_grid_bitfield,
     const float thres,
     const int n_grid,
-    const int n_cascade) {
+    const int n_cascade,
+    const bool inclusive) {
 
     // checking
     CHECK_INPUT(density_grid)
     CHECK_IS_FLOATING(density_grid)
     CHECK_INPUT(density_grid_bitfield)
 
-    return update_bitfield_multivol_cuda(density_grid, density_grid_mean, density_grid_bitfield, thres, n_grid, n_cascade);
+    return update_bitfield_multivol_cuda(
+        density_grid, density_grid_mean, density_grid_bitfield, thres, n_grid, n_cascade, inclusive);
 }
 
 

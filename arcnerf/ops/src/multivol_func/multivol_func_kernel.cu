@@ -32,6 +32,7 @@ __global__ void sparse_sampling_in_multivol_bitfield_cuda_kernel(
     const float min_step,
     const float max_step,
     const float near_distance,
+    const bool inclusive,
     default_rng_t rng,
     float *__restrict__ zvals,  //(N_rays, N_pts)
     bool *__restrict__ mask) {  //(N_rays, N_pts)
@@ -67,7 +68,7 @@ __global__ void sparse_sampling_in_multivol_bitfield_cuda_kernel(
         float dt = calc_dt(t, cone_angle, min_step, max_step);
         uint32_t mip = mip_from_pos(pos, minvol_xyz_min, minvol_xyz_max, n_cascade);
 
-        if (mip == 0) {  // since it hits the inner volume, revert back, The sampling should not cover bkg -> fg -> bkg sequence
+        if (mip == 0 && !inclusive) {  // since it hits the inner volume, revert back, The sampling should not cover bkg -> fg -> bkg sequence
             // reset all the previous values, and j becomes 0
             while (j > 0) {
                 zvals[j] = 0.0;
@@ -78,7 +79,7 @@ __global__ void sparse_sampling_in_multivol_bitfield_cuda_kernel(
             mask[j] = false;
             t = advance_to_next_voxel(t, dt, pos, _rays_d, minvol_xyz_min, minvol_xyz_max, n_grid);
         } else {
-            if (density_grid_occupied_at_multivol(pos, bitfield, mip, minvol_xyz_min, minvol_xyz_max, n_grid)) {
+            if (density_grid_occupied_at_multivol(pos, bitfield, mip, minvol_xyz_min, minvol_xyz_max, n_grid, inclusive)) {
                 // update the pts and mask
                 zvals[j] = t;
                 mask[j] = true;
@@ -120,6 +121,7 @@ __global__ void sparse_sampling_in_multivol_bitfield_cuda_kernel(
    @param: n_cascade, cascade level
    @param: bitfield, (n_grid**3 / 8) uint8 bit
    @param: near_distance, near distance for sampling. By default 0.0.
+   @param: inclusive, whether to include in the inner volume. By default False
    @return: zvals, (N_rays, N_pts), sampled points zvals on each rays.
    @return: mask, (N_rays, N_pts), show whether each ray has intersection with the volume, BoolTensor
 */
@@ -138,6 +140,7 @@ void sparse_sampling_in_multivol_bitfield_cuda(
     const int n_cascade,
     const torch::Tensor bitfield,
     const float near_distance,
+    const bool inclusive,
     torch::Tensor zvals,
     torch::Tensor mask) {
 
@@ -160,7 +163,7 @@ void sparse_sampling_in_multivol_bitfield_cuda(
 
     linear_kernel(sparse_sampling_in_multivol_bitfield_cuda_kernel, 0, stream, n_rays,
         rays_o_p, rays_d_p, near_p, far_p, min_aabb_range_p, aabb_range_p, bitfield_p,
-        (uint32_t)n_grid, (uint32_t)n_cascade, (uint32_t)n_pts, cone_angle, min_step, max_step, near_distance,
+        (uint32_t)n_grid, (uint32_t)n_cascade, (uint32_t)n_pts, cone_angle, min_step, max_step, near_distance, inclusive,
         rng, zvals_p, mask_p);
 
     rng.advance();
@@ -181,7 +184,8 @@ __global__ void generate_grid_samples_multivol_cuda_kernel(
     uint32_t *__restrict__ indices,
     uint32_t n_cascades,
     uint32_t n_grid,
-    const float thresh)
+    const float thresh,
+    const bool inclusive)
 {
     const uint32_t i = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -190,9 +194,15 @@ __global__ void generate_grid_samples_multivol_cuda_kernel(
 
     // 1 random number to select the level, 3 to select the position.
     rng.advance(i * 4);
-   uint32_t level = 0;
-    while (level == 0) {  // ignore the inner one
+
+    // sample
+    uint32_t level = 0;
+    if (inclusive) {
         level = (uint32_t)(random_val(rng) * n_cascades) % n_cascades;
+    } else {
+        while (level == 0) {  // ignore the inner one
+            level = (uint32_t)(random_val(rng) * n_cascades) % n_cascades;
+        }
     }
 
     uint32_t n_grid_per_level = n_grid * n_grid * n_grid;
@@ -202,7 +212,10 @@ __global__ void generate_grid_samples_multivol_cuda_kernel(
     for (uint32_t j = 0; j < 10; ++j)
     {
         idx = ((i + step * n_elements) * 56924617 + j * 19349663 + 96925573) % n_grid_per_level;
-        idx += (level - 1) * n_grid_per_level;  // The first level do not exist
+        if (inclusive)
+            idx += level * n_grid_per_level;
+        else
+            idx += (level - 1) * n_grid_per_level;  // The first level do not exist
         if (grid_in[idx] > thresh)
         {
             break;
@@ -234,6 +247,7 @@ void generate_grid_samples_multivol_cuda(
         const int n_cascade,
         const int n_grid,
         const float thresh,
+        const bool inclusive,
         torch::Tensor density_grid_positions_uniform,
         torch::Tensor density_grid_indices_uniform) {
 
@@ -250,7 +264,7 @@ void generate_grid_samples_multivol_cuda(
     linear_kernel(generate_grid_samples_multivol_cuda_kernel, 0, stream,
         n_elements, aabb_range_p, rng, (uint32_t)density_grid_ema_step, density_grid_p,
         density_grid_positions_uniform_p, density_grid_indices_p,
-        (uint32_t)n_cascade, (uint32_t)n_grid, thresh);
+        (uint32_t)n_cascade, (uint32_t)n_grid, thresh, inclusive);
 
     rng.advance();
     cudaDeviceSynchronize();
@@ -291,7 +305,8 @@ void update_bitfield_multivol_cuda(
     torch::Tensor density_grid_bitfield,
     const float thres,
     const int n_grid,
-    const int n_cascade) {
+    const int n_cascade,
+    const bool inclusive) {
 
     cudaStream_t stream=0;
     // input
@@ -303,8 +318,13 @@ void update_bitfield_multivol_cuda(
     const uint32_t n_elements = u_n_grid * u_n_grid * u_n_grid;
     const uint32_t u_n_cascades = (uint32_t)n_cascade;
 
-    linear_kernel(grid_to_bitfield, 0, stream, n_elements / 8 * (u_n_cascades-1),
-        density_grid_p, density_grid_bitfield_p, density_grid_mean, thres);
+    if (inclusive) {
+        linear_kernel(grid_to_bitfield, 0, stream, n_elements / 8 * u_n_cascades,
+            density_grid_p, density_grid_bitfield_p, density_grid_mean, thres);
+    } else {
+        linear_kernel(grid_to_bitfield, 0, stream, n_elements / 8 * (u_n_cascades-1),
+            density_grid_p, density_grid_bitfield_p, density_grid_mean, thres);
+    }
 
     cudaDeviceSynchronize();
 }
