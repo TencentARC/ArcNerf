@@ -41,7 +41,7 @@ optim:
         lr_steps: [20000, 30000, 40000, 50000]
     clip_gradients: 0.0
     clip_warmup: 2000
-    clip_gradients_warmup: 15.0   # hashgrid encode grad -> inf
+    clip_gradients_warmup: 15.0  # hashgrid sometimes get (-)inf grad
 
 progress:
     start_epoch: -1

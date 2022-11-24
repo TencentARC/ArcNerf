@@ -141,48 +141,77 @@ class FullModel(nn.Module):
         All inputs flatten in (B, x) dim
         """
         assert 'progress_sigma_coarse' in fg_output, 'You must get_progress for fg_model'
-        # coarse stage output from fg_model, (B, n_fg + n_bkg-1), already sorted since fg/bkg in different range
-        sigma_coarse_all = torch.cat([fg_output['progress_sigma_coarse'], bkg_output['progress_sigma']], 1)
-        radiance_coarse_all = torch.cat([fg_output['progress_radiance_coarse'], bkg_output['progress_radiance']], 1)
-        zvals_coarse_all = torch.cat([fg_output['progress_zvals_coarse'], bkg_output['progress_zvals']], 1)
 
-        # re-run fg ray-marching in coarse stage
-        fg_output_coarse = self.fg_model.ray_marching(
-            sigma_coarse_all,
-            radiance_coarse_all,
-            zvals_coarse_all,
-            add_inf_z=self.fg_model.get_ray_cfgs('add_inf_z'),
-            inference_only=inference_only
-        )
+        def run_blend_sigma(
+            fg_output, bkg_output, fg_key='_coarse', bkg_key='', inference_only=False, get_progress=False
+        ):
+            # reset the invalid sample, such that fg_output is sampling after some bkg sample
+            zvals_fg = fg_output['progress_zvals{}'.format(fg_key)]
+            zvals_bkg = bkg_output['progress_zvals{}'.format(bkg_key)]
+            invalid_idx = zvals_fg[:, -1] > zvals_bkg[:, 0]
+            # reset to 0
+            sigma_fg = fg_output['progress_sigma{}'.format(fg_key)]
+            sigma_bkg = bkg_output['progress_sigma{}'.format(bkg_key)]
+            radiance_fg = fg_output['progress_radiance{}'.format(fg_key)]
+            radiance_bkg = bkg_output['progress_radiance{}'.format(bkg_key)]
+            sigma_fg[invalid_idx] = 0
+            radiance_fg[invalid_idx] = 0
+            zvals_fg[invalid_idx] = 0
 
-        # just replace overall rgb and depth
-        for key in ['rgb', 'depth']:
-            fg_output[key + '_coarse'] = fg_output_coarse[key]
+            # coarse stage output from fg_model, (B, n_fg + n_bkg-1), already sorted since fg/bkg in different range
+            sigma_all = torch.cat([sigma_fg, sigma_bkg], 1)
+            radiance_all = torch.cat([radiance_fg, radiance_bkg], 1)
+            zvals_all = torch.cat([zvals_fg, zvals_bkg], 1)
 
-        # fine stage output from fg_model, (B, n_fg + n_bkg-1), already sorted since fg/bkg in different range
-        if 'progress_sigma_fine' in fg_output:
-            # (B, n_fg + n_bkg-1), already sorted since fg/bkg in different range
-            sigma_fine_all = torch.cat([fg_output['progress_sigma_fine'], bkg_output['progress_sigma']], 1)
-            radiance_fine_all = torch.cat([fg_output['progress_radiance_fine'], bkg_output['progress_radiance']], 1)
-            zvals_fine_all = torch.cat([fg_output['progress_zvals_fine'], bkg_output['progress_zvals']], 1)
-
-            # re-run fg ray-marching in fine stage
-            fg_output_fine = self.fg_model.ray_marching(
-                sigma_fine_all,
-                radiance_fine_all,
-                zvals_fine_all,
-                add_inf_z=self.fg_model.get_ray_cfgs('add_inf_z'),
-                inference_only=inference_only
+            # re-run fg ray-marching in coarse stage
+            fg_output_all = self.fg_model.ray_marching(
+                sigma_all, radiance_all, zvals_all, inference_only=inference_only
             )
 
-            # just replace overall rgb and depth
-            for key in ['rgb', 'depth']:
-                fg_output[key + '_fine'] = fg_output_fine[key]
+            # get progress for fg_model only
+            fg_output_all = self.fg_model.output_get_progress(fg_output_all, get_progress, sigma_fg.shape[1])
+
+            # replace the keys
+            final_out = {}
+            for k, v in fg_output_all.items():
+                if k == 'mask' and k + fg_key in fg_output.keys():  # The mask is still from fg output only
+                    final_out[k + fg_key] = fg_output[k + fg_key]
+                else:
+                    final_out[k + fg_key] = v
+
+            return final_out
+
+        if any([key.endswith('_coarse') or key.endswith('_fine') for key in bkg_output.keys()]):  # bkg is two stage
+            blend_coarse_output = run_blend_sigma(
+                fg_output, bkg_output, '_coarse', '_coarse', inference_only, get_progress
+            )
+            blend_fine_output = {}
+            if 'progress_sigma_fine' in fg_output:
+                if 'progress_sigma_fine' in bkg_output:
+                    blend_fine_output = run_blend_sigma(
+                        fg_output, bkg_output, '_fine', '_fine', inference_only, get_progress
+                    )
+                else:
+                    blend_fine_output = run_blend_sigma(
+                        fg_output, bkg_output, '_fine', '_coarse', inference_only, get_progress
+                    )
+        else:  # bkg is one stage
+            blend_coarse_output = run_blend_sigma(fg_output, bkg_output, '_coarse', '', inference_only, get_progress)
+            blend_fine_output = {}
+            if 'progress_sigma_fine' in fg_output:
+                blend_fine_output = run_blend_sigma(fg_output, bkg_output, '_fine', '', inference_only, get_progress)
+
+        # merge two stage
+        blend_out = {}
+        for k, v in blend_coarse_output.items():
+            blend_out[k] = v
+        for k, v in blend_fine_output.items():
+            blend_out[k] = v
 
         # keep one set of progress
-        fg_output = self.clean_two_stage_progress(fg_output)
+        blend_out = self.clean_two_stage_progress(blend_out)
 
-        return fg_output
+        return blend_out
 
     def blend_bkg_sigma(self, fg_output, bkg_output, inference_only=False, get_progress=False):
         """blend fg + bkg for sigma/radiance and re-run ray marching together.
@@ -197,26 +226,50 @@ class FullModel(nn.Module):
             return self.blend_two_stage_bkg_sigma(fg_output, bkg_output, inference_only, get_progress)
 
         assert 'progress_sigma' in fg_output, 'You must get_progress for fg_model'
+        if any([key.endswith('_coarse') or key.endswith('_fine') for key in bkg_output.keys()]):  # bkg is two stage
+            if 'progress_sigma_fine' in bkg_output.keys():
+                bkg_sigma = bkg_output['progress_sigma_fine']
+                bkg_radiance = bkg_output['progress_radiance_fine']
+                bkg_zvals = bkg_output['progress_zvals_fine']
+            else:
+                bkg_sigma = bkg_output['progress_sigma_coarse']
+                bkg_radiance = bkg_output['progress_radiance_coarse']
+                bkg_zvals = bkg_output['progress_zvals_coarse']
+        else:
+            bkg_sigma = bkg_output['progress_sigma']
+            bkg_radiance = bkg_output['progress_radiance']
+            bkg_zvals = bkg_output['progress_zvals']
+
+        # reset the invalid sample, such that fg_output is sampling after some bkg sample
+        fg_zvals = fg_output['progress_zvals']
+        invalid_idx = fg_zvals[:, -1] > bkg_zvals[:, 0]
+        # reset to 0
+        fg_sigma = fg_output['progress_sigma']
+        fg_radiance = fg_output['progress_radiance']
+        fg_sigma[invalid_idx] = 0
+        fg_radiance[invalid_idx] = 0
+        fg_zvals[invalid_idx] = 0
 
         # (B, n_fg + n_bkg-1), already sorted since fg/bkg in different range
-        sigma_all = torch.cat([fg_output['progress_sigma'], bkg_output['progress_sigma']], 1)
-        radiance_all = torch.cat([fg_output['progress_radiance'], bkg_output['progress_radiance']], 1)
-        zvals_all = torch.cat([fg_output['progress_zvals'], bkg_output['progress_zvals']], 1)
+        sigma_all = torch.cat([fg_sigma, bkg_sigma], 1)
+        radiance_all = torch.cat([fg_radiance, bkg_radiance], 1)
+        zvals_all = torch.cat([fg_zvals, bkg_zvals], 1)
 
         # re-run fg ray-marching
-        fg_output_all = self.fg_model.ray_marching(
-            sigma_all,
-            radiance_all,
-            zvals_all,
-            add_inf_z=self.fg_model.get_ray_cfgs('add_inf_z'),
-            inference_only=inference_only
-        )
+        fg_output_all = self.fg_model.ray_marching(sigma_all, radiance_all, zvals_all, inference_only=inference_only)
 
-        # just replace overall rgb and depth
-        for key in ['rgb', 'depth']:
-            fg_output[key] = fg_output_all[key]
+        # get progress for fg_model only
+        fg_output_all = self.fg_model.output_get_progress(fg_output_all, get_progress, fg_sigma.shape[1])
 
-        return fg_output
+        # replace the keys
+        final_out = {}
+        for k, v in fg_output_all.items():
+            if k == 'mask' and k in fg_output.keys():  # The mask is still from fg output only
+                final_out[k] = fg_output[k]
+            else:
+                final_out[k] = v
+
+        return fg_output_all
 
     def blend_two_stage_bkg_rgb(self, fg_output, bkg_output):
         """ blend fg + bkg for rgb and depth with coarse/fine output. mask is still for foreground only.
@@ -389,7 +442,7 @@ class FullModel(nn.Module):
 
         # reshape values from (B*N, ...) to (B, N, ...)
         output = self.reshape_output(output, batch_size, n_rays_per_batch)
-
+        print('Output keys ', output.keys())
         return output
 
     def process_fg_bkg_model(

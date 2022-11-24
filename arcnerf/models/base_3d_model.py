@@ -164,7 +164,7 @@ class Base3dModel(BaseModel):
         if get_progress:  # rename the keys
             for key in ['sigma', 'zvals', 'alpha', 'trans_shift', 'weights', 'radiance']:
                 if n_fg is not None:
-                    output['progress_{}'.format(key)] = output[key][:, n_fg]  # (B, N_fg)
+                    output['progress_{}'.format(key)] = output[key][:, :n_fg]  # (B, N_fg)
                 else:
                     output['progress_{}'.format(key)] = output[key]  # (B, N_sample(-1))
 

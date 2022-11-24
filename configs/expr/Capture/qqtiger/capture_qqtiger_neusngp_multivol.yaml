@@ -41,7 +41,7 @@ optim:
         lr_steps: [20000, 30000, 40000, 50000]
     clip_gradients: 0.0
     clip_warmup: 2000
-    clip_gradients_warmup: 15.0
+    clip_gradients_warmup: 15.0  # hashgrid sometimes get (-)inf grad
 
 progress:
     start_epoch: -1
@@ -101,28 +101,28 @@ dataset:
         device: gpu
         precache: True
 
-#inference:
-#    to_gpu: True
-#    render:
-#        type: [circle]
-#        n_cam: [20]
-#        repeat: [3]
-#        radius: 2.0
-#        u_start: 0.75
-#        v_ratio: -0.2
-#        fps: 5
-#        center_pixel: True
-#        surface_render:
-#            chunk_rays_factor: 1024
-#            method: sphere_tracing
-#    volume:
-#        n_grid: 512
-#        side: 1.5
-#        level: 0.0
-#        grad_dir: ascent
-#        chunk_pts_factor: 1
-#        render_mesh:
-#            backend: pytorch3d
+inference:
+    to_gpu: True
+    render:
+        type: [circle]
+        n_cam: [20]
+        repeat: [3]
+        radius: 2.0
+        u_start: 0.75
+        v_ratio: -0.2
+        fps: 5
+        center_pixel: True
+        surface_render:
+            chunk_rays_factor: 1024
+            method: sphere_tracing
+    volume:
+        n_grid: 512
+        side: 1.5
+        level: 0.0
+        grad_dir: ascent
+        chunk_pts_factor: 1
+        render_mesh:
+            backend: pytorch3d
 
 model:
     type: Neus
@@ -173,7 +173,7 @@ model:
         W_feat: 16
         geometric_init: True          # use geometric init. need radius_init
         radius_init: 0.75              # geometric init sphere radius
-        weight_norm: True
+        weight_norm: False   # no use, get nan
         skip_reduce_output: True
         norm_skip: True
         act_cfg: # activation function for dense layer
@@ -197,7 +197,7 @@ model:
                 backend: tcnn
                 dtype: torch.float32
         W_feat_in: 16
-        weight_norm: True
+        weight_norm: False   # no use, get nan
     background:
         type: MultiVol                    # background model type with multivol
         bkg_blend: 'rgb'
