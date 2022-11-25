@@ -1,4 +1,4 @@
-name: capture_qqtiger_neus_nerfpprgb
+name: dtu_65_neus
 
 resume: None
 
@@ -8,11 +8,11 @@ debug:
     get_progress: False
 
 dir:
-    expr_dir: None
+    expr_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/benchmark/DTU/neus'
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_neus_nerfpprgb'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_65_neus'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_neus_nerfpprgb/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/benchmark/DTU/neus/dtu_65_neus/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -25,7 +25,7 @@ dist:
     slurm: False
 
 batch_size: 2
-n_rays: 512     # follow original repo
+n_rays: 512
 worker: 4
 
 optim:
@@ -48,12 +48,12 @@ progress:
 
     epoch_loss: 100
     iter_loss: 1
-    save_progress: True
+    save_progress: False
     epoch_save_progress: 50000
     iter_save_progress: 1
 
     epoch_val: 50000
-    save_progress_val: True
+    save_progress_val: False
     max_samples_val: 1
 
     epoch_save_checkpoint: 100000
@@ -65,59 +65,33 @@ progress:
 
 dataset:
     train:
-        type: Capture
-        scene_name: qqtiger
-        test_holdout: 24
-        img_scale: 0.25
+        type: DTU
+        scan_id: 65
+        img_scale: 1.0
         scale_radius: 3.0
-        pc_radius: 2.0
-        skip: 3
-        device: gpu
+        align_cam: True
         precache: True
-
-    val:
-        type: Capture
-        scene_name: qqtiger
-        test_holdout: 24
-        img_scale: 0.125
-        scale_radius: 3.0
-        pc_radius: 2.0
         device: gpu
-        precache: False
+        augmentation:
+            blend_bkg_color:
+                bkg_color: [1.0, 1.0, 1.0]
+        scheduler:
+            precrop:
+                ratio: 0.5
+                max_epoch: 500
 
     eval:
         eval_batch_size: 1
-        type: Capture
-        scene_name: qqtiger
-        test_holdout: 24
-        img_scale: 0.25
+        type: DTU
+        scan_id: 65
+        img_scale: 1.0
         scale_radius: 3.0
-        pc_radius: 2.0
-        device: gpu
+        align_cam: True
         precache: True
-
-inference:
-    to_gpu: True
-    render:
-        type: [circle]
-        n_cam: [20]
-        repeat: [3]
-        radius: 2.0
-        u_start: 0.75
-        v_ratio: -0.2
-        fps: 5
-        surface_render:
-            chunk_rays_factor: 1024
-            method: sphere_tracing
-
-    volume:
-        n_grid: 512
-        side: 1.5
-        level: 0.0
-        grad_dir: ascent
-        chunk_pts_factor: 1
-        render_mesh:
-            backend: pytorch3d
+        device: gpu
+        augmentation:
+            blend_bkg_color:            # eval on white bkg
+                bkg_color: [1.0, 1.0, 1.0]
 
 model:
     type: Neus
@@ -126,8 +100,6 @@ model:
             radius: 1.5
     rays:
         radius_bound: 1.5
-        # near: 1.5
-        # far: 4.5
         n_sample: 64
         n_importance: 64
         n_iter: 4
@@ -135,7 +107,7 @@ model:
         perturb: True
         add_inf_z: False
         noise_std: 0.0
-        white_bkg: False
+        white_bkg: True
     params:
         speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
         init_var: 0.05                # init var, when it approaches 0, cdf more close
@@ -152,11 +124,11 @@ model:
             n_freqs: 10
         W_feat: 256
         geometric_init: True          # use geometric init. need radius_init
-        radius_init: 0.75             # geometric init sphere radius
+        radius_init: 0.5              # geometric init sphere radius
         weight_norm: True
         skip_reduce_output: True
         norm_skip: True
-        act_cfg:                      # activation function for dense layer
+        act_cfg: # activation function for dense layer
             type: softplus
             beta: 100
     radiance:
@@ -174,43 +146,15 @@ model:
                 n_freqs: 4
         W_feat_in: 256
         weight_norm: True
-    background:
-        type: NeRFPP
-        bkg_blend: 'rgb'
-        rays:
-            bounding_radius: 3.0
-            n_sample: 32
-            perturb: True
-            add_inf_z: True         # must set to be True
-            noise_std: 0.0
-            white_bkg: False
-        chunk_rays: 4096
-        chunk_pts: 131072
-        geometry:
-            W: 256
-            D: 8
-            skips: [4]
-            encoder:
-                type: FreqEmbedder
-                input_dim: 4              # xyz+1/r input channel
-                n_freqs: 10
-            W_feat: 256
-            geometric_init: False
-        radiance:
-            mode: 'vf'
-            W: 128
-            D: 1
-            encoder:
-                view:
-                    type: FreqEmbedder
-                    input_dim: 3
-                    n_freqs: 4
-            W_feat_in: 256
 
 loss:
     ImgLoss:
         loss_type: L1
+        use_mask: True
         weight: 1.0
+    MaskLoss:
+        loss_type: BCE
+        weight: 0.1
     EikonalLoss:
         key: normal_pts
         weight: 0.1

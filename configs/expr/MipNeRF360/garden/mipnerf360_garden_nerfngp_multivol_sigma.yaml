@@ -69,7 +69,6 @@ dataset:
     train:
         type: MipNeRF360
         scene_name: garden
-        test_holdout: 24
         img_scale: 0.25
         scale_radius: 3.0
         center_pixel: True
@@ -80,7 +79,6 @@ dataset:
     val:
         type: MipNeRF360
         scene_name: garden
-        test_holdout: 24
         img_scale: 0.25
         center_pixel: True
         scale_radius: 3.0
@@ -91,7 +89,6 @@ dataset:
     eval:
         type: MipNeRF360
         scene_name: garden
-        test_holdout: 24
         img_scale: 0.25
         center_pixel: True
         scale_radius: 3.0
@@ -191,7 +188,7 @@ model:
             epoch_optim: 16
             epoch_optim_warmup: 256
             near_distance: 0.2
-            opa_thres: 0.01
+            opa_thres: 0.001
             ema_optim_decay: 0.95
         rays:
             n_sample: 1024

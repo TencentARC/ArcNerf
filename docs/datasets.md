@@ -390,7 +390,7 @@ Some datasets may not be downloaded from their ref address. We show all the addr
 - BlenderMVS: https://www.dropbox.com/sh/oum8dyo19jqdkwu/AAAxpIifYjjotz_fIRBj1Fyla?preview=BlendedMVS.zip
 - NSVF: https://github.com/facebookresearch/NSVF
 - RTMV: https://drive.google.com/drive/folders/1cUXxUp6g25WwzHnm_491zNJJ4T7R_fum
-- Tanks&Temples: https://www.tanksandtemples.org/download/
+- Tanks&Temples: https://www.tanksandtemples.org/download/; https://github.com/Kai-46/nerfplusplus
 - MipNerf-360: http://storage.googleapis.com/gresearch/refraw360/360_v2.zip
 
 ------------------------------------------------------------------------

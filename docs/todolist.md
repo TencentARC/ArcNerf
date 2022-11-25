@@ -24,7 +24,6 @@ Model level:
 
 --------------------------------------------------------------------
 Optimization:
-- MipNerf match the benchmark
 - progressive training with sampling on errorous rays?
 - mix-precision training
 
@@ -35,4 +34,4 @@ Other functionality:
 - nvdiffras based rendering optimzation
 - real time train/inference online demo, any view point visual(opengl, cuda, etc)
 - online training gui(many have done)
-- 3d modification, text2obj generation
+- 3d modification, text2obj generation(HOT TOPIC)

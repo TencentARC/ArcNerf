@@ -55,7 +55,7 @@ progress:
     iter_save_progress: 1
 
     epoch_save_checkpoint: 10000
-    local_progress: True
+    local_progress: False
 
     epoch_val: 5000
     save_progress_val: False
@@ -209,7 +209,7 @@ model:
             epoch_optim: 16
             epoch_optim_warmup: 256
             near_distance: 0.2
-            opa_thres: 0.01
+            opa_thres: 0.001
             ema_optim_decay: 0.95
         rays:
             n_sample: 1024

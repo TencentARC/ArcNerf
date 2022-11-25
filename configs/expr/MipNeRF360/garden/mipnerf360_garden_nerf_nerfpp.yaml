@@ -67,7 +67,6 @@ dataset:
     train:
         type: MipNeRF360
         scene_name: garden
-        test_holdout: 24
         img_scale: 0.25
         scale_radius: 3.0
         cam_t_offset:  [0.0, 1.4, 0.0]
@@ -77,7 +76,6 @@ dataset:
     val:
         type: MipNeRF360
         scene_name: garden
-        test_holdout: 24
         img_scale: 0.25
         scale_radius: 3.0
         cam_t_offset:  [0.0, 1.4, 0.0]
@@ -87,7 +85,6 @@ dataset:
     eval:
         type: MipNeRF360
         scene_name: garden
-        test_holdout: 24
         img_scale: 0.25
         scale_radius: 3.0
         cam_t_offset:  [0.0, 1.4, 0.0]

@@ -1,4 +1,4 @@
-name: capture_plant_nerfpp_rgb
+name: capture_qqtiger_neus_nerfpp
 
 resume: None
 
@@ -10,9 +10,9 @@ debug:
 dir:
     expr_dir: None
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_plant_nerfpp_rgb'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_qqtiger_neus_nerfpp'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_plant_nerfpp_rgb/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_qqtiger_neus_nerfpp/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -25,7 +25,7 @@ dist:
     slurm: False
 
 batch_size: 2
-n_rays: 4096
+n_rays: 512     # follow original repo
 worker: 4
 
 optim:
@@ -33,9 +33,9 @@ optim:
     optim_type: adam
     weight_decay: 0.0
     lr_scheduler:
-        type: ExponentialLR
-        lr_gamma: 0.1
-        lr_steps: [500000]
+        type: WarmUpCosineLR        # follow the original implementation
+        lr_steps: [5000]
+        min_factor: 0.05
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -61,71 +61,86 @@ progress:
 
     init_eval: False
     epoch_eval: 100000
-    max_samples_eval: 3
+    max_samples_eval: 25
 
 dataset:
     train:
         type: Capture
-        scene_name: plant
+        scene_name: qqtiger
+        test_holdout: 24
         img_scale: 0.25
         scale_radius: 3.0
         pc_radius: 2.0
-        skip: 10
+        skip: 3
+        device: gpu
         precache: True
 
     val:
         type: Capture
-        scene_name: plant
+        scene_name: qqtiger
+        test_holdout: 24
         img_scale: 0.125
         scale_radius: 3.0
         pc_radius: 2.0
-        skip: 10
+        device: gpu
         precache: False
 
     eval:
         eval_batch_size: 1
-        eval_max_sample: 3
         type: Capture
-        scene_name: plant
+        scene_name: qqtiger
+        test_holdout: 24
         img_scale: 0.25
         scale_radius: 3.0
         pc_radius: 2.0
-        skip: 10
+        device: gpu
         precache: True
 
 inference:
+    to_gpu: True
     render:
         type: [circle]
         n_cam: [20]
         repeat: [3]
-        radius: 2.5     # cam distribution is different in front and back
+        radius: 2.0
         u_start: 0.75
         v_ratio: -0.2
         fps: 5
+        surface_render:
+            chunk_rays_factor: 1024
+            method: sphere_tracing
 
     volume:
         n_grid: 512
-        origin: [ 0.0, 0.2, 0.4 ]
-        side: 2.0
-        level: 50.0
-        chunk_pts_factor: 32
+        side: 1.5
+        level: 0.0
+        grad_dir: ascent
+        chunk_pts_factor: 1
         render_mesh:
             backend: pytorch3d
 
 model:
-    type: NeRF
+    type: Neus
+    obj_bound: # use a sphere bound for sampling. No need to optimize it.
+        sphere:
+            radius: 1.5
     rays:
-        bounding_radius: 3.0
-        near: 1.0
+        radius_bound: 1.5
+        # near: 1.5
         # far: 4.5
         n_sample: 64
-        n_importance: 128
+        n_importance: 64
+        n_iter: 4
         inverse_linear: False
         perturb: True
-        add_inf_z: False    # should not use inf for foreground rgb ray_marching
+        add_inf_z: False
         noise_std: 0.0
         white_bkg: False
-    chunk_rays: 32768
+    params:
+        speed_factor: 10              # factor for inv_s = -np.log(init_var)/10 ~= 0.3
+        init_var: 0.05                # init var, when it approaches 0, cdf more close
+        anneal_end: 50000             # for anneal param, only set during training. please
+    chunk_rays: 4096
     chunk_pts: 131072
     geometry:
         W: 256
@@ -136,17 +151,29 @@ model:
             input_dim: 3
             n_freqs: 10
         W_feat: 256
-        geometric_init: False
+        geometric_init: True          # use geometric init. need radius_init
+        radius_init: 0.75             # geometric init sphere radius
+        weight_norm: True
+        skip_reduce_output: True
+        norm_skip: True
+        act_cfg:                      # activation function for dense layer
+            type: softplus
+            beta: 100
     radiance:
-        mode: 'vf'
-        W: 128
-        D: 1
+        mode: 'pvnf'
+        W: 256
+        D: 4
         encoder:
+            pts:
+                type: FreqEmbedder
+                input_dim: 3
+                n_freqs: 0            # xyz embed freq, not embedding performed
             view:
                 type: FreqEmbedder
                 input_dim: 3
                 n_freqs: 4
         W_feat_in: 256
+        weight_norm: True
     background:
         type: NeRFPP
         bkg_blend: 'rgb'
@@ -157,7 +184,7 @@ model:
             add_inf_z: True         # must set to be True
             noise_std: 0.0
             white_bkg: False
-        chunk_rays: 32768
+        chunk_rays: 4096
         chunk_pts: 131072
         geometry:
             W: 256
@@ -182,12 +209,14 @@ model:
 
 loss:
     ImgLoss:
-        keys: [ 'rgb_coarse', 'rgb_fine' ]
+        loss_type: L1
         weight: 1.0
+    EikonalLoss:
+        key: normal_pts
+        weight: 0.1
 
 metric:
     PSNR:
 
 train_metric:
     PSNR:
-        key: 'rgb_fine'

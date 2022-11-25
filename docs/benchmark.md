@@ -2,11 +2,17 @@
 
 The benchmark is only for view synthesis, which evals the synthesized image psnr.
 
+Based on the type of data, we could benchmark on :
+    - object level for `NeRF`/`DTU`/`NSVF`/`RTMV`
+    - scene level for `LLFF`/`MipNeRF360`/`TanksAndTemplate`/`Capture`/`BlendedMVS`
+    - We have run on some dataset for benchmark, but not all. We will try to run on all datasets when time and resource allowed.
+
 -----------------------------------------------------------------------
 Expname are in the format of `{dataset}_{scene}_{model}_{other_settings}`.
 
 
 ## NeRF and related
+We follow the exact same setting on dataset split as original NeRF implementation at https://github.com/yenchenlin/nerf-pytorch.
 ### Lego  (800x800, 25 eval images)
 
 | Method |        cfg         | PSNR |    Official repo   |    Official PSNR     | paper PSNR  | Others |
@@ -70,6 +76,7 @@ All image with white-bkg, same as the eval in vanilla NeRF.
 -----------------------------------------------------------------------
 
 ## LLFF
+We follow the exact same setting on dataset split as original NeRF implementation at https://github.com/yenchenlin/nerf-pytorch.
 ### Fern  (378*504, 3 eval images)
 We only use non-ndc version. For ndc space, you need to refer to our [simplenerf](https://github.com/TencentARC/simplenerf) project.
 
@@ -91,7 +98,9 @@ All run for 20w iter and in non ndc-space.
 
 ## DTU
 DTU has 15 indoor scene with limit background. Since mask is provided, we change the background to white like `NeRF` dataset,
-and eval on the pure object image with white bkg. Testhold out is 8 (`1/8` images are for test and not in train).
+and eval on the pure object image with white bkg.
+
+For the dataset split, We do not follow the exact setting as NeuS but keep `testhold` out is `8` (`1/8` images are for test and not in train).
 
 |         |   24  |   37  |   40  |   55  |   63  |   65  |   69  |   83  |   97  |  105  |  106  |  110  |  114  |  118  |  122  |     |  avg |
 |:-------:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|:---:|:----:|
@@ -105,20 +114,40 @@ and eval on the pure object image with white bkg. Testhold out is 8 (`1/8` image
 * The volume in neus/nerf_ngp are set to `side=1.5` without tuning for each case specifically, only `scan=24` we use `side=2.0`.
 The result could be better for more accurate volume selection.
 
------------------------------------------------------------------------
-
-## TanksAndTemplates
-
-
 
 -----------------------------------------------------------------------
 
 ## MipNeRF360
 
+MipNeRF360 has 9 outdoor 360 scene with background. We run on the public available 7 scenes.
+
+For the dataset split, we do not follow the exact setting as MipNeRF360 but keep `testhold` out is `8` (`1/8` images are for test and not in train, roughly 25+).
+
+Images are resize by `1/4` on each dimension for training and testing.
+
+
+-----------------------------------------------------------------------
+
+## TanksAndTemplates
+
+TanksAndTemplates has 8 outdoor 360 scene with background. But since the official [link](https://www.tanksandtemples.org/) do not contain intrinsic parameters,
+we use the processed on at [nerf++](https://github.com/Kai-46/nerfplusplus), which has 4 scenes instead.
+
+For the dataset split, we follow the same split in `nerf++`, where the train/test ratio is roughly 8. Image size are the same.
+
+
 
 -----------------------------------------------------------------------
 
 ## Capture
+We only provide a real captured data call `qqtiger` at [here](../data/qqtiger.MOV). It tells you how to use the real captured data.
+For data preprocessing of it, please vis [doc](./datasets.md) or run
+`python tools/extract_video.py --configs configs/datasets/Capture/qqtiger.yaml`
+`python tools/run_poses.py --configs configs/datasets/Capture/qqtiger.yaml`.
+Remember to set your only path.
+
+We provide the precessed pose file at [data](../data/poses_bounds.npy.zip). You can put them together in to
+`your_data_dir/Capture/qqtiger/` and run.
 ### qqtiger
 It is a more daily scene captured by us. It reflects the algorithm performance on common daily scenes.
 It contains a foreground object and background.

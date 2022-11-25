@@ -1,18 +1,18 @@
-name: nerf_lego_nerf_ngp_newvolume
+name: dtu_65_nerf_ngp
 
 resume: None
 
 debug:
     debug_mode: False
     print_all_grad: False
-    get_progress: False  # remove this when real run
+    get_progress: False
 
 dir:
-    expr_dir: None
+    expr_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/benchmark/DTU/nerf_ngp'
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/nerf_lego_nerf_ngp_newvolume'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_65_nerf_ngp'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/nerf_lego_nerf_ngp_newvolume/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/benchmark/DTU/nerf_ngp/dtu_65_nerf_ngp/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -31,7 +31,7 @@ worker: 4
 optim:
     ema:
         decay: 0.95
-    lr: 1e-1
+    lr: 1e-2
     optim_type: adam
     weight_decay: 1e-6
     eps: 1e-15
@@ -51,7 +51,7 @@ progress:
 
     epoch_loss: 100
     iter_loss: 1
-    save_progress: True
+    save_progress: False
     epoch_save_progress: 5000
     iter_save_progress: 1
 
@@ -59,7 +59,7 @@ progress:
     local_progress: False
 
     epoch_val: 5000
-    save_progress_val: True
+    save_progress_val: False
     max_samples_val: 1
 
     init_eval: False
@@ -68,11 +68,12 @@ progress:
 
 dataset:
     train:
-        type: NeRF
-        scene_name: lego
+        type: DTU
+        scan_id: 65
         img_scale: 1.0
         center_pixel: True
         scale_radius: 3.0
+        align_cam: True
         precache: True
         device: gpu
         scheduler:
@@ -84,61 +85,26 @@ dataset:
             dynamic_batch_size:
                 update_epoch: 16
 
-    val:
-        skip: 8
-        type: NeRF
-        scene_name: lego
-        img_scale: 1.0
-        center_pixel: True
-        scale_radius: 3.0
-        precache: False
-        device: gpu
-        augmentation:
-            blend_bkg_color:
-                bkg_color: [1.0, 1.0, 1.0]
-
     eval:
         eval_batch_size: 1
-        skip: 8
-        type: NeRF
-        scene_name: lego
+        type: DTU
+        scan_id: 65
         img_scale: 1.0
         center_pixel: True
         scale_radius: 3.0
-        precache: False
+        align_cam: True
+        precache: True
         device: gpu
         augmentation:
-            blend_bkg_color:
+            blend_bkg_color:            # eval on white bkg
                 bkg_color: [1.0, 1.0, 1.0]
-
-inference:
-    to_gpu: True
-    render:
-        type: [spiral]
-        n_cam: [60]
-        repeat: [1]
-        radius: 3.0
-        u_start: 0.5
-        v_range: [-0.6, -0.2]
-        fps: 5
-        center_pixel: True
-
-    volume:
-        n_grid: 512
-        origin: [ 0.0, -0.11, 0.0 ]
-        xyz_len: [ 1.2, 1.2, 2.0 ]
-        level: 50.0
-        chunk_pts_factor: 32
-        render_mesh:
-            backend: pytorch3d
 
 model:
     type: NeRF
     obj_bound:
         volume:
             n_grid: 128
-            origin: [ 0.0, -0.11, 0.0 ]
-            xyz_len: [ 1.2, 1.2, 2.0 ]
+            side: 1.5
         epoch_optim: 16
         epoch_optim_warmup: 256
         ray_sample_acc: True
@@ -165,8 +131,7 @@ model:
             type: HashGridEmbedder
             input_dim: 3
             n_freqs: 0  # do not do geo init
-            origin: [ 0.0, -0.11, 0.0 ]
-            xyz_len: [ 1.2, 1.2, 2.0 ]
+            side: 1.5
             n_levels: 16
             n_feat_per_entry: 2
             hashmap_size: 19
@@ -197,7 +162,7 @@ loss:
         keys: ['rgb_coarse']
         loss_type: Huber
         delta: 0.1
-        weight: 3000
+        weight: 5
 
 metric:
     PSNR:

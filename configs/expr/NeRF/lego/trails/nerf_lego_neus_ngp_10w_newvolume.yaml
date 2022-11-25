@@ -56,7 +56,7 @@ progress:
     iter_save_progress: 1
 
     epoch_save_checkpoint: 10000
-    local_progress: True
+    local_progress: False
 
     epoch_val: 5000
     save_progress_val: True

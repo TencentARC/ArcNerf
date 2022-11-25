@@ -1,4 +1,4 @@
-name: capture_plant_nerf
+name: dtu_65_mipnerf
 
 resume: None
 
@@ -8,11 +8,11 @@ debug:
     get_progress: False
 
 dir:
-    expr_dir: None
+    expr_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/benchmark/DTU/mipnerf'
     data_dir: '/group/30042/leoyluo/Immerse/data'
-    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/capture_plant_nerf'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/ArcNerf/results/dtu_65_mipnerf'
 
-model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/capture_plant_nerf/checkpoints/final.pt.tar'
+model_pt: '/group/30042/leoyluo/Immerse/projects/ArcNerf/experiments/benchmark/DTU/mipnerf/dtu_65_mipnerf/checkpoints/final.pt.tar'
 
 gpu_ids: -1
 
@@ -35,7 +35,7 @@ optim:
     lr_scheduler:
         type: ExponentialLR
         lr_gamma: 0.1
-        lr_steps: [500000]
+        lr_steps: [250000]
 
     clip_gradients: 0.0
     clip_warmup: -1
@@ -43,17 +43,17 @@ optim:
 
 progress:
     start_epoch: -1
-    epoch: 300000
+    epoch: 500000
     save_time: 1800
 
     epoch_loss: 100
     iter_loss: 1
-    save_progress: True
+    save_progress: False
     epoch_save_progress: 50000
     iter_save_progress: 1
 
     epoch_val: 50000
-    save_progress_val: True
+    save_progress_val: False
     max_samples_val: 1
 
     epoch_save_checkpoint: 100000
@@ -61,69 +61,52 @@ progress:
 
     init_eval: False
     epoch_eval: 100000
-    max_samples_eval: 3
+    max_samples_eval: 25
 
 dataset:
     train:
-        type: Capture
-        scene_name: plant
-        img_scale: 0.25
+        type: DTU
+        scan_id: 65
+        img_scale: 1.0
         scale_radius: 3.0
-        pc_radius: 2.0
-        skip: 10
+        align_cam: True
         precache: True
-
-    val:
-        type: Capture
-        scene_name: plant
-        img_scale: 0.125
-        scale_radius: 3.0
-        pc_radius: 2.0
-        skip: 10
-        precache: False
+        device: gpu
+        augmentation:
+            blend_bkg_color:
+                bkg_color: [1.0, 1.0, 1.0]
+        scheduler:
+            precrop:
+                ratio: 0.5
+                max_epoch: 500
 
     eval:
         eval_batch_size: 1
-        eval_max_sample: 3
-        type: Capture
-        scene_name: plant
-        img_scale: 0.25
+        type: DTU
+        scan_id: 65
+        img_scale: 1.0
         scale_radius: 3.0
-        pc_radius: 2.0
-        skip: 10
+        align_cam: True
         precache: True
-
-inference:
-    render:
-        type: [circle]
-        n_cam: [20]
-        repeat: [3]
-        radius: 2.5     # cam distribution is different in front and back
-        u_start: 0.75
-        v_ratio: -0.2
-        fps: 5
-
-    volume:
-        n_grid: 512
-        origin: [0.0, 0.2, 0.4]
-        side: 2.0
-        level: 50.0
-        chunk_pts_factor: 32
-        render_mesh:
-            backend: pytorch3d
+        device: gpu
+        augmentation:
+            blend_bkg_color:            # eval on white bkg
+                bkg_color: [1.0, 1.0, 1.0]
 
 model:
-    type: NeRF
+    type: MipNeRF
     rays:
         bounding_radius: 3.0
-        far: 8.0
-        n_sample: 64
+        n_sample: 128
         n_importance: 128
+        gaussian:
+            gaussian_fn: cone        # ['cone', 'cylinder'] to get mean/cov
         inverse_linear: False
         perturb: True
         add_inf_z: True
         noise_std: 0.0
-        white_bkg: False
+        white_bkg: True
+        blur_coarse_weights: True
     chunk_rays: 32768
     chunk_pts: 131072
     geometry:
@@ -131,11 +114,13 @@ model:
         D: 8
         skips: [4]
         encoder:
-            type: FreqEmbedder
+            type: GaussianEmbedder    # Use gaussian embedder
             input_dim: 3
-            n_freqs: 10
+            n_freqs: 16
         W_feat: 256
         geometric_init: False
+        out_act_cfg:
+            type: softplus  # softplus on sigma
     radiance:
         mode: 'vf'
         W: 128
@@ -150,6 +135,7 @@ model:
 loss:
     ImgLoss:
         keys: ['rgb_coarse', 'rgb_fine']
+        internal_weights: [0.1, 1.0]
         weight: 1.0
 
 metric:
