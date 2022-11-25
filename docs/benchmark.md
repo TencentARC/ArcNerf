@@ -125,6 +125,25 @@ For the dataset split, we do not follow the exact setting as MipNeRF360 but keep
 
 Images are resize by `1/4` on each dimension for training and testing.
 
+### garden
+We benchmark on the garden split for now. We can model the fg/bkg separately, or model the whole scene
+
+|     Method      | iter | PSNR |           cfg       | Modeling | details|
+|:---------------:|:----:|:----:|:-------------------:|:--------:|:------:|
+|       NeRF      | 30w  |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf.yaml| fg only | nerf with 64+128 sampling|
+|      NeRF++     | 30w  |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf_nerfpp.yaml| fg(nerf) + bkg(nerf++/msi) | fg/bkg each 32+64 sample |
+|     MipNeRF     | 50w  |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf.yaml| fg_only | mipnerf with 128+128 sample |
+|    Neus+NeRF++  | 30w  |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf.yaml| fg(neus) + bkg(nerf++/msi) | fg 64+64, bkg 32+64 sample |
+|     Multivol    | 5w   |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_multivol.yaml| fg_only | multivol sampling with inner volume, 1024 sampling, that is the `instant-ngp` method |
+|  nerfngp+multivol| 5w  |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerfngp_multivol.yaml| fg(nerf_ngp) + bkg(multivol) | fg/bkg each 1024 sample with different hashEnc+mlp |
+|nerfngp+multivol+sigma_blending|  5w |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerfngp_multivol_sigma.yaml| fg(nerf_ngp) + bkg(multivol) | same as last but get blending results by merging sigmas and render |
+| neusngp+multivol |  5w |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_neusngp_multivol.yaml| fg(neus_ngp) + bkg(multivol)  | fg/bkg each 1024 sample with different hashEnc+mlp, fg is a neus |
+
+- For the methods modeling fg + bkg separately, the samples are in two splits. Each split gets a rgb value, and fg model gets transmittance as well. `full_color = fg_color + T * bkg_color`. It could be seen that
+the boundary area between fg/bkg are not that clear compared to directly modeling fg+bkg together. But separate modeling generally leads to better foreground result.
+- The multivol/ngp model sometimes get `inf` grad on `hashenc`, use grad_clipping to forbid.
+- For the scenes with sky, you should set `white_bkg: True  # sky` for the bkg_model to avoid empty black color.
+- The initialization is not that stable, sometimes you need to run several times to get optimized solution.
 
 -----------------------------------------------------------------------
 

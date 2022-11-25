@@ -112,7 +112,7 @@ inference:
         n_grid: 512
         side: 2.0
         level: 50.0
-        chunk_pts_factor: 16
+        chunk_pts_factor: 8
         render_mesh:
             backend: pytorch3d
 
@@ -197,7 +197,7 @@ model:
             perturb: True
             add_inf_z: False
             noise_std: 0.0
-            white_bkg: False
+            white_bkg: True  # sky
         chunk_rays: 32768
         chunk_pts: 1048576
         geometry:
