@@ -15,6 +15,8 @@ Expname are in the format of `{dataset}_{scene}_{model}_{other_settings}`.
 We follow the exact same setting on dataset split as original NeRF implementation at https://github.com/yenchenlin/nerf-pytorch.
 ### Lego  (800x800, 25 eval images)
 
+![img](../assets/result/lego_rgb.gif)
+
 | Method |        cfg         | PSNR |    Official repo   |    Official PSNR     | paper PSNR  | Others |
 |:------:|:------------------:|:----:|:------------------:|:--------------------:|:-----------:|:-------|
 |  NeRF  |configs/expr/NeRF/lego/nerf_lego_nerf.yaml|32.86|https://github.com/yenchenlin/nerf-pytorch|32.3|32.54|  |
@@ -128,22 +130,38 @@ Images are resize by `1/4` on each dimension for training and testing.
 ### garden
 We benchmark on the garden split for now. We can model the fg/bkg separately, or model the whole scene
 
-|     Method      | iter | PSNR |           cfg       | Modeling | details|
-|:---------------:|:----:|:----:|:-------------------:|:--------:|:------:|
-|       NeRF      | 30w  |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf.yaml| fg only | nerf with 64+128 sampling|
-|      NeRF++     | 30w  |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf_nerfpp.yaml| fg(nerf) + bkg(nerf++/msi) | fg/bkg each 32+64 sample |
-|     MipNeRF     | 50w  |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf.yaml| fg_only | mipnerf with 128+128 sample |
-|    Neus+NeRF++  | 30w  |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf.yaml| fg(neus) + bkg(nerf++/msi) | fg 64+64, bkg 32+64 sample |
-|     Multivol    | 5w   |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_multivol.yaml| fg_only | multivol sampling with inner volume, 1024 sampling, that is the `instant-ngp` method |
-|  nerfngp+multivol| 5w  |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerfngp_multivol.yaml| fg(nerf_ngp) + bkg(multivol) | fg/bkg each 1024 sample with different hashEnc+mlp |
-|nerfngp+multivol+sigma_blending|  5w |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerfngp_multivol_sigma.yaml| fg(nerf_ngp) + bkg(multivol) | same as last but get blending results by merging sigmas and render |
-| neusngp+multivol |  5w |      |configs/expr/MipNeRF360/garden/mipnerf360_garden_neusngp_multivol.yaml| fg(neus_ngp) + bkg(multivol)  | fg/bkg each 1024 sample with different hashEnc+mlp, fg is a neus |
+![volume](../assets/result/garden_volume.gif)
+
+|     Method      | iter |  PSNR |           cfg       | Modeling | details|
+|:---------------:|:----:|:-----:|:-------------------:|:--------:|:------:|
+|       NeRF      | 30w  | 23.77 |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf.yaml| fg only | nerf with 64+128 sampling|
+|      NeRF++     | 30w  | 24.75 |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf_nerfpp.yaml| fg(nerf) + bkg(nerf++/msi) | fg/bkg each 32+64 sample |
+|     MipNeRF     | 50w  |       |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf.yaml| fg_only | mipnerf with 128+128 sample |
+|    Neus+NeRF++  | 30w  | 22.93 |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf.yaml| fg(neus) + bkg(nerf++/msi) | fg 64+64, bkg 32+64 sample |
+|Multivol(instant-ngp)|5w| 24.20 |configs/expr/MipNeRF360/garden/mipnerf360_garden_multivol.yaml| fg_only | multivol sampling with inner volume, 1024 sampling, that is the `instant-ngp` method |
+|  nerfngp+multivol| 5w  | 24.79 |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerfngp_multivol.yaml| fg(nerf_ngp) + bkg(multivol) | fg/bkg each 1024 sample with different hashEnc+mlp |
+|nerfngp+multivol+sigma_blending|  5w | 24.77 |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerfngp_multivol_sigma.yaml| fg(nerf_ngp) + bkg(multivol) | same as last but get blending results by merging sigmas and render |
+| neusngp+multivol |  5w | 23.43 |configs/expr/MipNeRF360/garden/mipnerf360_garden_neusngp_multivol.yaml| fg(neus_ngp) + bkg(multivol)  | fg/bkg each 1024 sample with different hashEnc+mlp, fg is a neus |
 
 - For the methods modeling fg + bkg separately, the samples are in two splits. Each split gets a rgb value, and fg model gets transmittance as well. `full_color = fg_color + T * bkg_color`. It could be seen that
 the boundary area between fg/bkg are not that clear compared to directly modeling fg+bkg together. But separate modeling generally leads to better foreground result.
 - The multivol/ngp model sometimes get `inf` grad on `hashenc`, use grad_clipping to forbid.
 - For the scenes with sky, you should set `white_bkg: True  # sky` for the bkg_model to avoid empty black color.
 - The initialization is not that stable, sometimes you need to run several times to get optimized solution.
+- Using `sigma_blending` is not much beneficial compared to `rgb_blending`
+- The `neus` model works well with `nerf++` bkg in object area, but not that good in background and boundary area.
+- The `neusngp+multivol` combination does not work that well and may need further investigation, but it is much faster than original `neus`.
+
+![neus](../assets/result/garden_volume.gif)
+neus + nerf++, obj extraction.
+
+![surface](../assets/result/garden_surface.gif)
+neus using surface rendering (much faster than volume rendering), fg object only.
+
+- Compare all, the best way(in time & capability), multivol(`instant-ngp`) should be the baseline.
+
+### Full benchmark
+We will run on all case when we have time.
 
 -----------------------------------------------------------------------
 
@@ -154,6 +172,20 @@ we use the processed on at [nerf++](https://github.com/Kai-46/nerfplusplus), whi
 
 For the dataset split, we follow the same split in `nerf++`, where the train/test ratio is roughly 8. Image size are the same.
 
+### truck
+We benchmark on the truck split for now. The models are the same as `mipnerf360.garden`.
+
+|     Method      |  PSNR |
+|:---------------:|:-----:|
+|       NeRF      | 20.77 |
+|      NeRF++     | 22.26 |
+|     MipNeRF     |       |
+|    Neus+NeRF++  | 20.59 |
+|Multivol(instant-ngp)| 21.47 |
+|  nerfngp+multivol| 19.37 |
+| neusngp+multivol | 18.31 |
+
+- The `nerf/neus-ngp + multivol` models are not performed as expected. Many due to the initialization.
 
 
 -----------------------------------------------------------------------
@@ -167,6 +199,17 @@ Remember to set your only path.
 
 We provide the precessed pose file at [data](../data/poses_bounds.npy.zip). You can put them together in to
 `your_data_dir/Capture/qqtiger/` and run.
+
 ### qqtiger
 It is a more daily scene captured by us. It reflects the algorithm performance on common daily scenes.
 It contains a foreground object and background.
+
+|     Method      |  PSNR |
+|:---------------:|:-----:|
+|       NeRF      | 29.22 |
+|      NeRF++     | 32.73 |
+|     MipNeRF     |       |
+|    Neus+NeRF++  | 20.59 |
+|Multivol(instant-ngp)| 30.58 |
+|  nerfngp+multivol| 30.44 |
+| neusngp+multivol | 27.38 |
