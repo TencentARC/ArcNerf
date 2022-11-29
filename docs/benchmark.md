@@ -136,7 +136,7 @@ We benchmark on the garden split for now. We can model the fg/bkg separately, or
 |:---------------:|:----:|:-----:|:-------------------:|:--------:|:------:|
 |       NeRF      | 30w  | 23.77 |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf.yaml| fg only | nerf with 64+128 sampling|
 |      NeRF++     | 30w  | 24.75 |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf_nerfpp.yaml| fg(nerf) + bkg(nerf++/msi) | fg/bkg each 32+64 sample |
-|     MipNeRF     | 50w  |       |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf.yaml| fg_only | mipnerf with 128+128 sample |
+|     MipNeRF     | 50w  | 23.95 |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf.yaml| fg_only | mipnerf with 128+128 sample |
 |    Neus+NeRF++  | 30w  | 22.93 |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerf.yaml| fg(neus) + bkg(nerf++/msi) | fg 64+64, bkg 32+64 sample |
 |Multivol(instant-ngp)|5w| 24.20 |configs/expr/MipNeRF360/garden/mipnerf360_garden_multivol.yaml| fg_only | multivol sampling with inner volume, 1024 sampling, that is the `instant-ngp` method |
 |  nerfngp+multivol| 5w  | 24.79 |configs/expr/MipNeRF360/garden/mipnerf360_garden_nerfngp_multivol.yaml| fg(nerf_ngp) + bkg(multivol) | fg/bkg each 1024 sample with different hashEnc+mlp |
@@ -179,7 +179,7 @@ We benchmark on the truck split for now. The models are the same as `mipnerf360.
 |:---------------:|:-----:|
 |       NeRF      | 20.77 |
 |      NeRF++     | 22.26 |
-|     MipNeRF     |       |
+|     MipNeRF     | 21.48 |
 |    Neus+NeRF++  | 20.59 |
 |Multivol(instant-ngp)| 21.47 |
 |  nerfngp+multivol| 19.37 |
@@ -208,8 +208,8 @@ It contains a foreground object and background.
 |:---------------:|:-----:|
 |       NeRF      | 29.22 |
 |      NeRF++     | 32.73 |
-|     MipNeRF     |       |
-|    Neus+NeRF++  | 20.59 |
+|     MipNeRF     | 32.76 |
+|    Neus+NeRF++  | 31.97 |
 |Multivol(instant-ngp)| 30.58 |
 |  nerfngp+multivol| 30.44 |
 | neusngp+multivol | 27.38 |
