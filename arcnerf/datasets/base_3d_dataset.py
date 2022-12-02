@@ -3,7 +3,7 @@
 import numpy as np
 import torch
 
-from arcnerf.geometry.poses import center_poses, average_poses
+from arcnerf.geometry.poses import center_poses, average_poses, average_poses_up
 from arcnerf.geometry.ray import closest_point_to_rays
 from common.datasets.base_dataset import BaseDataset
 from common.utils.cfgs_utils import valid_key_in_cfgs, get_value_from_cfgs_field, pop_none_item
@@ -260,7 +260,7 @@ class Base3dDataset(BaseDataset):
         if valid_key_in_cfgs(self.cfgs, 'align_cam') and self.cfgs.align_cam is True:
             c2ws = self.get_poses(torch_tensor=False, concat=True)
             dtype = c2ws.dtype
-            avg_pose = average_poses(c2ws)
+            avg_pose = average_poses_up(c2ws)
             rot_mat = np.eye(4, dtype=dtype)
             rot_mat[:3, :3] = np.linalg.inv(avg_pose)[:3, :3]
             for idx in range(len(self.cameras)):

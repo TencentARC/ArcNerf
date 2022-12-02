@@ -3,11 +3,15 @@
 import numpy as np
 import torch
 
-from pytorch3d.renderer import (
-    MeshRasterizer, MeshRenderer, PerspectiveCameras, RasterizationSettings, SoftPhongShader, SoftSilhouetteShader,
-    TexturesVertex, TexturesAtlas
-)
-from pytorch3d.structures import Meshes
+try:
+    from pytorch3d.renderer import (
+        MeshRasterizer, MeshRenderer, PerspectiveCameras, RasterizationSettings, SoftPhongShader, SoftSilhouetteShader,
+        TexturesVertex, TexturesAtlas
+    )
+    from pytorch3d.structures import Meshes
+except Exception:
+    import warnings
+    warnings.warn('Do not use pytorch3d render...')
 
 from common.utils.torch_utils import torch_to_np
 from common.visual import get_colors

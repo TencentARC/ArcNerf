@@ -8,7 +8,6 @@ dataset:
         img_scale: 1.0
         scale_radius: 3.0
         align_cam: True     #  scan6 need to adjust
-        exchange_coord: [z, y, x]  # make it stand up
         precache: False
 
 model:

@@ -54,7 +54,7 @@ def center_poses(poses, center_loc=None):
     return poses_centered
 
 
-def average_poses(poses):
+def average_poses_up(poses):
     """
     Calculate the average pose, which is then used to center all poses
     using @center_poses. Its computation is as follows:
@@ -89,6 +89,41 @@ def average_poses(poses):
     # 5. Compute the z axis (as x and y are normalized, y is already of norm 1)
     z = np.cross(x, y)
 
+    pose_avg = np.stack([x, y, z, center], 1)
+    homo = np.zeros(shape=(1, 4), dtype=pose_avg.dtype)
+    homo[0, -1] = 1.0
+    pose_avg = np.concatenate([pose_avg, homo], axis=0)
+
+    return pose_avg
+
+
+def average_poses(poses):
+    """
+    Calculate the average pose, which is then used to center all poses
+    using @center_poses. Its computation is as follows:
+    1. Compute the center: the average of pose centers.
+    2. Compute the z axis: the normalized average z axis.
+    3. Compute axis y': the average y axis.
+    4. Compute x' = y' cross product z, then normalize it as the x axis.
+    5. Compute the y axis: z cross product x.
+    Note that at step 3, we cannot directly use y' as y axis since it's
+    not necessarily orthogonal to z axis. We need to pass from x to y.
+    Args:
+        poses: (N_images, 4, 4), c2w poses
+    Returns:
+        pose_avg: (4, 4) the average pose c2w
+    """
+    poses_3x4 = poses[:, :3, :].copy()
+    # 1. Compute the center
+    center = poses_3x4[..., 3].mean(0)
+    # 2. Compute the z axis
+    z = normalize(poses_3x4[..., 2].mean(0))
+    # 3. Compute axis y' (no need to normalize as it's not the final output)
+    y_ = poses_3x4[..., 1].mean(0)
+    # 4. Compute the x axis
+    x = normalize(np.cross(y_, z))
+    # 5. Compute the y axis (as z and x are normalized, y is already of norm 1)
+    y = np.cross(z, x)
     pose_avg = np.stack([x, y, z, center], 1)
     homo = np.zeros(shape=(1, 4), dtype=pose_avg.dtype)
     homo[0, -1] = 1.0
