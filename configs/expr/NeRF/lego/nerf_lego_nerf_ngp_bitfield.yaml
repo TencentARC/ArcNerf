@@ -149,7 +149,7 @@ model:
         perturb: True
         add_inf_z: False
         noise_std: 0.0
-        white_bkg: False  # for eval only, if want black-background, set False
+        white_bkg: True  # for eval only, if want black-background, set False
     chunk_rays: 32768   # 4096 * 16
     chunk_pts: 1048576  # 4096 * 256
     geometry:
