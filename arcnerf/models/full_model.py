@@ -34,6 +34,9 @@ class FullModel(nn.Module):
             if self.bkg_blend == 'sigma':
                 self.fg_model.set_add_inf_z(True)
 
+            # whether to render fg only
+            self.fg_only = get_value_from_cfgs_field(self.bkg_cfgs.model, 'fg_only', False)
+
     def check_bkg_cfgs(self):
         """If bkg model is used, check for invalid cfgs"""
         if self.bkg_blend == 'rgb':
@@ -452,8 +455,9 @@ class FullModel(nn.Module):
         get_progress_fg = True if (bkg_model is not None) else get_progress  # need the progress to blend
         fg_output = fg_model.forward(flat_inputs, inference_only, get_progress_fg, cur_epoch, total_epoch)
 
+        # bkg model always keep progress item for blending. Will not be saved after merge
         bkg_output = None
-        if bkg_model is not None:  # bkg model always keep progress item for blending. Will not be saved after merge
+        if bkg_model is not None and not self.fg_only:
             bkg_output = bkg_model.forward(flat_inputs, inference_only, True, cur_epoch, total_epoch)
 
         # merge output and detach progress item
