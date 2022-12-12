@@ -227,6 +227,7 @@ It combines values from both model and get final results. If you don't use bkg m
 to reconstruct the whole scene by fg_model.
 - The input size(like rays_o/rays_d) are `(B, N_rays, ...)` in `FullModel.forward()`.
 But they are flattened into `(B*N_rays, ...)` and process by chunk in fg_model/bkg_model.
+- If you set `model.bkg_model.fg_only` as True in cfgs, it will only render fg result. Could be used for inference.
 ### bkg_blend
 Method two merge bkg_model with fg_mdeol.
 - If `rgb`, get fg and bkg rgb separately, then use fg_weight factor to mix bkg color.

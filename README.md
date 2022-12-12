@@ -189,7 +189,7 @@ correctness are check under [unittests](tests/tests_arcnerf/tests_geometry).
 You can see the [doc](docs/geometry.md) for more details and know what is support.
 
 ------------------------------------------------------------------------
-## Visualization
+## Offline Visualization
 
 We make a offline interactive 3d visualizer in `plotly` backend. All the geometry components
 in `numpy` tensor could be easily plugin the visualizer. It is compatible to torch-template 3d
@@ -221,6 +221,37 @@ We have another repo [common_trainer](https://github.com/TencentARC/common_train
 Or you can ref the [doc](docs/common_trainer.md) for more information.
 
 ------------------------------------------------------------------------
+
+## Web Viewer
+Thanks to the very power `nerfstudio` [viewer](https://github.com/nerfstudio-project/nerfstudio), we adopt arcnerf to it
+and it can easily show the training and eval result of model from this project.
+
+![ns_viewer](assets/viewer/ns_viewer.gif)
+
+To use it in training, you can follow [train_cfgs](configs/expr/NeRF/lego/nerf_lego_nerf_ngp_with_ns_viewer.yaml) to add
+the viewer confs in [viewer_cfg](configs/viewer.yaml). You can directly start training as usually by
+`python train.py --configs configs/path_to_config`.
+
+After training, you can use the online viewer to visualize the result.
+You can call `python tools/vis_ns_viewer.py --configs configs/path_to_config --model_pt path_to_model` to visualize the
+dataset and rendering outputs. You can also vis the fg_model by setting `--viewer.show_fg_only True`.
+
+For how to use the viewer, please visit their website at [doc](https://docs.nerf.studio/en/latest/).
+
+### Export cam path
+You can also add infer cams using their `render` panel, which export a json file.
+You can then set `inference.render.json_path` as the file location, our pipeline will render the video with such customized cam path.
+
+![export](assets/viewer/ns_viewer_export_path.png)
+
+We may develop the viewer more compatible with this project in the future, for example, adding more function to object level
+rendering or manipulation. Thanks to the authors of `nerfstudio` again!
+
+
+
+------------------------------------------------------------------------
+
+
 # License
 
 TODO

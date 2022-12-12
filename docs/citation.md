@@ -168,6 +168,28 @@ Below is the several implementations of `instant-ngp`.
 }
 ```
 
+- [nerfstudio](https://github.com/nerfstudio-project/nerfstudio)
+```
+@misc{nerfstudio,
+      title={Nerfstudio: A Framework for Neural Radiance Field Development},
+      author={Matthew Tancik*, Ethan Weber*, Evonne Ng*, Ruilong Li, Brent Yi,
+              Terrance Wang, Alexander Kristoffersen, Jake Austin, Kamyar Salahi,
+              Abhik Ahuja, David McAllister, Angjoo Kanazawa},
+      year={2022},
+      url={https://github.com/nerfstudio-project/nerfstudio},
+}
+```
+
+- [nerfacc](https://github.com/KAIR-BAIR/nerfacc)
+```
+@article{li2022nerfacc,
+  title={NerfAcc: A General NeRF Accleration Toolbox.},
+  author={Li, Ruilong and Tancik, Matthew and Kanazawa, Angjoo},
+  journal={arXiv preprint arXiv:2210.04847},
+  year={2022}
+}
+```
+
 ------------------------------------------------------------------------
 Thanks Xintao for the project template
 https://github.com/xinntao/ProjectTemplate-Python/

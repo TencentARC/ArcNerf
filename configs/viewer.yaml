@@ -1,0 +1,13 @@
+# default cfgs for viewer
+
+viewer:
+    relative_log_filename: 'viewer_log_filename.txt'
+    start_train: False
+    zmq_port: None
+    launch_bridge_server: True
+    websocket_port: 7007
+    ip_address: '127.0.0.1'
+    max_num_display_images: 512
+    quit_on_train_completion: False
+    skip_openrelay: True  # That works on my pc
+    show_fg_only: False  # That is for viewing on the online web viewer

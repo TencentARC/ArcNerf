@@ -1,3 +1,4 @@
+aiortc
 ffmpeg-python
 imageio
 kaleido
@@ -8,12 +9,19 @@ numpy
 opencv-python
 plotly
 pyfqmr
-pytorch3d >= 0.6.1
+pyngrok
+pytorch3d  # >= 0.6.1 if for pytorch rendering only
 pyyaml
 scikit-image
 tensorboard
 thop
 torch
 torchgeometry
+
+# for nerfstudio viewer
+torchtyping
 torchvision
+tornado
 trimesh
+umsgpack
+zmq

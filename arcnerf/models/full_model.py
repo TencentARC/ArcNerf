@@ -26,6 +26,7 @@ class FullModel(nn.Module):
         self.bkg_cfgs = bkg_cfgs
         self.bkg_model = bkg_model
         # set and check bkg cfgs
+        self.fg_only = False
         if self.bkg_cfgs is not None:
             # bkg_blend type, 'rgb' or 'sigma
             self.bkg_blend = get_value_from_cfgs_field(self.bkg_cfgs.model, 'bkg_blend', 'rgb')

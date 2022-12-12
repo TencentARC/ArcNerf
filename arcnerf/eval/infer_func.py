@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import json
 import time
 import os
 import os.path as osp
@@ -84,6 +85,7 @@ class Inferencer(object):
             render_cfgs = None
         else:
             render_cfgs = {
+                'json_path': get_value_from_cfgs_field(self.cfgs.render, 'json_path', None),
                 'type': get_value_from_cfgs_field(self.cfgs.render, 'type', ['circle', 'spiral']),
                 'n_cam': get_value_from_cfgs_field(self.cfgs.render, 'n_cam', [30, 60]),
                 'radius': get_value_from_cfgs_field(self.cfgs.render, 'radius', 3.0),
@@ -166,21 +168,31 @@ class Inferencer(object):
         if self.render_cfgs is not None:
             render_data = {'inputs': []}
 
-            for idx, mode in enumerate(self.render_cfgs['type']):
-                c2w = generate_cam_pose_on_sphere(
-                    mode,
-                    self.render_cfgs['radius'],
-                    self.render_cfgs['n_cam'][idx],
-                    u_start=self.render_cfgs['u_start'],
-                    u_range=self.render_cfgs['u_range'],
-                    v_ratio=self.render_cfgs['v_ratio'],
-                    v_range=self.render_cfgs['v_range'],
-                    normal=self.render_cfgs['normal'],
-                    n_rot=self.render_cfgs['n_rot'],
-                    reverse=self.render_cfgs['reverse'],
-                    close=True
-                )  # (n_cam, 4, 4), np array
+            c2w_list = []
+            if self.render_cfgs['json_path'] is not None:  # load from json file, it only provides c2w
+                c2w = self.read_json_cam(self.render_cfgs['json_path'])
+                self.render_cfgs['type'] = ['custom']  # for file name
+                self.render_cfgs['n_cam'] = [len(c2w)]
+                c2w_list.append(c2w)
+            else:
+                for idx, mode in enumerate(self.render_cfgs['type']):
+                    c2w = generate_cam_pose_on_sphere(
+                        mode,
+                        self.render_cfgs['radius'],
+                        self.render_cfgs['n_cam'][idx],
+                        u_start=self.render_cfgs['u_start'],
+                        u_range=self.render_cfgs['u_range'],
+                        v_ratio=self.render_cfgs['v_ratio'],
+                        v_range=self.render_cfgs['v_range'],
+                        normal=self.render_cfgs['normal'],
+                        n_rot=self.render_cfgs['n_rot'],
+                        reverse=self.render_cfgs['reverse'],
+                        close=True
+                    )  # (n_cam, 4, 4), np array
+                    c2w_list.append(c2w)
 
+            # append intrinsic by eval dataset
+            for c2w in c2w_list:
                 input = []
                 for cam_id in range(c2w.shape[0]):
                     t_intrinsic = torch.tensor(self.intrinsic, dtype=self.dtype)
@@ -212,6 +224,29 @@ class Inferencer(object):
                 render_data['surface_render'] = self.render_cfgs['surface_render'].__dict__
 
         return render_data
+
+    @staticmethod
+    def read_json_cam(json_path):
+        """Read json cam from file. Currently support json file from nerfstudio-viewer"""
+        assert os.path.exists(json_path), '{} File not exist...'.format(json_path)
+        with open(json_path, 'r') as f:
+            res = json.load(f)
+        c2w = []
+        for cam_path in res['camera_path']:
+            cam = cam_path['camera_to_world']
+            cam = np.array(cam).reshape(4, 4)[None]  # (1, 4, 4)
+            # make rotation correct
+            cam[0, 2, 0] *= -1
+            cam[0, 0:2, 1] *= -1
+            cam[0, 0:2, 2] *= -1
+            # make z downside up
+            cam[0, 2, 3] *= -1
+            # exchange y, x
+            cam = cam[:, [0, 2, 1], :]
+            c2w.append(cam)
+        c2w = np.concatenate(c2w, axis=0)  # (n_cam, 4, 4), np array
+
+        return c2w
 
     def get_render_data(self):
         """Get the render data"""
