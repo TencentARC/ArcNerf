@@ -160,9 +160,9 @@ On the trails are run on one A100 GPU.
 
 What is special in the project is that you are free to separate fg_model and bkg_model. Full_model will auto merge the result.
 
-To get better fg_model for extraction, a sdf model is better. And you can still use `nerf++` or `instant-ngp` like multi-sphere/volume strcture for modeling unlimited background area.
+For fg_model, you can use density model or sdf model. And you can add `nerf++` or `instant-ngp` like multi-sphere/volume structure for modeling unlimited background area.
 
-TODO: Add real scene modeling samples and result.
+For the experiments on real 360 scene, you can visit [benchmark](benchmark.md) for detail.
 
 ------------------------------------------------------------------------------------------------------------
 
