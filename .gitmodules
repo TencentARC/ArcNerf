@@ -1,0 +1,6 @@
+[submodule "include/tiny-cuda-nn"]
+	path = include/tiny-cuda-nn
+	url = https://github.com/nvlabs/tiny-cuda-nn
+[submodule "simplengp/ops/include/eigen"]
+	path = simplengp/ops/include/eigen
+	url = https://gitlab.com/libeigen/eigen
