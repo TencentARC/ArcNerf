@@ -1,11 +1,9 @@
 # simplenerf
 
-This is the simple nerf reimplementation of [NeRF](https://www.matthewtancik.com/nerf) by our common_trainer pipeline.
+This branch is the simple nerf reimplementation of [NeRF](https://www.matthewtancik.com/nerf) by our common_trainer pipeline.
 
 Function for NeRF provided and train/eval on lego/fern. Complicated operation and pipeline not support. 
 
-For more common nerf pipeline, please visit our repo [ArcNerf](https://github.com/TencentARC/ArcNerf). It is an easy-to-extent
-framework that include many existing SOTA models.
 
 ![lego_rgb](assets/lego_rgb.png) ![lego_depth](assets/lego_depth.png)
 
@@ -13,8 +11,6 @@ framework that include many existing SOTA models.
 
 ------------------------------------------------------------------------
 # Installation
-Get the repo by `git clone https://github.com/TencentARC/simplenerf`
-
 Install libs by `pip install -r requirements.txt`.
 
 ------------------------------------------------------------------------
