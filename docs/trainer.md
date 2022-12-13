@@ -40,6 +40,12 @@ with object bound in `expr_dir/progress/train(val)`.
 # Eval/Inference
 Refer to [datasets](datasets.md) for more details.
 
+# Web view
+Thanks to [nerfstudio](https://github.com/nerfstudio-project/nerfstudio), we directly adopt their viewer in this project.
+You can add the config in [viewer](../configs/viewer.yaml) in any of the training cfg, and view the result on web browser.
+
+![viewer](../assets/viewer/ns_viewer.gif)
+
 ------------------------------------------------------------------------
 ## Common_Trainer
 The details of how to use the trainer please ref to [common_trainer](common_trainer.md) and our project

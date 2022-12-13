@@ -12,9 +12,9 @@ Traditional Methods:
 
 --------------------------------------------------------------------
 Model level:
-- Octree bound for pruning and sampling
+- Octree bound for pruning and sampling（will it be better than density volume?)
 - Deformable mesh templates for better mesh optimization(marching/deftet, tetrahedra, demtet)
-- fully optimzation of the mesh output (nvdiffrec)
+- fully optimization of the mesh output (nvdiffrec)
 - compression (tensorRF)
 - 360/background modeling (mipnerf-360)
 - dynamic modeling(DNeRF and extension)
@@ -31,7 +31,7 @@ Optimization:
 --------------------------------------------------------------------
 Other functionality:
 - More accurate and complete mesh extraction methods.
-- nvdiffras based rendering optimzation
+- nvdiffras based rendering optimization
 - real time train/inference online demo, any view point visual(opengl, cuda, etc)
-- online training gui(many have done)
+- better online training gui with data processing(end-to-end pipeline)
 - 3d modification, text2obj generation(HOT TOPIC)

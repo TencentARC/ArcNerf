@@ -170,7 +170,20 @@ See [benchmark](docs/benchmark.md) for details, and [expr](docs/expr.md) for som
 ![rgb](assets/result/lego_rgb.gif)
 ![mask](assets/result/lego_mask.gif)
 
+-----------------------------------------------------------------------
+### Full Benchmark on NeRF synthetic dataset
 
+All image with white-bkg, same as the eval in vanilla NeRF.
+
+|          |   chair    |   drums    |   ficus    |   hotdog   |   lego     | materials  |    mic     |   ship     |     |   avg  |
+|:--------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|:----------:|:---:|:------:|
+|nerf     |   33.30    |   25.11    |   30.47    |   36.73    |   32.86    |   29.87    |   33.24    |   28.70    | | 31.285 |
+|nerf(paper)|   33.00    |   25.01    |   30.13    |   36.18    |   32.54    |   29.62    |   32.91    |   28.65  |  | 31.043 |
+| | | | | | | | | | |
+|ngp     |    34.88    |   25.50    |   30.55    |   36.92    |   35.38    |   29.12    |   34.80    |   28.39    | | 31.942 |
+|ngp(paper)| 34.28    |   25.70    |   33.13    |   36.99    |   36.12    |   29.35    |   35.67    |   30.61    | | 32.731 |
+
+* ngp paper reports PSNR with black background, which is higher than using white background.
 ------------------------------------------------------------------------
 ## Models
 The models are highly modular and are in level-structure. You are free to modify components at each level by configs,
@@ -223,7 +236,7 @@ Or you can ref the [doc](docs/common_trainer.md) for more information.
 ------------------------------------------------------------------------
 
 ## Web Viewer
-Thanks to the very power `nerfstudio` [viewer](https://github.com/nerfstudio-project/nerfstudio), we adopt arcnerf to it
+Thanks to the very powerful `nerfstudio` [viewer](https://github.com/nerfstudio-project/nerfstudio), we adopt arcnerf to it
 and it can easily show the training and eval result of model from this project.
 
 ![ns_viewer](assets/viewer/ns_viewer.gif)
@@ -254,7 +267,7 @@ rendering or manipulation. Thanks to the authors of `nerfstudio` again!
 
 # License
 
-TODO
+Check [LICENSE](LICENSE).
 
 ------------------------------------------------------------------------
 # Acknowledgements
