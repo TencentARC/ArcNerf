@@ -4,7 +4,7 @@ Here are the trails and experience on Lego scene.
 
 # NeRF (density model)
 
-For some basic setting like `lr`/`precrop`/`maskloss`, you can visit our project [simplenerf](http://github.com/TencentARC/simplenerf) for more experiment log.
+For some basic setting like `lr`/`precrop`/`maskloss`, you can visit `simplenerf` branch for more experiment log.
 But what worth notice is:
 - precrop is important for such white_bkg case since nerf model is sensitive to initialization.
 
@@ -39,9 +39,9 @@ With such object structure, we can set the `n_sample` large(1024), and it will r
 
 ## ngp
 `instant-ngp` combines volume pruning with hash/sh encoding, for much faster converge.
-You can visit our project [simplengp](http://github.com/TencentARC/simplengp) for more experiment log.
+You can visit `simplengp` branch for more experiment log.
 
-- We get `PSNR=35.21` for 5w iteration, base on volume-pruning and hashencoding. Many factors affect the result, you can see [simplengp](http://github.com/TencentARC/simplengp) for more detail.
+- We get `PSNR=35.21` for 5w iteration, base on volume-pruning and hashencoding. Many factors affect the result, you can see `simplengp` branch for more detail.
 The [conf](../configs/expr/NeRF/lego/nerf_lego_nerf_ngp.yaml).
 
 - Using a smaller but closely bounding volume get the same result `35.21`. [conf](../configs/expr/NeRF/lego/trails/nerf_lego_nerf_ngp_newvolume.yaml).

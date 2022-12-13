@@ -116,6 +116,9 @@ Colmap is used to estimate camera locations and sparse point cloud. It will let 
 
 Install under their [instruction](https://github.com/colmap/colmap).
 
+## Branch
+Two branch `simplenerf`/`simplengp` contains the model for `vanilla nerf` and `instant-ngp` only with less complicated model design.
+
 ------------------------------------------------------------------------
 # Usage
 

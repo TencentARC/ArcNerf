@@ -24,7 +24,7 @@ We follow the exact same setting on dataset split as original NeRF implementatio
 | VolSDF |configs/expr/NeRF/lego/nerf_lego_volsdf.yaml|28.25| https://github.com/lioryariv/volsdf | 20.77 |NA| Official repo not converge well on lego scene  |
 |MipNeRF |configs/expr/NeRF/lego/nerf_lego_mipnerf.yaml|35.36| https://github.com/google/mipnerf | NA |35.74| TODO: Not fully match up yet|
 
-* NeRF: We have another repo contains only the function for vanilla nerf. You can visit [simplenerf](https://github.com/TencentARC/simplenerf) for more detail.
+* NeRF: We have another repo contains only the function for vanilla nerf. You can visit `simplenerf` branch for more detail.
 
 -----------------------------------------------------------------------
 
@@ -57,7 +57,7 @@ Our result:
 * Many factor that could affect the result(Like using `black background` improve PSNR to `~35.78`.)
 * We implement most of the operation in torch rather than Highly optimized CUDA kernels. It is more flexible for experiment but slower in speed.
 * We have another repo contains only the function for instant-ngp. It contains functions for ngp only and gets better result.
-It uses more CUDA implementation from original repo. You can visit [simplengp](https://github.com/TencentARC/simplengp) for more detail and expr log.
+It uses more CUDA implementation from original repo. You can visit `simplengp` branch for more detail and expr log.
 * In our framework, we can easily plugin the `HashEncoder` or `SparseVolumeSample` for other models(eg. `NeuS`).
 
 -----------------------------------------------------------------------
@@ -80,7 +80,7 @@ All image with white-bkg, same as the eval in vanilla NeRF.
 ## LLFF
 We follow the exact same setting on dataset split as original NeRF implementation at https://github.com/yenchenlin/nerf-pytorch.
 ### Fern  (378*504, 3 eval images)
-We only use non-ndc version. For ndc space, you need to refer to our [simplenerf](https://github.com/TencentARC/simplenerf) project.
+We only use non-ndc version. For ndc space, you need to refer to `simplenerf` branch.
 
 | Method |        cfg         | PSNR |    Official repo   |    Official PSNR     | paper PSNR  |
 |:------:|:------------------:|:----:|:------------------:|:--------------------:|:-----------:|
