@@ -1,0 +1,142 @@
+# default config on lego dataset.
+
+name: lego
+
+resume: None
+
+debug:
+    debug_mode: False               # support debug like checking grad.
+    print_all_grad: False           # print all grad for all param in model. Only in debug mode
+
+dir:
+    expr_dir: None
+    data_dir: '/group/30042/leoyluo/Immerse/data'      # It is the main dataset address containing all dataset
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/simplenerf/results/lego'
+
+model_pt: '/group/30042/leoyluo/Immerse/projects/simplenerf/experiments/lego/checkpoints/final.pt.tar'
+
+gpu_ids: -1                         # -1 is cpu, otherwise use list of gpus
+
+dist:
+    local_rank: 0
+    rank: 0
+    world_size: 1
+    distributed_backend: nccl       # nccl/mpi
+    random_seed: None               # None will not require reproducibility, run benchmark to be faster
+    slurm: False                    # use slurm for management
+
+batch_size: 2                       # actually do not use it in training
+n_rays: 4096                        # n_rays for each training batch, does not affect inference/val, capacity by model
+worker: 4
+
+optim:
+    lr: 5e-4
+    optim_type: adam                # [adam, sgd, lbfgs, rmsprop]
+    weight_decay: 0.0
+    maxiters: 5                     # for lbfgs only
+    lr_scheduler:
+        type: ExponentialLR         # [MultiStepLR, ExponentialLR, PolyLR, CosineAnnealingLR, WarmUpCosineLR]
+        lr_gamma: 0.1               # for ExponentialLR, MultiStepLR, PolyLR
+        lr_steps: [500000]          # for ExponentialLR(Use first), MultiStepLR(Use all), PolyLR(Use all)
+        tmax: 20                    # for CosineAnnealingLR
+        ema_min: 1e-3               # for CosineAnnealingLR
+        min_factor: 0.1             # for WarmUpCosineLR
+
+    clip_gradients: 0.0             # grad clipping set for init
+    clip_warmup: -1                 # warmup epoches. -1 mean not change after warmup
+    clip_gradients_warmup: 0.0      # grad cliping after warmup period. Can be smaller incase explode
+
+progress:
+    start_epoch: -1                 # -1: resume; 0: finetune. Only for resume mode
+    epoch: 300000                   # Num of epoch for training
+    save_time: 1800                 # save model after this time(in second). By default 30min
+
+    epoch_loss: 100                 # Num of epoch to display loss
+    iter_loss: 1                    # Num of iteration to display loss
+    save_progress: False            # Whether to save progress during training
+    epoch_save_progress: 50000      # Num of epoch for saving progress
+    iter_save_progress: 1           # Num of iteration for saving progress
+
+    epoch_val: 50000                # Num of epoch for validation. -1 means not validation
+    save_progress_val: True         # Whether to save progress during validation
+    max_samples_val: 1              # Max num of sample to write into image in valid
+
+    epoch_save_checkpoint: 50000    # Num of epoch save checkpoint
+    local_progress: False           # When local progress, will write to local files. Otherwise to tensorboard only
+
+    init_eval: False                # Whether to eval the model at first epoch
+    epoch_eval: 50000               # Num of epoch eval model on test set. -1 means no evaluation
+    max_samples_eval: 25            # Max num of sample to write into image in eval
+
+dataset:
+    train:
+        type: NeRF
+        scene_name: lego
+        img_scale: 1.0               # scale image and intrinsic, < 1 means scale_down
+        precache: True               # precache all the rays at once
+        device: gpu                  # get rays on gpu for fast processing
+        augmentation:                # augmentation is for rays on a single image. Do not change in whole progress
+            shuffle: False           # do not shuffle for single image due to use of center cropping
+        scheduler:                   # scheduler handles sampling during training in different stage
+            precrop:                 # crop the image to keep center rays
+                ratio: 0.5           # num of ratio keep on each dim
+                max_epoch: 500       # max epoch for precropping
+            ray_sample:
+                mode: 'full'         # ['full', 'random'], full takes all rays, random is sample with replacement
+                cross_view: True     # used in both mode. If True, each sample takes rays from different image. Else on in one image.
+
+    val:
+        skip: 8
+        type: NeRF
+        scene_name: lego
+        img_scale: 0.5
+        precache: False
+        device: gpu
+
+    eval:
+        skip: 8
+        eval_batch_size: 1
+        type: NeRF
+        scene_name: lego
+        img_scale: 1.0
+        precache: True
+        device: gpu
+
+model:
+    type: NeRF
+    rays:
+        near: 2.0                     # hardcode near zvals
+        far: 6.0                      # hardcode far zvals
+        n_sample: 64                  # n_sample for zvals sampling
+        n_importance: 128             # n_importance for zvals for hierarchical sampling
+        inverse_linear: False         # inverse_linear make zvals close to near
+        perturb: True                 # perturb zvals interval
+        noise_std: 0.0                # noise for sigma in training
+        white_bkg: True               # cast the background as white
+    chunk_rays: 32768                 # each chunk to process 1024*32(rays), full nerf takes more memory
+    chunk_pts: 131072                 # each chunk to progress 4096*32(pts), full nerf takes more memory
+    geometry:
+        W: 256                        # linear hidden neuron
+        D: 8                          # num of linear, not include final
+        skips: [4]                    # pos to add input embedding
+        input_ch: 3                   # xyz input channel
+        embed_freq: 10                # xyz embed freq
+        W_feat: 256                   # extra feature output
+    radiance:
+        W: 128                        # linear hidden dim
+        D: 1                          # num of linear, not include final
+        input_ch_view: 3              # view input channel
+        embed_freq_view: 4            # view embed freq
+        W_feat_in: 256                # dim for feature from geometry
+
+loss:
+    ImgLoss:
+        keys: ['rgb_coarse', 'rgb_fine']
+        weight: 1.0
+
+metric:
+    PSNR:
+
+train_metric:
+    PSNR:
+        key: 'rgb_fine'

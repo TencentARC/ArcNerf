@@ -1,0 +1,136 @@
+# full cross without noise, mask loss w1.0
+
+name: lego_maskloss1
+
+resume: None
+
+debug:
+    debug_mode: False               # support debug like checking grad.
+    print_all_grad: False           # print all grad for all param in model. Only in debug mode
+
+dir:
+    expr_dir: None
+    data_dir: '/group/30042/leoyluo/Immerse/data'      # It is the main dataset address containing all dataset
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/simplenerf/results/lego_maskloss1'
+
+model_pt: '/group/30042/leoyluo/Immerse/projects/simplenerf/experiments/lego_maskloss1/checkpoints/final.pt.tar'
+
+gpu_ids: -1                         # -1 is cpu, otherwise use list of gpus
+
+dist:
+    local_rank: 0
+    rank: 0
+    world_size: 1
+    distributed_backend: nccl
+    random_seed: None
+    slurm: False
+
+batch_size: 2
+n_rays: 4096
+worker: 4
+
+optim:
+    lr: 5e-4
+    optim_type: adam
+    weight_decay: 0.0
+    lr_scheduler:
+        type: ExponentialLR
+        lr_gamma: 0.1
+        lr_steps: [500000]
+
+    clip_gradients: 0.0
+    clip_warmup: -1
+    clip_gradients_warmup: 0.0
+
+progress:
+    start_epoch: -1
+    epoch: 300000
+    save_time: 1800
+
+    epoch_loss: 100
+    iter_loss: 1
+    save_progress: False
+    epoch_save_progress: 50000
+    iter_save_progress: 5
+
+    epoch_val: 50000
+    save_progress_val: True
+    max_samples_val: 1
+
+    epoch_save_checkpoint: 50000
+    local_progress: False
+
+    init_eval: False
+    epoch_eval: 50000
+    max_samples_eval: 25
+
+dataset:
+    train:
+        type: NeRF
+        scene_name: lego
+        img_scale: 1.0
+        precache: True
+        scheduler:
+            precrop:
+                ratio: 0.5
+                max_epoch: 500
+            ray_sample:
+                mode: 'full'
+                cross_view: True
+
+    val:
+        skip: 8
+        type: NeRF
+        scene_name: lego
+        img_scale: 0.5
+        precache: False
+
+    eval:
+        skip: 8
+        eval_batch_size: 1
+        type: NeRF
+        scene_name: lego
+        img_scale: 1.0
+        precache: True
+
+model:
+    type: NeRF
+    rays:
+        near: 2.0
+        far: 6.0
+        n_sample: 64
+        n_importance: 128
+        inverse_linear: False
+        perturb: True
+        noise_std: 0.0
+        white_bkg: True
+    chunk_rays: 32768
+    chunk_pts: 131072
+    geometry:
+        W: 256
+        D: 8
+        skips: [4]
+        input_ch: 3
+        embed_freq: 10
+        W_feat: 256
+    radiance:
+        W: 128
+        D: 1
+        input_ch_view: 3
+        embed_freq_view: 4
+        W_feat_in: 256
+
+loss:
+    ImgLoss:
+        keys: ['rgb_coarse', 'rgb_fine']
+        weight: 1.0
+    MaskLoss:
+        keys: [ 'mask_coarse', 'mask_fine' ]
+        weight: 1.0
+
+metric:
+    PSNR:
+
+train_metric:
+    PSNR:
+        key: 'rgb_fine'

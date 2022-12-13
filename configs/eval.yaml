@@ -1,0 +1,58 @@
+# eval script
+
+name: lego
+
+model_pt: '/group/30042/leoyluo/Immerse/projects/simplenerf/experiments/lego/checkpoints/final.pt.tar'
+
+dir:
+    data_dir: '/group/30042/leoyluo/Immerse/data'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/simplenerf/results/lego'
+
+gpu_ids: -1                   # -1 for cpu, 0/1/2 for gpu. Do not use multiple gpu
+
+worker: 4
+
+dist:
+    rank: 0
+    local_rank: 0
+    world_size: 1
+
+progress:
+    max_samples_eval: 25      # Max num of sample to write into image in eval
+
+dataset:
+    eval:
+        skip: 8
+        eval_batch_size: 1
+        type: NeRF
+        scene_name: lego
+        img_scale: 1.0
+        precache: True
+        device: gpu
+
+model:
+    type: NeRF
+    rays:
+        near: 2.0                     # hardcode near zvals
+        far: 6.0                      # hardcode far zvals
+        n_sample: 64                  # n_sample for zvals sampling
+        n_importance: 128             # n_importance for zvals for hierarchical sampling
+        white_bkg: True               # cast the background as white
+    chunk_rays: 32768                 # each chunk to process 1024*32(ray), enough for 32 GB
+    chunk_pts: 131072                 # each chunk to progress 4096*32(pts), for model forward
+    geometry:
+        W: 256                        # linear hidden neuron
+        D: 8                          # num of linear, not include final
+        skips: [4]                    # pos to add input embedding
+        input_ch: 3                   # xyz input channel
+        embed_freq: 10                # xyz embed freq
+        W_feat: 256                   # extra feature output
+    radiance:
+        W: 128                        # linear hidden dim
+        D: 1                          # num of linear, not include final
+        input_ch_view: 3              # view input channel
+        embed_freq_view: 4            # view embed freq
+        W_feat_in: 256                # dim for feature from geometry
+
+metric:
+    PSNR:
