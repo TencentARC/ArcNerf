@@ -1,0 +1,137 @@
+name: ngp_drums
+
+resume: None
+
+debug:
+    debug_mode: False
+    print_all_grad: False
+
+dir:
+    expr_dir: '/group/30042/leoyluo/Immerse/projects/simplengp/experiments/benchmark'
+    data_dir: '/group/30042/leoyluo/Immerse/data'
+    eval_dir: '/group/30042/leoyluo/Immerse/projects/simplengp/results/ngp_drums'
+
+model_pt: '/group/30042/leoyluo/Immerse/projects/simplengp/experiments/benchmark/ngp_drums/checkpoints/final.pt.tar'
+
+gpu_ids: 0 # only gpu.
+
+dist:
+    local_rank: 0
+    rank: 0
+    world_size: 1
+    distributed_backend: nccl
+    random_seed: None
+    slurm: False
+
+batch_size: 2
+n_rays: 4096
+worker: 4
+
+optim:
+    ema:
+        decay: 0.95
+    lr: 1e-1
+    optim_type: adam
+    weight_decay: 1e-6
+    eps: 1e-15
+    lr_scheduler:
+        type: MultiStepLR
+        lr_gamma: 0.33
+        lr_steps: [20000, 30000, 40000]
+
+    clip_gradients: 0.0
+    clip_warmup: -1
+    clip_gradients_warmup: 0.0
+
+progress:
+    start_epoch: -1
+    epoch: 50000
+    save_time: 1800
+
+    epoch_loss: 100
+    iter_loss: 1
+    save_progress: False
+    epoch_save_progress: 10000
+    iter_save_progress: 1
+
+    epoch_save_checkpoint: 10000
+    local_progress: False
+
+    epoch_val: 5000
+    save_progress_val: False
+    max_samples_val: 1
+
+    init_eval: False
+    epoch_eval: 10000
+    max_samples_eval: 25
+
+dataset:
+    train:
+        type: NeRF
+        scene_name: drums
+        img_scale: 1.0
+        center_pixel: True
+        bkg_color: None  # do not merge bkg_color now
+        precache: True
+        device: gpu
+        scheduler:
+            precrop:       # precrop
+                ratio: 0.5
+                max_epoch: 500
+            bkg_color:
+                color: random
+            dynamic_batch_size:
+                update_epoch: 16
+
+    eval:
+        eval_batch_size: 1
+        skip: 8
+        type: NeRF
+        scene_name: drums
+        img_scale: 1.0
+        center_pixel: True
+        precache: False
+        device: gpu
+        augmentation:
+            blend_bkg_color:
+                bkg_color: [0.0, 0.0, 0.0]
+
+model:
+    type: NGP
+    rays:
+        n_sample: 1024
+        log_max_allowance: 18  # only used for dynamic batch_size, 1 << 18 = 4096*64
+    sampler:
+        near_distance: 0.2
+    dense_grid:
+        n_grid: 128
+        n_cascades: 1    # only need to keep the inner grid
+        aabb_scale: 1.0
+        aabb_range: [0.0, 1.0]
+        epoch_optim: 16
+        epoch_optim_warmup: 256
+        opa_thres: 0.01
+        decay: 0.95
+    network:
+        n_levels: 16
+        n_feat_per_entry: 2
+        hashmap_size: 19
+        base_res: 16
+        max_res: 2048
+    renderer:
+        early_stop: 1e-4
+        bkg_color: [0.0, 0.0, 0.0]
+    chunk_rays: 32768   # 4096 * 16
+    chunk_pts: 1048576  # 4096 * 256
+
+loss:
+    ImgLoss:
+        loss_type: Huber
+        delta: 0.1
+        weight: 3000
+
+metric:
+    PSNR:
+
+train_metric:
+    PSNR:

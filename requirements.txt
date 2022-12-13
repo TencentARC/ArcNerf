@@ -1,0 +1,19 @@
+ffmpeg-python
+imageio
+kaleido
+loguru
+matplotlib
+numpy
+#open3d==0.9.0  install if you need
+opencv-python
+plotly
+pyfqmr
+pytorch3d
+pyyaml
+scikit-image
+tensorboard
+thop
+torch
+torchgeometry
+torchvision
+trimesh
