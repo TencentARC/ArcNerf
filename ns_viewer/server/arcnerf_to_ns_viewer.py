@@ -23,6 +23,7 @@ class NSDataset:
         self.scene_box = SceneBox(aabb=torch.Tensor([[-1.5, -1.5, -1.5], [1.5, 1.5, 1.5]]))  # always default bbox now
         self.cameras = self.parse_cam(dataset)
         self.dataset = dataset
+        self.pointcloud = self.parse_pc(dataset)
 
     def parse_cam(self, dataset):
         """Parse cam"""
@@ -63,6 +64,17 @@ class NSDataset:
         }
 
         return CamDict(cam_dict)
+
+    def parse_pc(self, dataset):
+        if 'pc' in dataset[0]:
+            pc = dataset[0]['pc']
+            pc_json = {
+                'pts': arcnerf_pts_to_ns_viewer(pc['pts']).tolist(),  # (3n)
+                'color': pc['color'].tolist(),  # (3n)
+            }
+            return pc_json
+        else:
+            return None
 
     def arc_coord_to_ns_coord(self, c2w):
         """Change coord of (1, 3, 4)"""
@@ -136,3 +148,11 @@ def arcnerf_cam_to_ns_view(c2w):
     c2w[0:2, 2] *= -1
 
     return c2w
+
+
+def arcnerf_pts_to_ns_viewer(pts):
+    """Pts converts, (n, 3) shape"""
+    pts = pts[:, [0, 2, 1]]
+    pts[:, -1] *= -1
+
+    return pts

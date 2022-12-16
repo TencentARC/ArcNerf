@@ -291,6 +291,7 @@ class ViewerState:
         # clear the current scene
         self.vis['sceneState/sceneBox'].delete()
         self.vis['sceneState/cameras'].delete()
+        self.vis['sceneState/pointCloud'].delete()
 
         # draw the training cameras and images
         image_indices = self._pick_drawn_image_idxs(len(dataset))
@@ -306,6 +307,9 @@ class ViewerState:
 
         # set the initial state whether to train or not
         self.vis['renderingState/isTraining'].write(start_train)
+
+        if dataset.pointcloud is not None:
+            self.vis['sceneState/pointCloud'].write(dataset.pointcloud)
 
         # self.vis["renderingState/render_time"].write(str(0))
 

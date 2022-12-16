@@ -7,7 +7,7 @@ import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer';
 
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { useDispatch } from 'react-redux';
-import { drawCamera, drawSceneBox } from './drawing';
+import { drawCamera, drawSceneBox, drawPointCloud } from './drawing';
 
 import { CameraHelper } from '../SidePanel/CameraPanel/CameraHelper';
 import SceneNode from '../../SceneNode';
@@ -19,6 +19,7 @@ const msgpack = require('msgpack-lite');
 
 const SCENE_BOX_NAME = 'Scene Box';
 const CAMERAS_NAME = 'Training Cameras';
+const POINT_CLOUD_NAME = 'Point Cloud'
 
 export function get_scene_tree() {
   const scene = new THREE.Scene();
@@ -237,6 +238,20 @@ export function get_scene_tree() {
   const intensity = 1;
   const light = new THREE.AmbientLight(color, intensity);
   sceneTree.set_object_from_path(['Light'], light);
+
+  // draw point cloud
+  const selector_fn_point_cloud = (state) => {
+    return state.sceneState.pointCloud;
+  };
+  const fn_value_point_cloud = (previous, current) => {
+    if (current !== null) {
+      const pc = drawPointCloud(current);
+      sceneTree.set_object_from_path([POINT_CLOUD_NAME], pc);
+    } else {
+      sceneTree.delete([POINT_CLOUD_NAME]);
+    }
+  };
+  subscribe_to_changes(selector_fn_point_cloud, fn_value_point_cloud);
 
   // draw scene box
   const selector_fn_scene_box = (state) => {

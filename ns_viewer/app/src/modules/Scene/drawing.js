@@ -164,3 +164,20 @@ export function drawCameras(cameras): Record<number, THREE.Object3D> {
   }
   return cameraObjects;
 }
+
+export function drawPointCloud(pointCloud): THREE.Object3D {
+  const geo = new THREE.BufferGeometry();
+
+  let pts = JSON.parse(JSON.stringify(pointCloud.pts)).flat();
+  const verts = new Float32Array(pts);
+  geo.setAttribute( 'position', new THREE.BufferAttribute(verts, 3) );
+
+  let color = JSON.parse(JSON.stringify(pointCloud.color)).flat();
+  console.log(color)
+  const colors = new Float32Array(color);
+  geo.setAttribute( 'color', new THREE.BufferAttribute(colors, 3) );
+  const material = new THREE.PointsMaterial( { vertexColors: true, size: 0.02 } );
+  const cloud = new THREE.Points(geo, material)
+
+  return cloud
+}

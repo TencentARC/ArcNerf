@@ -45,6 +45,7 @@ const initialState = {
   sceneState: {
     sceneBox: null,
     cameras: null,
+    pointCloud: null,
   },
   // ------------------------------------------------------------------------
   // which of the state keys to synchronize with the bridge server
