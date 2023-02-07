@@ -4,6 +4,7 @@ import os
 import os.path as osp
 
 import cv2
+import imageio
 import numpy as np
 import torch
 
@@ -114,6 +115,10 @@ def get_render_imgs(inputs, output):
             pred_cat = np.concatenate([img, pred_hdr_tm], axis=1)  # (H, 2W, 3)
             names.append(pred_name)
             images.append(pred_cat)
+
+            # exr format
+            names.append(pred_name + '.exr')
+            images.append(pred_hdr[:, :, [2, 1, 0]])  # bgr -> rgb
 
     img_dict = {'names': names, 'imgs': images}
 
@@ -240,10 +245,17 @@ def write_progress_imgs(
     if 'imgs' in files[0] and len(files[0]['imgs']['names']) > 0:
         for idx, file in enumerate(files):
             for name, img in zip(file['imgs']['names'], file['imgs']['imgs']):
-                img_folder = osp.join(folder, name)
-                os.makedirs(img_folder, exist_ok=True)
-                img_path = get_dst_path(img_folder, eval, idx, num_sample, epoch, step, global_step)
-                cv2.imwrite(img_path, img)
+                if name.endswith('.exr'):
+                    img_folder = osp.join(folder, name.split('.')[0])
+                    os.makedirs(img_folder, exist_ok=True)
+                    img_path = get_dst_path(img_folder, eval, idx, num_sample, epoch, step, global_step)
+                    img_path = img_path.replace('.png', '.exr')
+                    imageio.imwrite(img_path, img)
+                else:
+                    img_folder = osp.join(folder, name)
+                    os.makedirs(img_folder, exist_ok=True)
+                    img_path = get_dst_path(img_folder, eval, idx, num_sample, epoch, step, global_step)
+                    cv2.imwrite(img_path, img)
 
     # write the rays by plotly
     if 'rays' in files[0] and files[0]['rays'] is not None:
