@@ -359,6 +359,7 @@ class FullModel(nn.Module):
                 inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
                 inputs['bounds']: torch.tensor (B, N, 2). zvals near/far bound, optional
                 inputs['bkg_color']: torch.tensor (B, N, 3), random/fix bkg color, optional
+                inputs['exp_time']: torch.tensor (B, N, 1). exposure time, optional for HDRNeRF only
 
         Returns:
             flatten_inputs:
@@ -389,8 +390,13 @@ class FullModel(nn.Module):
 
         bkg_color = None
         if 'bkg_color' in inputs:
-            bkg_color = inputs['bkg_color'].view(-1, 3)  # (BN,)
+            bkg_color = inputs['bkg_color'].view(-1, 3)  # (BN, 3)
         flat_inputs['bkg_color'] = bkg_color
+
+        exp_time = None
+        if 'exp_time' in inputs:
+            exp_time = inputs['exp_time'].view(-1)  # (BN,)
+        flat_inputs['exp_time'] = exp_time
 
         return flat_inputs, batch_size, n_rays_per_batch
 
@@ -419,6 +425,7 @@ class FullModel(nn.Module):
                 inputs['mask']: torch.tensor (B, N), mask value in {0, 1}. optional
                 inputs['bounds']: torch.tensor (B, N, 2). zvals near/far bound, optional
                 inputs['bkg_color']: torch.tensor (B, N, 3), random/fix bkg color, optional
+                inputs['exp_time']: torch.tensor (B, N). exposure time, optional for HDRNeRF only
             inference_only: If True, only return the final results(not coarse, no progress).
                             Use in eval/infer mode to save memory. By default False
             get_progress: If True, output some progress for recording(in foreground),

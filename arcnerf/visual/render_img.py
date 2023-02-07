@@ -101,6 +101,20 @@ def get_render_imgs(inputs, output):
             names.append(pred_name)
             images.append(pred_cat)
 
+    # hdr images. It is from HDR-NeRF, only save tone-mapping images.
+    pred_hdr = ['hdr_coarse', 'hdr_fine', 'hdr']
+
+    def tonemap_func(x):
+        return (np.log(np.clip(x, 0, 1) * 5000 + 1) / np.log(5000 + 1) * 255).astype(np.uint8)
+
+    for pred_name in pred_hdr:
+        if pred_name in output:
+            pred_hdr = torch_to_np(output[pred_name][idx]).copy().reshape(h, w, 3)  # (H, W, 3) hdr
+            pred_hdr_tm = tonemap_func(pred_hdr / np.max(pred_hdr))  # (H, W, 3), 0~255
+            pred_cat = np.concatenate([img, pred_hdr_tm], axis=1)  # (H, 2W, 3)
+            names.append(pred_name)
+            images.append(pred_cat)
+
     img_dict = {'names': names, 'imgs': images}
 
     return img_dict

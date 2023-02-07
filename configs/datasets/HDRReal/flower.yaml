@@ -1,0 +1,16 @@
+dir:
+    data_dir:  '/Users/leoyluo/Desktop/Immerse/data'   # It is the main dataset address containing all dataset
+
+dataset:
+    train:
+        type: HDRReal
+        scene_name: flower
+        img_scale: 0.25
+        precache: False
+        ndc_space: True
+
+model:
+    rays:
+        # Use near far as 0/1 if in ndc_space by default
+        near: 0.0
+        far: 1.0

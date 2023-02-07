@@ -344,6 +344,13 @@ on the customized volume.
 
 The converge is like:
 ![ngp](../assets/models/ngp.gif)
+
+### HDR-NeRF
+[HDR-NeRF](https://github.com/shsf0817/hdr-nerf) has the same structure as NeRF, so it directly
+inherits the NeRF class. Difference is that it has several tiny and separate mlps to map the hdr rgb value
+into ldr values. Most configs are the same as nerf.
+- exp_mlps: Use for define the exp_mlps structure.
+
 ------------------------------------------------------------------------
 ## bkg_model
 Here are the class of bkg_model, which concentrates on building the background.

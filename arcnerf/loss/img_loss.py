@@ -98,3 +98,31 @@ class HuberLoss(nn.Module):
             return loss.mean()
 
         return loss
+
+
+@LOSS_REGISTRY.register()
+class FixValueLoss(nn.Module):
+    """Fix Value loss"""
+
+    def __init__(self, cfgs=None):
+        super(FixValueLoss, self).__init__()
+        self.keys = get_value_from_cfgs_field(cfgs, 'keys', None)
+        assert self.keys is not None, 'You must set a list of keys...'
+        self.internal_weights = get_value_from_cfgs_field(cfgs, 'internal_weights', None)
+        self.fix_value = get_value_from_cfgs_field(cfgs, 'fix_value', 0.0)
+
+    def forward(self, data, output):
+        """
+        Args:
+            x: any torch tensor
+        """
+        loss = 0.0
+        for idx, k in enumerate(self.keys):
+            if self.internal_weights is not None:
+                loss += self.internal_weights[idx] * ((output[k] - self.fix_value)**2)
+            else:
+                loss += ((output[k] - self.fix_value)**2)
+
+        loss = loss.mean()
+
+        return loss

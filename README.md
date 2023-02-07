@@ -10,6 +10,10 @@ It is developed by [TencentARC Lab](https://arc.tencent.com/).
 ![nerf](assets/models/ngp.gif)
 
 ------------------------------------------------------------------------
+# News
+[2023.02] We provide [HDR-NeRF](https://github.com/shsf0817/hdr-nerf) implementation and benchmark on HDR-Real dataset.
+
+------------------------------------------------------------------------
 # What is special in this project?
 
 In the recent few months, many frameworks working on common NeRF-based pipeline have been proposed:

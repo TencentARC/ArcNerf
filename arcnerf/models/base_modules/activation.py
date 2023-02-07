@@ -42,6 +42,8 @@ def get_activation(cfg, default=dict_to_obj({'type': 'relu'})):
     elif cfg.type.lower() == 'truncexp':
         clip = get_value_from_cfgs_field(cfg, 'clip', 15.0)
         act = TruncExp(clip)
+    elif cfg.type.lower() == 'identity':
+        act = nn.Identity()
     else:
         raise NotImplementedError('No activation class {}'.format(cfg.type))
 

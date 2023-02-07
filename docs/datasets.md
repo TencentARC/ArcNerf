@@ -382,6 +382,43 @@ TanksAndTemples
 
 Ref: http://www.cs.umd.edu/~mmeshry/projects/rtmv/
 
+### HDRReal
+This is a forward facing dataset. Not object extraction is performed. Only used to view synthesis.
+For fair comparison, test/val images have not overlapping with train images.
+- The dataset has same structure as `LLFF`, but it contains a new field `exposure time`. So in each scene,
+each position contains different exposure time.
+- For train and eval, it uses different position together with different exposure time.
+- The cameras are aligned flatten. Adjust the poses/bounds by range to avoid large xyz values.
+- scene_name: scene_name that is the folder name under `HDRReal`. Use it to be identifier.
+- NDC: We support NDC Space conversion if you set `ndc_space=True` in dataset.
+  - In the original implementation, even they use `ndc_space` rays for sampling, the view_dirs sent to radianceNet is
+still in non-ndc space. We don't follow it here but only used `ndc rays_d` as view_dirs. But notice that this affects
+the performance, use `non-ndc rays_d` gets better result.
+
+```
+HDRReal
+└───flower
+│     └───input_images
+│     │    └─── 000_0.jgp
+│     │    └─── 000_1.jgp
+│     │    └─── 000_2.jgp
+│     │    └─── 000_3.jgp
+│     │    └─── 000_4.jgp
+│     │    └─── ...
+│     │    └─── 034_0.jgp
+│     │    └─── 034_1.jgp
+│     │    └─── 034_2.jgp
+│     │    └─── 034_3.jgp
+│     │    └─── 034_4.jgp
+│     └───exposure.json
+│     └───poses_bounds_exps.npy
+└───box
+└───computer
+└───luckycat
+```
+
+Ref: https://github.com/shsf0817/hdr-nerf
+
 
 ### Download address
 Some datasets may not be downloaded from their ref address. We show all the address we use here.
@@ -392,6 +429,7 @@ Some datasets may not be downloaded from their ref address. We show all the addr
 - RTMV: https://drive.google.com/drive/folders/1cUXxUp6g25WwzHnm_491zNJJ4T7R_fum
 - Tanks&Temples: https://www.tanksandtemples.org/download/; https://github.com/Kai-46/nerfplusplus
 - MipNerf-360: http://storage.googleapis.com/gresearch/refraw360/360_v2.zip
+- HDRReal: https://drive.google.com/drive/folders/1OTDLLH8ydKX1DcaNpbQ46LlP0dKx6E-I
 
 ------------------------------------------------------------------------
 # Train/Val/Eval/Inference

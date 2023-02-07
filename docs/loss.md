@@ -15,6 +15,15 @@ Required input/output:
   - 'rgb/rgb_coarse/rgb_fine': one or several rgb values by keys. `(B, N_rays, 3)`
   - 'mask': if use_mask. `(B, N_rays)`
 
+## FixValueLoss
+The loss of any tensor to a fix_value
+- keys: list of key to calculate
+- fix_value: the fixed floating target
+- internal_weights: If set, will multiply factors to each weight. By default None.
+
+Required input/output:
+- Output: Any key specified in `keys` with tensor as value.
+
 ------------------------------------------------------------------------
 # mask_loss
 Loss for comparing mask. Used for view synthesis and object area prediction.
