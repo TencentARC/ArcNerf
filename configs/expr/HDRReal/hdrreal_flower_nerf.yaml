@@ -68,7 +68,7 @@ dataset:
         type: HDRReal
         scene_name: flower
         img_scale: 0.25
-        ndc_space: True
+        ndc_space: False  # like llff, no ndc used in arcnerf since view_dir is calculated in ndc_space
         device: gpu
         precache: True
 
@@ -76,7 +76,7 @@ dataset:
         type: HDRReal
         scene_name: flower
         img_scale: 0.25
-        ndc_space: True
+        ndc_space: False
         device: gpu
         precache: False
 
@@ -85,15 +85,15 @@ dataset:
         type: HDRReal
         scene_name: flower
         img_scale: 0.25
-        ndc_space: True
+        ndc_space: False
         device: gpu
         precache: True
 
 model:
     type: NeRF
     rays:
-        near: 0.0   # NDC Space
-        far: 1.0    # NDC Space
+#        near: 0.0   # near/far takes the bounds from estimation
+#        far: 1.0
         n_sample: 64
         n_importance: 64  # same as HDR-NeRF
         inverse_linear: False

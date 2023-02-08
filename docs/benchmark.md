@@ -190,6 +190,23 @@ We benchmark on the truck split for now. The models are the same as `mipnerf360.
 
 -----------------------------------------------------------------------
 
+## HDR-Real
+
+HDR-Real is introduced in [HDR-NeRF](https://github.com/shsf0817/hdr-nerf), which captures 4 real life scene in forward-facing mode, with
+35 poses and each contains 5 exposure time. NeRF generally does not model the exp_time, where HDR-NeRF does.
+
+We use {1, 3, 5, ..., 35} poses each with a random exposure time in {t1, t3, t5} (total 17 samples), and eval on all {t2, t4} cases of {2, 4, ..., 34} samples (total 34 samples).
+Benchmark on `flower` scene is provided. Similar as `LLFF`, we train it in non-ndc space, since the view_dirs is obtains from rays_d in ndc space, which affects the result a lot.
+
+| Method |        cfg         | PSNR |    Official repo   |    Official PSNR     |
+|:------:|:------------------:|:----:|:------------------:|:--------------------:|
+|NeRF(non-ndc)|configs/expr/HDRReal/flower/hdrreal_flower_nerf.yaml|13.95|https://github.com/shsf0817/hdr-nerf|13.18(ndc space)|
+|HDR-NeRF(non-ndc)|configs/expr/HDRReal/flower/hdrreal_flower_hdrnerf.yaml|29.67|https://github.com/shsf0817/hdr-nerf|29.57(ndc space)|
+
+In the experiment, we also provide hdr image with dynamic range.
+
+-----------------------------------------------------------------------
+
 ## Capture
 We only provide a real captured data call `qqtiger` at [here](../data/qqtiger.MOV). It tells you how to use the real captured data.
 For data preprocessing of it, please vis [doc](./datasets.md) or run

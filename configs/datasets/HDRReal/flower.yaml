@@ -7,7 +7,7 @@ dataset:
         scene_name: flower
         img_scale: 0.25
         precache: False
-        ndc_space: True
+        ndc_space: True     # This only for visualization, in training do not use ndc space
 
 model:
     rays:
