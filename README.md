@@ -12,6 +12,7 @@ It is developed by [TencentARC Lab](https://arc.tencent.com/).
 ------------------------------------------------------------------------
 # News
 [2023.02] We provide [HDR-NeRF](https://github.com/shsf0817/hdr-nerf) implementation and benchmark on HDR-Real dataset.
+We also provide a simple guidance for adding new algorithm/datasets to the pipeline. See [guidance](docs/guidance.md)
 
 ------------------------------------------------------------------------
 # What is special in this project?
