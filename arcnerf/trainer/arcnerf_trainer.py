@@ -14,6 +14,7 @@ from arcnerf.geometry.point_cloud import save_point_cloud
 from arcnerf.loss import build_loss
 from arcnerf.metric import build_metric
 from arcnerf.models import build_model
+from arcnerf.models.full_model import FullModel
 from arcnerf.trainer.ema import EMA
 from arcnerf.visual.plot_3d import draw_3d_components
 from arcnerf.visual.render_img import render_progress_imgs, write_progress_imgs
@@ -54,7 +55,12 @@ class ArcNerfTrainer(BasicTrainer):
         # pretrain siren layer in implicit model
         self.logger.add_log('-' * 60)
         self.logger.add_log('Init Setting of the model...')
-        self.model.init_setting()
+
+        # init considering gpu num
+        try:
+            self.model.init_setting()
+        except AttributeError:
+            self.model.module.init_setting()
 
         # ema update
         self.ema = None
@@ -409,7 +415,8 @@ class ArcNerfTrainer(BasicTrainer):
 
         # inference and save result
         self.model.eval()
-        self.data['inference'].run_infer(self.model, self.get_model_feed_in, eval_dir_epoch)
+        model = self.model if isinstance(self.model, FullModel) else self.model.module  # incase multi gpu
+        self.data['inference'].run_infer(model, self.get_model_feed_in, eval_dir_epoch)
 
         # release gpu memory
         self.empty_gpu_cache()
@@ -464,7 +471,8 @@ class ArcNerfTrainer(BasicTrainer):
 
     def write_progress_imgs(self, files, folder, epoch=None, step=None, global_step=None, eval=False):
         """Actual function to write the progress images"""
-        write_progress_imgs(files, folder, self.model, epoch, step, global_step, eval, self.radius, self.volume_dict)
+        model = self.model if isinstance(self.model, FullModel) else self.model.module  # incase multi gpu
+        write_progress_imgs(files, folder, model, epoch, step, global_step, eval, self.radius, self.volume_dict)
 
     def evaluate(self, data, model, metric_summary, device, max_samples_eval):
         """Actual eval function for the model. Use run_eval since we want to run it locally as well"""
@@ -487,27 +495,31 @@ class ArcNerfTrainer(BasicTrainer):
         """Train for one epoch. Each epoch return the final sum of loss and total num of iter in epoch"""
         step_in_epoch = 1  # in nerf, each epoch is sampling of all rays in all training samples
 
+        # get model considering
+        model = self.model if isinstance(self.model, FullModel) else self.model.module
+
         # optimize the model for its bounding structure
-        self.model.optimize(epoch)
+        model.optimize(epoch)
+
         # show the occ ratio
-        if epoch % self.cfgs.progress.epoch_loss == 0:
-            if self.model.get_fg_model().get_obj_bound_type() == 'volume':
-                volume = self.model.get_fg_model().get_obj_bound_structure()
+        if epoch % self.cfgs.progress.epoch_loss == 0 and self.cfgs.dist.rank == 0:
+            if model.get_fg_model().get_obj_bound_type() == 'volume':
+                volume = model.get_fg_model().get_obj_bound_structure()
                 if volume.get_voxel_bitfield() is not None:
                     occ_ratio = volume.get_n_occupied_voxel() / volume.get_n_voxel()
                     self.logger.add_log('Remaining voxel ratio is {:.2f}%'.format(occ_ratio * 100.0))
-            elif self.model.get_fg_model().get_obj_bound_type() == 'bitfield':
-                bitfield = self.model.get_fg_model().get_obj_bound_structure()
+            elif model.get_fg_model().get_obj_bound_type() == 'bitfield':
+                bitfield = model.get_fg_model().get_obj_bound_structure()
                 if bitfield is not None:
-                    bit_bound = self.model.get_fg_model().get_obj_bound()
+                    bit_bound = model.get_fg_model().get_obj_bound()
                     occ_ratio = bit_bound.get_bitfield_count()[1]
                     self.logger.add_log('Remaining voxel ratio is {:.2f}%'.format(occ_ratio * 100.0))
 
         # write debug pc
-        if self.cfgs.progress.save_progress and self.cfgs.progress.local_progress:
+        if self.cfgs.progress.save_progress and self.cfgs.progress.local_progress and self.cfgs.dist.rank == 0:
             if epoch % self.cfgs.progress.epoch_save_progress == 0:
-                if self.model.get_fg_model().get_obj_bound_type() == 'volume':
-                    volume = self.model.get_fg_model().get_obj_bound_structure()
+                if model.get_fg_model().get_obj_bound_type() == 'volume':
+                    volume = model.get_fg_model().get_obj_bound_structure()
                     if volume.get_voxel_bitfield() is not None:
                         occ_pc = torch_to_np(volume.get_occupied_voxel_pts())  # (n_occ, 3)
                         progress_dir = os.path.join(self.cfgs.dir.expr_spec_dir, 'progress', 'train', 'occ_pc')
@@ -571,7 +583,10 @@ class ArcNerfTrainer(BasicTrainer):
             if self.data['val'] is not None and self.cfgs.progress.epoch_val > 0:
                 if epoch > 0 and epoch % self.cfgs.progress.epoch_val == 0:
                     self.valid_epoch(epoch, step_in_epoch)
-                    self.model.reset_measurement()  # for dynamic batchsize reset
+                    try:
+                        self.model.reset_measurement()  # for dynamic batchsize reset
+                    except AttributeError:
+                        self.model.module.reset_measurement()
 
             if self.data['eval'] is not None and self.cfgs.progress.epoch_eval > 0:
                 if (epoch + 1) % self.cfgs.progress.epoch_eval == 0:

@@ -226,7 +226,10 @@ class Pipeline(object):
         if self.get_info('dynamic_batch_size') > 0:
             update_epoch = self.get_info('dynamic_batch_size')
             if epoch % update_epoch == 0 and epoch > 500:  # fix warmup
-                dynamic_factor = model.get_dynamicbs_factor()
+                try:
+                    dynamic_factor = model.get_dynamicbs_factor()
+                except AttributeError:
+                    dynamic_factor = model.module.get_dynamicbs_factor()
 
                 def div_round_up(val, divisor):
                     return (val + divisor - 1) // divisor
